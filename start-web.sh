@@ -4,7 +4,9 @@
 set -euo pipefail
 
 PORT=${PORT:-8080}
-DOC_ROOT=${DOC_ROOT:-.}
+# Default document root: the repository's website landing page directory
+# Changeable via DOC_ROOT environment variable (e.g., set to 'modules/student' or other)
+DOC_ROOT=${DOC_ROOT:-website}
 
 if [ -x "./vendor/bin/heroku-php-apache2" ]; then
   echo "Starting heroku-php-apache2 (provided by buildpack)..."
