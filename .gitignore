@@ -715,3 +715,13 @@ assets/uploads/student/letter_mayor/GENERALTRIAS-2025-3-KK05VE/GENERALTRIAS-2025
 assets/uploads/student/letter_mayor/GENERALTRIAS-2025-3-KK05VE/GENERALTRIAS-2025-3-KK05VE_letter_to_mayor_1761994693_20251101115828.ocr.txt
 assets/uploads/student/letter_mayor/GENERALTRIAS-2025-3-KK05VE/GENERALTRIAS-2025-3-KK05VE_letter_to_mayor_1761994693_20251101115828.verify.json
 >>>>>>> c4ccd7d00919691e6aa717835025e8a13fc709a7
+10-31-2025 2'39PM fix_duplicate_check_function.sql
+fix_stuck_distribution.sql
+migrations/2025_11_01_add_validation_confidence_to_documents.sql
+migrations/2025_11_01_fix_university_name_column_type.sql
+sql/IGNOREschema 1.0.sql
+uploads/archived_students/.gitkeep
+uploads/distributions/.gitkeep
+uploads/students/.gitkeep
+uploads/temp/.gitkeep
+10-31-2025 2'39PM fix_duplicate_check_function.sql
