@@ -428,11 +428,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Clear all schedule data for the next cycle
             clearScheduleData($connection);
             
-            // Set global distribution status to inactive
-            pg_query($connection, "
-                INSERT INTO config (key, value) VALUES ('distribution_status', 'inactive')
-                ON CONFLICT (key) DO UPDATE SET value = 'inactive'
-            ");
+            // CRITICAL: Set distribution status back to inactive and clear academic period
+            $config_resets = [
+                ['distribution_status', 'inactive'],
+                ['uploads_enabled', '0']
+            ];
+            
+            // Also clear the current academic period to allow new distribution
+            $clear_period_keys = ['current_academic_year', 'current_semester', 'documents_deadline'];
+            
+            foreach ($config_resets as [$key, $value]) {
+                pg_query_params($connection, 
+                    "INSERT INTO config (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2",
+                    [$key, $value]
+                );
+            }
+            
+            foreach ($clear_period_keys as $key) {
+                pg_query_params($connection, "DELETE FROM config WHERE key = $1", [$key]);
+            }
+            
+            error_log("End Distribution: Set distribution status to inactive and cleared academic period configuration");
             
             // No transaction to commit - each operation is auto-committed
             
@@ -534,18 +550,50 @@ if (in_array($distribution_status, ['preparing', 'active']) && $has_completed_sn
         $student_count = intval($record_row['count']); // More accurate than students table
     }
     
-    // Count total files in student folders
+    // Count total files in student folders (handles both new nested and old flat structure)
     $file_count = 0;
     $total_size = 0;
-    $document_types = ['enrollment_forms', 'grades', 'id_pictures', 'indigency', 'letter_mayor']; // Fixed: letter_mayor not letter_to_mayor
+    $document_types = ['enrollment_forms', 'grades', 'id_pictures', 'indigency', 'letter_mayor'];
+    
     foreach ($document_types as $type) {
         $folder = __DIR__ . "/../../assets/uploads/student/{$type}";
         if (is_dir($folder)) {
-            $files = glob($folder . '/*');
-            $file_count += count($files);
-            foreach ($files as $file) {
-                if (is_file($file)) {
-                    $total_size += filesize($file);
+            $items = scandir($folder);
+            $hasStudentFolders = false;
+            
+            // Check if we have student subdirectories (new structure)
+            foreach ($items as $item) {
+                if ($item !== '.' && $item !== '..' && is_dir($folder . '/' . $item)) {
+                    $hasStudentFolders = true;
+                    break;
+                }
+            }
+            
+            if ($hasStudentFolders) {
+                // NEW STRUCTURE: student/{doc_type}/{student_id}/files
+                foreach ($items as $item) {
+                    if ($item !== '.' && $item !== '..') {
+                        $studentFolder = $folder . '/' . $item;
+                        if (is_dir($studentFolder)) {
+                            // Get all files in student folder
+                            $studentFiles = glob($studentFolder . '/*.*');
+                            foreach ($studentFiles as $file) {
+                                if (is_file($file)) {
+                                    $file_count++;
+                                    $total_size += filesize($file);
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                // OLD STRUCTURE: flat files in student/{doc_type}/
+                $files = glob($folder . '/*.*');
+                foreach ($files as $file) {
+                    if (is_file($file)) {
+                        $file_count++;
+                        $total_size += filesize($file);
+                    }
                 }
             }
         }
@@ -579,15 +627,15 @@ $pageTitle = "End Distribution";
                 
                 <div class="d-flex justify-content-between align-items-center mb-4">
                     <div>
-                        <h2 class="mb-1"><i class="bi bi-stop-circle"></i> End Distribution</h2>
-                        <p class="text-muted mb-0">Archive and compress distribution files</p>
+                        <h2 class="mb-1"><i class="bi bi-file-zip"></i> End Distribution</h2>
+                        <p class="text-muted mb-0">Compress student files and reset system for next cycle</p>
                     </div>
                 </div>
 
-                <!-- Active Distributions Card -->
+                <!-- Finalized Distributions Ready for Compression -->
                 <div class="card shadow mb-4">
                     <div class="card-header bg-primary text-white">
-                        <h5 class="mb-0"><i class="bi bi-play-circle"></i> Active Distributions</h5>
+                        <h5 class="mb-0"><i class="bi bi-file-zip"></i> Finalized Distributions</h5>
                     </div>
                     <div class="card-body">
                     <?php if (empty($activeDistributions)): ?>
@@ -622,10 +670,10 @@ $pageTitle = "End Distribution";
                                             <td><?php echo number_format($dist['total_size'] / 1024 / 1024, 2); ?> MB</td>
                                             <td><span class="badge bg-success">Active</span></td>
                                             <td class="action-buttons">
-                                                <button class="btn btn-danger btn-sm" 
+                                                <button class="btn btn-primary btn-sm" 
                                                         onclick="showPasswordModal('<?php echo $dist['id']; ?>')"
-                                                        title="End distribution and compress files">
-                                                    <i class="bi bi-lock-fill"></i> End & Compress
+                                                        title="Compress files and reset system">
+                                                    <i class="bi bi-file-zip-fill"></i> Compress & Reset
                                                 </button>
                                             </td>
                                         </tr>
@@ -701,11 +749,12 @@ $pageTitle = "End Distribution";
                         <i class="bi bi-exclamation-triangle-fill"></i> <strong>Critical Action!</strong>
                         <p class="mb-0 mt-2">This will:</p>
                         <ul class="mb-0 mt-2">
-                            <li>End the distribution cycle</li>
                             <li>Compress all student files into a ZIP archive</li>
-                            <li>Delete original student uploads</li>
-                            <li>Set distribution status to inactive</li>
-                            <li>Lock the workflow</li>
+                            <li>Delete original student uploads from the server</li>
+                            <li>Reset all students from "Given" back to "Applicant" status</li>
+                            <li>Clear payroll numbers and QR codes</li>
+                            <li>Clear all distribution schedules</li>
+                            <li>Prepare the system for the next distribution cycle</li>
                         </ul>
                     </div>
                     

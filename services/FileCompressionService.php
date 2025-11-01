@@ -148,8 +148,8 @@ class FileCompressionService {
                                     $studentFiles_scan = scandir($studentFolder);
                                     foreach ($studentFiles_scan as $file) {
                                         if ($file !== '.' && $file !== '..' && is_file($studentFolder . '/' . $file)) {
-                                            // Skip associated files (.ocr.txt, .verify.json, etc.)
-                                            if (!preg_match('/\.(ocr\.txt|verify\.json|confidence\.json|tsv)$/', $file)) {
+                                            // Skip associated files (.ocr.txt, .verify.json, .confidence.json, .tsv, .ocr.json)
+                                            if (!preg_match('/\.(ocr\.(txt|json)|verify\.json|confidence\.json|tsv)$/i', $file)) {
                                                 $files[] = $studentFolder . '/' . $file;
                                             }
                                         }
@@ -162,8 +162,8 @@ class FileCompressionService {
                         error_log("  Using legacy flat structure");
                         foreach ($items as $file) {
                             if ($file !== '.' && $file !== '..' && is_file($fullPath . '/' . $file)) {
-                                // Skip associated files
-                                if (!preg_match('/\.(ocr\.txt|verify\.json|confidence\.json|tsv)$/', $file)) {
+                                // Skip associated files (.ocr.txt, .verify.json, .confidence.json, .tsv, .ocr.json)
+                                if (!preg_match('/\.(ocr\.(txt|json)|verify\.json|confidence\.json|tsv)$/i', $file)) {
                                     $files[] = $fullPath . '/' . $file;
                                 }
                             }

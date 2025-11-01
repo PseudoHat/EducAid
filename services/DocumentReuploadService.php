@@ -867,7 +867,7 @@ class DocumentReuploadService {
             
             // University verification
             $universityValidationResult = validateUniversity($ocrText, $declaredUniversityName);
-            $universityMatch = $universityValidationResult['match'];
+            $universityMatch = $universityValidationResult['matched'];
             $universityConfidence = $universityValidationResult['confidence'];
             $foundUniversityText = $universityValidationResult['found_text'];
             

@@ -138,7 +138,61 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 break;
             }
             
-            // CONSTRAINT 2: Validate documents deadline must be after the last finalized distribution
+            // CONSTRAINT 2: Check if year level advancement is needed before starting new distribution
+            // Get current academic year from the system
+            $current_year_query = pg_query($connection, "SELECT year_code FROM academic_years WHERE is_current = TRUE LIMIT 1");
+            $current_sys_year = null;
+            if ($current_year_query && pg_num_rows($current_year_query) > 0) {
+                $year_row = pg_fetch_assoc($current_year_query);
+                $current_sys_year = $year_row['year_code'];
+            }
+            
+            // Check if both semesters of the CURRENT academic year have been finalized
+            if ($current_sys_year) {
+                $completed_semesters_query = pg_query_params($connection,
+                    "SELECT semester, finalized_at 
+                     FROM distribution_snapshots 
+                     WHERE academic_year = $1 
+                     AND finalized_at IS NOT NULL
+                     ORDER BY semester",
+                    [$current_sys_year]
+                );
+                
+                $completed_semesters = [];
+                if ($completed_semesters_query) {
+                    while ($sem_row = pg_fetch_assoc($completed_semesters_query)) {
+                        $completed_semesters[] = $sem_row['semester'];
+                    }
+                }
+                
+                // If both 1st and 2nd semester are completed for current year
+                $has_both_semesters = in_array('1st Semester', $completed_semesters) && 
+                                     in_array('2nd Semester', $completed_semesters);
+                
+                if ($has_both_semesters) {
+                    // Check if year levels have been advanced for this academic year
+                    $advancement_check = pg_query_params($connection,
+                        "SELECT year_levels_advanced FROM academic_years WHERE year_code = $1",
+                        [$current_sys_year]
+                    );
+                    
+                    if ($advancement_check && pg_num_rows($advancement_check) > 0) {
+                        $adv_row = pg_fetch_assoc($advancement_check);
+                        $already_advanced = ($adv_row['year_levels_advanced'] === 't' || $adv_row['year_levels_advanced'] === true);
+                        
+                        if (!$already_advanced) {
+                            $message = "⚠️ <strong>Year Level Advancement Required!</strong><br><br>"
+                                     . "Both semesters (1st and 2nd) for academic year <strong>$current_sys_year</strong> have been completed and finalized. "
+                                     . "You must advance student year levels before starting a new distribution cycle.<br><br>"
+                                     . "Please go to <strong>Year Level Advancement</strong> to promote students to their next year level or graduate eligible students. "
+                                     . "This ensures students are at the correct year level for the new academic year.";
+                            break;
+                        }
+                    }
+                }
+            }
+            
+            // CONSTRAINT 3: Validate documents deadline must be after the last finalized distribution
             if (!empty($documents_deadline)) {
                 $d = DateTime::createFromFormat('Y-m-d', $documents_deadline);
                 $dateValid = $d && $d->format('Y-m-d') === $documents_deadline;
@@ -211,11 +265,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     }
                 }
                 
+                // CRITICAL: Flag all existing students for document re-upload
+                // Students who registered in previous distributions need to upload fresh documents
+                $flag_reupload = pg_query($connection, "
+                    UPDATE students 
+                    SET needs_document_upload = TRUE,
+                        documents_to_reupload = '[\"00\",\"01\",\"02\",\"03\",\"04\"]'::jsonb
+                    WHERE status IN ('applicant', 'active')
+                    AND (is_archived = FALSE OR is_archived IS NULL)
+                ");
+                
+                if (!$flag_reupload) {
+                    throw new Exception("Failed to flag students for re-upload: " . pg_last_error($connection));
+                }
+                
+                $students_flagged = pg_affected_rows($flag_reupload);
+                error_log("Distribution Start: Flagged $students_flagged existing students for document re-upload");
+                
+                // CRITICAL: Unlock student list for new distribution cycle
+                // This allows admin to lock the list again and generate new payroll numbers
+                pg_query($connection, "
+                    INSERT INTO config (key, value) VALUES ('student_list_finalized', '0')
+                    ON CONFLICT (key) DO UPDATE SET value = '0'
+                ");
+                error_log("Distribution Start: Unlocked student list for new distribution cycle");
+                
                 pg_query($connection, "COMMIT");
                 $success = true;
                 $message = "Distribution cycle started for $semester $academic_year!"
                     . (!empty($documents_deadline) ? " Document deadline set to $documents_deadline." : "")
-                    . " The distribution is now active and all features are unlocked!";
+                    . " The distribution is now active and all features are unlocked!"
+                    . " $students_flagged existing student(s) flagged for document re-upload."
+                    . " Student list has been unlocked for new payroll generation.";
                 
                 // Send email notifications to all applicants
                 require_once __DIR__ . '/../../services/DistributionEmailService.php';
@@ -493,6 +574,51 @@ $history_query = "
     LIMIT 5
 ";
 $history_result = pg_query($connection, $history_query);
+
+// Check if year advancement is required (for display warning)
+$year_advancement_needed = false;
+$year_advancement_message = '';
+$current_year_check = pg_query($connection, "SELECT year_code, year_levels_advanced, advanced_at FROM academic_years WHERE is_current = TRUE LIMIT 1");
+if ($current_year_check && pg_num_rows($current_year_check) > 0) {
+    $current_year_data = pg_fetch_assoc($current_year_check);
+    $system_year = $current_year_data['year_code'];
+    $already_advanced = ($current_year_data['year_levels_advanced'] === 't' || $current_year_data['year_levels_advanced'] === true);
+    $advanced_at = $current_year_data['advanced_at'];
+    
+    // Check if both semesters are completed for current year
+    // If year was already advanced, check if NEW distributions were completed AFTER the advancement
+    $semester_check_query = "SELECT 
+            COUNT(DISTINCT semester) as completed_count,
+            MIN(finalized_at) as earliest_finalized,
+            MAX(finalized_at) as latest_finalized
+         FROM distribution_snapshots 
+         WHERE academic_year = $1 
+         AND finalized_at IS NOT NULL 
+         AND semester IN ('1st Semester', '2nd Semester')";
+    
+    // If already advanced, only count distributions finalized AFTER the advancement
+    if ($already_advanced && $advanced_at) {
+        $semester_check_query .= " AND finalized_at > $2";
+        $semester_check = pg_query_params($connection, $semester_check_query, [$system_year, $advanced_at]);
+    } else {
+        $semester_check = pg_query_params($connection, $semester_check_query, [$system_year]);
+    }
+    
+    if ($semester_check) {
+        $sem_data = pg_fetch_assoc($semester_check);
+        $completed_count = intval($sem_data['completed_count']);
+        
+        // If both semesters completed (and if already advanced, both were completed AFTER advancement)
+        if ($completed_count >= 2) {
+            $year_advancement_needed = true;
+            if ($already_advanced) {
+                $year_advancement_message = "Both semesters for <strong>$system_year</strong> have been completed again since the last year advancement. Another year level advancement is required.";
+            } else {
+                $year_advancement_message = "Both semesters for <strong>$system_year</strong> have been completed. Year level advancement is required before starting a new distribution.";
+            }
+        }
+    }
+}
 ?>
 
 <!DOCTYPE html>
@@ -750,6 +876,27 @@ $history_result = pg_query($connection, $history_query);
                     Default academic period has been set: 
                     <strong><?= htmlspecialchars($current_semester) ?> <?= htmlspecialchars($current_academic_year) ?></strong>
                     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            <?php endif; ?>
+            
+            <?php if ($year_advancement_needed): ?>
+                <div class="alert alert-modern alert-warning alert-dismissible fade show border-warning" role="alert" style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border-width: 2px;">
+                    <div class="d-flex align-items-start">
+                        <i class="bi bi-exclamation-triangle-fill me-3" style="font-size: 2rem; color: #d97706;"></i>
+                        <div class="flex-grow-1">
+                            <h5 class="alert-heading mb-2" style="color: #78350f; font-weight: 700;">
+                                <i class="bi bi-arrow-up-circle me-2"></i>Year Level Advancement Required
+                            </h5>
+                            <p class="mb-2" style="color: #92400e;">
+                                <?= $year_advancement_message ?>
+                            </p>
+                            <hr class="my-2" style="border-color: #f59e0b; opacity: 0.3;">
+                            <p class="mb-0 small" style="color: #92400e;">
+                                <strong>Action Required:</strong> Go to <strong>Year Level Advancement</strong> to promote students to their next year level. 
+                                You cannot start a new distribution until year advancement is completed.
+                            </p>
+                        </div>
+                    </div>
                 </div>
             <?php endif; ?>
             

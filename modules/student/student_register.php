@@ -386,7 +386,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processEnrollmentOcr'
             'year_level_match' => $extracted['year_level']['found'],
             
             // University verification
-            'university_match' => $extracted['university']['match'],
+            'university_match' => $extracted['university']['matched'],
             
             // Document type verification
             'document_keywords_found' => $extracted['document_type']['is_enrollment_form'],
@@ -426,7 +426,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processEnrollmentOcr'
                                    ($extracted['student_name']['middle_name_found'] ? 1 : 0) +
                                    ($extracted['student_name']['last_name_found'] ? 1 : 0) +
                                    ($extracted['year_level']['found'] ? 1 : 0) +
-                                   ($extracted['university']['match'] ? 1 : 0) +
+                                   ($extracted['university']['matched'] ? 1 : 0) +
                                    ($extracted['document_type']['is_enrollment_form'] ? 1 : 0),
                 'total_checks' => 6,
                 'average_confidence' => $overallConfidence,
@@ -3210,7 +3210,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processGradesOcr'])) 
 
         // === 5. UNIVERSITY VERIFICATION ===
         $universityValidationResult = validateUniversity($ocrText, $declaredUniversityName);
-        $universityMatch = $universityValidationResult['match'];
+        $universityMatch = $universityValidationResult['matched'];
         $universityConfidence = $universityValidationResult['confidence'];
         $foundUniversityText = $universityValidationResult['found_text'];
 
@@ -3880,7 +3880,7 @@ function validatePerSubjectGrades($universityKey, $uploadedFile = null, $subject
 
 function validateUniversity($ocrText, $declaredUniversityName) {
     if (empty($declaredUniversityName)) {
-        return ['match' => false, 'confidence' => 0, 'found_text' => ''];
+        return ['matched' => false, 'confidence' => 0, 'found_text' => ''];
     }
     
     $ocrTextLower = strtolower($ocrText);
@@ -3888,7 +3888,7 @@ function validateUniversity($ocrText, $declaredUniversityName) {
     
     // Direct match
     if (stripos($ocrTextLower, $universityLower) !== false) {
-        return ['match' => true, 'confidence' => 100, 'found_text' => $declaredUniversityName];
+        return ['matched' => true, 'confidence' => 100, 'found_text' => $declaredUniversityName];
     }
     
     // Word-by-word matching for partial matches
@@ -3898,7 +3898,7 @@ function validateUniversity($ocrText, $declaredUniversityName) {
     });
     
     if (empty($significantWords)) {
-        return ['match' => false, 'confidence' => 0, 'found_text' => ''];
+        return ['matched' => false, 'confidence' => 0, 'found_text' => ''];
     }
     
     $matchedWords = 0;
@@ -3916,13 +3916,13 @@ function validateUniversity($ocrText, $declaredUniversityName) {
     
     if ($matchPercentage >= 70) {
         return [
-            'match' => true, 
+            'matched' => true, 
             'confidence' => round($matchPercentage), 
             'found_text' => trim($foundText)
         ];
     }
     
-    return ['match' => false, 'confidence' => round($matchPercentage), 'found_text' => trim($foundText)];
+    return ['matched' => false, 'confidence' => round($matchPercentage), 'found_text' => trim($foundText)];
 }
 
 function validateStudentName($ocrText, $firstName, $lastName, $returnDetails = false) {

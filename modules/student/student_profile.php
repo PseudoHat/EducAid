@@ -353,8 +353,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_picture'])) {
   exit;
 }
 
-// Fetch student data including profile picture
-$stuRes = pg_query($connection, "SELECT first_name, middle_name, last_name, bdate, email, mobile, student_picture FROM students WHERE student_id = '" . pg_escape_string($connection, $student_id) . "'");
+// Fetch student data including profile picture and academic credentials
+$stuRes = pg_query_params($connection, 
+    "SELECT s.first_name, s.middle_name, s.last_name, s.bdate, s.email, s.mobile, s.student_picture,
+            s.course, s.school_student_id, s.first_registered_academic_year, s.current_academic_year,
+            u.name as university_name,
+            yl.name as year_level_name,
+            b.name as barangay_name,
+            m.name as municipality_name
+     FROM students s
+     LEFT JOIN universities u ON s.university_id = u.university_id
+     LEFT JOIN year_levels yl ON s.year_level_id = yl.year_level_id
+     LEFT JOIN barangays b ON s.barangay_id = b.barangay_id
+     LEFT JOIN municipalities m ON s.municipality_id = m.municipality_id
+     WHERE s.student_id = $1",
+    [$student_id]
+);
 $student = pg_fetch_assoc($stuRes);
 
 // Get student info for header dropdown
@@ -734,6 +748,107 @@ unset($_SESSION['profile_flash'], $_SESSION['profile_flash_type']);
             <div class="info-value"><?php echo htmlspecialchars($student['mobile']); ?></div>
             <div class="info-actions">
               <span class="text-muted small">Editable in settings</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Academic Credentials Card -->
+    <div class="info-card">
+      <div class="info-card-header">
+        <i class="bi bi-mortarboard-fill"></i>
+        <h5 class="d-inline mb-0">Academic Credentials</h5>
+      </div>
+      <div class="info-card-body">
+        <!-- University Information -->
+        <div class="mb-4">
+          <h6 class="text-muted mb-3 fw-bold">
+            <i class="bi bi-bank me-2"></i>University Information
+          </h6>
+          <div class="info-item">
+            <div class="info-label">University</div>
+            <div class="info-value"><?php echo htmlspecialchars($student['university_name'] ?? 'Not specified'); ?></div>
+            <div class="info-actions">
+              <span class="text-muted small">Read-only</span>
+            </div>
+          </div>
+          <?php if ($student['school_student_id']): ?>
+          <div class="info-item">
+            <div class="info-label">School Student ID</div>
+            <div class="info-value"><?php echo htmlspecialchars($student['school_student_id']); ?></div>
+            <div class="info-actions">
+              <span class="text-muted small">Read-only</span>
+            </div>
+          </div>
+          <?php endif; ?>
+        </div>
+
+        <!-- Program Information -->
+        <div class="mb-4">
+          <h6 class="text-muted mb-3 fw-bold">
+            <i class="bi bi-book me-2"></i>Program Information
+          </h6>
+          <div class="info-item">
+            <div class="info-label">Course/Program</div>
+            <div class="info-value"><?php echo htmlspecialchars($student['course'] ?? 'Not specified'); ?></div>
+            <div class="info-actions">
+              <span class="text-muted small">Read-only</span>
+            </div>
+          </div>
+          <div class="info-item">
+            <div class="info-label">Year Level</div>
+            <div class="info-value">
+              <span class="badge bg-primary" style="font-size: 0.9rem; padding: 0.4rem 0.8rem;">
+                <?php echo htmlspecialchars($student['year_level_name'] ?? 'Not specified'); ?>
+              </span>
+            </div>
+            <div class="info-actions">
+              <span class="text-muted small">Updated annually</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Academic Year Information -->
+        <div class="mb-0">
+          <h6 class="text-muted mb-3 fw-bold">
+            <i class="bi bi-calendar-range me-2"></i>Academic Year Information
+          </h6>
+          <div class="info-item">
+            <div class="info-label">First Registered</div>
+            <div class="info-value"><?php echo htmlspecialchars($student['first_registered_academic_year'] ?? 'Not specified'); ?></div>
+            <div class="info-actions">
+              <span class="text-muted small">Read-only</span>
+            </div>
+          </div>
+          <div class="info-item">
+            <div class="info-label">Current Academic Year</div>
+            <div class="info-value">
+              <strong><?php echo htmlspecialchars($student['current_academic_year'] ?? 'Not specified'); ?></strong>
+            </div>
+            <div class="info-actions">
+              <span class="text-muted small">Auto-updated</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Residence Information -->
+        <div class="mb-0 mt-4">
+          <h6 class="text-muted mb-3 fw-bold">
+            <i class="bi bi-geo-alt-fill me-2"></i>Residence Information
+          </h6>
+          <div class="info-item">
+            <div class="info-label">Barangay</div>
+            <div class="info-value"><?php echo htmlspecialchars($student['barangay_name'] ?? 'Not specified'); ?></div>
+            <div class="info-actions">
+              <span class="text-muted small">Read-only</span>
+            </div>
+          </div>
+          <div class="info-item">
+            <div class="info-label">Municipality</div>
+            <div class="info-value"><?php echo htmlspecialchars($student['municipality_name'] ?? 'Not specified'); ?></div>
+            <div class="info-actions">
+              <span class="text-muted small">Read-only</span>
             </div>
           </div>
         </div>

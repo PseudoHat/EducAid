@@ -101,7 +101,7 @@ $isDistributionActive = in_array($current, $distributionFiles, true);
 $sysControlsFiles = [
     'blacklist_archive.php',
     'archived_students.php',
-    'run_automatic_archiving_admin.php',
+    'advance_year_levels.php',
     'document_archives.php',
     'admin_management.php',
     'municipality_content.php',
@@ -319,8 +319,8 @@ $isSysControlsActive = in_array($current, $sysControlsFiles, true);
             </a>
           </li>
           <li>
-            <a class="submenu-link <?= is_active('run_automatic_archiving_admin.php', $current) ? 'active' : '' ?>" href="run_automatic_archiving_admin.php">
-              <i class="bi bi-clock-history me-2"></i> Run Auto-Archiving
+            <a class="submenu-link <?= is_active('advance_year_levels.php', $current) ? 'active' : '' ?>" href="advance_year_levels.php">
+              <i class="bi bi-arrow-up-circle me-2"></i> Advance Year Levels
             </a>
           </li>
           <li>

@@ -25,6 +25,38 @@ if ($configResult && $row = pg_fetch_assoc($configResult)) {
     $isFinalized = ($row['value'] === '1');
 }
 
+// Check if any students have been scanned in the CURRENT distribution (prevents unlocking after distribution started)
+$has_scanned_students = false;
+
+// Get current distribution ID from config
+$current_dist_query = pg_query($connection, "SELECT value FROM config WHERE key = 'current_academic_year'");
+$current_semester_query = pg_query($connection, "SELECT value FROM config WHERE key = 'current_semester'");
+
+if ($current_dist_query && $current_semester_query) {
+    $current_year_row = pg_fetch_assoc($current_dist_query);
+    $current_semester_row = pg_fetch_assoc($current_semester_query);
+    
+    if ($current_year_row && $current_semester_row) {
+        $current_year = $current_year_row['value'];
+        $current_semester = $current_semester_row['value'];
+        
+        // Check if there's a snapshot for current distribution with scanned students
+        $scanned_check = pg_query_params($connection, 
+            "SELECT COUNT(*) as count 
+             FROM distribution_student_records dsr
+             INNER JOIN distribution_snapshots ds ON dsr.snapshot_id = ds.snapshot_id
+             WHERE ds.academic_year = $1 
+             AND ds.semester = $2",
+            [$current_year, $current_semester]
+        );
+        
+        if ($scanned_check) {
+            $scanned_data = pg_fetch_assoc($scanned_check);
+            $has_scanned_students = intval($scanned_data['count']) > 0;
+        }
+    }
+}
+
 // Get student counts
 $student_counts = getStudentCounts($connection);
 
@@ -440,6 +472,11 @@ while ($row = pg_fetch_assoc($barangayResult)) {
                 <button type="button" class="btn btn-warning" disabled title="Cannot revert - schedules exist">
                   <i class="bi bi-backspace-reverse-fill me-1"></i> Revert List
                   <small class="d-block">Remove schedules first</small>
+                </button>
+                <?php elseif ($has_scanned_students): ?>
+                <button type="button" class="btn btn-warning" disabled title="Cannot revert - students have been scanned">
+                  <i class="bi bi-backspace-reverse-fill me-1"></i> Revert List
+                  <small class="d-block">Distribution in progress</small>
                 </button>
                 <?php else: ?>
                 <button type="button" class="btn btn-warning" id="revertTriggerBtn">
