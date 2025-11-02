@@ -883,13 +883,50 @@ include '../../includes/admin/admin_head.php';
             .then(data => {
                 if (data.success) {
                     // Show success message
-                    alert(`✅ SUCCESS!\n\n${data.message}\n\nStudents Advanced: ${data.students_advanced}\nStudents Graduated: ${data.students_graduated}`);
+                    const successMsg = `✅ SUCCESS!\n\n${data.message}\n\nStudents Advanced: ${data.students_advanced}\nStudents Graduated: ${data.students_graduated}`;
                     
-                    // Close modal
-                    closeModal();
-                    
-                    // Reload page to show new state
-                    window.location.reload();
+                    // If students were graduated, compress their files
+                    if (data.students_graduated > 0) {
+                        alert(successMsg + '\n\n⏳ Now compressing archived student files...');
+                        
+                        // Call compression endpoint
+                        fetch('compress_archived_students.php', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                // Let it auto-detect all archived students
+                            })
+                        })
+                        .then(resp => resp.json())
+                        .then(compressData => {
+                            if (compressData.success) {
+                                alert(`📦 File Compression Complete!\n\n` +
+                                      `Students Processed: ${compressData.compressed}/${compressData.total_students}\n` +
+                                      `Files Archived: ${compressData.total_files}\n` +
+                                      `Space Saved: ${compressData.space_saved_mb} MB\n\n` +
+                                      `Files are stored in: assets/uploads/archived_students/`);
+                            } else {
+                                alert(`⚠️ File compression completed with issues:\n${compressData.message}`);
+                            }
+                            
+                            // Close modal and reload
+                            closeModal();
+                            window.location.reload();
+                        })
+                        .catch(compressError => {
+                            console.error('Compression error:', compressError);
+                            alert('⚠️ Year advancement successful, but file compression encountered an error.\nFiles can be compressed manually later.');
+                            closeModal();
+                            window.location.reload();
+                        });
+                    } else {
+                        // No graduates, just show success and reload
+                        alert(successMsg);
+                        closeModal();
+                        window.location.reload();
+                    }
                 } else {
                     alert(`❌ ERROR\n\n${data.error || data.message}`);
                     btn.disabled = false;

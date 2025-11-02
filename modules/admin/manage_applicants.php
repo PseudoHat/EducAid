@@ -1063,25 +1063,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         }
         
-        // Archive files first
-        require_once __DIR__ . '/../../services/UnifiedFileService.php';
-        $fileService = new UnifiedFileService($connection);
-        $archiveResult = $fileService->compressArchivedStudent($sid);
+        // Use StudentArchivalService for archival
+        require_once __DIR__ . '/../../services/StudentArchivalService.php';
+        $archivalService = new StudentArchivalService($connection);
         
-        if (!$archiveResult['success']) {
-            error_log("Archive Error: Failed to compress files for student $sid");
-            $_SESSION['error_message'] = "Failed to archive student files. Please try again.";
-            header('Location: ' . $_SERVER['PHP_SELF']);
-            exit;
-        }
-        
-        // Update student record using SQL function
-        $archiveQuery = pg_query_params($connection,
-            "SELECT archive_student($1, $2, $3) as success",
-            [$sid, $adminId, $archiveReason]
+        // Archive with manual archival (not household duplicate)
+        $archiveResult = $archivalService->archiveStudentManually(
+            $sid,
+            $archiveReason,
+            $adminId
         );
         
-        if ($archiveQuery && pg_fetch_assoc($archiveQuery)['success'] === 't') {
+        if ($archiveResult['success']) {
             // Log the archival action
             require_once __DIR__ . '/../../services/AuditLogger.php';
             $auditLogger = new AuditLogger($connection);
@@ -1105,7 +1098,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $notification_msg = "Student archived: {$fullName} (ID: {$sid}) - Reason: {$archiveReason}";
             pg_query_params($connection, "INSERT INTO admin_notifications (message) VALUES ($1)", [$notification_msg]);
         } else {
-            $_SESSION['error_message'] = "Failed to archive student. Please try again.";
+            $error_msg = $archiveResult['error'] ?? 'Unknown error occurred';
+            $_SESSION['error_message'] = "Failed to archive student: {$error_msg}";
         }
         
         header('Location: ' . $_SERVER['PHP_SELF']);

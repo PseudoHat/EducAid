@@ -23,6 +23,7 @@
 
                 <form id="blacklistForm">
                     <input type="hidden" id="blacklist_student_id" name="student_id">
+                    <input type="hidden" name="csrf_token" value="<?php echo CSRFProtection::generateToken('blacklist_operation'); ?>">
                     
                     <div class="row mb-3">
                         <div class="col-12">
@@ -38,7 +39,7 @@
                             <label for="reason_category" class="form-label fw-bold text-danger">
                                 <i class="bi bi-exclamation-circle"></i> Reason for Blacklisting *
                             </label>
-                            <select class="form-select" id="reason_category" name="reason_category" required>
+                            <select class="form-select" id="reason_category" name="reason_category">
                                 <option value="">Select a reason...</option>
                                 <option value="fraudulent_activity">Fraudulent Activity</option>
                                 <option value="academic_misconduct">Academic Misconduct</option>
@@ -86,7 +87,7 @@
                                 <i class="bi bi-key"></i> Your Admin Password *
                             </label>
                             <input type="password" class="form-control" id="admin_password" 
-                                   name="admin_password" required placeholder="Enter your admin password">
+                                   name="admin_password" placeholder="Enter your admin password">
                         </div>
                     </div>
 
@@ -106,11 +107,11 @@
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
                     <i class="bi bi-x"></i> Cancel
                 </button>
-                <button type="button" class="btn btn-warning" id="sendOtpBtn" onclick="initiateBlacklist()">
+                <button type="button" class="btn btn-warning" id="sendOtpBtn" onclick="initiateBlacklist(); return false;">
                     <i class="bi bi-send"></i> Send Verification Code
                 </button>
                 <button type="button" class="btn btn-danger" id="confirmBlacklistBtn" 
-                        onclick="completeBlacklist()" style="display: none;">
+                        onclick="completeBlacklist(); return false;" style="display: none;">
                     <i class="bi bi-shield-exclamation"></i> CONFIRM BLACKLIST
                 </button>
             </div>
@@ -165,6 +166,13 @@ function showBlacklistModal(studentId, studentName, studentEmail, additionalInfo
     
     // Show modal
     new bootstrap.Modal(document.getElementById('blacklistModal')).show();
+    
+    // Prevent form submission
+    const form = document.getElementById('blacklistForm');
+    form.onsubmit = function(e) {
+        e.preventDefault();
+        return false;
+    };
 }
 
 function initiateBlacklist() {
@@ -255,24 +263,16 @@ function completeBlacklist() {
         return;
     }
     
+    // Get CSRF token from the form
+    const csrfToken = document.querySelector('#blacklistForm input[name="csrf_token"]').value;
+    
     const formData = new FormData();
     formData.append('action', 'complete_blacklist');
     formData.append('student_id', currentBlacklistStudent.id);
     formData.append('otp', otp);
+    formData.append('csrf_token', csrfToken);
     
-    // Debug: Test endpoint first
-    console.log('Testing debug endpoint first...');
-    fetch('blacklist_debug_endpoint.php', {
-        method: 'POST',
-        body: formData
-    })
-    .then(response => response.json())
-    .then(debugData => {
-        console.log('Debug endpoint response:', debugData);
-    })
-    .catch(debugError => {
-        console.error('Debug endpoint error:', debugError);
-    });
+    console.log('Completing blacklist for student:', currentBlacklistStudent.id);
     
     // Show loading state
     const confirmBtn = document.getElementById('confirmBlacklistBtn');

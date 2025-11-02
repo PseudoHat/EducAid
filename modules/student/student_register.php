@@ -4328,6 +4328,9 @@ function updateVerificationJsonPaths($oldVerifyJsonPath, $newVerifyJsonPath, $ol
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['register'])) {
     // Include UnifiedFileService for unified document management
     require_once __DIR__ . '/../../services/UnifiedFileService.php';
+    // Include BlacklistService for checking blacklisted emails/mobiles
+    require_once __DIR__ . '/../../services/BlacklistService.php';
+    
     // Basic input validation
     $firstname = trim($_POST['first_name'] ?? '');
     $middlename = trim($_POST['middle_name'] ?? '');
@@ -4371,13 +4374,71 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['register'])) {
         json_response(['status' => 'error', 'message' => 'Invalid date of birth. Please enter a valid birthdate.']);
     }
 
-    // Check if email or mobile already exists
-    $checkEmail = pg_query_params($connection, "SELECT 1 FROM students WHERE email = $1", [$email]);
+    // Initialize BlacklistService
+    $blacklistService = new BlacklistService($connection);
+
+    // Check if email is blacklisted
+    if ($blacklistService->isEmailBlacklisted($email)) {
+        json_response([
+            'status' => 'error',
+            'message' => 'This email address has been blacklisted due to policy violations. You cannot register with this email. Please contact support if you believe this is an error.'
+        ]);
+    }
+
+    // Check if mobile number is blacklisted
+    if ($blacklistService->isMobileBlacklisted($mobile)) {
+        json_response([
+            'status' => 'error',
+            'message' => 'This mobile number has been blacklisted due to policy violations. You cannot register with this number. Please contact support if you believe this is an error.'
+        ]);
+    }
+
+    // Check if email or mobile belongs to an archived student
+    $archivedCheck = pg_query_params(
+        $connection,
+        "SELECT student_id, first_name, last_name, archival_type, is_archived 
+         FROM students 
+         WHERE (email = $1 OR mobile = $2) 
+         AND is_archived = TRUE 
+         LIMIT 1",
+        [$email, $mobile]
+    );
+
+    if (pg_num_rows($archivedCheck) > 0) {
+        $archivedStudent = pg_fetch_assoc($archivedCheck);
+        $archivalType = $archivedStudent['archival_type'] ?? 'unknown';
+        
+        // Different messages based on archival type
+        if ($archivalType === 'blacklisted') {
+            json_response([
+                'status' => 'error',
+                'message' => 'This account has been permanently banned due to policy violations. You cannot create a new account. Please contact support if you believe this is an error.'
+            ]);
+        } elseif ($archivalType === 'graduated') {
+            json_response([
+                'status' => 'error',
+                'message' => 'This email/mobile is registered to a graduated student. If you are a different person, please use a different email address and mobile number.'
+            ]);
+        } elseif ($archivalType === 'household_duplicate') {
+            json_response([
+                'status' => 'error',
+                'message' => 'This email/mobile is registered to an archived household member. Only one member per household can receive assistance. Please contact support if the primary recipient has graduated.'
+            ]);
+        } else {
+            json_response([
+                'status' => 'error',
+                'message' => 'This email/mobile is registered to an archived account. Please use a different email address and mobile number, or contact support for assistance.'
+            ]);
+        }
+    }
+
+    // Check if email or mobile already exists (active students)
+    $checkEmail = pg_query_params($connection, "SELECT 1 FROM students WHERE email = $1 AND is_archived = FALSE", [$email]);
     if (pg_num_rows($checkEmail) > 0) {
         json_response(['status' => 'error', 'message' => 'This email is already registered.']);
     }
 
-    $checkMobile = pg_query_params($connection, "SELECT 1 FROM students WHERE mobile = $1", [$mobile]);
+    $checkMobile = pg_query_params($connection, "SELECT 1 FROM students WHERE mobile = $1 AND is_archived = FALSE", [$mobile]);
     if (pg_num_rows($checkMobile) > 0) {
         json_response(['status' => 'error', 'message' => 'This mobile number is already registered.']);
     }
@@ -4432,8 +4493,17 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['register'])) {
         }
     }
 
-    $insertQuery = "INSERT INTO students (student_id, municipality_id, first_name, middle_name, last_name, extension_name, email, mobile, password, sex, status, payroll_no, application_date, bdate, barangay_id, university_id, year_level_id, slot_id, school_student_id, course, course_verified)
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'under_registration', 0, NOW(), $11, $12, $13, $14, $15, $16, $17, $18) RETURNING student_id";
+    $insertQuery = "INSERT INTO students (
+        student_id, municipality_id, first_name, middle_name, last_name, extension_name, 
+        email, mobile, password, sex, status, payroll_no, application_date, bdate, 
+        barangay_id, university_id, year_level_id, slot_id, school_student_id, course, course_verified,
+        household_verified, household_primary, household_group_id, archival_type
+    )
+    VALUES (
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 
+        'under_registration', 0, NOW(), $11, $12, $13, $14, $15, $16, $17, $18,
+        FALSE, FALSE, NULL, NULL
+    ) RETURNING student_id";
 
     $result = pg_query_params($connection, $insertQuery, [
         $student_id,
