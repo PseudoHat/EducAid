@@ -2,7 +2,7 @@
 // Suppress all output and errors for AJAX requests
 if (isset($_POST['processIdPictureOcr']) || isset($_POST['processGradesOcr']) || 
     isset($_POST['processOcr']) || isset($_POST['processLetterOcr']) || isset($_POST['processCertificateOcr']) ||
-    (isset($_POST['action']) && in_array($_POST['action'], ['check_full_duplicate', 'check_email_duplicate']))) {
+    (isset($_POST['action']) && in_array($_POST['action'], ['check_full_duplicate', 'check_email_duplicate', 'check_mobile_duplicate', 'check_name_duplicate', 'check_household_lastname']))) {
     @ini_set('display_errors', '0');
     error_reporting(0);
     if (!ob_get_level()) ob_start();
@@ -594,7 +594,7 @@ $isAjaxRequest = isset($_POST['sendOtp']) || isset($_POST['verifyOtp']) ||
                  isset($_POST['processCertificateOcr']) || isset($_POST['processGradesOcr']) ||
                  isset($_POST['cleanup_temp']) || isset($_POST['check_existing']) || isset($_POST['test_db']) ||
                  isset($_POST['check_school_student_id']) ||
-                 (isset($_POST['action']) && in_array($_POST['action'], ['check_full_duplicate', 'check_email_duplicate']));
+                 (isset($_POST['action']) && in_array($_POST['action'], ['check_full_duplicate', 'check_email_duplicate', 'check_mobile_duplicate', 'check_name_duplicate', 'check_household_lastname']));
 
 // Only output HTML for non-AJAX requests
 if (!$isAjaxRequest) {
@@ -709,6 +709,24 @@ if (!$isAjaxRequest) {
         .form-label .text-muted {
             font-size: 0.85em;
             font-style: italic;
+        }
+        
+        /* Name duplicate and household warnings */
+        #nameDuplicateWarning {
+            font-size: 0.9rem;
+            padding: 0.75rem 1rem;
+            border-left: 4px solid #dc3545;
+        }
+        
+        #householdWarning {
+            font-size: 0.9rem;
+            padding: 0.75rem 1rem;
+            border-left: 4px solid #ffc107;
+        }
+        
+        #nameDuplicateWarning i,
+        #householdWarning i {
+            font-size: 1.1rem;
         }
         </style>
         <!-- reCAPTCHA v3 -->
@@ -865,7 +883,13 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['action']) && $_POST['
     }
     
     try {
-        $query = "SELECT COUNT(*) as count FROM students WHERE email = $1";
+        // Check if email is used by an admin
+        $adminCheck = pg_query_params($connection, "SELECT 1 FROM admins WHERE email = $1", [$email]);
+        if (pg_num_rows($adminCheck) > 0) {
+            json_response(['exists' => true, 'message' => 'This email is already in use.']);
+        }
+        
+        $query = "SELECT COUNT(*) as count FROM students WHERE email = $1 AND is_archived = FALSE";
         $result = pg_query_params($connection, $query, [$email]);
         
         if ($result) {
@@ -877,6 +901,96 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['action']) && $_POST['
     } catch (Exception $e) {
         error_log("Error checking email duplicate: " . $e->getMessage());
         json_response(['exists' => false]);
+    }
+}
+
+// --- Check Mobile Duplicate ---
+if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['action']) && $_POST['action'] === 'check_mobile_duplicate') {
+    $mobile = trim($_POST['mobile'] ?? '');
+    
+    if (empty($mobile)) {
+        json_response(['exists' => false]);
+    }
+    
+    try {
+        $query = "SELECT COUNT(*) as count FROM students WHERE mobile = $1 AND is_archived = FALSE";
+        $result = pg_query_params($connection, $query, [$mobile]);
+        
+        if ($result) {
+            $row = pg_fetch_assoc($result);
+            json_response(['exists' => intval($row['count']) > 0]);
+        } else {
+            json_response(['exists' => false]);
+        }
+    } catch (Exception $e) {
+        error_log("Error checking mobile duplicate: " . $e->getMessage());
+        json_response(['exists' => false]);
+    }
+}
+
+// --- Check Name Duplicate (First + Last Name) ---
+if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['action']) && $_POST['action'] === 'check_name_duplicate') {
+    $firstName = trim($_POST['first_name'] ?? '');
+    $lastName = trim($_POST['last_name'] ?? '');
+    
+    if (empty($firstName) || empty($lastName)) {
+        json_response(['exists' => false, 'count' => 0]);
+    }
+    
+    try {
+        $query = "SELECT COUNT(*) as count
+                  FROM students 
+                  WHERE LOWER(first_name) = LOWER($1) 
+                    AND LOWER(last_name) = LOWER($2) 
+                    AND is_archived = FALSE";
+        $result = pg_query_params($connection, $query, [$firstName, $lastName]);
+        
+        if ($result) {
+            $row = pg_fetch_assoc($result);
+            $count = intval($row['count']);
+            json_response([
+                'exists' => $count > 0,
+                'count' => $count,
+                'message' => $count > 0 ? "A student with the name \"$firstName $lastName\" is already registered." : ''
+            ]);
+        } else {
+            json_response(['exists' => false, 'count' => 0]);
+        }
+    } catch (Exception $e) {
+        error_log("Error checking name duplicate: " . $e->getMessage());
+        json_response(['exists' => false, 'count' => 0]);
+    }
+}
+
+// --- Check Last Name Only (Household Warning) ---
+if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['action']) && $_POST['action'] === 'check_household_lastname') {
+    $lastName = trim($_POST['last_name'] ?? '');
+    
+    if (empty($lastName)) {
+        json_response(['exists' => false, 'count' => 0]);
+    }
+    
+    try {
+        $query = "SELECT COUNT(*) as count
+                  FROM students 
+                  WHERE LOWER(last_name) = LOWER($1) 
+                    AND is_archived = FALSE";
+        $result = pg_query_params($connection, $query, [$lastName]);
+        
+        if ($result) {
+            $row = pg_fetch_assoc($result);
+            $count = intval($row['count']);
+            json_response([
+                'exists' => $count > 0,
+                'count' => $count,
+                'message' => $count > 0 ? "Found $count student(s) with last name \"$lastName\". Note: Only one member per household can receive assistance." : ''
+            ]);
+        } else {
+            json_response(['exists' => false, 'count' => 0]);
+        }
+    } catch (Exception $e) {
+        error_log("Error checking household lastname: " . $e->getMessage());
+        json_response(['exists' => false, 'count' => 0]);
     }
 }
 
@@ -4331,11 +4445,34 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['register'])) {
     // Include BlacklistService for checking blacklisted emails/mobiles
     require_once __DIR__ . '/../../services/BlacklistService.php';
     
-    // Basic input validation
-    $firstname = trim($_POST['first_name'] ?? '');
-    $middlename = trim($_POST['middle_name'] ?? '');
-    $lastname = trim($_POST['last_name'] ?? '');
-    $extension_name = trim($_POST['extension_name'] ?? '');
+    // Helper function to properly capitalize names (Title Case with special name handling)
+    function capitalizeProperName($name) {
+        if (empty($name)) return $name;
+        
+        // Trim and convert to lowercase first
+        $name = strtolower(trim($name));
+        
+        // Capitalize first letter of each word
+        $name = ucwords($name);
+        
+        // Handle special cases for compound names
+        // McDonald, O'Brien, D'Angelo, MacArthur, etc.
+        $name = preg_replace_callback(
+            "/(Mc|Mac|O'|D')([a-z])/",
+            function($matches) {
+                return $matches[1] . strtoupper($matches[2]);
+            },
+            $name
+        );
+        
+        return $name;
+    }
+    
+    // Basic input validation with proper name capitalization
+    $firstname = capitalizeProperName($_POST['first_name'] ?? '');
+    $middlename = capitalizeProperName($_POST['middle_name'] ?? '');
+    $lastname = capitalizeProperName($_POST['last_name'] ?? '');
+    $extension_name = trim($_POST['extension_name'] ?? ''); // Extensions like Jr., Sr. are already uppercase in select
     $email = trim($_POST['email'] ?? '');
     $mobile = trim($_POST['mobile'] ?? '');
     $bdate = trim($_POST['bdate'] ?? '');
@@ -4432,15 +4569,25 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['register'])) {
         }
     }
 
-    // Check if email or mobile already exists (active students)
+    // CRITICAL DUPLICATE CHECKS - Re-validate at final submission to prevent race conditions
+    // These checks happen again even though they're checked earlier in the flow
+    
+    // Check if email is used by an admin
+    $adminEmailCheck = pg_query_params($connection, "SELECT 1 FROM admins WHERE email = $1", [$email]);
+    if (pg_num_rows($adminEmailCheck) > 0) {
+        json_response(['status' => 'error', 'message' => 'This email is already in use. Please use a different email address.']);
+    }
+    
+    // Check if email already exists (active students only)
     $checkEmail = pg_query_params($connection, "SELECT 1 FROM students WHERE email = $1 AND is_archived = FALSE", [$email]);
     if (pg_num_rows($checkEmail) > 0) {
-        json_response(['status' => 'error', 'message' => 'This email is already registered.']);
+        json_response(['status' => 'error', 'message' => 'This email is already registered. Please use a different email address.']);
     }
 
+    // Check if mobile already exists (active students only)
     $checkMobile = pg_query_params($connection, "SELECT 1 FROM students WHERE mobile = $1 AND is_archived = FALSE", [$mobile]);
     if (pg_num_rows($checkMobile) > 0) {
-        json_response(['status' => 'error', 'message' => 'This mobile number is already registered.']);
+        json_response(['status' => 'error', 'message' => 'This mobile number is already registered. Please use a different mobile number.']);
     }
 
     // Generate system student ID: <MUNICIPALITY>-<YEAR>-<YEARLEVEL>-<SEQUENCE>
@@ -5033,7 +5180,7 @@ if (!$isAjaxRequest) {
                 <div class="step-panel" id="step-1">
                     <div class="mb-3">
                         <label class="form-label">First Name <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" name="first_name" autocomplete="given-name" required />
+                        <input type="text" class="form-control" name="first_name" id="firstNameInput" autocomplete="given-name" required />
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Middle Name <span class="text-muted">(Optional)</span></label>
@@ -5041,7 +5188,19 @@ if (!$isAjaxRequest) {
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Last Name <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" name="last_name" autocomplete="family-name" required />
+                        <input type="text" class="form-control" name="last_name" id="lastNameInput" autocomplete="family-name" required />
+                        
+                        <!-- Warning Messages -->
+                        <div id="nameDuplicateWarning" class="alert alert-danger mt-2" style="display:none;">
+                            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                            <strong>Duplicate Name Detected:</strong>
+                            <span id="nameDuplicateMessage"></span>
+                        </div>
+                        <div id="householdWarning" class="alert alert-warning mt-2" style="display:none;">
+                            <i class="bi bi-people-fill me-2"></i>
+                            <strong>Household Notice:</strong>
+                            <span id="householdMessage"></span>
+                        </div>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Extension Name <span class="text-muted">(Optional)</span></label>
@@ -5666,6 +5825,11 @@ if (!$isAjaxRequest) {
                     <div class="mb-3">
                         <label class="form-label" for="mobile">Phone Number</label>
                         <input type="tel" class="form-control" name="mobile" id="mobile" maxlength="11" pattern="09[0-9]{9}" placeholder="e.g., 09123456789" required />
+                        <!-- Mobile duplicate warning (hidden by default, shown via JavaScript) -->
+                        <div id="mobileDuplicateWarning" class="alert alert-warning mt-2" style="display: none;">
+                            <i class="bi bi-exclamation-triangle me-2"></i>
+                            <strong>Mobile Number Already Registered!</strong> This mobile number is already registered in our system. Please use a different mobile number.
+                        </div>
                     </div>
                     <div class="mb-3">
                         <button type="button" class="btn btn-info" id="sendOtpBtn">Send OTP (Email)</button>
@@ -5776,6 +5940,225 @@ if (!$isAjaxRequest) {
 <script>
 // Simple working navigation functions (fallback if main script fails)
 let currentStep = 1;
+let hasNameDuplicate = false; // Track if name duplicate was detected
+let hasHouseholdWarning = false; // Track if household warning is active
+let householdConfirmed = false; // Track if user confirmed different household
+
+// Check for duplicate name before proceeding from Step 1
+async function checkNameBeforeProceeding() {
+    console.log('🔍 Checking for duplicate name...');
+    
+    const firstName = document.querySelector('input[name="first_name"]')?.value.trim();
+    const lastName = document.querySelector('input[name="last_name"]')?.value.trim();
+    
+    if (!firstName || !lastName) {
+        console.log('❌ Missing name fields');
+        return false; // Allow if fields empty (normal validation will catch it)
+    }
+    
+    // If name was already flagged as duplicate, always block
+    if (hasNameDuplicate) {
+        console.log('🚫 Name still flagged as duplicate - blocking');
+        showNameDuplicateBlockModal(firstName, lastName, 1);
+        return true;
+    }
+    
+    try {
+        const formData = new FormData();
+        formData.append('action', 'check_name_duplicate');
+        formData.append('first_name', firstName);
+        formData.append('last_name', lastName);
+        
+        const response = await fetch('student_register.php', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const data = await response.json();
+        
+        if (data.exists && data.count > 0) {
+            console.log('⚠️ NAME DUPLICATE FOUND!', data);
+            hasNameDuplicate = true; // Set flag
+            // Show blocking modal
+            showNameDuplicateBlockModal(firstName, lastName, data.count);
+            return true; // Block progression
+        }
+        
+        console.log('✅ No name duplicate, allowing progression');
+        hasNameDuplicate = false; // Clear flag if no duplicate
+        return false; // Allow progression
+    } catch (error) {
+        console.error('❌ Error checking name duplicate:', error);
+        return false; // On error, allow progression
+    }
+}
+
+// Show name duplicate blocking modal
+function showNameDuplicateBlockModal(firstName, lastName, count) {
+    const modalHtml = `
+        <div class="modal fade" id="nameDuplicateBlockModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content border-danger">
+                    <div class="modal-header bg-danger text-white">
+                        <h5 class="modal-title">
+                            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                            Duplicate Name Detected
+                        </h5>
+                    </div>
+                    <div class="modal-body">
+                        <div class="alert alert-danger mb-3">
+                            <i class="bi bi-shield-fill-exclamation me-2"></i>
+                            <strong>Registration Not Allowed</strong>
+                        </div>
+                        <p class="mb-3 lead">
+                            <i class="bi bi-person-fill-exclamation me-2"></i>
+                            A student with the name <strong>"${firstName} ${lastName}"</strong> is already registered in our system.
+                        </p>
+                        <div class="alert alert-warning">
+                            <i class="bi bi-info-circle me-2"></i>
+                            <strong>What to do:</strong>
+                            <ul class="mb-0 mt-2">
+                                <li>If this is you, please check if you already have an account</li>
+                                <li>If you forgot your credentials, use the password reset option</li>
+                                <li>If this is a different person with the same name, please contact support</li>
+                                <li>For assistance, email us or call our support line</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" onclick="closeNameDuplicateModal()">
+                            <i class="bi bi-arrow-left me-2"></i>Go Back
+                        </button>
+                        <a href="../../unified_login.php" class="btn btn-primary">
+                            <i class="bi bi-box-arrow-in-right me-2"></i>Login Instead
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Remove existing modal if any
+    const existingModal = document.getElementById('nameDuplicateBlockModal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+    
+    // Add modal to body
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('nameDuplicateBlockModal'));
+    modal.show();
+}
+
+// Close name duplicate modal
+function closeNameDuplicateModal() {
+    const modal = bootstrap.Modal.getInstance(document.getElementById('nameDuplicateBlockModal'));
+    if (modal) {
+        modal.hide();
+    }
+    // Keep hasNameDuplicate flag - user must change name to clear it
+}
+
+// Check household confirmation before proceeding from Step 1
+async function checkHouseholdBeforeProceeding() {
+    console.log('🏠 Checking household warning...');
+    
+    // If no warning shown, allow
+    if (!hasHouseholdWarning) {
+        console.log('✅ No household warning');
+        return false; // Allow progression
+    }
+    
+    // If already confirmed different household, allow
+    if (householdConfirmed) {
+        console.log('✅ Household already confirmed as different');
+        return false; // Allow progression
+    }
+    
+    // Show confirmation modal
+    const lastName = document.querySelector('input[name="last_name"]')?.value.trim();
+    return await showHouseholdConfirmationModal(lastName);
+}
+
+// Show household confirmation modal
+async function showHouseholdConfirmationModal(lastName) {
+    return new Promise((resolve) => {
+        const modalHtml = `
+            <div class="modal fade" id="householdConfirmModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content border-warning">
+                        <div class="modal-header bg-warning text-dark">
+                            <h5 class="modal-title">
+                                <i class="bi bi-people-fill me-2"></i>
+                                Household Confirmation
+                            </h5>
+                        </div>
+                        <div class="modal-body">
+                            <div class="alert alert-warning mb-3">
+                                <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                                <strong>Student with Same Last Name Found</strong>
+                            </div>
+                            <p class="mb-3 lead">
+                                <i class="bi bi-house-fill me-2"></i>
+                                We found student(s) with the last name <strong>"${lastName}"</strong> already registered in our system.
+                            </p>
+                            <div class="alert alert-info">
+                                <i class="bi bi-info-circle-fill me-2"></i>
+                                <strong>Important:</strong> Only ONE member per household can receive assistance.
+                            </div>
+                            <p class="mb-0">
+                                <strong>Are you from a DIFFERENT household than the existing student(s)?</strong>
+                            </p>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-danger" id="householdSameBtn">
+                                <i class="bi bi-x-circle me-2"></i>No, Same Household
+                            </button>
+                            <button type="button" class="btn btn-success" id="householdDifferentBtn">
+                                <i class="bi bi-check-circle me-2"></i>Yes, Different Household
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Remove existing modal if any
+        const existingModal = document.getElementById('householdConfirmModal');
+        if (existingModal) {
+            existingModal.remove();
+        }
+        
+        // Add modal to body
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        
+        // Show modal
+        const modal = new bootstrap.Modal(document.getElementById('householdConfirmModal'));
+        modal.show();
+        
+        // Handle "Same Household" button
+        document.getElementById('householdSameBtn').addEventListener('click', function() {
+            householdConfirmed = false;
+            modal.hide();
+            
+            // Show blocking message
+            showNotifier('Registration cannot proceed. Only one member per household can receive assistance.', 'error');
+            resolve(true); // Block progression
+        });
+        
+        // Handle "Different Household" button
+        document.getElementById('householdDifferentBtn').addEventListener('click', function() {
+            householdConfirmed = true;
+            modal.hide();
+            
+            // Show success message
+            showNotifier('Thank you for confirming. You may proceed with registration.', 'success');
+            resolve(false); // Allow progression
+        });
+    });
+}
 
 // Check for duplicate registration (first name, last name, university, school student ID)
 async function checkForDuplicateRegistration() {
@@ -5902,6 +6285,21 @@ async function nextStep() {
     console.log('🔧 Enhanced nextStep called - Step:', currentStep);
     
     if (currentStep >= 10) return; // Allow navigation through all 10 steps
+    
+    // Special check for Step 1: Check for duplicate names AND household confirmation before proceeding
+    if (currentStep === 1) {
+        // First check for duplicate names (blocks if duplicate)
+        const isNameDuplicate = await checkNameBeforeProceeding();
+        if (isNameDuplicate) {
+            return; // Stop here if duplicate name found
+        }
+        
+        // Then check for household confirmation (blocks if same household)
+        const householdBlocked = await checkHouseholdBeforeProceeding();
+        if (householdBlocked) {
+            return; // Stop here if same household
+        }
+    }
     
     // Special check for Step 3: Check for duplicate registration before proceeding to ID upload
     if (currentStep === 3) {
@@ -7319,6 +7717,175 @@ function setupEmailDuplicateCheck() {
     });
 }
 
+// Check mobile duplicate on blur
+function setupMobileDuplicateCheck() {
+    const mobileInput = document.getElementById('mobile');
+    const mobileWarning = document.getElementById('mobileDuplicateWarning');
+    
+    if (!mobileInput) return;
+    
+    mobileInput.addEventListener('blur', async function() {
+        const mobile = this.value.trim();
+        
+        // Validate Philippines mobile format (09xxxxxxxxx)
+        if (!mobile || !/^09[0-9]{9}$/.test(mobile)) {
+            if (mobileWarning) mobileWarning.style.display = 'none';
+            return;
+        }
+        
+        try {
+            const formData = new FormData();
+            formData.append('action', 'check_mobile_duplicate');
+            formData.append('mobile', mobile);
+            
+            const response = await fetch('student_register.php', {
+                method: 'POST',
+                body: formData
+            });
+            
+            const data = await response.json();
+            
+            if (data.exists) {
+                if (mobileWarning) {
+                    mobileWarning.textContent = '⚠️ This mobile number is already registered. Please use a different mobile number.';
+                    mobileWarning.className = 'alert alert-danger mt-2';
+                    mobileWarning.style.display = 'block';
+                }
+                showNotifier('This mobile number is already registered. Please use a different mobile number.', 'error');
+            } else {
+                if (mobileWarning) {
+                    mobileWarning.textContent = '✓ This mobile number is available.';
+                    mobileWarning.className = 'alert alert-success mt-2';
+                    mobileWarning.style.display = 'block';
+                    // Hide success message after 3 seconds
+                    setTimeout(() => {
+                        mobileWarning.style.display = 'none';
+                    }, 3000);
+                }
+            }
+        } catch (error) {
+            console.error('Error checking mobile:', error);
+        }
+    });
+}
+
+// Check name duplicate (First + Last Name) on blur
+function setupNameDuplicateCheck() {
+    const firstNameInput = document.getElementById('firstNameInput');
+    const lastNameInput = document.getElementById('lastNameInput');
+    const nameDuplicateWarning = document.getElementById('nameDuplicateWarning');
+    const nameDuplicateMessage = document.getElementById('nameDuplicateMessage');
+    
+    if (!firstNameInput || !lastNameInput || !nameDuplicateWarning) return;
+    
+    // Clear duplicate flag when user changes name
+    const clearDuplicateFlag = function() {
+        hasNameDuplicate = false; // User changed name, clear the block
+        console.log('🔄 Name changed - clearing duplicate flag');
+    };
+    
+    firstNameInput.addEventListener('input', clearDuplicateFlag);
+    lastNameInput.addEventListener('input', clearDuplicateFlag);
+    
+    const checkNameDuplicate = async function() {
+        const firstName = firstNameInput.value.trim();
+        const lastName = lastNameInput.value.trim();
+        
+        // Both names must be filled
+        if (!firstName || !lastName) {
+            if (nameDuplicateWarning) nameDuplicateWarning.style.display = 'none';
+            return;
+        }
+        
+        try {
+            const formData = new FormData();
+            formData.append('action', 'check_name_duplicate');
+            formData.append('first_name', firstName);
+            formData.append('last_name', lastName);
+            
+            const response = await fetch('student_register.php', {
+                method: 'POST',
+                body: formData
+            });
+            
+            const data = await response.json();
+            
+            if (data.exists && data.count > 0) {
+                if (nameDuplicateWarning && nameDuplicateMessage) {
+                    nameDuplicateMessage.textContent = data.message;
+                    nameDuplicateWarning.style.display = 'block';
+                }
+            } else {
+                if (nameDuplicateWarning) {
+                    nameDuplicateWarning.style.display = 'none';
+                }
+            }
+        } catch (error) {
+            console.error('Error checking name duplicate:', error);
+        }
+    };
+    
+    // Trigger check when both names are filled
+    firstNameInput.addEventListener('blur', checkNameDuplicate);
+    lastNameInput.addEventListener('blur', checkNameDuplicate);
+}
+
+// Check household warning (Last Name only) on blur
+function setupHouseholdWarning() {
+    const lastNameInput = document.getElementById('lastNameInput');
+    const householdWarning = document.getElementById('householdWarning');
+    const householdMessage = document.getElementById('householdMessage');
+    
+    if (!lastNameInput || !householdWarning) return;
+    
+    lastNameInput.addEventListener('blur', async function() {
+        const lastName = this.value.trim();
+        
+        // Must have last name
+        if (!lastName || lastName.length < 2) {
+            if (householdWarning) householdWarning.style.display = 'none';
+            hasHouseholdWarning = false; // Clear flag
+            householdConfirmed = false; // Reset confirmation
+            return;
+        }
+        
+        try {
+            const formData = new FormData();
+            formData.append('action', 'check_household_lastname');
+            formData.append('last_name', lastName);
+            
+            const response = await fetch('student_register.php', {
+                method: 'POST',
+                body: formData
+            });
+            
+            const data = await response.json();
+            
+            if (data.exists && data.count > 0) {
+                if (householdWarning && householdMessage) {
+                    householdMessage.textContent = data.message;
+                    householdWarning.style.display = 'block';
+                    hasHouseholdWarning = true; // Set flag
+                    householdConfirmed = false; // Reset confirmation when new warning appears
+                }
+            } else {
+                if (householdWarning) {
+                    householdWarning.style.display = 'none';
+                    hasHouseholdWarning = false; // Clear flag
+                    householdConfirmed = false; // Reset confirmation
+                }
+            }
+        } catch (error) {
+            console.error('Error checking household:', error);
+        }
+    });
+    
+    // Also reset flags when user types (name changed)
+    lastNameInput.addEventListener('input', function() {
+        householdConfirmed = false; // User is typing, reset confirmation
+    });
+}
+
 // Password strength indicator
 function setupPasswordStrength() {
     const passwordInput = document.getElementById('password');
@@ -7397,6 +7964,9 @@ document.addEventListener('DOMContentLoaded', function() {
     setupOtpHandlers();
     setupOtpInputFormatting();
     setupEmailDuplicateCheck();
+    setupMobileDuplicateCheck(); // Add mobile duplicate check
+    setupNameDuplicateCheck(); // Add name duplicate check
+    setupHouseholdWarning(); // Add household warning check
     setupPasswordStrength();
     setupSessionCleanup();
     setupConnectionMonitoring();

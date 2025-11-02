@@ -25,10 +25,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax'])) {
             echo json_encode(['status' => 'error', 'message' => 'Invalid email format.']);
             exit;
         }
-        // Check if email already used by another student (exclude current)
-        $res = pg_query_params($connection, "SELECT 1 FROM students WHERE email = $1 AND student_id != $2", [$newEmail, $student_id]);
+        // Check if email is used by an admin
+        $adminCheck = pg_query_params($connection, "SELECT 1 FROM admins WHERE email = $1", [$newEmail]);
+        if (pg_num_rows($adminCheck) > 0) {
+            echo json_encode(['status' => 'error', 'message' => 'This email is already in use.']);
+            exit;
+        }
+        // Check if email already used by another active student (exclude current)
+        $res = pg_query_params($connection, "SELECT 1 FROM students WHERE email = $1 AND student_id != $2 AND is_archived = FALSE", [$newEmail, $student_id]);
         if (pg_num_rows($res) > 0) {
-            echo json_encode(['status' => 'error', 'message' => 'This email is already registered.']);
+            echo json_encode(['status' => 'error', 'message' => 'This email is already registered by another active student.']);
             exit;
         }
         $otp = rand(100000, 999999);
@@ -184,7 +190,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_email'])) {
     }
 
     if (filter_var($newEmail, FILTER_VALIDATE_EMAIL)) {
-        pg_query($connection, "UPDATE students SET email = '" . pg_escape_string($connection, $newEmail) . "' WHERE student_id = '" . pg_escape_string($connection, $student_id) . "'");
+        // Check if email is used by an admin
+        $adminCheck = pg_query_params($connection, "SELECT 1 FROM admins WHERE email = $1", [$newEmail]);
+        if (pg_num_rows($adminCheck) > 0) {
+            $_SESSION['profile_flash'] = 'This email is already in use.';
+            $_SESSION['profile_flash_type'] = 'error';
+            unset($_SESSION['profile_otp_email'], $_SESSION['profile_otp_verified']);
+            header("Location: student_profile.php");
+            exit;
+        }
+        
+        // Update email with error handling for database constraints
+        $updateResult = @pg_query($connection, "UPDATE students SET email = '" . pg_escape_string($connection, $newEmail) . "' WHERE student_id = '" . pg_escape_string($connection, $student_id) . "'");
+        
+        if ($updateResult === false) {
+            $error = pg_last_error($connection);
+            // Check if it's a unique constraint violation
+            if (strpos($error, 'idx_unique_email_active') !== false || strpos($error, 'students_email_key') !== false) {
+                $_SESSION['profile_flash'] = 'This email is already registered by another active student. Please use a different email.';
+                $_SESSION['profile_flash_type'] = 'error';
+            } else {
+                $_SESSION['profile_flash'] = 'Failed to update email. Please try again.';
+                $_SESSION['profile_flash_type'] = 'error';
+                error_log("Email update error for student $student_id: $error");
+            }
+            header("Location: student_profile.php");
+            exit;
+        }
+        
         $msg = 'Your email has been changed to ' . $newEmail . '.';
         pg_query($connection, "INSERT INTO notifications (student_id, message) VALUES ('" . pg_escape_string($connection, $student_id) . "', '" . pg_escape_string($connection, $msg) . "')");
         $nameRes = pg_query($connection, "SELECT first_name, last_name FROM students WHERE student_id = '" . pg_escape_string($connection, $student_id) . "'");
@@ -201,8 +234,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_email'])) {
 // --------- Handle Mobile Number Update ----------
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_mobile'])) {
     $newMobile = preg_replace('/\D/', '', $_POST['new_mobile']);
+    
     if ($newMobile) {
-        pg_query($connection, "UPDATE students SET mobile = '" . pg_escape_string($connection, $newMobile) . "' WHERE student_id = '" . pg_escape_string($connection, $student_id) . "'");
+        // Check if mobile already used by another active student (exclude current)
+        $mobileCheckRes = pg_query_params($connection, "SELECT 1 FROM students WHERE mobile = $1 AND student_id != $2 AND is_archived = FALSE", [$newMobile, $student_id]);
+        if (pg_num_rows($mobileCheckRes) > 0) {
+            $_SESSION['profile_flash'] = 'This mobile number is already registered by another active student.';
+            $_SESSION['profile_flash_type'] = 'error';
+            header("Location: student_profile.php");
+            exit;
+        }
+        
+        // Update mobile with error handling for database constraints
+        $updateResult = @pg_query($connection, "UPDATE students SET mobile = '" . pg_escape_string($connection, $newMobile) . "' WHERE student_id = '" . pg_escape_string($connection, $student_id) . "'");
+        
+        if ($updateResult === false) {
+            $error = pg_last_error($connection);
+            // Check if it's a unique constraint violation
+            if (strpos($error, 'idx_unique_mobile_active') !== false) {
+                $_SESSION['profile_flash'] = 'This mobile number is already registered by another active student. Please use a different mobile number.';
+                $_SESSION['profile_flash_type'] = 'error';
+            } else {
+                $_SESSION['profile_flash'] = 'Failed to update mobile number. Please try again.';
+                $_SESSION['profile_flash_type'] = 'error';
+                error_log("Mobile update error for student $student_id: $error");
+            }
+            header("Location: student_profile.php");
+            exit;
+        }
+        
         $msg = 'Your mobile number has been changed to ' . $newMobile . '.';
         pg_query($connection, "INSERT INTO notifications (student_id, message) VALUES ('" . pg_escape_string($connection, $student_id) . "', '" . pg_escape_string($connection, $msg) . "')");
         $nameRes = pg_query($connection, "SELECT first_name, last_name FROM students WHERE student_id = '" . pg_escape_string($connection, $student_id) . "'");
