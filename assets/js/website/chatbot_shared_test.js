@@ -1,4 +1,4 @@
-// Shared chatbot logic for all pages
+// TEST VERSION - Chatbot logic with FIXED typing indicator positioning
 (function(){
   document.addEventListener('DOMContentLoaded', function(){
     const apiUrl = (window.location.pathname.indexOf('/website/')!==-1)? '../chatbot/gemini_chat.php' : 'chatbot/gemini_chat.php';
@@ -45,23 +45,24 @@
 
     function showTyping(){
       const typing = createTypingIndicator();
-      // Remove from current position first
+      // CRITICAL: Remove from current position first
       if(typing.parentNode){
         typing.parentNode.removeChild(typing);
       }
-      // Append to the very END of the body
+      // Now append to the very END of the body
       body.appendChild(typing);
       typing.style.display = 'block';
       // Force scroll to bottom immediately
       scrollToBottom();
+      console.log('Typing indicator shown at position:', Array.from(body.children).indexOf(typing), 'of', body.children.length);
     }
 
     function hideTyping(){
       if(typingElement && typingElement.parentNode){
         typingElement.style.display = 'none';
-        // Remove it entirely for clean slate
+        // Optionally remove it entirely
         typingElement.parentNode.removeChild(typingElement);
-        typingElement = null;
+        typingElement = null; // Reset so it can be recreated next time
       }
     }
 
@@ -71,8 +72,12 @@
       if(!text) return; 
       input.value='';
       
-      addUser(text); 
-      showTyping(); 
+      // Add user message
+      addUser(text);
+      
+      // Show typing indicator at the BOTTOM
+      showTyping();
+      
       busy=true; 
       input.disabled=true;
       
@@ -92,8 +97,16 @@
           }
           addBot(msg);
         }
-      } catch(e){ console.error('Chatbot error',e); addBot('Network error. Please retry.'); }
-      finally { hideTyping(); busy=false; input.disabled=false; input.focus(); }
+      } catch(e){ 
+        console.error('Chatbot error',e); 
+        addBot('Network error. Please retry.'); 
+      }
+      finally { 
+        hideTyping(); 
+        busy=false; 
+        input.disabled=false; 
+        input.focus(); 
+      }
     }
 
     function diagnosticTag(p){
@@ -103,7 +116,9 @@
       `</div>`;
     }
 
-    function escapeHtml(s){ return s.replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c])); }
+    function escapeHtml(s){ 
+      return s.replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c])); 
+    }
 
     function addUser(text){ 
       const d=document.createElement('div'); 
@@ -115,7 +130,9 @@
     }
     
     function addBot(html){ 
+      // Hide typing first
       hideTyping();
+      
       const d=document.createElement('div'); 
       d.className='ea-chat__msg'; 
       d.innerHTML='<div class="ea-chat__bubble"></div>'; 
@@ -125,8 +142,18 @@
     }
 
     send && send.addEventListener('click',sendMsg);
-    input && input.addEventListener('keydown',e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); sendMsg(); }});
-    document.addEventListener('click',e=>{ if(!e.target.closest('.ea-chat')&&isOpen){ toggleChat(); }});
+    input && input.addEventListener('keydown',e=>{ 
+      if(e.key==='Enter'&&!e.shiftKey){ 
+        e.preventDefault(); 
+        sendMsg(); 
+      }
+    });
+    
+    document.addEventListener('click',e=>{ 
+      if(!e.target.closest('.ea-chat')&&isOpen){ 
+        toggleChat(); 
+      }
+    });
   });
 })();
 

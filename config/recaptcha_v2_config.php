@@ -14,15 +14,21 @@
 // Prefer environment variables for keys (do NOT commit real secrets to the repo).
 // Accept either RECAPTCHA_V2_SITE_KEY / RECAPTCHA_V2_SECRET_KEY or the older RECAPTCHA_SITE_KEY / RECAPTCHA_SECRET_KEY
 
+// Load layered .env variables so getenv(...) works for local/dev too.
+// This ensures values from project .env or config/.env are visible here when running under Apache/XAMPP.
+// Safe to include multiple times across pages due to require_once.
+require_once __DIR__ . '/env.php';
+
 // Try v2-specific env vars first, then fall back to generic names some deploy UIs use.
 $siteKeyV2 = getenv('RECAPTCHA_V2_SITE_KEY');
 $siteKeyAlt = getenv('RECAPTCHA_SITE_KEY');
 $secretV2 = getenv('RECAPTCHA_V2_SECRET_KEY');
 $secretAlt = getenv('RECAPTCHA_SECRET_KEY');
 
-// Fallback (only if env vars are not provided). Replace with your local dev keys if needed.
-$fallbackSiteKey = '6LcQ9NArAAAAALTbYBJn1b2iG9MJcJ6SnA3b6x53';
-$fallbackSecret  = 'D';
+// Fallback (only if env vars are not provided). Prefer Google's official public test keys for v2.
+// These are safe and always validate, but should NOT be used in production.
+$fallbackSiteKey = '6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI';
+$fallbackSecret  = '6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4WifJWe';
 
 // Choose the first non-empty value and remember which env var provided it for logging.
 $siteKey = ($siteKeyV2 !== false && $siteKeyV2 !== '') ? $siteKeyV2 : (($siteKeyAlt !== false && $siteKeyAlt !== '') ? $siteKeyAlt : $fallbackSiteKey);

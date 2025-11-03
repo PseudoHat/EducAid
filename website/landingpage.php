@@ -627,7 +627,7 @@ function lp_block_style($key){
           What would you like to know about the EducAid scholarship program?
         </div>
       </div>
-      <div class="ea-typing" id="eaTyping">EducAid Assistant is typing...</div>
+      <!-- Typing indicator will be dynamically inserted at the bottom -->
     </div>
     <div class="ea-chat__footer">
       <input class="ea-chat__input" id="eaInput" placeholder="Type your message…" />
@@ -737,9 +737,9 @@ document.addEventListener('DOMContentLoaded', function() {
   const body   = document.getElementById('eaBody');
   const input  = document.getElementById('eaInput');
   const send   = document.getElementById('eaSend');
-  const typing = document.getElementById('eaTyping');
 
   let isOpen = false;
+  let typingElement = null; // Will be created dynamically
 
   // Toggle chatbot panel
   function toggleChat() {
@@ -747,6 +747,46 @@ document.addEventListener('DOMContentLoaded', function() {
     panel.style.display = isOpen ? 'block' : 'none';
     if (isOpen) {
       input.focus();
+      scrollToBottom();
+    }
+  }
+
+  function scrollToBottom(){
+    if(body){
+      setTimeout(() => {
+        body.scrollTop = body.scrollHeight;
+      }, 10);
+    }
+  }
+
+  function createTypingIndicator(){
+    if(!typingElement){
+      typingElement = document.createElement('div');
+      typingElement.className = 'ea-typing';
+      typingElement.innerHTML = 'EducAid Assistant is typing...';
+      typingElement.style.display = 'none';
+    }
+    return typingElement;
+  }
+
+  function showTyping(){
+    const typing = createTypingIndicator();
+    // Remove from current position first
+    if(typing.parentNode){
+      typing.parentNode.removeChild(typing);
+    }
+    // Append to the very END of the body
+    body.appendChild(typing);
+    typing.style.display = 'block';
+    // Force scroll to bottom immediately
+    scrollToBottom();
+  }
+
+  function hideTyping(){
+    if(typingElement && typingElement.parentNode){
+      typingElement.style.display = 'none';
+      typingElement.parentNode.removeChild(typingElement);
+      typingElement = null;
     }
   }
 
@@ -768,10 +808,10 @@ document.addEventListener('DOMContentLoaded', function() {
     userMsg.innerHTML = `<div class="ea-chat__bubble ea-chat__bubble--user"></div>`;
     userMsg.querySelector('.ea-chat__bubble').textContent = text;
     body.appendChild(userMsg);
-    body.scrollTop = body.scrollHeight;
+    scrollToBottom();
 
-    // Show typing indicator
-    typing.style.display = 'block';
+    // Show typing indicator at the BOTTOM
+    showTyping();
 
     try {
       const res = await fetch(apiUrl, {
@@ -788,28 +828,30 @@ document.addEventListener('DOMContentLoaded', function() {
       const reply = data.reply || 'Sorry, I could not understand that.';
 
       // Add bot response
+      hideTyping(); // Hide typing before adding bot message
       const botMsg = document.createElement('div');
       botMsg.className = 'ea-chat__msg';
       botMsg.innerHTML = `<div class="ea-chat__bubble"></div>`;
       const formattedReply = formatChatbotResponse(reply);
       botMsg.querySelector('.ea-chat__bubble').innerHTML = formattedReply;
       body.appendChild(botMsg);
+      scrollToBottom();
 
     } catch (error) {
       console.error('Chatbot error:', error);
       
       // Add error message
+      hideTyping();
       const errMsg = document.createElement('div');
       errMsg.className = 'ea-chat__msg';
       errMsg.innerHTML = `<div class="ea-chat__bubble">Sorry, I'm having trouble connecting. Please try again later or contact support at educaid@generaltrias.gov.ph</div>`;
       body.appendChild(errMsg);
+      scrollToBottom();
       
     } finally {
-      // Hide typing indicator and re-enable input
-      typing.style.display = 'none';
+      // Re-enable input
       input.disabled = false;
       input.focus();
-      body.scrollTop = body.scrollHeight;
     }
   }
 

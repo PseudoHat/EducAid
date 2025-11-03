@@ -1,6 +1,7 @@
 <?php
 include __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../includes/CSRFProtection.php';
+require_once __DIR__ . '/../../includes/student_notification_helper.php';
 session_start();
 if (!isset($_SESSION['admin_username'])) {
     header("Location: ../../unified_login.php");
@@ -84,11 +85,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($location) $student_notif_message .= "Location: " . $location;
       }
       
-      // Send notification to all students
-      $student_notif_query = "INSERT INTO student_notifications (student_id, title, message, type, priority, action_url)
-                              SELECT student_id, $1, $2, 'announcement', 'medium', '../../website/announcements.php'
-                              FROM students";
-      pg_query_params($connection, $student_notif_query, [$student_notif_title, $student_notif_message]);
+      // Use helper function to send notifications (handles both bell notifications and emails automatically)
+      createBulkStudentNotification(
+        $connection,
+        $student_notif_title,
+        $student_notif_message,
+        'announcement',
+        'medium',
+        '../../website/announcements.php'
+      );
     }
     header('Location: ' . $_SERVER['PHP_SELF'] . '?posted=1');
     exit;

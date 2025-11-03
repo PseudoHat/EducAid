@@ -4678,6 +4678,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['register'])) {
         $student_id_row = pg_fetch_assoc($result);
         $student_id = $student_id_row['student_id'];
 
+        // Initialize default notification preferences for the student
+        $notif_pref_query = "INSERT INTO student_notification_preferences (student_id) VALUES ($1) ON CONFLICT (student_id) DO NOTHING";
+        pg_query_params($connection, $notif_pref_query, [$student_id]);
+
         // Note: school_student_ids table will be populated when admin approves the application
         // This prevents fake/spam registrations from polluting the duplicate check system
 
