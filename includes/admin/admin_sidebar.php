@@ -297,6 +297,15 @@ $isSysControlsActive = in_array($current, $sysControlsFiles, true);
       </li>
     <?php endif; ?>
 
+    <!-- Scan QR (sub_admin access) -->
+    <?php if ($admin_role === 'sub_admin' || $admin_role === 'admin'): ?>
+      <?php if ($canScanQR): ?>
+        <?= menu_link('scan_qr.php', 'bi bi-qr-code-scan', 'Scan QR', is_active('scan_qr.php', $current), ['text' => 'Ready', 'class' => 'bg-success']); ?>
+      <?php else: ?>
+        <?= menu_link('#', 'bi bi-qr-code-scan', 'Scan QR', '', ['text' => 'Locked', 'class' => 'bg-secondary'], true, 'Please generate payroll numbers and QR codes first before scanning.'); ?>
+      <?php endif; ?>
+    <?php endif; ?>
+
     <!-- System Controls (super_admin only) -->
     <?php if ($admin_role === 'super_admin'): ?>
   <li class="nav-item dropdown">

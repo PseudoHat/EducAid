@@ -48,6 +48,8 @@ $prompt = "You are EducAid Assistant for the scholarship program in General Tria
           "- Help with general student concerns, academic guidance, and university/scholarship information\n" .
           "- Be conversational, helpful, and friendly for casual chat or greetings\n" .
           "- Keep responses concise (2-3 sentences for simple questions)\n\n" .
+          "Important eligibility requirement:\n" .
+          "- Students must maintain at least 75% or higher in their grades to qualify for the scholarship. We believe in your potential and are here to support your educational journey every step of the way.\n\n" .
           "Student message: " . $userMessage;
 
 // Payload with optimized generation config
