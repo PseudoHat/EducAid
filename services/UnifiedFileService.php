@@ -301,10 +301,9 @@ class UnifiedFileService {
                 }
             }
             
-            // Check permanent student-specific folders (2 levels up from services/)
-            $projectRoot = dirname(dirname(__FILE__));
+            // Check permanent student-specific folders
             foreach ($folderPairs as $folderPair) {
-                $permanentPath = $projectRoot . '/student/' . $folderPair['permanent'] . '/' . $studentId;
+                $permanentPath = $this->basePath . '/student/' . $folderPair['permanent'] . '/' . $studentId;
                 
                 if (!is_dir($permanentPath)) {
                     error_log("UnifiedFileService: Checking permanent path (not found): {$permanentPath}");
@@ -490,9 +489,8 @@ class UnifiedFileService {
             }
             
             // Check permanent student-specific folders (for students blacklisted after approval)
-            $projectRoot = dirname(dirname(__FILE__));
             foreach ($folderPairs as $folderPair) {
-                $permanentPath = $projectRoot . '/student/' . $folderPair['permanent'] . '/' . $studentId;
+                $permanentPath = $this->basePath . '/student/' . $folderPair['permanent'] . '/' . $studentId;
                 
                 if (!is_dir($permanentPath)) continue;
                 
@@ -891,29 +889,64 @@ class UnifiedFileService {
             return ['success' => false, 'message' => 'Archive ZIP not found'];
         }
         
-        if (!$extractPath) {
-            $extractPath = __DIR__ . '/../assets/uploads/temp/extracted_' . $studentId;
-        }
-        
         $zip = new ZipArchive();
         if ($zip->open($zipFile) !== TRUE) {
             return ['success' => false, 'message' => 'Failed to open ZIP file'];
         }
         
-        $extractedFiles = [];
+        // Keep the CORRECT folder structure: /student/{filetype}/{student_id}/
+        // ZIP contains: enrollment_forms/file.pdf, grades/file.pdf, etc.
+        
+        $extractedFiles = 0;
+        $errors = [];
         
         for ($i = 0; $i < $zip->numFiles; $i++) {
             $filename = $zip->getNameIndex($i);
-            $zip->extractTo($extractPath, $filename);
-            $extractedFiles[] = $filename;
+            
+            // Parse the ZIP path (e.g., "enrollment_forms/STUDENTID_file.pdf")
+            $parts = explode('/', $filename);
+            if (count($parts) !== 2) {
+                $errors[] = "Invalid ZIP structure: $filename";
+                continue;
+            }
+            
+            $folderName = $parts[0]; // enrollment_forms, grades, letter_mayor, indigency, id_picture
+            $file = $parts[1];
+            
+            // Create permanent storage directory: /assets/uploads/student/{folderName}/{studentId}/
+            $targetDir = $this->basePath . '/student/' . $folderName . '/' . $studentId;
+            if (!is_dir($targetDir)) {
+                if (!mkdir($targetDir, 0755, true)) {
+                    $errors[] = "Failed to create directory: $targetDir";
+                    continue;
+                }
+            }
+            
+            // Extract file directly to the permanent location
+            $targetPath = $targetDir . '/' . $file;
+            
+            // Get file content from ZIP and write to target
+            $fileContent = $zip->getFromIndex($i);
+            if ($fileContent === false) {
+                $errors[] = "Failed to read file from ZIP: $filename";
+                continue;
+            }
+            
+            if (file_put_contents($targetPath, $fileContent) === false) {
+                $errors[] = "Failed to write file: $targetPath";
+                continue;
+            }
+            
+            $extractedFiles++;
+            error_log("UnifiedFileService: Extracted $filename to $targetPath");
         }
         
         $zip->close();
         
         return [
             'success' => true,
-            'extracted_files' => $extractedFiles,
-            'extract_path' => $extractPath
+            'files_extracted' => $extractedFiles,
+            'errors' => $errors
         ];
     }
     

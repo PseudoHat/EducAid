@@ -1,6 +1,7 @@
 <?php
 include __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../services/UnifiedFileService.php';
+require_once __DIR__ . '/../../services/DocumentService.php';
 require_once __DIR__ . '/../../includes/student_notification_helper.php';
 
 session_start();
@@ -30,6 +31,9 @@ if (isset($_GET['api']) && $_GET['api'] === 'badge_count') {
 
 // Initialize DocumentService
 $docService = new DocumentService($connection);
+
+// Initialize UnifiedFileService for file operations
+$fileService = new UnifiedFileService($connection);
 
 // Handle approval/rejection
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -235,6 +239,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $updateQuery = "UPDATE students 
                            SET status = 'applicant', 
                                needs_document_upload = FALSE,
+                               documents_submitted = TRUE,
                                first_registered_academic_year = $2,
                                current_academic_year = $2
                            WHERE student_id = $1";
@@ -586,8 +591,8 @@ $confidence_filter = $_GET['confidence'] ?? '';
 $sort_by = $_GET['sort'] ?? 'application_date';
 $sort_order = $_GET['order'] ?? 'DESC';
 
-// Build WHERE clause
-$whereConditions = ["s.status = 'under_registration'"];
+// Build WHERE clause - exclude archived students
+$whereConditions = ["s.status = 'under_registration'", "(s.is_archived = FALSE OR s.is_archived IS NULL)"];
 $params = [];
 $paramCount = 1;
 
@@ -990,8 +995,8 @@ $yearLevels = pg_fetch_all(pg_query($connection, "SELECT year_level_id, name FRO
                         </div>
                         <div class="d-flex gap-2">
                             <?php
-                            // Count high confidence registrations (80%+)
-                            $highConfidenceQuery = "SELECT COUNT(*) FROM students s WHERE s.status = 'under_registration' AND COALESCE(s.confidence_score, calculate_confidence_score(s.student_id)) >= 80";
+                            // Count high confidence registrations (80%+) - exclude archived
+                            $highConfidenceQuery = "SELECT COUNT(*) FROM students s WHERE s.status = 'under_registration' AND (s.is_archived = FALSE OR s.is_archived IS NULL) AND COALESCE(s.confidence_score, calculate_confidence_score(s.student_id)) >= 80";
                             $highConfidenceResult = pg_query($connection, $highConfidenceQuery);
                             $highConfidenceCount = pg_fetch_result($highConfidenceResult, 0, 0);
                             ?>

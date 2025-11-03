@@ -195,40 +195,40 @@ foreach ($doc_type_config as $code => $config) {
             $verify_raw = json_decode($verify_content, true);
             
             if ($verify_raw && is_array($verify_raw)) {
-                // Handle nested structure (EAF has data under "verification" key)
-                $verification = isset($verify_raw['verification']) ? $verify_raw['verification'] : $verify_raw;
+                // Start with the raw data as the verification base
+                $verification = $verify_raw;
                 
-                // If it's nested, merge the top-level fields (like tsv_quality, extracted_data)
-                if (isset($verify_raw['verification']) && $verify_raw !== $verification) {
-                    // Preserve top-level keys like tsv_quality, extracted_data
-                    foreach ($verify_raw as $top_level_key => $value) {
-                        if ($top_level_key !== 'verification' && !isset($verification[$top_level_key])) {
-                            $verification[$top_level_key] = $value;
-                        }
-                    }
-                }
-                
-                // Extract confidence from verification data
+                // Extract confidence from various possible locations
                 $confidence = 0;
-                if (isset($verification['summary']['average_confidence'])) {
-                    $confidence = floatval($verification['summary']['average_confidence']);
-                } elseif (isset($verification['tsv_quality']['avg_confidence'])) {
-                    $confidence = floatval($verification['tsv_quality']['avg_confidence']);
-                } elseif (isset($verification['summary']['tsv_avg_confidence'])) {
-                    $confidence = floatval($verification['summary']['tsv_avg_confidence']);
-                } elseif (isset($verification['ocr_confidence'])) {
-                    $confidence = floatval($verification['ocr_confidence']);
+                if (isset($verify_raw['ocr_confidence'])) {
+                    $confidence = floatval($verify_raw['ocr_confidence']);
+                } elseif (isset($verify_raw['overall_confidence'])) {
+                    $confidence = floatval($verify_raw['overall_confidence']);
+                } elseif (isset($verify_raw['summary']['average_confidence'])) {
+                    $confidence = floatval($verify_raw['summary']['average_confidence']);
+                } elseif (isset($verify_raw['tsv_quality']['avg_confidence'])) {
+                    $confidence = floatval($verify_raw['tsv_quality']['avg_confidence']);
                 }
                 
                 // Extract verification score
                 $verification_score = 0;
-                if (isset($verification['verification_score'])) {
-                    $verification_score = floatval($verification['verification_score']);
-                } elseif (isset($verification['summary']['verification_score'])) {
-                    $verification_score = floatval($verification['summary']['verification_score']);
-                } elseif (isset($verification['summary']['average_confidence'])) {
-                    // Fallback to average confidence as verification score
-                    $verification_score = floatval($verification['summary']['average_confidence']);
+                if (isset($verify_raw['verification_score'])) {
+                    $verification_score = floatval($verify_raw['verification_score']);
+                } elseif (isset($verify_raw['summary']['verification_score'])) {
+                    $verification_score = floatval($verify_raw['summary']['verification_score']);
+                } elseif ($confidence > 0) {
+                    // Fallback to confidence as verification score
+                    $verification_score = $confidence;
+                }
+                
+                // Extract verification status
+                $verification_status = 'pending';
+                if (isset($verify_raw['verification_status'])) {
+                    $verification_status = $verify_raw['verification_status'];
+                } elseif (isset($verify_raw['success'])) {
+                    $verification_status = $verify_raw['success'] ? 'passed' : 'manual_review';
+                } elseif (isset($verify_raw['is_eligible'])) {
+                    $verification_status = $verify_raw['is_eligible'] ? 'verified' : 'pending';
                 }
                 
                 // Read OCR text if available
@@ -240,9 +240,7 @@ foreach ($doc_type_config as $code => $config) {
                 $ocr_data = [
                     'confidence' => $confidence,
                     'verification_score' => $verification_score,
-                    'verification_status' => isset($verification['is_eligible']) 
-                        ? ($verification['is_eligible'] ? 'verified' : 'pending') 
-                        : 'pending',
+                    'verification_status' => $verification_status,
                     'verification' => $verification,
                     'extracted_text' => $extracted_text
                 ];

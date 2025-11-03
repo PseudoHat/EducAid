@@ -252,6 +252,9 @@ class EnrollmentFormOCRService {
         $lastName = $studentData['last_name'] ?? '';
         
         $result = [
+            'first_name' => $firstName,
+            'middle_name' => $middleName,
+            'last_name' => $lastName,
             'first_name_found' => false,
             'middle_name_found' => false,
             'last_name_found' => false,
@@ -568,7 +571,7 @@ class EnrollmentFormOCRService {
             return [
                 'found' => false,
                 'confidence' => 0,
-                'match' => false
+                'matched' => false
             ];
         }
         
@@ -578,7 +581,7 @@ class EnrollmentFormOCRService {
         return [
             'found' => $similarity >= 60,
             'confidence' => $similarity,
-            'match' => $similarity >= 70
+            'matched' => $similarity >= 70
         ];
     }
     
@@ -667,42 +670,73 @@ class EnrollmentFormOCRService {
         $needle = strtolower(trim($needle));
         $haystack = strtolower($haystack);
         
-        // Exact match
+        // Normalize both strings by removing punctuation and extra spaces
+        // This helps match "University - Cavite" with "University Cavite"
+        $needleNormalized = preg_replace('/[^\w\s]/u', ' ', $needle); // Remove punctuation
+        $needleNormalized = preg_replace('/\s+/', ' ', $needleNormalized); // Collapse spaces
+        $needleNormalized = trim($needleNormalized);
+        
+        $haystackNormalized = preg_replace('/[^\w\s]/u', ' ', $haystack);
+        $haystackNormalized = preg_replace('/\s+/', ' ', $haystackNormalized);
+        $haystackNormalized = trim($haystackNormalized);
+        
+        // Exact match on normalized strings
+        if (strpos($haystackNormalized, $needleNormalized) !== false) {
+            return 100;
+        }
+        
+        // Also check original strings for backward compatibility
         if (strpos($haystack, $needle) !== false) {
             return 100;
         }
         
         // Split into words and check each
-        $needleWords = preg_split('/\s+/', $needle);
+        $needleWords = preg_split('/\s+/', $needleNormalized);
+        $haystackWords = preg_split('/\s+/', $haystackNormalized);
         $matchedWords = 0;
         
-        foreach ($needleWords as $word) {
-            if (strlen($word) >= 3 && strpos($haystack, $word) !== false) {
-                $matchedWords++;
+        // Count exact word matches
+        foreach ($needleWords as $nWord) {
+            if (strlen($nWord) >= 3) {
+                foreach ($haystackWords as $hWord) {
+                    if ($nWord === $hWord) {
+                        $matchedWords++;
+                        break; // Don't count the same haystack word multiple times
+                    }
+                }
             }
         }
         
         $wordMatchPercent = count($needleWords) > 0 ? ($matchedWords / count($needleWords)) * 100 : 0;
         
-        // Levenshtein for short strings
-        if (strlen($needle) <= 255) {
-            $minDistance = PHP_INT_MAX;
-            $haystackWords = preg_split('/\s+/', $haystack);
-            
-            foreach ($haystackWords as $hWord) {
-                if (strlen($hWord) >= 3) {
-                    $distance = levenshtein($needle, $hWord);
-                    $minDistance = min($minDistance, $distance);
+        // If we got a good word match, return it
+        if ($wordMatchPercent >= 70) {
+            return $wordMatchPercent;
+        }
+        
+        // Levenshtein for fuzzy word matching (to catch typos)
+        $fuzzyMatchedWords = 0;
+        foreach ($needleWords as $nWord) {
+            if (strlen($nWord) >= 3) {
+                $bestSimilarity = 0;
+                foreach ($haystackWords as $hWord) {
+                    if (strlen($hWord) >= 3) {
+                        $distance = levenshtein($nWord, $hWord);
+                        $maxLen = max(strlen($nWord), strlen($hWord));
+                        $similarity = max(0, 100 - ($distance / $maxLen) * 100);
+                        $bestSimilarity = max($bestSimilarity, $similarity);
+                    }
                 }
-            }
-            
-            if ($minDistance !== PHP_INT_MAX) {
-                $levSimilarity = max(0, 100 - ($minDistance / strlen($needle)) * 100);
-                return max($wordMatchPercent, $levSimilarity);
+                // Consider it a match if similarity is >= 80%
+                if ($bestSimilarity >= 80) {
+                    $fuzzyMatchedWords++;
+                }
             }
         }
         
-        return $wordMatchPercent;
+        $fuzzyMatchPercent = count($needleWords) > 0 ? ($fuzzyMatchedWords / count($needleWords)) * 100 : 0;
+        
+        return max($wordMatchPercent, $fuzzyMatchPercent);
     }
     
     /**

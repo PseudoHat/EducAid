@@ -454,8 +454,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['complete_distribution
             $email_message = " Email notifications sent to {$emailResult['sent']} student(s).";
         }
         
-        $_SESSION['success_message'] = "Distribution snapshot $action_type successfully! Recorded $total_students students for " . 
-            trim($academic_year . ' ' . ($semester ?? '')) . ". You can now proceed to End Distribution when ready." . $slot_message . $schedule_message . $email_message;
+        $_SESSION['success_message'] = "Distribution completed and finalized! Recorded $total_students students for " . 
+            trim($academic_year . ' ' . ($semester ?? '')) . ". The scanner has been disabled." . $slot_message . $schedule_message . $email_message . 
+            " You can now proceed to 'End Distribution' to compress files and reset the system for the next cycle.";
     } catch (Exception $e) {
         pg_query($connection, "ROLLBACK");
         $error_details = $e->getMessage() . " | Line: " . $e->getLine();

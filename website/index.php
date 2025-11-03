@@ -27,4 +27,5 @@ if (isset($_SESSION['captcha_verified']) && $_SESSION['captcha_verified'] === tr
 // Redirect to security verification
 header('Location: security_verification.php');
 exit;
+
 ?>

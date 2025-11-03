@@ -27,10 +27,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax'])) {
             echo json_encode(['status' => 'error', 'message' => 'Invalid email format.']);
             exit;
         }
-        // Check if email already used by another student (exclude current)
-        $res = pg_query_params($connection, "SELECT 1 FROM students WHERE email = $1 AND student_id != $2", [$newEmail, $student_id]);
+        // Check if email is used by an admin
+        $adminCheck = pg_query_params($connection, "SELECT 1 FROM admins WHERE email = $1", [$newEmail]);
+        if (pg_num_rows($adminCheck) > 0) {
+            echo json_encode(['status' => 'error', 'message' => 'This email is already in use.']);
+            exit;
+        }
+        // Check if email already used by another active student (exclude current)
+        $res = pg_query_params($connection, "SELECT 1 FROM students WHERE email = $1 AND student_id != $2 AND is_archived = FALSE", [$newEmail, $student_id]);
         if (pg_num_rows($res) > 0) {
-            echo json_encode(['status' => 'error', 'message' => 'This email is already registered.']);
+            echo json_encode(['status' => 'error', 'message' => 'This email is already registered by another active student.']);
             exit;
         }
         $otp = rand(100000, 999999);
@@ -186,16 +192,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_email'])) {
     }
 
     if (filter_var($newEmail, FILTER_VALIDATE_EMAIL)) {
-        pg_query($connection, "UPDATE students SET email = '" . pg_escape_string($connection, $newEmail) . "' WHERE student_id = '" . pg_escape_string($connection, $student_id) . "'");
-        $msg = 'Your email has been changed to ' . $newEmail . '.';
-        pg_query($connection, "INSERT INTO notifications (student_id, message) VALUES ('" . pg_escape_string($connection, $student_id) . "', '" . pg_escape_string($connection, $msg) . "')");
-        $nameRes = pg_query($connection, "SELECT first_name, last_name FROM students WHERE student_id = '" . pg_escape_string($connection, $student_id) . "'");
-        $nm = pg_fetch_assoc($nameRes);
-        $adminMsg = $nm['first_name'] . ' ' . $nm['last_name'] . ' (' . $student_id . ') updated email to ' . $newEmail . '.';
-        pg_query($connection, "INSERT INTO admin_notifications (message) VALUES ('" . pg_escape_string($connection,$adminMsg) . "')");
-        $_SESSION['profile_flash'] = 'Email updated successfully.';
-        $_SESSION['profile_flash_type'] = 'success';
-        unset($_SESSION['profile_otp_email'], $_SESSION['profile_otp_verified']);
+        // Check if email is used by an admin
+        $adminCheck = pg_query_params($connection, "SELECT 1 FROM admins WHERE email = $1", [$newEmail]);
+        if (pg_num_rows($adminCheck) > 0) {
+            $_SESSION['profile_flash'] = 'This email is already in use.';
+            $_SESSION['profile_flash_type'] = 'error';
+            unset($_SESSION['profile_otp_email'], $_SESSION['profile_otp_verified']);
+            header("Location: student_settings.php");
+            exit;
+        }
+        
+        try {
+            pg_query($connection, "UPDATE students SET email = '" . pg_escape_string($connection, $newEmail) . "' WHERE student_id = '" . pg_escape_string($connection, $student_id) . "'");
+            $msg = 'Your email has been changed to ' . $newEmail . '.';
+            pg_query($connection, "INSERT INTO notifications (student_id, message) VALUES ('" . pg_escape_string($connection, $student_id) . "', '" . pg_escape_string($connection, $msg) . "')");
+            $nameRes = pg_query($connection, "SELECT first_name, last_name FROM students WHERE student_id = '" . pg_escape_string($connection, $student_id) . "'");
+            $nm = pg_fetch_assoc($nameRes);
+            $adminMsg = $nm['first_name'] . ' ' . $nm['last_name'] . ' (' . $student_id . ') updated email to ' . $newEmail . '.';
+            pg_query($connection, "INSERT INTO admin_notifications (message) VALUES ('" . pg_escape_string($connection,$adminMsg) . "')");
+            $_SESSION['profile_flash'] = 'Email updated successfully.';
+            $_SESSION['profile_flash_type'] = 'success';
+            unset($_SESSION['profile_otp_email'], $_SESSION['profile_otp_verified']);
+        } catch (Exception $e) {
+            // Catch database constraint violations
+            if (strpos($e->getMessage(), 'unique') !== false || strpos($e->getMessage(), 'duplicate') !== false) {
+                $_SESSION['profile_flash'] = 'This email is already registered by another active student.';
+            } else {
+                $_SESSION['profile_flash'] = 'Failed to update email. Please try again.';
+            }
+            $_SESSION['profile_flash_type'] = 'error';
+        }
     }
     header("Location: student_settings.php"); exit;
 }
@@ -204,15 +230,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_email'])) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_mobile'])) {
     $newMobile = preg_replace('/\D/', '', $_POST['new_mobile']);
     if ($newMobile) {
-        pg_query($connection, "UPDATE students SET mobile = '" . pg_escape_string($connection, $newMobile) . "' WHERE student_id = '" . pg_escape_string($connection, $student_id) . "'");
-        $msg = 'Your mobile number has been changed to ' . $newMobile . '.';
-        pg_query($connection, "INSERT INTO notifications (student_id, message) VALUES ('" . pg_escape_string($connection, $student_id) . "', '" . pg_escape_string($connection, $msg) . "')");
-        $nameRes = pg_query($connection, "SELECT first_name, last_name FROM students WHERE student_id = '" . pg_escape_string($connection, $student_id) . "'");
-        $nm = pg_fetch_assoc($nameRes);
-        $adminMsg = $nm['first_name'] . ' ' . $nm['last_name'] . ' (' . $student_id . ') updated mobile to ' . $newMobile . '.';
-        pg_query($connection, "INSERT INTO admin_notifications (message) VALUES ('" . pg_escape_string($connection,$adminMsg) . "')");
-        $_SESSION['profile_flash'] = 'Mobile number updated successfully.';
-        $_SESSION['profile_flash_type'] = 'success';
+        // Check if mobile already used by another active student (exclude current)
+        $checkRes = pg_query_params($connection, "SELECT 1 FROM students WHERE mobile = $1 AND student_id != $2 AND is_archived = FALSE", [$newMobile, $student_id]);
+        if (pg_num_rows($checkRes) > 0) {
+            $_SESSION['profile_flash'] = 'This mobile number is already registered by another active student.';
+            $_SESSION['profile_flash_type'] = 'error';
+            header("Location: student_settings.php");
+            exit;
+        }
+
+        try {
+            pg_query($connection, "UPDATE students SET mobile = '" . pg_escape_string($connection, $newMobile) . "' WHERE student_id = '" . pg_escape_string($connection, $student_id) . "'");
+            $msg = 'Your mobile number has been changed to ' . $newMobile . '.';
+            pg_query($connection, "INSERT INTO notifications (student_id, message) VALUES ('" . pg_escape_string($connection, $student_id) . "', '" . pg_escape_string($connection, $msg) . "')");
+            $nameRes = pg_query($connection, "SELECT first_name, last_name FROM students WHERE student_id = '" . pg_escape_string($connection, $student_id) . "'");
+            $nm = pg_fetch_assoc($nameRes);
+            $adminMsg = $nm['first_name'] . ' ' . $nm['last_name'] . ' (' . $student_id . ') updated mobile to ' . $newMobile . '.';
+            pg_query($connection, "INSERT INTO admin_notifications (message) VALUES ('" . pg_escape_string($connection,$adminMsg) . "')");
+            $_SESSION['profile_flash'] = 'Mobile number updated successfully.';
+            $_SESSION['profile_flash_type'] = 'success';
+        } catch (Exception $e) {
+            // Catch database constraint violations
+            if (strpos($e->getMessage(), 'unique') !== false || strpos($e->getMessage(), 'duplicate') !== false) {
+                $_SESSION['profile_flash'] = 'This mobile number is already registered by another active student.';
+            } else {
+                $_SESSION['profile_flash'] = 'Failed to update mobile number. Please try again.';
+            }
+            $_SESSION['profile_flash_type'] = 'error';
+        }
     }
     header("Location: student_settings.php"); exit;
 }
@@ -301,8 +346,24 @@ unset($_SESSION['profile_flash'], $_SESSION['profile_flash_type']);
   <script src="../../assets/js/student/accessibility.js"></script>
   <style>
     .verified-indicator { color: #28a745; font-weight: bold; }
-    .form-error { color:#e14343; font-size: 0.92em; font-weight: 500; min-width: 90px; text-align: left; }
-    .form-success { color:#41d87d; font-size: 0.92em; font-weight: 500; min-width: 90px; text-align: left; }
+    .form-error { 
+      color: #dc3545; 
+      font-size: 0.875rem; 
+      font-weight: 500;
+      padding: 0.5rem 0.75rem;
+      background: #f8d7da;
+      border-radius: 6px;
+      border-left: 3px solid #dc3545;
+    }
+    .form-success { 
+      color: #28a745; 
+      font-size: 0.875rem; 
+      font-weight: 500;
+      padding: 0.5rem 0.75rem;
+      background: #d4edda;
+      border-radius: 6px;
+      border-left: 3px solid #28a745;
+    }
     .home-section { padding-top: 0 !important; }
     .home-section > .main-header:first-child { margin-top: 0 !important; }
     
@@ -939,6 +1000,42 @@ unset($_SESSION['profile_flash'], $_SESSION['profile_flash_type']);
       background-color: #4299e1;
       border-color: #4299e1;
     }
+
+    /* Modal styling - NO backdrop interference */
+    .modal {
+      z-index: 200000 !important;
+      background: rgba(0, 0, 0, 0.5) !important; /* Built-in backdrop effect */
+    }
+
+    .modal.fade.show {
+      z-index: 200000 !important;
+    }
+
+    .modal-dialog {
+      z-index: 200001 !important;
+      position: relative;
+    }
+
+    .modal-content {
+      z-index: 200002 !important;
+      position: relative;
+    }
+
+    /* Hide any Bootstrap-generated backdrop */
+    .modal-backdrop {
+      display: none !important;
+    }
+
+    /* Ensure modal is clickable and centered */
+    .modal.show {
+      display: flex !important;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal.show .modal-dialog {
+      pointer-events: auto !important;
+    }
   </style>
 </head>
 <body>
@@ -1201,7 +1298,7 @@ unset($_SESSION['profile_flash'], $_SESSION['profile_flash_type']);
 
             <!-- Modals (same as before but updated redirects) -->
             <!-- Email Modal with OTP -->
-            <div class="modal fade" id="emailModal" tabindex="-1">
+            <div class="modal fade" id="emailModal" tabindex="-1" data-bs-backdrop="false">
               <div class="modal-dialog modal-dialog-centered">
                 <form id="emailUpdateForm" method="POST" class="modal-content">
                   <div class="modal-header">
@@ -1211,11 +1308,11 @@ unset($_SESSION['profile_flash'], $_SESSION['profile_flash_type']);
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
               </div>
               <div class="modal-body">
-                <div class="mb-3 position-relative">
+                <div class="mb-3">
                   <label class="form-label">New Email Address</label>
                   <input type="email" name="new_email" id="newEmailInput" class="form-control" 
                          placeholder="Enter your new email address" required>
-                  <span id="emailOtpStatus" class="form-error position-absolute" style="right:15px;top:35px;"></span>
+                  <div id="emailOtpStatus" class="mt-2"></div>
                 </div>
                 <div id="otpSection" style="display:none;">
                   <div class="alert alert-info">
@@ -1251,7 +1348,7 @@ unset($_SESSION['profile_flash'], $_SESSION['profile_flash_type']);
         </div>
 
         <!-- Mobile Modal -->
-        <div class="modal fade" id="mobileModal" tabindex="-1">
+        <div class="modal fade" id="mobileModal" tabindex="-1" data-bs-backdrop="false">
           <div class="modal-dialog modal-dialog-centered">
             <form method="POST" class="modal-content">
               <div class="modal-header">
@@ -1284,7 +1381,7 @@ unset($_SESSION['profile_flash'], $_SESSION['profile_flash_type']);
         </div>
 
         <!-- Change Password Modal with OTP -->
-        <div class="modal fade" id="passwordModal" tabindex="-1">
+        <div class="modal fade" id="passwordModal" tabindex="-1" data-bs-backdrop="false">
           <div class="modal-dialog modal-dialog-centered">
             <form id="passwordUpdateForm" method="POST" class="modal-content" autocomplete="off">
               <div class="modal-header">
@@ -1381,21 +1478,49 @@ unset($_SESSION['profile_flash'], $_SESSION['profile_flash_type']);
   <script src="../../assets/js/student/student_profile.js"></script>
   
   <script>
-    // Password visibility toggle function
-    function togglePasswordVisibility(fieldId, iconId) {
-      const field = document.getElementById(fieldId);
-      const icon = document.getElementById(iconId);
-      
-      if (field.type === 'password') {
-        field.type = 'text';
-        icon.classList.remove('bi-eye');
-        icon.classList.add('bi-eye-slash');
-      } else {
-        field.type = 'password';
-        icon.classList.remove('bi-eye-slash');
-        icon.classList.add('bi-eye');
-      }
-    }
+    // Fix modal z-index and remove backdrop interference
+    document.addEventListener('DOMContentLoaded', function() {
+      const allModals = document.querySelectorAll('.modal');
+      allModals.forEach(modal => {
+        modal.addEventListener('shown.bs.modal', function() {
+          // Set modal z-index
+          this.style.zIndex = '200000';
+          this.style.display = 'flex';
+          this.style.alignItems = 'center';
+          this.style.justifyContent = 'center';
+          this.style.background = 'rgba(0, 0, 0, 0.5)'; // Built-in backdrop
+          
+          // Set dialog z-index higher
+          const dialog = this.querySelector('.modal-dialog');
+          if (dialog) {
+            dialog.style.zIndex = '200001';
+            dialog.style.pointerEvents = 'auto';
+            dialog.style.position = 'relative';
+          }
+          
+          // Set content z-index even higher
+          const content = this.querySelector('.modal-content');
+          if (content) {
+            content.style.zIndex = '200002';
+            content.style.position = 'relative';
+          }
+          
+          // Remove any Bootstrap-generated backdrop that might interfere
+          const backdrop = document.querySelector('.modal-backdrop');
+          if (backdrop) {
+            backdrop.remove();
+          }
+        });
+        
+        modal.addEventListener('hidden.bs.modal', function() {
+          // Clean up when modal closes
+          const backdrop = document.querySelector('.modal-backdrop');
+          if (backdrop && !document.querySelector('.modal.show')) {
+            backdrop.remove();
+          }
+        });
+      });
+    });
 
     // Smooth scroll and active navigation highlighting
     document.addEventListener('DOMContentLoaded', function() {

@@ -33,9 +33,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     header('Content-Type: application/json');
     
     $studentId = $_POST['student_id'] ?? null;
+    $unarchiveReason = trim($_POST['unarchive_reason'] ?? '');
     
     if (!$studentId) {
         echo json_encode(['success' => false, 'message' => 'Student ID is required']);
+        exit;
+    }
+    
+    if (empty($unarchiveReason)) {
+        echo json_encode(['success' => false, 'message' => 'Unarchive reason is required']);
         exit;
     }
     
@@ -54,16 +60,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     $student = pg_fetch_assoc($studentQuery);
     $fullName = trim($student['first_name'] . ' ' . ($student['middle_name'] ?? '') . ' ' . $student['last_name']);
     
-    // Unarchive student
+    // Unarchive student with reason
     $result = pg_query_params($connection,
-        "SELECT unarchive_student($1, $2) as success",
-        [$studentId, $adminId]
+        "SELECT unarchive_student($1, $2, $3) as success",
+        [$studentId, $adminId, $unarchiveReason]
     );
     
     if ($result && pg_fetch_assoc($result)['success'] === 't') {
-        // Extract archived files back to permanent storage
-        require_once '../../services/FileManagementService.php';
-        $fileService = new FileManagementService($connection);
+        // Extract archived files back to permanent storage using NEW structure
+        require_once '../../services/UnifiedFileService.php';
+        $fileService = new UnifiedFileService($connection);
         $extractResult = $fileService->extractArchivedStudent($studentId);
         
         // Delete the ZIP file after successful extraction
@@ -223,12 +229,17 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
             u.name as university,
             s.archived_at,
             s.archive_reason,
+            s.unarchived_at,
+            s.unarchived_by,
+            s.unarchive_reason,
             CASE WHEN s.archived_by IS NULL THEN 'Automatic' ELSE 'Manual' END as archive_type,
-            CONCAT(a.first_name, ' ', a.last_name) as archived_by_name
+            CONCAT(a.first_name, ' ', a.last_name) as archived_by_name,
+            CONCAT(ua.first_name, ' ', ua.last_name) as unarchived_by_name
         FROM students s
         LEFT JOIN year_levels yl ON s.year_level_id = yl.year_level_id
         LEFT JOIN universities u ON s.university_id = u.university_id
         LEFT JOIN admins a ON s.archived_by = a.admin_id
+        LEFT JOIN admins ua ON s.unarchived_by = ua.admin_id
         WHERE {$whereClause}
         ORDER BY s.archived_at DESC
     ";
@@ -240,7 +251,7 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
     header('Content-Disposition: attachment; filename="archived_students_' . date('Y-m-d_His') . '.csv"');
     
     $output = fopen('php://output', 'w');
-    fputcsv($output, ['Student ID', 'First Name', 'Middle Name', 'Last Name', 'Email', 'Mobile', 'Year Level', 'University', 'Archived At', 'Archive Type', 'Archived By', 'Reason']);
+    fputcsv($output, ['Student ID', 'First Name', 'Middle Name', 'Last Name', 'Email', 'Mobile', 'Year Level', 'University', 'Archived At', 'Archive Type', 'Archived By', 'Archive Reason', 'Previously Unarchived At', 'Unarchived By', 'Unarchive Reason']);
     
     while ($row = pg_fetch_assoc($result)) {
         fputcsv($output, [
@@ -255,7 +266,10 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
             $row['archived_at'],
             $row['archive_type'],
             $row['archived_by_name'] ?? 'System',
-            $row['archive_reason']
+            $row['archive_reason'],
+            $row['unarchived_at'] ?? '',
+            $row['unarchived_by_name'] ?? '',
+            $row['unarchive_reason'] ?? ''
         ]);
     }
     
@@ -349,8 +363,12 @@ $query = "
         s.archived_at,
         s.archived_by,
         s.archive_reason,
+        s.unarchived_at,
+        s.unarchived_by,
+        s.unarchive_reason,
         s.last_login,
         CONCAT(a.first_name, ' ', a.last_name) as archived_by_name,
+        CONCAT(ua.first_name, ' ', ua.last_name) as unarchived_by_name,
         CASE 
             WHEN s.archived_by IS NULL THEN 'Automatic'
             ELSE 'Manual'
@@ -359,6 +377,7 @@ $query = "
     LEFT JOIN year_levels yl ON s.year_level_id = yl.year_level_id
     LEFT JOIN universities u ON s.university_id = u.university_id
     LEFT JOIN admins a ON s.archived_by = a.admin_id
+    LEFT JOIN admins ua ON s.unarchived_by = ua.admin_id
     WHERE {$whereClause}
     ORDER BY s.archived_at DESC
     LIMIT $" . $paramCount++ . " OFFSET $" . $paramCount;
@@ -386,7 +405,8 @@ $statsQuery = "
         COUNT(*) as total_archived,
         COUNT(CASE WHEN archived_by IS NULL THEN 1 END) as auto_archived,
         COUNT(CASE WHEN archived_by IS NOT NULL THEN 1 END) as manual_archived,
-        COUNT(CASE WHEN archived_at >= CURRENT_DATE - INTERVAL '30 days' THEN 1 END) as archived_last_30_days
+        COUNT(CASE WHEN archived_at >= CURRENT_DATE - INTERVAL '30 days' THEN 1 END) as archived_last_30_days,
+        COUNT(CASE WHEN unarchived_at IS NOT NULL THEN 1 END) as previously_unarchived
     FROM students
     WHERE is_archived = TRUE" . 
     ($adminMunicipalityId ? " AND (municipality_id = " . $adminMunicipalityId . " OR municipality_id IS NULL)" : "");
@@ -548,13 +568,8 @@ $stats = pg_fetch_assoc($statsResult);
             <!-- Statistics Cards -->
             <div class="stats-cards">
                 <div class="stat-card">
-                    <div class="stat-icon primary">
-                        <i class="bi bi-archive"></i>
-                    </div>
-                    <div class="stat-details">
-                        <h3><?php echo $stats['total_archived']; ?></h3>
-                        <p>Total Archived</p>
-                    </div>
+                    <div class="stat-number text-primary"><?php echo $stats['total_archived']; ?></div>
+                    <div class="stat-label">Total Archived</div>
                 </div>
 
                 <div class="stat-card">
@@ -570,6 +585,11 @@ $stats = pg_fetch_assoc($statsResult);
                 <div class="stat-card">
                     <div class="stat-number text-warning"><?php echo $stats['archived_last_30_days']; ?></div>
                     <div class="stat-label">Last 30 Days</div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-number text-secondary"><?php echo $stats['previously_unarchived']; ?></div>
+                    <div class="stat-label">Re-archived (Previously Restored)</div>
                 </div>
             </div>
 
@@ -688,8 +708,24 @@ $stats = pg_fetch_assoc($statsResult);
                                         <span class="badge <?php echo strtolower($student['archive_type']); ?>">
                                             <?php echo $student['archive_type']; ?>
                                         </span>
+                                        <?php if ($student['unarchived_at']): ?>
+                                            <br>
+                                            <small class="text-muted" 
+                                                   title="Previously restored on <?php echo date('M d, Y h:i A', strtotime($student['unarchived_at'])); ?> by <?php echo htmlspecialchars($student['unarchived_by_name'] ?? 'Unknown'); ?><?php echo $student['unarchive_reason'] ? '\nReason: ' . htmlspecialchars($student['unarchive_reason']) : ''; ?>">
+                                                <i class="bi bi-arrow-counterclockwise"></i> Re-archived
+                                            </small>
+                                        <?php endif; ?>
                                     </td>
-                                    <td><?php echo $student['archived_by_name'] ?? '<em>System</em>'; ?></td>
+                                    <td>
+                                        <?php echo $student['archived_by_name'] ?? '<em>System</em>'; ?>
+                                        <?php if ($student['unarchived_at']): ?>
+                                            <br>
+                                            <small class="text-muted" 
+                                                   title="<?php echo htmlspecialchars($student['unarchive_reason'] ?? 'No reason provided'); ?>">
+                                                <i class="bi bi-info-circle"></i> Last restored: <?php echo date('M d, Y', strtotime($student['unarchived_at'])); ?>
+                                            </small>
+                                        <?php endif; ?>
+                                    </td>
                                     <td>
                                         <button class="btn btn-sm btn-info" 
                                                 onclick="viewDetails('<?php echo htmlspecialchars($student['student_id'], ENT_QUOTES); ?>')">
@@ -786,6 +822,54 @@ $stats = pg_fetch_assoc($statsResult);
     </div>
 </div>
 
+<!-- Unarchive Modal -->
+<div class="modal fade" id="unarchiveModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">
+                    <i class="bi bi-arrow-counterclockwise"></i> Unarchive Student
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="unarchiveForm">
+                <div class="modal-body">
+                    <input type="hidden" id="unarchiveStudentId">
+                    
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle me-2"></i>
+                        You are about to unarchive <strong id="unarchiveStudentName"></strong>.
+                        This will restore their account and they will be able to log in again.
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="unarchiveReason" class="form-label">
+                            Reason for Unarchiving <span class="text-danger">*</span>
+                        </label>
+                        <textarea class="form-control" 
+                                  id="unarchiveReason" 
+                                  name="unarchive_reason" 
+                                  rows="3" 
+                                  required
+                                  placeholder="e.g., Account was archived by mistake, Student re-enrolled, Administrative error, etc."></textarea>
+                        <div class="form-text">
+                            Please provide a clear reason for restoring this student's account.
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle"></i> Cancel
+                    </button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="bi bi-arrow-counterclockwise"></i> Confirm Unarchive
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         function clearFilters() {
@@ -842,32 +926,63 @@ $stats = pg_fetch_assoc($statsResult);
         });
 
         function unarchiveStudent(studentId, studentName) {
-            if (!confirm(`Are you sure you want to unarchive ${studentName}?\n\nThis will restore their account and they will be able to log in again.`)) {
-                return;
-            }
-
-            const formData = new FormData();
-            formData.append('action', 'unarchive');
-            formData.append('student_id', studentId);
-
-            fetch('archived_students.php', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    alert(data.message);
-                    location.reload();
-                } else {
-                    alert('Error: ' + data.message);
-                }
-            })
-            .catch(error => {
-                alert('An error occurred. Please try again.');
-                console.error(error);
-            });
+            // Show the unarchive modal
+            const modal = new bootstrap.Modal(document.getElementById('unarchiveModal'));
+            document.getElementById('unarchiveStudentId').value = studentId;
+            document.getElementById('unarchiveStudentName').textContent = studentName;
+            document.getElementById('unarchiveReason').value = '';
+            modal.show();
         }
+
+        // Handle unarchive form submission
+        document.addEventListener('DOMContentLoaded', function() {
+            const unarchiveForm = document.getElementById('unarchiveForm');
+            if (unarchiveForm) {
+                unarchiveForm.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    
+                    const studentId = document.getElementById('unarchiveStudentId').value;
+                    const reason = document.getElementById('unarchiveReason').value.trim();
+                    
+                    if (!reason) {
+                        alert('Please provide a reason for unarchiving this student.');
+                        return;
+                    }
+                    
+                    const formData = new FormData();
+                    formData.append('action', 'unarchive');
+                    formData.append('student_id', studentId);
+                    formData.append('unarchive_reason', reason);
+
+                    // Disable submit button
+                    const submitBtn = this.querySelector('button[type="submit"]');
+                    submitBtn.disabled = true;
+                    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Processing...';
+
+                    fetch('archived_students.php', {
+                        method: 'POST',
+                        body: formData
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            alert(data.message);
+                            location.reload();
+                        } else {
+                            alert('Error: ' + data.message);
+                            submitBtn.disabled = false;
+                            submitBtn.innerHTML = '<i class="bi bi-arrow-counterclockwise"></i> Confirm Unarchive';
+                        }
+                    })
+                    .catch(error => {
+                        alert('An error occurred. Please try again.');
+                        console.error(error);
+                        submitBtn.disabled = false;
+                        submitBtn.innerHTML = '<i class="bi bi-arrow-counterclockwise"></i> Confirm Unarchive';
+                    });
+                });
+            }
+        });
     </script>
 
 <script src="../../assets/js/admin/sidebar.js"></script>

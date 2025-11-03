@@ -657,9 +657,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $can_upload) {
                     if ($extracted_data && isset($extracted_data['university'])) {
                         // If university was found, check if it matched
                         $university_found = $extracted_data['university']['found'] ?? false;
-                        $university_match = $extracted_data['university']['match'] ?? false;
+                        $university_matched = $extracted_data['university']['matched'] ?? false;
                         
-                        if ($university_found && !$university_match) {
+                        if ($university_found && !$university_matched) {
                             // University was found in document but doesn't match expected value
                             $errors[] = "• University mismatch: Expected '{$student['university_name']}', found '" . ($extracted_data['university']['raw'] ?? 'Not found') . "'";
                         } elseif (!$university_found) {
@@ -2154,10 +2154,10 @@ $page_title = 'Upload Documents';
                 indicator.style.display = 'block';
             }
             
-            // Check immediately on load
-            setTimeout(checkDocumentStatus, 1000);
-            // Then check every 1 second
-            setInterval(checkDocumentStatus, 1000);
+            // Check after 3 seconds on load
+            setTimeout(checkDocumentStatus, 3000);
+            // Then check every 3 seconds
+            setInterval(checkDocumentStatus, 3000);
         });
     </script>
 </body>

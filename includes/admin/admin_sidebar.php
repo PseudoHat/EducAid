@@ -93,7 +93,6 @@ $distributionFiles = [
     'end_distribution.php',
     'distribution_archives.php',
     'storage_dashboard.php',
-    'reset_distribution.php',
 ];
 $isDistributionActive = in_array($current, $distributionFiles, true);
 
@@ -101,8 +100,7 @@ $isDistributionActive = in_array($current, $distributionFiles, true);
 $sysControlsFiles = [
     'blacklist_archive.php',
     'archived_students.php',
-    'run_automatic_archiving_admin.php',
-    'document_archives.php',
+    'advance_year_levels.php',
     'admin_management.php',
     'municipality_content.php',
     'system_data.php',
@@ -148,7 +146,18 @@ $isSysControlsActive = in_array($current, $sysControlsFiles, true);
         include_once __DIR__ . '/../../config/database.php';
       }
       if (isset($connection)) {
-        $countRes = @pg_query($connection, "SELECT COUNT(*) AS c FROM (SELECT LOWER(last_name) FROM students GROUP BY LOWER(last_name) HAVING COUNT(*) > 1) t");
+        // Count surname groups where household_verified is FALSE or NULL (unresolved households)
+        $countRes = @pg_query($connection, "
+          SELECT COUNT(*) AS c 
+          FROM (
+            SELECT LOWER(last_name) 
+            FROM students 
+            WHERE (household_verified IS NULL OR household_verified = FALSE)
+              AND is_archived = FALSE
+            GROUP BY LOWER(last_name) 
+            HAVING COUNT(*) > 1
+          ) t
+        ");
         if ($countRes) {
           $matches_count = (int) pg_fetch_result($countRes, 0, 'c');
           pg_free_result($countRes);
@@ -164,10 +173,10 @@ $isSysControlsActive = in_array($current, $sysControlsFiles, true);
 
     // Render a custom menu item so we can display a shorter visible label while keeping
     // a descriptive tooltip for hover and screen readers.
-    $phm_href = '/EducAid/modules/admin/duplicate_surnames.php';
-    $phm_active = is_active('duplicate_surnames.php', $current);
-    $visibleLabel = 'Flagged Matches';
-    $tooltipLabel = 'Potential Household Matches';
+    $phm_href = '/EducAid/modules/admin/household_duplicates.php';
+    $phm_active = is_active('household_duplicates.php', $current);
+    $visibleLabel = 'Household Duplicates';
+    $tooltipLabel = 'Resolve Household Duplicate Registrations';
     $badgeClass = $badge['class'];
     $badgeText = $badge['text'];
     $badgeIdAttr = ' id="' . htmlspecialchars($badge['id']) . '"';
@@ -176,7 +185,7 @@ $isSysControlsActive = in_array($current, $sysControlsFiles, true);
     $phmHtml .=   '<a href="' . $phm_href . '" title="' . htmlspecialchars($tooltipLabel) . '" data-bs-toggle="tooltip" data-bs-placement="right" aria-describedby="' . htmlspecialchars($badge['id']) . '">';
     $phmHtml .=     '<i class="bi bi-people-fill icon" aria-hidden="true"></i>';
     $phmHtml .=     '<span class="links_name">' . htmlspecialchars($visibleLabel) . '</span>';
-    $phmHtml .=     '<span' . $badgeIdAttr . ' class="badge ' . $badgeClass . '" role="status" aria-live="polite" aria-label="' . htmlspecialchars(($matches_count>0? $matches_count . ' flagged matches' : '')) . '">' . htmlspecialchars($badgeText) . '</span>';
+    $phmHtml .=     '<span' . $badgeIdAttr . ' class="badge ' . $badgeClass . '" role="status" aria-live="polite" aria-label="' . htmlspecialchars(($matches_count>0? $matches_count . ' unresolved household groups' : '')) . '">' . htmlspecialchars($badgeText) . '</span>';
     $phmHtml .=   '</a>';
     $phmHtml .= '</li>';
     echo $phmHtml;
@@ -284,16 +293,6 @@ $isSysControlsActive = in_array($current, $sysControlsFiles, true);
               <i class="bi bi-hdd me-2"></i> Storage Dashboard
             </a>
           </li>
-          
-          <!-- Divider -->
-          <li><hr class="dropdown-divider my-2"></li>
-          
-          <li>
-            <a class="submenu-link <?= is_active('reset_distribution.php', $current) ? 'active' : '' ?>" href="reset_distribution.php">
-              <i class="bi bi-arrow-counterclockwise me-2"></i> Reset Distribution
-              <span class="badge bg-warning ms-2">DEV</span>
-            </a>
-          </li>
         </ul>
       </li>
     <?php endif; ?>
@@ -319,13 +318,8 @@ $isSysControlsActive = in_array($current, $sysControlsFiles, true);
             </a>
           </li>
           <li>
-            <a class="submenu-link <?= is_active('run_automatic_archiving_admin.php', $current) ? 'active' : '' ?>" href="run_automatic_archiving_admin.php">
-              <i class="bi bi-clock-history me-2"></i> Run Auto-Archiving
-            </a>
-          </li>
-          <li>
-            <a class="submenu-link <?= is_active('document_archives.php', $current) ? 'active' : '' ?>" href="document_archives.php">
-              <i class="bi bi-archive me-2"></i> Document Archives
+            <a class="submenu-link <?= is_active('advance_year_levels.php', $current) ? 'active' : '' ?>" href="advance_year_levels.php">
+              <i class="bi bi-arrow-up-circle me-2"></i> Advance Year Levels
             </a>
           </li>
           <li>

@@ -135,12 +135,61 @@ $reasonCategories = [
 
 <div class="row mt-4">
     <div class="col-12">
+        <h6 class="fw-bold text-danger mb-2">Archived Files</h6>
+        <?php
+        // Check if ZIP file exists
+        $zipFile = __DIR__ . '/../../assets/uploads/blacklisted_students/' . $student_id . '.zip';
+        if (file_exists($zipFile)):
+            $fileSize = filesize($zipFile);
+            $fileSizeMB = round($fileSize / 1024 / 1024, 2);
+        ?>
+        <div class="alert alert-success">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <i class="bi bi-file-zip-fill"></i>
+                    <strong><?= htmlspecialchars($student_id) ?>.zip</strong>
+                    <span class="text-muted ms-2">(<?= $fileSizeMB ?> MB)</span>
+                </div>
+                <a href="download_blacklist_zip.php?student_id=<?= urlencode($student_id) ?>" 
+                   class="btn btn-sm btn-success">
+                    <i class="bi bi-download"></i> Download ZIP
+                </a>
+            </div>
+        </div>
+        <?php else: ?>
+        <div class="alert alert-warning">
+            <i class="bi bi-exclamation-triangle-fill"></i>
+            No archived files found for this student.
+        </div>
+        <?php endif; ?>
+    </div>
+</div>
+
+<div class="row mt-3">
+    <div class="col-12">
         <div class="alert alert-info">
             <i class="bi bi-info-circle-fill"></i>
             <strong>Note:</strong> This student's account is permanently disabled. 
             They cannot register, login, or access any system features. 
             Any attempt to access the system will show an appropriate message 
             directing them to contact the Office of the Mayor.
+        </div>
+    </div>
+</div>
+
+<!-- Development Only: Restore Button -->
+<div class="row mt-3">
+    <div class="col-12">
+        <div class="alert alert-warning border-warning">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <i class="bi bi-tools"></i>
+                    <strong>Development Tool:</strong> Restore this student completely (removes from blacklist, restores files, resets status)
+                </div>
+                <button type="button" class="btn btn-sm btn-warning restoreBlacklistBtn" onclick="restoreBlacklistedStudent('<?= $student_id ?>', '<?= addslashes($student['first_name'] . ' ' . $student['last_name']) ?>')">
+                    <i class="bi bi-arrow-counterclockwise"></i> Restore Student
+                </button>
+            </div>
         </div>
     </div>
 </div>

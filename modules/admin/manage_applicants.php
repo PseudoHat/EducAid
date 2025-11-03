@@ -809,33 +809,29 @@ function render_table($applicants, $connection) {
                                         <strong>Distribution Not Active:</strong> Please start a distribution first to approve or reject applicants.
                                         <a href="distribution_control.php" class="alert-link">Go to Distribution Control</a>
                                     </div>
-                                <?php elseif ($isComplete): ?>
-                                    <form method="POST" class="d-inline" onsubmit="return confirm('Verify this student?');">
+                                <?php else: ?>
+                                    <!-- Incomplete documents message - shown when documents are not complete -->
+                                    <span class="text-muted incomplete-message" style="display: <?= $isComplete ? 'none' : 'inline' ?>;">Incomplete documents</span>
+                                    
+                                    <!-- Verify button form - shown when documents are complete -->
+                                    <form method="POST" class="d-inline verify-form" style="display: <?= $isComplete ? 'inline' : 'none' ?>;" onsubmit="return confirm('Verify this student?');">
                                         <input type="hidden" name="student_id" value="<?= $student_id ?>">
                                         <input type="hidden" name="mark_verified" value="1">
                                         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfApproveApplicantToken) ?>">
                                         <button class="btn btn-success btn-sm"><i class="bi bi-check-circle me-1"></i> Verify</button>
                                     </form>
-                                    <!-- Reject Documents Button -->
-                                    <form method="POST" class="d-inline ms-2" onsubmit="return confirm('⚠️ DELETE ALL DOCUMENTS?\n\nThis will:\n• Delete all uploaded files from the server\n• Clear all document records from database\n• Require student to re-upload everything\n\nThis action cannot be undone. Continue?');">
-                                        <input type="hidden" name="student_id" value="<?= $student_id ?>">
-                                        <input type="hidden" name="reject_documents" value="1">
-                                        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfRejectDocumentsToken) ?>">
-                                        <button type="submit" class="btn btn-danger btn-sm" title="Delete all documents and request re-upload">
-                                            <i class="bi bi-trash me-1"></i> Reject Documents
-                                        </button>
-                                    </form>
-                                <?php else: ?>
-                                    <span class="text-muted">Incomplete documents</span>
+                                    
+                                    <!-- Override Verify button - shown for super_admin when documents are incomplete -->
                                     <?php if (!empty($_SESSION['admin_role']) && $_SESSION['admin_role'] === 'super_admin'): ?>
-                                    <form method="POST" class="d-inline ms-2" onsubmit="return confirm('Override verification and mark this student as Active even without complete grades/documents?');">
+                                    <form method="POST" class="d-inline ms-2 override-form" style="display: <?= $isComplete ? 'none' : 'inline' ?>;" onsubmit="return confirm('Override verification and mark this student as Active even without complete grades/documents?');">
                                         <input type="hidden" name="student_id" value="<?= $student_id ?>">
                                         <input type="hidden" name="mark_verified_override" value="1">
                                         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfOverrideApplicantToken) ?>">
                                         <button class="btn btn-warning btn-sm"><i class="bi bi-exclamation-triangle me-1"></i> Override Verify</button>
                                     </form>
                                     <?php endif; ?>
-                                    <!-- Reject Documents Button (also available for incomplete) -->
+                                    
+                                    <!-- Reject Documents Button - always visible -->
                                     <form method="POST" class="d-inline ms-2" onsubmit="return confirm('⚠️ DELETE ALL DOCUMENTS?\n\nThis will:\n• Delete all uploaded files from the server\n• Clear all document records from database\n• Require student to re-upload everything\n\nThis action cannot be undone. Continue?');">
                                         <input type="hidden" name="student_id" value="<?= $student_id ?>">
                                         <input type="hidden" name="reject_documents" value="1">
@@ -1067,25 +1063,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         }
         
-        // Archive files first
-        require_once __DIR__ . '/../../services/UnifiedFileService.php';
-        $fileService = new UnifiedFileService($connection);
-        $archiveResult = $fileService->compressArchivedStudent($sid);
+        // Use StudentArchivalService for archival
+        require_once __DIR__ . '/../../services/StudentArchivalService.php';
+        $archivalService = new StudentArchivalService($connection);
         
-        if (!$archiveResult['success']) {
-            error_log("Archive Error: Failed to compress files for student $sid");
-            $_SESSION['error_message'] = "Failed to archive student files. Please try again.";
-            header('Location: ' . $_SERVER['PHP_SELF']);
-            exit;
-        }
-        
-        // Update student record using SQL function
-        $archiveQuery = pg_query_params($connection,
-            "SELECT archive_student($1, $2, $3) as success",
-            [$sid, $adminId, $archiveReason]
+        // Archive with manual archival (not household duplicate)
+        $archiveResult = $archivalService->archiveStudentManually(
+            $sid,
+            $archiveReason,
+            $adminId
         );
         
-        if ($archiveQuery && pg_fetch_assoc($archiveQuery)['success'] === 't') {
+        if ($archiveResult['success']) {
             // Log the archival action
             require_once __DIR__ . '/../../services/AuditLogger.php';
             $auditLogger = new AuditLogger($connection);
@@ -1109,7 +1098,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $notification_msg = "Student archived: {$fullName} (ID: {$sid}) - Reason: {$archiveReason}";
             pg_query_params($connection, "INSERT INTO admin_notifications (message) VALUES ($1)", [$notification_msg]);
         } else {
-            $_SESSION['error_message'] = "Failed to archive student. Please try again.";
+            $error_msg = $archiveResult['error'] ?? 'Unknown error occurred';
+            $_SESSION['error_message'] = "Failed to archive student: {$error_msg}";
         }
         
         header('Location: ' . $_SERVER['PHP_SELF']);
@@ -2370,57 +2360,58 @@ function refreshModalContent(modalEl, studentId, silent = false) {
 
 // Update modal footer buttons based on document completeness
 function updateModalFooterButtons(modalFooter, isComplete, studentId) {
-    // Find the section with approve/reject buttons (between distribution warning and super admin buttons)
-    const forms = modalFooter.querySelectorAll('form');
+    if (!modalFooter) return;
+    
+    // Find the specific form elements using class names for reliable selection
+    const verifyForm = modalFooter.querySelector('.verify-form');
+    const overrideForm = modalFooter.querySelector('.override-form');
+    const incompleteSpan = modalFooter.querySelector('.incomplete-message');
+    
+    console.log('Updating footer buttons - Complete:', isComplete, 'Student:', studentId);
+    console.log('Found elements:', {
+        verifyForm: !!verifyForm,
+        overrideForm: !!overrideForm,
+        incompleteSpan: !!incompleteSpan
+    });
     
     if (isComplete) {
-        // Show "Verify" button and hide "Incomplete documents" message
-        forms.forEach(form => {
-            if (form.querySelector('input[name="mark_verified"]')) {
-                form.style.display = 'inline';
-            }
-        });
+        // Documents are complete - show Verify button
+        if (verifyForm) {
+            verifyForm.style.display = 'inline';
+            console.log('✅ Showing Verify button');
+        }
         
         // Hide "Incomplete documents" message
-        const incompleteSpan = modalFooter.querySelector('span.text-muted');
-        if (incompleteSpan && incompleteSpan.textContent.includes('Incomplete')) {
+        if (incompleteSpan) {
             incompleteSpan.style.display = 'none';
+            console.log('✅ Hiding incomplete message');
         }
         
         // Hide "Override Verify" button (only show for incomplete)
-        forms.forEach(form => {
-            if (form.querySelector('input[name="mark_verified_override"]')) {
-                form.style.display = 'none';
-            }
-        });
+        if (overrideForm) {
+            overrideForm.style.display = 'none';
+            console.log('✅ Hiding Override button');
+        }
         
         console.log('✅ Documents complete - Verify button enabled for student:', studentId);
     } else {
-        // Hide "Verify" button and show "Incomplete documents" message
-        forms.forEach(form => {
-            if (form.querySelector('input[name="mark_verified"]')) {
-                form.style.display = 'none';
-            }
-        });
-        
-        // Show "Incomplete documents" message
-        const incompleteSpan = modalFooter.querySelector('span.text-muted');
-        if (incompleteSpan && incompleteSpan.textContent.includes('Incomplete')) {
-            incompleteSpan.style.display = 'inline';
-        } else if (!incompleteSpan) {
-            // Create the message if it doesn't exist
-            const newSpan = document.createElement('span');
-            newSpan.className = 'text-muted';
-            newSpan.textContent = 'Incomplete documents';
-            modalFooter.insertBefore(newSpan, modalFooter.firstChild);
+        // Documents are incomplete - hide Verify button
+        if (verifyForm) {
+            verifyForm.style.display = 'none';
+            console.log('⚠️ Hiding Verify button');
         }
         
-        // Show "Override Verify" button (for super admin)
-        forms.forEach(form => {
-            if (form.querySelector('input[name="mark_verified_override"]')) {
-                form.style.display = 'inline';
-            }
-        });
+        // Show "Incomplete documents" message
+        if (incompleteSpan) {
+            incompleteSpan.style.display = 'inline';
+            console.log('⚠️ Showing incomplete message');
+        }
+        
+        // Show "Override Verify" button (for super admin, if it exists)
+        if (overrideForm) {
+            overrideForm.style.display = 'inline';
+            console.log('⚠️ Showing Override button');
+        }
         
         console.log('⚠️ Documents incomplete - Verify button disabled for student:', studentId);
     }
@@ -3361,19 +3352,26 @@ async function loadValidationData(docType, studentId) {
         
         if (data.success && data.documents && data.documents[docType]) {
             const doc = data.documents[docType];
+            console.log('Document data for', docType, ':', doc);
+            console.log('OCR data:', doc.ocr_data);
             
-            if (doc.ocr_data && doc.ocr_data.verification) {
-                // Use the verification data from the NEW structure
+            if (doc.ocr_data) {
+                // The verification data is in ocr_data.verification object
+                // Build validation object from ocr_data
                 const validation = {
-                    ocr_confidence: doc.ocr_data.confidence,
-                    verification_score: doc.ocr_data.verification_score,
-                    verification_status: doc.ocr_data.verification_status,
-                    ...doc.ocr_data.verification
+                    ocr_confidence: doc.ocr_data.confidence || 0,
+                    verification_score: doc.ocr_data.verification_score || 0,
+                    verification_status: doc.ocr_data.verification_status || 'pending',
+                    // Spread the entire verification object which contains all the extracted data
+                    ...(doc.ocr_data.verification || {})
                 };
+                
+                console.log('Built validation object:', validation);
                 
                 const html = generateValidationHTML(validation, docType);
                 modalBody.innerHTML = html;
             } else {
+                console.log('No ocr_data found for document');
                 modalBody.innerHTML = `<div class="alert alert-warning">
                     <h6><i class="bi bi-exclamation-triangle me-2"></i>No validation data available</h6>
                     <p>This document has not been validated yet or validation data is missing.</p>
@@ -3436,6 +3434,15 @@ function generateValidationHTML(validation, docType) {
     const isGrades = (docType === 'grades');
     const hasGradesVerification = isGrades && (validation.enhanced_grade_validation || validation.grades || validation.all_grades_passing !== undefined);
     
+    // For EAF (enrollment forms), check for TSV-based verification structure
+    const isEAF = (docType === 'eaf');
+    const hasEAFVerification = isEAF && (
+        validation.extracted_data !== undefined ||
+        validation.tsv_quality !== undefined ||
+        validation.course_data !== undefined ||
+        validation.success !== undefined
+    );
+    
     // For other documents, check for identity_verification or direct verification fields
     const hasIdentityVerification = validation.identity_verification && 
                                 (parseFloat(validation.identity_verification.first_name_confidence || 0) > 0 ||
@@ -3444,7 +3451,7 @@ function generateValidationHTML(validation, docType) {
                                  parseInt(validation.identity_verification.passed_checks || 0) > 0);
     
     // Check if we have direct verification fields (not nested under identity_verification)
-    const hasDirectVerification = !validation.identity_verification && (
+    const hasDirectVerification = !validation.identity_verification && !isEAF && (
         validation.year_level_match !== undefined ||
         validation.semester_match !== undefined ||
         validation.first_name_match !== undefined ||
@@ -3452,7 +3459,16 @@ function generateValidationHTML(validation, docType) {
         validation.summary !== undefined
     );
     
-    const hasVerificationData = hasGradesVerification || hasIdentityVerification || hasDirectVerification;
+    const hasVerificationData = hasGradesVerification || hasEAFVerification || hasIdentityVerification || hasDirectVerification;
+    
+    console.log('Verification checks:', {
+        isEAF,
+        hasEAFVerification,
+        hasGradesVerification,
+        hasIdentityVerification,
+        hasDirectVerification,
+        hasVerificationData
+    });
     
     if (!hasVerificationData && parseFloat(validation.ocr_confidence || 0) > 0) {
         html += `<div class="alert alert-warning mb-4">
@@ -3472,6 +3488,132 @@ function generateValidationHTML(validation, docType) {
             html += `<div class="card mb-3">
                 <div class="card-header bg-secondary text-white">
                     <h6 class="mb-0"><i class="bi bi-file-text me-2"></i>Extracted Text (${parseFloat(validation.ocr_confidence || 0).toFixed(1)}% confidence)</h6>
+                </div>
+                <div class="card-body">
+                    <pre style="max-height: 300px; overflow-y: auto; white-space: pre-wrap; font-size: 0.85rem;">${validation.extracted_text}</pre>
+                </div>
+            </div>`;
+        }
+        
+        return html;
+    }
+    
+    // === HANDLE TSV-BASED EAF VERIFICATION (NEW FORMAT) ===
+    if (docType === 'eaf' && validation.extracted_data) {
+        const extracted = validation.extracted_data;
+        const tsv_quality = validation.tsv_quality || {};
+        const course_data = validation.course_data || null;
+        
+        html += '<div class="card mb-4"><div class="card-header bg-primary text-white">';
+        html += '<h5 class="mb-0"><i class="bi bi-clipboard-check me-2"></i>TSV Verification Results</h5>';
+        html += '</div><div class="card-body"><div class="verification-checklist">';
+        
+        // Student Name - First Name
+        if (extracted.student_name) {
+            const fnFound = extracted.student_name.first_name_found;
+            const fnConf = parseFloat(extracted.student_name.first_name_similarity || extracted.student_name.first_name_confidence || 0);
+            const fnClass = fnFound ? 'check-passed' : 'check-failed';
+            const fnIcon = fnFound ? 'check-circle-fill text-success' : 'x-circle-fill text-danger';
+            html += `<div class="form-check ${fnClass} d-flex justify-content-between align-items-center">
+                <div><i class="bi bi-${fnIcon} me-2" style="font-size:1.2rem;"></i>
+                <span><strong>First Name</strong> ${fnFound ? extracted.student_name.first_name : 'Not Found'}</span></div>
+                <span class="badge ${fnFound ? 'bg-success' : 'bg-danger'} confidence-score">${fnConf.toFixed(1)}%</span>
+            </div>`;
+            
+            // Last Name
+            const lnFound = extracted.student_name.last_name_found;
+            const lnConf = parseFloat(extracted.student_name.last_name_similarity || extracted.student_name.last_name_confidence || 0);
+            const lnClass = lnFound ? 'check-passed' : 'check-failed';
+            const lnIcon = lnFound ? 'check-circle-fill text-success' : 'x-circle-fill text-danger';
+            html += `<div class="form-check ${lnClass} d-flex justify-content-between align-items-center">
+                <div><i class="bi bi-${lnIcon} me-2" style="font-size:1.2rem;"></i>
+                <span><strong>Last Name</strong> ${lnFound ? extracted.student_name.last_name : 'Not Found'}</span></div>
+                <span class="badge ${lnFound ? 'bg-success' : 'bg-danger'} confidence-score">${lnConf.toFixed(1)}%</span>
+            </div>`;
+        }
+        
+        // Course
+        if (course_data) {
+            const courseFound = course_data.matched;
+            const courseClass = courseFound ? 'check-passed' : 'check-warning';
+            const courseIcon = courseFound ? 'check-circle-fill text-success' : 'exclamation-triangle-fill text-warning';
+            html += `<div class="form-check ${courseClass} d-flex justify-content-between align-items-center">
+                <div><i class="bi bi-${courseIcon} me-2" style="font-size:1.2rem;"></i>
+                <span><strong>Course</strong> ${course_data.normalized_course || 'Not Found'}</span></div>
+                <span class="badge ${courseFound ? 'bg-success' : 'bg-warning'}">
+                    ${courseFound ? 'Matched' : 'Unmatched'}
+                </span>
+            </div>`;
+        } else if (extracted.course) {
+            const courseFound = extracted.course.found;
+            const courseConf = parseFloat(extracted.course.confidence || 0);
+            const courseClass = courseFound ? 'check-passed' : 'check-failed';
+            const courseIcon = courseFound ? 'check-circle-fill text-success' : 'x-circle-fill text-danger';
+            html += `<div class="form-check ${courseClass} d-flex justify-content-between align-items-center">
+                <div><i class="bi bi-${courseIcon} me-2" style="font-size:1.2rem;"></i>
+                <span><strong>Course</strong> ${courseFound ? extracted.course.normalized : 'Not Found'}</span></div>
+                <span class="badge ${courseFound ? 'bg-success' : 'bg-danger'} confidence-score">${courseConf.toFixed(1)}%</span>
+            </div>`;
+        }
+        
+        // University
+        if (extracted.university) {
+            const uniMatched = extracted.university.matched;
+            const uniConf = parseFloat(extracted.university.confidence || 0);
+            const uniClass = uniMatched ? 'check-passed' : 'check-failed';
+            const uniIcon = uniMatched ? 'check-circle-fill text-success' : 'x-circle-fill text-danger';
+            html += `<div class="form-check ${uniClass} d-flex justify-content-between align-items-center">
+                <div><i class="bi bi-${uniIcon} me-2" style="font-size:1.2rem;"></i>
+                <span><strong>University</strong> ${uniMatched ? 'Matched' : 'Not Matched'}</span></div>
+                <span class="badge ${uniMatched ? 'bg-success' : 'bg-danger'} confidence-score">${uniConf.toFixed(1)}%</span>
+            </div>`;
+        }
+        
+        // Year Level
+        if (extracted.year_level) {
+            const ylFound = extracted.year_level.found;
+            const ylConf = parseFloat(extracted.year_level.confidence || 0);
+            const ylClass = ylFound ? 'check-passed' : 'check-failed';
+            const ylIcon = ylFound ? 'check-circle-fill text-success' : 'x-circle-fill text-danger';
+            html += `<div class="form-check ${ylClass} d-flex justify-content-between align-items-center">
+                <div><i class="bi bi-${ylIcon} me-2" style="font-size:1.2rem;"></i>
+                <span><strong>Year Level</strong> ${ylFound ? extracted.year_level.raw : 'Not Found'}</span></div>
+                <span class="badge ${ylFound ? 'bg-success' : 'bg-danger'} confidence-score">${ylConf.toFixed(1)}%</span>
+            </div>`;
+        }
+        
+        html += '</div></div></div>'; // close checklist, card-body, card
+        
+        // TSV Quality Metrics
+        if (tsv_quality.total_cells !== undefined) {
+            html += '<div class="card mb-4"><div class="card-header bg-info text-white">';
+            html += '<h5 class="mb-0"><i class="bi bi-table me-2"></i>TSV Data Quality</h5>';
+            html += '</div><div class="card-body">';
+            html += '<div class="row g-3">';
+            html += `<div class="col-md-3"><div class="text-center p-3 bg-light rounded">
+                <h6 class="text-muted mb-1">Total Cells</h6>
+                <h4 class="mb-0">${tsv_quality.total_cells || 0}</h4>
+            </div></div>`;
+            html += `<div class="col-md-3"><div class="text-center p-3 bg-light rounded">
+                <h6 class="text-muted mb-1">Valid Cells</h6>
+                <h4 class="mb-0 text-success">${tsv_quality.valid_cells || 0}</h4>
+            </div></div>`;
+            html += `<div class="col-md-3"><div class="text-center p-3 bg-light rounded">
+                <h6 class="text-muted mb-1">Empty Cells</h6>
+                <h4 class="mb-0 text-warning">${tsv_quality.empty_cells || 0}</h4>
+            </div></div>`;
+            html += `<div class="col-md-3"><div class="text-center p-3 bg-light rounded">
+                <h6 class="text-muted mb-1">Quality Score</h6>
+                <h4 class="mb-0 text-primary">${(tsv_quality.quality_score || 0).toFixed(1)}%</h4>
+            </div></div>`;
+            html += '</div></div></div>'; // close row, card-body, card
+        }
+        
+        // Show extracted text if available
+        if (validation.extracted_text) {
+            html += `<div class="card mb-3">
+                <div class="card-header bg-secondary text-white">
+                    <h6 class="mb-0"><i class="bi bi-file-text me-2"></i>Extracted Text</h6>
                 </div>
                 <div class="card-body">
                     <pre style="max-height: 300px; overflow-y: auto; white-space: pre-wrap; font-size: 0.85rem;">${validation.extracted_text}</pre>

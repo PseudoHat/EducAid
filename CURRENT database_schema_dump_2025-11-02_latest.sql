@@ -25,6 +25,20 @@ CREATE SCHEMA grading;
 
 
 --
+-- Name: pg_trgm; Type: EXTENSION; Schema: -; Owner: -
+--
+
+CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA public;
+
+
+--
+-- Name: EXTENSION pg_trgm; Type: COMMENT; Schema: -; Owner: -
+--
+
+COMMENT ON EXTENSION pg_trgm IS 'text similarity measurement and index searching based on trigrams';
+
+
+--
 -- Name: grading_is_passing(text, text); Type: FUNCTION; Schema: grading; Owner: -
 --
 
@@ -453,10 +467,209 @@ $$;
 
 
 --
+-- Name: calculate_expected_graduation_year(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.calculate_expected_graduation_year() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    program_duration INTEGER;
+    registration_year INTEGER;
+    current_year_level INTEGER;
+    remaining_years INTEGER;
+BEGIN
+    -- Only calculate if we have course and first_registered_academic_year
+    IF NEW.course IS NOT NULL AND NEW.first_registered_academic_year IS NOT NULL THEN
+        
+        -- Get program duration from courses_mapping
+        SELECT cm.program_duration INTO program_duration
+        FROM courses_mapping cm
+        WHERE cm.normalized_course = NEW.course
+        LIMIT 1;
+        
+        -- If course found in mapping
+        IF program_duration IS NOT NULL THEN
+            -- Extract year from "2024-2025" format (take first year)
+            registration_year := CAST(SPLIT_PART(NEW.first_registered_academic_year, '-', 1) AS INTEGER);
+            
+            -- Get current year level (default to 1 if not set)
+            current_year_level := COALESCE(NEW.year_level_id, 1);
+            
+            -- Calculate remaining years: program_duration - current_year_level + 1
+            -- Example: 4-year course, currently 3rd year = 4 - 3 + 1 = 2 years remaining
+            remaining_years := program_duration - current_year_level + 1;
+            
+            -- Ensure remaining years is never negative (safety check)
+            IF remaining_years < 0 THEN
+                remaining_years := 0;
+            END IF;
+            
+            -- Calculate graduation year: registration_year + remaining_years
+            NEW.expected_graduation_year := registration_year + remaining_years;
+        END IF;
+    END IF;
+    
+    RETURN NEW;
+END;
+$$;
+
+
+--
+-- Name: calculate_graduation_eligibility(text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.calculate_graduation_eligibility(p_student_id text) RETURNS TABLE(should_graduate boolean, reason text, current_year_level_id integer, current_year_level_name text, program_duration integer, years_completed integer, next_year_level_id integer, next_year_level_name text)
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_student RECORD;
+    v_course_mapping RECORD;
+    v_next_level RECORD;
+    v_years_completed INTEGER;
+    v_first_year INTEGER;
+    v_current_year INTEGER;
+BEGIN
+    -- Get student information
+    SELECT 
+        s.student_id,
+        s.year_level_id,
+        s.course,
+        s.first_registered_academic_year,
+        s.current_academic_year,
+        yl.name as year_level_name,
+        yl.sort_order
+    INTO v_student
+    FROM students s
+    LEFT JOIN year_levels yl ON s.year_level_id = yl.year_level_id
+    WHERE s.student_id = p_student_id
+      AND (s.is_archived IS NULL OR s.is_archived = FALSE);
+
+    -- If student not found or already archived
+    IF v_student.student_id IS NULL THEN
+        RETURN QUERY SELECT 
+            FALSE, 
+            'Student not found or already archived'::TEXT,
+            NULL::INTEGER,
+            NULL::TEXT,
+            NULL::INTEGER,
+            NULL::INTEGER,
+            NULL::INTEGER,
+            NULL::TEXT;
+        RETURN;
+    END IF;
+
+    -- Get course mapping to determine program duration
+    SELECT 
+        cm.program_duration,
+        cm.normalized_course
+    INTO v_course_mapping
+    FROM courses_mapping cm
+    WHERE cm.raw_course_name = v_student.course
+      AND (cm.university_id = (SELECT university_id FROM students WHERE student_id = p_student_id) 
+           OR cm.university_id IS NULL)
+    ORDER BY cm.university_id NULLS LAST
+    LIMIT 1;
+
+    -- Calculate years completed (current academic year - first registered year)
+    -- Extract starting year from academic year format (YYYY-YYYY)
+    v_first_year := CAST(SPLIT_PART(v_student.first_registered_academic_year, '-', 1) AS INTEGER);
+    v_current_year := CAST(SPLIT_PART(COALESCE(v_student.current_academic_year, 
+                                       (SELECT year_code FROM academic_years WHERE is_current = TRUE)), 
+                                     '-', 1) AS INTEGER);
+    v_years_completed := v_current_year - v_first_year + 1; -- +1 because they are completing the current year
+
+    -- Get next year level
+    SELECT 
+        yl.year_level_id,
+        yl.name
+    INTO v_next_level
+    FROM year_levels yl
+    WHERE yl.sort_order = v_student.sort_order + 1
+    LIMIT 1;
+
+    -- Determine graduation eligibility
+    -- 5th year students always graduate
+    IF v_student.year_level_name = '5th Year' THEN
+        RETURN QUERY SELECT 
+            TRUE,
+            'Completed 5th year - automatic graduation'::TEXT,
+            v_student.year_level_id,
+            v_student.year_level_name,
+            v_course_mapping.program_duration,
+            v_years_completed,
+            NULL::INTEGER,
+            'Graduated'::TEXT;
+        RETURN;
+    END IF;
+
+    -- 4th year students - check program duration
+    IF v_student.year_level_name = '4th Year' THEN
+        IF v_course_mapping.program_duration IS NULL THEN
+            -- No course mapping - default to 4-year assumption for safety
+            RETURN QUERY SELECT 
+                TRUE,
+                'Completed 4th year - no course mapping found, defaulting to 4-year program'::TEXT,
+                v_student.year_level_id,
+                v_student.year_level_name,
+                4::INTEGER,
+                v_years_completed,
+                NULL::INTEGER,
+                'Graduated'::TEXT;
+            RETURN;
+        ELSIF v_course_mapping.program_duration = 4 THEN
+            -- 4-year program - graduate
+            RETURN QUERY SELECT 
+                TRUE,
+                FORMAT('Completed 4-year program (%s)', v_course_mapping.normalized_course)::TEXT,
+                v_student.year_level_id,
+                v_student.year_level_name,
+                v_course_mapping.program_duration,
+                v_years_completed,
+                NULL::INTEGER,
+                'Graduated'::TEXT;
+            RETURN;
+        ELSIF v_course_mapping.program_duration = 5 THEN
+            -- 5-year program - advance to 5th year
+            RETURN QUERY SELECT 
+                FALSE,
+                FORMAT('Advancing to 5th year (%s is a 5-year program)', v_course_mapping.normalized_course)::TEXT,
+                v_student.year_level_id,
+                v_student.year_level_name,
+                v_course_mapping.program_duration,
+                v_years_completed,
+                v_next_level.year_level_id,
+                v_next_level.name;
+            RETURN;
+        END IF;
+    END IF;
+
+    -- All other year levels - normal advancement
+    RETURN QUERY SELECT 
+        FALSE,
+        FORMAT('Normal advancement from %s to %s', v_student.year_level_name, COALESCE(v_next_level.name, 'Unknown'))::TEXT,
+        v_student.year_level_id,
+        v_student.year_level_name,
+        v_course_mapping.program_duration,
+        v_years_completed,
+        v_next_level.year_level_id,
+        v_next_level.name;
+END;
+$$;
+
+
+--
+-- Name: FUNCTION calculate_graduation_eligibility(p_student_id text); Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON FUNCTION public.calculate_graduation_eligibility(p_student_id text) IS 'Determines if a student should graduate during year advancement. Returns graduation status, reason, and next year level information.';
+
+
+--
 -- Name: check_duplicate_school_student_id(integer, character varying); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.check_duplicate_school_student_id(p_university_id integer, p_school_student_id character varying) RETURNS TABLE(is_duplicate boolean, system_student_id character varying, student_name text, student_email text, student_mobile text, student_status text, registered_at timestamp without time zone, university_name character varying, first_name character varying, last_name character varying)
+CREATE FUNCTION public.check_duplicate_school_student_id(p_university_id integer, p_school_student_id character varying) RETURNS TABLE(is_duplicate boolean, system_student_id text, student_name text, student_email text, student_mobile text, student_status text, registered_at timestamp without time zone, university_name character varying, first_name character varying, last_name character varying)
     LANGUAGE plpgsql
     AS $$
 BEGIN
@@ -464,14 +677,14 @@ BEGIN
     SELECT 
         TRUE as is_duplicate,
         s.student_id as system_student_id,
-        s.first_name || ' ' || COALESCE(s.middle_name || ' ', '') || s.last_name as student_name,
-        s.email,
-        s.mobile,
-        s.status,
+        (s.first_name || ' ' || COALESCE(s.middle_name || ' ', '') || s.last_name)::TEXT as student_name,
+        s.email::TEXT as student_email,
+        s.mobile::TEXT as student_mobile,
+        s.status::TEXT as student_status,
         ssi.registered_at,
-        ssi.university_name,
-        ssi.first_name,
-        ssi.last_name
+        ssi.university_name as university_name,
+        ssi.first_name as first_name,
+        ssi.last_name as last_name
     FROM school_student_ids ssi
     JOIN students s ON ssi.student_id = s.student_id
     WHERE ssi.university_id = p_university_id
@@ -481,7 +694,7 @@ BEGIN
     
     -- If no duplicate found, return false
     IF NOT FOUND THEN
-        RETURN QUERY SELECT FALSE, NULL::VARCHAR, NULL::TEXT, NULL::TEXT, NULL::TEXT, NULL::TEXT, NULL::TIMESTAMP, NULL::VARCHAR, NULL::VARCHAR, NULL::VARCHAR;
+        RETURN QUERY SELECT FALSE, NULL::TEXT, NULL::TEXT, NULL::TEXT, NULL::TEXT, NULL::TEXT, NULL::TIMESTAMP, NULL::VARCHAR, NULL::VARCHAR, NULL::VARCHAR;
     END IF;
 END;
 $$;
@@ -492,6 +705,280 @@ $$;
 --
 
 COMMENT ON FUNCTION public.check_duplicate_school_student_id(p_university_id integer, p_school_student_id character varying) IS 'Checks if a school student ID is already registered for a given university';
+
+
+--
+-- Name: ensure_single_current_academic_year(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.ensure_single_current_academic_year() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    IF NEW.is_current = TRUE THEN
+        -- Set all other years to not current
+        UPDATE academic_years 
+        SET is_current = FALSE 
+        WHERE academic_year_id != NEW.academic_year_id;
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+
+--
+-- Name: execute_year_level_advancement(integer, text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.execute_year_level_advancement(p_admin_id integer, p_notes text DEFAULT NULL::text) RETURNS TABLE(success boolean, message text, students_advanced integer, students_graduated integer, execution_log jsonb)
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_current_academic_year TEXT;
+    v_next_academic_year TEXT;
+    v_can_advance BOOLEAN;
+    v_blocking_reasons TEXT[];
+    v_students_advanced INTEGER := 0;
+    v_students_graduated INTEGER := 0;
+    v_student RECORD;
+    v_graduation_check RECORD;
+    v_next_year_level_id INTEGER;
+    v_execution_log JSONB := '[]'::JSONB;
+    v_log_entry JSONB;
+    v_audit_id INTEGER;
+BEGIN
+    -- Pre-flight checks using preview function
+    SELECT can_advance, blocking_reasons, summary
+    INTO v_can_advance, v_blocking_reasons, v_execution_log
+    FROM preview_year_level_advancement();
+    
+    -- Abort if cannot advance
+    IF NOT v_can_advance THEN
+        RETURN QUERY SELECT 
+            FALSE,
+            'Cannot advance: ' || array_to_string(v_blocking_reasons, '; '),
+            0::INTEGER,
+            0::INTEGER,
+            jsonb_build_object(
+                'error', 'Pre-flight check failed',
+                'blocking_reasons', v_blocking_reasons
+            );
+        RETURN;
+    END IF;
+    
+    -- Get current academic year info
+    SELECT year_code INTO v_current_academic_year
+    FROM academic_years
+    WHERE is_current = TRUE
+    LIMIT 1;
+    
+    -- Calculate next academic year
+    DECLARE
+        v_start_year INTEGER;
+        v_end_year INTEGER;
+    BEGIN
+        v_start_year := CAST(SPLIT_PART(v_current_academic_year, '-', 1) AS INTEGER);
+        v_end_year := CAST(SPLIT_PART(v_current_academic_year, '-', 2) AS INTEGER);
+        v_next_academic_year := FORMAT('%s-%s', v_start_year + 1, v_end_year + 1);
+    END;
+    
+    -- Start transaction-safe execution
+    BEGIN
+        -- Log the start of advancement
+        INSERT INTO audit_logs (
+            user_id, user_type, username, event_type, event_category,
+            action_description, metadata, status
+        ) VALUES (
+            p_admin_id, 'admin', 
+            (SELECT username FROM admins WHERE admin_id = p_admin_id),
+            'year_advancement_started',
+            'academic_year',
+            FORMAT('Started year level advancement: %s → %s', v_current_academic_year, v_next_academic_year),
+            jsonb_build_object(
+                'current_year', v_current_academic_year,
+                'next_year', v_next_academic_year,
+                'notes', p_notes
+            ),
+            'in_progress'
+        ) RETURNING audit_id INTO v_audit_id;
+        
+        -- Process each active student
+        FOR v_student IN 
+            SELECT 
+                s.student_id,
+                s.first_name,
+                s.last_name,
+                s.year_level_id,
+                s.year_level_history,
+                yl.name as current_year_level,
+                yl.sort_order
+            FROM students s
+            LEFT JOIN year_levels yl ON s.year_level_id = yl.year_level_id
+            WHERE s.status IN ('active', 'applicant')
+              AND (s.is_archived IS NULL OR s.is_archived = FALSE)
+            ORDER BY yl.sort_order, s.last_name, s.first_name
+        LOOP
+            -- Get graduation eligibility for this student
+            SELECT * INTO v_graduation_check
+            FROM calculate_graduation_eligibility(v_student.student_id);
+            
+            IF v_graduation_check.should_graduate THEN
+                -- Graduate and archive this student
+                UPDATE students
+                SET 
+                    is_archived = TRUE,
+                    archived_at = NOW(),
+                    archived_by = NULL,
+                    archive_reason = 'graduated',
+                    current_academic_year = v_next_academic_year,
+                    last_year_level_update = NOW(),
+                    year_level_history = COALESCE(year_level_history, '[]'::JSONB) || 
+                        jsonb_build_object(
+                            'year', v_next_academic_year,
+                            'level', 'Graduated',
+                            'updated_at', NOW(),
+                            'reason', v_graduation_check.reason
+                        )
+                WHERE student_id = v_student.student_id;
+                
+                v_students_graduated := v_students_graduated + 1;
+                
+                v_log_entry := jsonb_build_object(
+                    'student_id', v_student.student_id,
+                    'name', v_student.first_name || ' ' || v_student.last_name,
+                    'action', 'graduated',
+                    'from_level', v_student.current_year_level,
+                    'to_level', 'Graduated (Archived)',
+                    'reason', v_graduation_check.reason
+                );
+                
+            ELSE
+                -- Advance to next year level
+                UPDATE students
+                SET 
+                    year_level_id = v_graduation_check.next_year_level_id,
+                    current_academic_year = v_next_academic_year,
+                    last_year_level_update = NOW(),
+                    year_level_history = COALESCE(year_level_history, '[]'::JSONB) || 
+                        jsonb_build_object(
+                            'year', v_next_academic_year,
+                            'level', v_graduation_check.next_year_level_name,
+                            'updated_at', NOW(),
+                            'reason', 'Annual year level advancement'
+                        )
+                WHERE student_id = v_student.student_id;
+                
+                v_students_advanced := v_students_advanced + 1;
+                
+                v_log_entry := jsonb_build_object(
+                    'student_id', v_student.student_id,
+                    'name', v_student.first_name || ' ' || v_student.last_name,
+                    'action', 'advanced',
+                    'from_level', v_student.current_year_level,
+                    'to_level', v_graduation_check.next_year_level_name,
+                    'reason', v_graduation_check.reason
+                );
+            END IF;
+            
+            v_execution_log := v_execution_log || v_log_entry;
+        END LOOP;
+        
+        -- Mark academic year as advanced
+        UPDATE academic_years
+        SET 
+            year_levels_advanced = TRUE,
+            advanced_at = NOW(),
+            advanced_by = p_admin_id
+        WHERE year_code = v_current_academic_year;
+        
+        -- Update the audit log entry to success
+        UPDATE audit_logs
+        SET 
+            status = 'success',
+            action_description = FORMAT(
+                'Completed year level advancement: %s students advanced, %s students graduated',
+                v_students_advanced, v_students_graduated
+            ),
+            metadata = metadata || jsonb_build_object(
+                'students_advanced', v_students_advanced,
+                'students_graduated', v_students_graduated,
+                'completed_at', NOW()
+            )
+        WHERE audit_id = v_audit_id;
+        
+        RETURN QUERY SELECT 
+            TRUE,
+            FORMAT('Successfully advanced %s students and graduated %s students', 
+                   v_students_advanced, v_students_graduated),
+            v_students_advanced,
+            v_students_graduated,
+            jsonb_build_object(
+                'current_year', v_current_academic_year,
+                'next_year', v_next_academic_year,
+                'students_advanced', v_students_advanced,
+                'students_graduated', v_students_graduated,
+                'executed_at', NOW(),
+                'executed_by', p_admin_id,
+                'audit_id', v_audit_id
+            );
+        
+    EXCEPTION WHEN OTHERS THEN
+        UPDATE audit_logs
+        SET 
+            status = 'error',
+            action_description = 'Year level advancement failed: ' || SQLERRM
+        WHERE audit_id = v_audit_id;
+        
+        RETURN QUERY SELECT 
+            FALSE,
+            'Error during advancement: ' || SQLERRM,
+            0::INTEGER,
+            0::INTEGER,
+            jsonb_build_object(
+                'error', SQLERRM,
+                'sqlstate', SQLSTATE
+            );
+    END;
+END;
+$$;
+
+
+--
+-- Name: FUNCTION execute_year_level_advancement(p_admin_id integer, p_notes text); Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON FUNCTION public.execute_year_level_advancement(p_admin_id integer, p_notes text) IS 'Executes year level advancement for all active students. Transaction-safe with full audit logging.';
+
+
+--
+-- Name: find_course_mapping(character varying, integer); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.find_course_mapping(p_raw_course character varying, p_university_id integer DEFAULT NULL::integer) RETURNS TABLE(mapping_id integer, raw_course_name character varying, normalized_course character varying, program_duration integer, course_category character varying, similarity_score real)
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        cm.mapping_id,
+        cm.raw_course_name,
+        cm.normalized_course,
+        cm.program_duration,
+        cm.course_category,
+        similarity(cm.raw_course_name, p_raw_course) AS similarity_score
+    FROM courses_mapping cm
+    WHERE 
+        (p_university_id IS NULL OR cm.university_id IS NULL OR cm.university_id = p_university_id)
+        AND (
+            LOWER(cm.raw_course_name) = LOWER(p_raw_course)
+            OR similarity(cm.raw_course_name, p_raw_course) > 0.6
+        )
+    ORDER BY 
+        CASE WHEN LOWER(cm.raw_course_name) = LOWER(p_raw_course) THEN 0 ELSE 1 END,
+        similarity_score DESC
+    LIMIT 5;
+END;
+$$;
 
 
 --
@@ -875,6 +1362,42 @@ $$;
 
 
 --
+-- Name: initialize_year_level_history(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.initialize_year_level_history() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    year_level_name TEXT;
+BEGIN
+    -- If year_level_history is empty and we have a year_level_id, initialize it
+    IF (NEW.year_level_history = '[]'::jsonb OR NEW.year_level_history IS NULL)
+       AND NEW.year_level_id IS NOT NULL
+       AND NEW.current_academic_year IS NOT NULL THEN
+
+        -- Get the year level name from year_levels table (FIXED: using 'name' column)
+        SELECT yl.name INTO year_level_name
+        FROM year_levels yl
+        WHERE yl.year_level_id = NEW.year_level_id;
+
+        -- Initialize history with current year level
+        NEW.year_level_history = jsonb_build_array(
+            jsonb_build_object(
+                'academic_year', NEW.current_academic_year,
+                'year_level_id', NEW.year_level_id,
+                'year_level_name', COALESCE(year_level_name, 'Unknown'),
+                'updated_at', NOW()
+            )
+        );
+    END IF;
+
+    RETURN NEW;
+END;
+$$;
+
+
+--
 -- Name: log_document_audit(integer, character varying, character varying, character varying, character varying, text, character varying, integer, jsonb, character varying); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -926,6 +1449,234 @@ COMMENT ON FUNCTION public.log_document_audit(p_user_id integer, p_user_type cha
 
 
 --
+-- Name: preview_year_level_advancement(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.preview_year_level_advancement() RETURNS TABLE(summary jsonb, students_advancing jsonb, students_graduating jsonb, warnings jsonb, can_advance boolean, blocking_reasons text[])
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_current_academic_year TEXT;
+    v_next_academic_year TEXT;
+    v_distributions_complete BOOLEAN := FALSE;
+    v_completed_semesters INTEGER := 0;
+    v_already_advanced BOOLEAN := FALSE;
+    v_blocking_reasons TEXT[] := ARRAY[]::TEXT[];
+    v_summary JSONB;
+    v_advancing JSONB;
+    v_graduating JSONB;
+    v_warnings JSONB := '[]'::JSONB;
+    v_student RECORD;
+    v_graduation_check RECORD;
+    
+    -- Categorization arrays
+    v_advancing_1_to_2 JSONB := '[]'::JSONB;
+    v_advancing_2_to_3 JSONB := '[]'::JSONB;
+    v_advancing_3_to_4 JSONB := '[]'::JSONB;
+    v_advancing_4_to_5 JSONB := '[]'::JSONB;
+    v_graduating_4th JSONB := '[]'::JSONB;
+    v_graduating_5th JSONB := '[]'::JSONB;
+    v_no_course_mapping JSONB := '[]'::JSONB;
+    v_edge_cases JSONB := '[]'::JSONB;
+    
+    -- Counters
+    v_total_students INTEGER := 0;
+    v_total_advancing INTEGER := 0;
+    v_total_graduating INTEGER := 0;
+BEGIN
+    -- Get current academic year
+    SELECT year_code, year_levels_advanced
+    INTO v_current_academic_year, v_already_advanced
+    FROM academic_years
+    WHERE is_current = TRUE
+    LIMIT 1;
+
+    -- Check if academic year exists
+    IF v_current_academic_year IS NULL THEN
+        v_blocking_reasons := array_append(v_blocking_reasons, 'No current academic year set in system');
+    END IF;
+
+    -- Check if already advanced this year
+    IF v_already_advanced = TRUE THEN
+        v_blocking_reasons := array_append(v_blocking_reasons, 
+            FORMAT('Year levels already advanced for academic year %s', v_current_academic_year));
+    END IF;
+
+    -- Check distribution completion (both semesters must be finalized)
+    SELECT 
+        COUNT(DISTINCT semester),
+        BOOL_AND(finalized_at IS NOT NULL)
+    INTO v_completed_semesters, v_distributions_complete
+    FROM distribution_snapshots
+    WHERE academic_year = v_current_academic_year
+      AND finalized_at IS NOT NULL;
+
+    IF v_completed_semesters < 2 THEN
+        v_blocking_reasons := array_append(v_blocking_reasons,
+            FORMAT('Only %s semester(s) distributed for %s. Both semesters must be finalized before advancing.', 
+                   v_completed_semesters, v_current_academic_year));
+    END IF;
+
+    -- Calculate next academic year
+    IF v_current_academic_year IS NOT NULL THEN
+        DECLARE
+            v_start_year INTEGER;
+            v_end_year INTEGER;
+        BEGIN
+            v_start_year := CAST(SPLIT_PART(v_current_academic_year, '-', 1) AS INTEGER);
+            v_end_year := CAST(SPLIT_PART(v_current_academic_year, '-', 2) AS INTEGER);
+            v_next_academic_year := FORMAT('%s-%s', v_start_year + 1, v_end_year + 1);
+        END;
+    END IF;
+
+    -- Process each active student
+    FOR v_student IN 
+        SELECT 
+            s.student_id,
+            s.first_name,
+            s.last_name,
+            s.extension_name,
+            s.email,
+            s.course,
+            s.year_level_id,
+            s.first_registered_academic_year,
+            s.current_academic_year,
+            yl.name as current_year_level,
+            yl.sort_order,
+            u.name as university_name,
+            b.name as barangay_name
+        FROM students s
+        LEFT JOIN year_levels yl ON s.year_level_id = yl.year_level_id
+        LEFT JOIN universities u ON s.university_id = u.university_id
+        LEFT JOIN barangays b ON s.barangay_id = b.barangay_id
+        WHERE s.status IN ('active', 'applicant')
+          AND (s.is_archived IS NULL OR s.is_archived = FALSE)
+        ORDER BY yl.sort_order, s.last_name, s.first_name
+    LOOP
+        v_total_students := v_total_students + 1;
+        
+        -- Get graduation eligibility
+        SELECT * INTO v_graduation_check
+        FROM calculate_graduation_eligibility(v_student.student_id);
+        
+        -- Build student info object
+        DECLARE
+            v_student_info JSONB;
+        BEGIN
+            v_student_info := jsonb_build_object(
+                'student_id', v_student.student_id,
+                'name', CONCAT(v_student.first_name, ' ', v_student.last_name, 
+                              COALESCE(' ' || v_student.extension_name, '')),
+                'email', v_student.email,
+                'current_year_level', v_student.current_year_level,
+                'course', v_student.course,
+                'program_duration', v_graduation_check.program_duration,
+                'university', v_student.university_name,
+                'barangay', v_student.barangay_name,
+                'years_enrolled', v_graduation_check.years_completed,
+                'next_status', CASE 
+                    WHEN v_graduation_check.should_graduate THEN 'Graduated (Auto-Archived)'
+                    ELSE v_graduation_check.next_year_level_name 
+                END,
+                'reason', v_graduation_check.reason
+            );
+
+            -- Categorize student
+            IF v_graduation_check.should_graduate THEN
+                v_total_graduating := v_total_graduating + 1;
+                
+                IF v_student.current_year_level = '4th Year' THEN
+                    v_graduating_4th := v_graduating_4th || v_student_info;
+                ELSIF v_student.current_year_level = '5th Year' THEN
+                    v_graduating_5th := v_graduating_5th || v_student_info;
+                END IF;
+            ELSE
+                v_total_advancing := v_total_advancing + 1;
+                
+                -- Check for missing course mapping
+                IF v_graduation_check.program_duration IS NULL THEN
+                    v_no_course_mapping := v_no_course_mapping || v_student_info;
+                    v_warnings := v_warnings || jsonb_build_object(
+                        'student_id', v_student.student_id,
+                        'warning', FORMAT('No course mapping for "%s"', v_student.course),
+                        'severity', 'medium'
+                    );
+                END IF;
+                
+                -- Categorize by advancement type
+                IF v_student.current_year_level = '1st Year' THEN
+                    v_advancing_1_to_2 := v_advancing_1_to_2 || v_student_info;
+                ELSIF v_student.current_year_level = '2nd Year' THEN
+                    v_advancing_2_to_3 := v_advancing_2_to_3 || v_student_info;
+                ELSIF v_student.current_year_level = '3rd Year' THEN
+                    v_advancing_3_to_4 := v_advancing_3_to_4 || v_student_info;
+                ELSIF v_student.current_year_level = '4th Year' THEN
+                    v_advancing_4_to_5 := v_advancing_4_to_5 || v_student_info;
+                ELSE
+                    v_edge_cases := v_edge_cases || v_student_info;
+                END IF;
+            END IF;
+        END;
+    END LOOP;
+
+    -- Build summary
+    v_summary := jsonb_build_object(
+        'current_academic_year', v_current_academic_year,
+        'next_academic_year', v_next_academic_year,
+        'distributions_completed', v_completed_semesters,
+        'distributions_required', 2,
+        'already_advanced', v_already_advanced,
+        'total_students', v_total_students,
+        'total_advancing', v_total_advancing,
+        'total_graduating', v_total_graduating,
+        'breakdown', jsonb_build_object(
+            'advancing_1st_to_2nd', jsonb_array_length(v_advancing_1_to_2),
+            'advancing_2nd_to_3rd', jsonb_array_length(v_advancing_2_to_3),
+            'advancing_3rd_to_4th', jsonb_array_length(v_advancing_3_to_4),
+            'advancing_4th_to_5th', jsonb_array_length(v_advancing_4_to_5),
+            'graduating_4th_year', jsonb_array_length(v_graduating_4th),
+            'graduating_5th_year', jsonb_array_length(v_graduating_5th),
+            'no_course_mapping', jsonb_array_length(v_no_course_mapping),
+            'edge_cases', jsonb_array_length(v_edge_cases)
+        )
+    );
+
+    -- Build advancing students object
+    v_advancing := jsonb_build_object(
+        '1st_to_2nd', v_advancing_1_to_2,
+        '2nd_to_3rd', v_advancing_2_to_3,
+        '3rd_to_4th', v_advancing_3_to_4,
+        '4th_to_5th', v_advancing_4_to_5,
+        'no_course_mapping', v_no_course_mapping,
+        'edge_cases', v_edge_cases
+    );
+
+    -- Build graduating students object
+    v_graduating := jsonb_build_object(
+        '4th_year', v_graduating_4th,
+        '5th_year', v_graduating_5th
+    );
+
+    -- Determine if advancement can proceed
+    RETURN QUERY SELECT 
+        v_summary,
+        v_advancing,
+        v_graduating,
+        v_warnings,
+        (CARDINALITY(v_blocking_reasons) = 0)::BOOLEAN,
+        v_blocking_reasons;
+END;
+$$;
+
+
+--
+-- Name: FUNCTION preview_year_level_advancement(); Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON FUNCTION public.preview_year_level_advancement() IS 'Previews year level advancement, checking distribution completion and categorizing students by advancement type. Returns detailed JSON with all students grouped by their next status.';
+
+
+--
 -- Name: set_document_upload_needs(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -933,20 +1684,32 @@ CREATE FUNCTION public.set_document_upload_needs() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
 BEGIN
-    -- New registrations after the last distribution don't need upload tab
-    -- (they upload during registration)
-    IF NEW.status = 'under_registration' OR NEW.application_date > (
-        SELECT COALESCE(MAX(finalized_at), '1970-01-01'::timestamp) 
-        FROM distribution_snapshots
-    ) THEN
-        NEW.needs_document_upload = FALSE;
-    ELSE
-        NEW.needs_document_upload = TRUE;
+    -- Only automatically set needs_document_upload on INSERT (new student creation)
+    -- On UPDATE, let the value pass through unchanged (respects manual admin changes)
+    IF TG_OP = 'INSERT' THEN
+        -- New registrations after the last distribution don't need upload tab
+        -- (they upload during registration)
+        IF NEW.status = 'under_registration' OR NEW.application_date > (
+            SELECT COALESCE(MAX(finalized_at), '1970-01-01'::timestamp) 
+            FROM distribution_snapshots
+        ) THEN
+            NEW.needs_document_upload = FALSE;
+        ELSE
+            NEW.needs_document_upload = TRUE;
+        END IF;
     END IF;
+    -- On UPDATE: do nothing, return NEW unchanged
     
     RETURN NEW;
 END;
 $$;
+
+
+--
+-- Name: FUNCTION set_document_upload_needs(); Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON FUNCTION public.set_document_upload_needs() IS 'Automatically sets needs_document_upload for new students based on registration date. Only runs on INSERT to avoid overriding manual admin changes during UPDATE operations (e.g., document rejection).';
 
 
 --
@@ -1010,6 +1773,20 @@ $$;
 
 
 --
+-- Name: trg_student_notif_prefs_updated_at(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.trg_student_notif_prefs_updated_at() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  NEW.updated_at := CURRENT_TIMESTAMP;
+  RETURN NEW;
+END;
+$$;
+
+
+--
 -- Name: unarchive_student(text, integer); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -1024,6 +1801,8 @@ BEGIN
         archived_at = NULL,
         archived_by = NULL,
         archive_reason = NULL,
+        unarchived_by = p_admin_id,
+        unarchived_at = NOW(),
         status = 'applicant' -- Set to applicant status (requires re-verification)
     WHERE student_id = p_student_id
     AND is_archived = TRUE; -- Only unarchive if currently archived
@@ -1038,7 +1817,71 @@ $$;
 -- Name: FUNCTION unarchive_student(p_student_id text, p_admin_id integer); Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON FUNCTION public.unarchive_student(p_student_id text, p_admin_id integer) IS 'Unarchives a student and restores active status';
+COMMENT ON FUNCTION public.unarchive_student(p_student_id text, p_admin_id integer) IS 'Unarchives a student, restores active status, and tracks who performed the unarchive action';
+
+
+--
+-- Name: unarchive_student(text, integer, text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.unarchive_student(p_student_id text, p_admin_id integer, p_unarchive_reason text DEFAULT NULL::text) RETURNS boolean
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    -- Update student record
+    UPDATE students
+    SET 
+        is_archived = FALSE,
+        archived_at = NULL,
+        archived_by = NULL,
+        archive_reason = NULL,
+        archival_type = NULL,
+        unarchived_by = p_admin_id,
+        unarchived_at = NOW(),
+        unarchive_reason = p_unarchive_reason,
+        status = 'applicant' -- Set to applicant status (requires re-verification)
+    WHERE student_id = p_student_id
+    AND is_archived = TRUE; -- Only unarchive if currently archived
+    
+    -- Return true if a row was updated
+    RETURN FOUND;
+END;
+$$;
+
+
+--
+-- Name: FUNCTION unarchive_student(p_student_id text, p_admin_id integer, p_unarchive_reason text); Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON FUNCTION public.unarchive_student(p_student_id text, p_admin_id integer, p_unarchive_reason text) IS 'Unarchives a student, restores active status, clears archival metadata, tracks who performed the action and the reason for restoration';
+
+
+--
+-- Name: update_academic_years_updated_at(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.update_academic_years_updated_at() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$;
+
+
+--
+-- Name: update_courses_mapping_updated_at(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.update_courses_mapping_updated_at() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$;
 
 
 --
@@ -1051,6 +1894,63 @@ CREATE FUNCTION public.update_updated_at_column() RETURNS trigger
 BEGIN
     NEW.updated_at = NOW();
     RETURN NEW;
+END;
+$$;
+
+
+--
+-- Name: upsert_course_mapping(character varying, character varying, integer, character varying, integer, integer); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.upsert_course_mapping(p_raw_course character varying, p_normalized_course character varying, p_duration integer, p_category character varying DEFAULT NULL::character varying, p_university_id integer DEFAULT NULL::integer, p_admin_id integer DEFAULT NULL::integer) RETURNS integer
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_mapping_id INTEGER;
+BEGIN
+    -- Try to find existing mapping
+    SELECT mapping_id INTO v_mapping_id
+    FROM courses_mapping
+    WHERE LOWER(raw_course_name) = LOWER(p_raw_course)
+        AND (university_id IS NULL AND p_university_id IS NULL OR university_id = p_university_id);
+    
+    IF v_mapping_id IS NOT NULL THEN
+        -- Update existing mapping
+        UPDATE courses_mapping
+        SET 
+            normalized_course = p_normalized_course,
+            program_duration = p_duration,
+            course_category = COALESCE(p_category, course_category),
+            occurrence_count = occurrence_count + 1,
+            last_seen = NOW(),
+            verified_by = COALESCE(p_admin_id, verified_by),
+            is_verified = TRUE
+        WHERE mapping_id = v_mapping_id;
+    ELSE
+        -- Insert new mapping
+        INSERT INTO courses_mapping (
+            raw_course_name,
+            normalized_course,
+            program_duration,
+            course_category,
+            university_id,
+            created_by,
+            verified_by,
+            is_verified
+        ) VALUES (
+            p_raw_course,
+            p_normalized_course,
+            p_duration,
+            p_category,
+            p_university_id,
+            p_admin_id,
+            p_admin_id,
+            TRUE
+        )
+        RETURNING mapping_id INTO v_mapping_id;
+    END IF;
+    
+    RETURN v_mapping_id;
 END;
 $$;
 
@@ -1205,6 +2105,89 @@ CREATE SEQUENCE public.about_content_blocks_id_seq
 --
 
 ALTER SEQUENCE public.about_content_blocks_id_seq OWNED BY public.about_content_blocks.id;
+
+
+--
+-- Name: academic_years; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.academic_years (
+    academic_year_id integer NOT NULL,
+    year_code character varying(20) NOT NULL,
+    start_date date NOT NULL,
+    end_date date NOT NULL,
+    is_current boolean DEFAULT false,
+    year_levels_advanced boolean DEFAULT false,
+    advanced_by integer,
+    advanced_at timestamp without time zone,
+    status character varying(20) DEFAULT 'upcoming'::character varying,
+    notes text,
+    created_at timestamp without time zone DEFAULT now(),
+    updated_at timestamp without time zone DEFAULT now(),
+    CONSTRAINT academic_years_status_check CHECK (((status)::text = ANY ((ARRAY['upcoming'::character varying, 'current'::character varying, 'completed'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE academic_years; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.academic_years IS 'Tracks academic years and year level advancement status for the scholarship system';
+
+
+--
+-- Name: COLUMN academic_years.year_code; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.academic_years.year_code IS 'Academic year in format YYYY-YYYY (e.g., 2024-2025)';
+
+
+--
+-- Name: COLUMN academic_years.is_current; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.academic_years.is_current IS 'Only one academic year should be marked as current at any time';
+
+
+--
+-- Name: COLUMN academic_years.year_levels_advanced; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.academic_years.year_levels_advanced IS 'Prevents double advancement - set to TRUE after running year advancement';
+
+
+--
+-- Name: COLUMN academic_years.advanced_by; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.academic_years.advanced_by IS 'Admin who executed the year level advancement';
+
+
+--
+-- Name: COLUMN academic_years.status; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.academic_years.status IS 'Status: upcoming (future), current (active), completed (past)';
+
+
+--
+-- Name: academic_years_academic_year_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.academic_years_academic_year_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: academic_years_academic_year_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.academic_years_academic_year_id_seq OWNED BY public.academic_years.academic_year_id;
 
 
 --
@@ -1553,9 +2536,21 @@ CREATE TABLE public.students (
     archived_by integer,
     archive_reason text,
     expected_graduation_year integer,
-    academic_year_registered text,
     school_student_id character varying(50),
     documents_to_reupload text,
+    first_registered_academic_year character varying(20),
+    current_academic_year character varying(20),
+    year_level_history jsonb DEFAULT '[]'::jsonb,
+    last_year_level_update timestamp without time zone,
+    course character varying(255),
+    course_verified boolean DEFAULT false,
+    unarchived_at timestamp without time zone,
+    unarchived_by integer,
+    unarchive_reason text,
+    household_verified boolean DEFAULT false,
+    household_primary boolean DEFAULT false,
+    household_group_id text,
+    archival_type character varying(50) DEFAULT NULL::character varying,
     CONSTRAINT students_sex_check CHECK ((sex = ANY (ARRAY['Male'::text, 'Female'::text]))),
     CONSTRAINT students_status_check CHECK ((status = ANY (ARRAY['under_registration'::text, 'applicant'::text, 'active'::text, 'disabled'::text, 'given'::text, 'blacklisted'::text, 'archived'::text])))
 );
@@ -1635,14 +2630,7 @@ COMMENT ON COLUMN public.students.archive_reason IS 'Reason for archiving: gradu
 -- Name: COLUMN students.expected_graduation_year; Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON COLUMN public.students.expected_graduation_year IS 'Calculated graduation year based on year level at registration';
-
-
---
--- Name: COLUMN students.academic_year_registered; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON COLUMN public.students.academic_year_registered IS 'Academic year when student first registered (e.g., 2024-2025)';
+COMMENT ON COLUMN public.students.expected_graduation_year IS 'Calculated graduation year based on registration year + program duration';
 
 
 --
@@ -1657,6 +2645,97 @@ COMMENT ON COLUMN public.students.school_student_id IS 'Official student ID numb
 --
 
 COMMENT ON COLUMN public.students.documents_to_reupload IS 'JSON array of document type codes that need to be re-uploaded after rejection';
+
+
+--
+-- Name: COLUMN students.first_registered_academic_year; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.students.first_registered_academic_year IS 'The academic year when student first registered (e.g., "2024-2025"). Never changes.';
+
+
+--
+-- Name: COLUMN students.current_academic_year; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.students.current_academic_year IS 'The current academic year for this student. Updates during year advancement.';
+
+
+--
+-- Name: COLUMN students.year_level_history; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.students.year_level_history IS 'JSON array tracking year level progression: [{year: "2024-2025", level: "1st Year", updated_at: "2024-06-15"}]';
+
+
+--
+-- Name: COLUMN students.last_year_level_update; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.students.last_year_level_update IS 'Timestamp of last year level advancement. Prevents double advancement.';
+
+
+--
+-- Name: COLUMN students.course; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.students.course IS 'Student degree program (normalized from OCR). E.g., "BS Computer Science"';
+
+
+--
+-- Name: COLUMN students.course_verified; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.students.course_verified IS 'TRUE if course was verified from enrollment form via OCR';
+
+
+--
+-- Name: COLUMN students.unarchived_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.students.unarchived_at IS 'Timestamp when student was unarchived (for household duplicates)';
+
+
+--
+-- Name: COLUMN students.unarchived_by; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.students.unarchived_by IS 'Admin who unarchived the student';
+
+
+--
+-- Name: COLUMN students.unarchive_reason; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.students.unarchive_reason IS 'Reason for unarchiving (e.g., primary recipient graduated)';
+
+
+--
+-- Name: COLUMN students.household_verified; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.students.household_verified IS 'Admin verified household relationship (same/different household)';
+
+
+--
+-- Name: COLUMN students.household_primary; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.students.household_primary IS 'TRUE if this is the primary household recipient receiving assistance';
+
+
+--
+-- Name: COLUMN students.household_group_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.students.household_group_id IS 'Links household members together (same value for siblings)';
+
+
+--
+-- Name: COLUMN students.archival_type; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.students.archival_type IS 'Type of archival: manual, graduated, household_duplicate, blacklisted';
 
 
 --
@@ -1931,6 +3010,91 @@ CREATE SEQUENCE public.contact_content_blocks_id_seq
 --
 
 ALTER SEQUENCE public.contact_content_blocks_id_seq OWNED BY public.contact_content_blocks.id;
+
+
+--
+-- Name: courses_mapping; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.courses_mapping (
+    mapping_id integer NOT NULL,
+    raw_course_name character varying(255) NOT NULL,
+    normalized_course character varying(255) NOT NULL,
+    program_duration integer NOT NULL,
+    course_category character varying(100),
+    is_verified boolean DEFAULT false,
+    university_id integer,
+    occurrence_count integer DEFAULT 1,
+    created_by integer,
+    verified_by integer,
+    created_at timestamp without time zone DEFAULT now(),
+    last_seen timestamp without time zone DEFAULT now(),
+    updated_at timestamp without time zone DEFAULT now(),
+    notes text,
+    CONSTRAINT courses_mapping_program_duration_check CHECK ((program_duration = ANY (ARRAY[4, 5])))
+);
+
+
+--
+-- Name: TABLE courses_mapping; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.courses_mapping IS 'Normalizes course names from OCR and stores program duration for automatic graduation calculation';
+
+
+--
+-- Name: COLUMN courses_mapping.raw_course_name; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.courses_mapping.raw_course_name IS 'Course name as extracted from OCR (e.g., BSCS, BS CompSci)';
+
+
+--
+-- Name: COLUMN courses_mapping.normalized_course; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.courses_mapping.normalized_course IS 'Standardized course name (e.g., BS Computer Science)';
+
+
+--
+-- Name: COLUMN courses_mapping.program_duration; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.courses_mapping.program_duration IS 'Program length in years (4 or 5) - determines graduation year';
+
+
+--
+-- Name: COLUMN courses_mapping.university_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.courses_mapping.university_id IS 'If set, this mapping only applies to specific university';
+
+
+--
+-- Name: COLUMN courses_mapping.occurrence_count; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.courses_mapping.occurrence_count IS 'Number of students with this course - helps identify common courses';
+
+
+--
+-- Name: courses_mapping_mapping_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.courses_mapping_mapping_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: courses_mapping_mapping_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.courses_mapping_mapping_id_seq OWNED BY public.courses_mapping.mapping_id;
 
 
 --
@@ -2291,51 +3455,6 @@ CREATE SEQUENCE public.file_archive_log_log_id_seq
 --
 
 ALTER SEQUENCE public.file_archive_log_log_id_seq OWNED BY public.file_archive_log.log_id;
-
-
---
--- Name: grading_systems; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.grading_systems (
-    id integer NOT NULL,
-    system_name character varying(50) NOT NULL,
-    display_name character varying(100) NOT NULL,
-    scale_type character varying(20) NOT NULL,
-    min_value numeric(5,2),
-    max_value numeric(5,2),
-    passing_grade numeric(5,2),
-    grade_mappings jsonb,
-    is_active boolean DEFAULT true,
-    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
-);
-
-
---
--- Name: TABLE grading_systems; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON TABLE public.grading_systems IS 'Configuration for different grading systems';
-
-
---
--- Name: grading_systems_id_seq; Type: SEQUENCE; Schema: public; Owner: -
---
-
-CREATE SEQUENCE public.grading_systems_id_seq
-    AS integer
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: grading_systems_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
---
-
-ALTER SEQUENCE public.grading_systems_id_seq OWNED BY public.grading_systems.id;
 
 
 --
@@ -3115,6 +4234,53 @@ COMMENT ON TABLE public.student_active_sessions IS 'Tracks currently active stud
 
 
 --
+-- Name: student_data_export_requests; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.student_data_export_requests (
+    request_id integer NOT NULL,
+    student_id integer NOT NULL,
+    status character varying(20) DEFAULT 'pending'::character varying NOT NULL,
+    requested_at timestamp without time zone DEFAULT now() NOT NULL,
+    processed_at timestamp without time zone,
+    expires_at timestamp without time zone,
+    download_token character varying(128),
+    file_path text,
+    file_size_bytes bigint,
+    error_message text,
+    requested_by_ip character varying(45),
+    user_agent text
+);
+
+
+--
+-- Name: TABLE student_data_export_requests; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.student_data_export_requests IS 'Tracks student self-service data export requests';
+
+
+--
+-- Name: student_data_export_requests_request_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.student_data_export_requests_request_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: student_data_export_requests_request_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.student_data_export_requests_request_id_seq OWNED BY public.student_data_export_requests.request_id;
+
+
+--
 -- Name: student_login_history; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -3161,6 +4327,49 @@ CREATE SEQUENCE public.student_login_history_history_id_seq
 --
 
 ALTER SEQUENCE public.student_login_history_history_id_seq OWNED BY public.student_login_history.history_id;
+
+
+--
+-- Name: student_notification_preferences; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.student_notification_preferences (
+    student_id text NOT NULL,
+    email_enabled boolean DEFAULT true NOT NULL,
+    email_frequency character varying(16) DEFAULT 'immediate'::character varying NOT NULL,
+    email_announcement boolean DEFAULT true NOT NULL,
+    email_document boolean DEFAULT true NOT NULL,
+    email_schedule boolean DEFAULT true NOT NULL,
+    email_warning boolean DEFAULT true NOT NULL,
+    email_error boolean DEFAULT true NOT NULL,
+    email_success boolean DEFAULT true NOT NULL,
+    email_system boolean DEFAULT true NOT NULL,
+    email_info boolean DEFAULT true NOT NULL,
+    last_digest_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT chk_student_notif_pref_email_frequency CHECK (((email_frequency)::text = ANY ((ARRAY['immediate'::character varying, 'daily'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE student_notification_preferences; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.student_notification_preferences IS 'Per-student preferences for email notification delivery and digest timing.';
+
+
+--
+-- Name: COLUMN student_notification_preferences.email_enabled; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.student_notification_preferences.email_enabled IS 'Master switch for emailing notifications to this student.';
+
+
+--
+-- Name: COLUMN student_notification_preferences.email_frequency; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.student_notification_preferences.email_frequency IS 'Email delivery mode: immediate (send instantly) or daily (one daily digest).';
 
 
 --
@@ -3468,7 +4677,7 @@ CREATE VIEW public.v_archived_students_summary AS
     s.status,
     yl.name AS year_level_name,
     u.name AS university_name,
-    s.academic_year_registered,
+    s.first_registered_academic_year AS academic_year_registered,
     s.expected_graduation_year,
     s.is_archived,
     s.archived_at,
@@ -3610,7 +4819,7 @@ CREATE VIEW public.v_students_eligible_for_archiving AS
     s.status,
     s.year_level_id,
     yl.name AS year_level_name,
-    s.academic_year_registered,
+    s.first_registered_academic_year AS academic_year_registered,
     s.expected_graduation_year,
     (EXTRACT(year FROM CURRENT_DATE))::integer AS current_year,
     ((EXTRACT(year FROM CURRENT_DATE))::integer - s.expected_graduation_year) AS years_past_graduation,
@@ -3667,6 +4876,13 @@ ALTER TABLE ONLY public.about_content_audit ALTER COLUMN audit_id SET DEFAULT ne
 --
 
 ALTER TABLE ONLY public.about_content_blocks ALTER COLUMN id SET DEFAULT nextval('public.about_content_blocks_id_seq'::regclass);
+
+
+--
+-- Name: academic_years academic_year_id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.academic_years ALTER COLUMN academic_year_id SET DEFAULT nextval('public.academic_years_academic_year_id_seq'::regclass);
 
 
 --
@@ -3754,6 +4970,13 @@ ALTER TABLE ONLY public.contact_content_blocks ALTER COLUMN id SET DEFAULT nextv
 
 
 --
+-- Name: courses_mapping mapping_id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.courses_mapping ALTER COLUMN mapping_id SET DEFAULT nextval('public.courses_mapping_mapping_id_seq'::regclass);
+
+
+--
 -- Name: distribution_file_manifest manifest_id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -3793,13 +5016,6 @@ ALTER TABLE ONLY public.document_archives ALTER COLUMN archive_id SET DEFAULT ne
 --
 
 ALTER TABLE ONLY public.file_archive_log ALTER COLUMN log_id SET DEFAULT nextval('public.file_archive_log_log_id_seq'::regclass);
-
-
---
--- Name: grading_systems id; Type: DEFAULT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.grading_systems ALTER COLUMN id SET DEFAULT nextval('public.grading_systems_id_seq'::regclass);
 
 
 --
@@ -3929,6 +5145,13 @@ ALTER TABLE ONLY public.signup_slots ALTER COLUMN slot_id SET DEFAULT nextval('p
 
 
 --
+-- Name: student_data_export_requests request_id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.student_data_export_requests ALTER COLUMN request_id SET DEFAULT nextval('public.student_data_export_requests_request_id_seq'::regclass);
+
+
+--
 -- Name: student_login_history history_id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -4015,6 +5238,22 @@ ALTER TABLE ONLY public.about_content_blocks
 
 ALTER TABLE ONLY public.about_content_blocks
     ADD CONSTRAINT about_content_blocks_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: academic_years academic_years_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.academic_years
+    ADD CONSTRAINT academic_years_pkey PRIMARY KEY (academic_year_id);
+
+
+--
+-- Name: academic_years academic_years_year_code_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.academic_years
+    ADD CONSTRAINT academic_years_year_code_key UNIQUE (year_code);
 
 
 --
@@ -4154,6 +5393,22 @@ ALTER TABLE ONLY public.contact_content_blocks
 
 
 --
+-- Name: courses_mapping courses_mapping_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.courses_mapping
+    ADD CONSTRAINT courses_mapping_pkey PRIMARY KEY (mapping_id);
+
+
+--
+-- Name: courses_mapping courses_mapping_raw_course_name_university_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.courses_mapping
+    ADD CONSTRAINT courses_mapping_raw_course_name_university_id_key UNIQUE (raw_course_name, university_id);
+
+
+--
 -- Name: distribution_file_manifest distribution_file_manifest_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -4231,22 +5486,6 @@ ALTER TABLE ONLY public.documents
 
 ALTER TABLE ONLY public.file_archive_log
     ADD CONSTRAINT file_archive_log_pkey PRIMARY KEY (log_id);
-
-
---
--- Name: grading_systems grading_systems_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.grading_systems
-    ADD CONSTRAINT grading_systems_pkey PRIMARY KEY (id);
-
-
---
--- Name: grading_systems grading_systems_system_name_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.grading_systems
-    ADD CONSTRAINT grading_systems_system_name_key UNIQUE (system_name);
 
 
 --
@@ -4450,11 +5689,27 @@ ALTER TABLE ONLY public.student_active_sessions
 
 
 --
+-- Name: student_data_export_requests student_data_export_requests_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.student_data_export_requests
+    ADD CONSTRAINT student_data_export_requests_pkey PRIMARY KEY (request_id);
+
+
+--
 -- Name: student_login_history student_login_history_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.student_login_history
     ADD CONSTRAINT student_login_history_pkey PRIMARY KEY (history_id);
+
+
+--
+-- Name: student_notification_preferences student_notification_preferences_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.student_notification_preferences
+    ADD CONSTRAINT student_notification_preferences_pkey PRIMARY KEY (student_id);
 
 
 --
@@ -4604,6 +5859,27 @@ CREATE UNIQUE INDEX announcements_content_blocks_unique ON public.announcements_
 --
 
 CREATE UNIQUE INDEX contact_content_blocks_unique ON public.contact_content_blocks USING btree (municipality_id, block_key);
+
+
+--
+-- Name: idx_academic_years_is_current; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_academic_years_is_current ON public.academic_years USING btree (is_current);
+
+
+--
+-- Name: idx_academic_years_status; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_academic_years_status ON public.academic_years USING btree (status);
+
+
+--
+-- Name: idx_academic_years_year_code; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_academic_years_year_code ON public.academic_years USING btree (year_code);
 
 
 --
@@ -4758,6 +6034,62 @@ CREATE INDEX idx_audit_user_date ON public.audit_logs USING btree (user_type, cr
 --
 
 CREATE INDEX idx_blacklisted_students_blacklisted_by ON public.blacklisted_students USING btree (blacklisted_by);
+
+
+--
+-- Name: idx_courses_mapping_category; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_courses_mapping_category ON public.courses_mapping USING btree (course_category);
+
+
+--
+-- Name: idx_courses_mapping_duration; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_courses_mapping_duration ON public.courses_mapping USING btree (program_duration);
+
+
+--
+-- Name: idx_courses_mapping_normalized; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_courses_mapping_normalized ON public.courses_mapping USING btree (normalized_course);
+
+
+--
+-- Name: idx_courses_mapping_normalized_trgm; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_courses_mapping_normalized_trgm ON public.courses_mapping USING gin (normalized_course public.gin_trgm_ops);
+
+
+--
+-- Name: idx_courses_mapping_raw_name; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_courses_mapping_raw_name ON public.courses_mapping USING btree (raw_course_name);
+
+
+--
+-- Name: idx_courses_mapping_raw_name_trgm; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_courses_mapping_raw_name_trgm ON public.courses_mapping USING gin (raw_course_name public.gin_trgm_ops);
+
+
+--
+-- Name: idx_courses_mapping_university; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_courses_mapping_university ON public.courses_mapping USING btree (university_id);
+
+
+--
+-- Name: idx_courses_mapping_verified; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_courses_mapping_verified ON public.courses_mapping USING btree (is_verified);
 
 
 --
@@ -4940,6 +6272,27 @@ CREATE INDEX idx_dss_distribution ON public.distribution_student_snapshot USING 
 --
 
 CREATE INDEX idx_dss_student ON public.distribution_student_snapshot USING btree (student_id);
+
+
+--
+-- Name: idx_export_requests_requested_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_export_requests_requested_at ON public.student_data_export_requests USING btree (requested_at DESC);
+
+
+--
+-- Name: idx_export_requests_status; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_export_requests_status ON public.student_data_export_requests USING btree (status);
+
+
+--
+-- Name: idx_export_requests_student; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_export_requests_student ON public.student_data_export_requests USING btree (student_id);
 
 
 --
@@ -5146,6 +6499,13 @@ CREATE INDEX idx_students_active_status ON public.students USING btree (is_archi
 
 
 --
+-- Name: idx_students_archival_type; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_students_archival_type ON public.students USING btree (archival_type) WHERE (archival_type IS NOT NULL);
+
+
+--
 -- Name: idx_students_archived_at; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -5167,6 +6527,41 @@ CREATE INDEX idx_students_confidence_score ON public.students USING btree (confi
 
 
 --
+-- Name: idx_students_course; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_students_course ON public.students USING btree (course);
+
+
+--
+-- Name: idx_students_course_verified; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_students_course_verified ON public.students USING btree (course_verified);
+
+
+--
+-- Name: idx_students_current_academic_year; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_students_current_academic_year ON public.students USING btree (current_academic_year);
+
+
+--
+-- Name: idx_students_email; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_students_email ON public.students USING btree (email) WHERE (email IS NOT NULL);
+
+
+--
+-- Name: idx_students_expected_graduation; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_students_expected_graduation ON public.students USING btree (expected_graduation_year);
+
+
+--
 -- Name: idx_students_extension_name; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -5174,10 +6569,24 @@ CREATE INDEX idx_students_extension_name ON public.students USING btree (extensi
 
 
 --
+-- Name: idx_students_first_registered_year; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_students_first_registered_year ON public.students USING btree (first_registered_academic_year);
+
+
+--
 -- Name: idx_students_graduation_year; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_students_graduation_year ON public.students USING btree (expected_graduation_year);
+
+
+--
+-- Name: idx_students_household_group; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_students_household_group ON public.students USING btree (household_group_id) WHERE (household_group_id IS NOT NULL);
 
 
 --
@@ -5192,6 +6601,20 @@ CREATE INDEX idx_students_is_archived ON public.students USING btree (is_archive
 --
 
 CREATE INDEX idx_students_last_login ON public.students USING btree (last_login);
+
+
+--
+-- Name: idx_students_mobile; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_students_mobile ON public.students USING btree (mobile) WHERE (mobile IS NOT NULL);
+
+
+--
+-- Name: idx_students_school_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_students_school_id ON public.students USING btree (school_student_id) WHERE (school_student_id IS NOT NULL);
 
 
 --
@@ -5216,6 +6639,20 @@ CREATE INDEX idx_students_year_level ON public.students USING btree (year_level_
 
 
 --
+-- Name: idx_students_year_level_history; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_students_year_level_history ON public.students USING gin (year_level_history);
+
+
+--
+-- Name: idx_unique_email_active; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_unique_email_active ON public.students USING btree (lower(email)) WHERE ((is_archived = false) AND (email IS NOT NULL));
+
+
+--
 -- Name: idx_unique_finalized_distribution; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -5227,6 +6664,20 @@ CREATE UNIQUE INDEX idx_unique_finalized_distribution ON public.distribution_sna
 --
 
 COMMENT ON INDEX public.idx_unique_finalized_distribution IS 'Ensures only one finalized distribution can exist per academic year/semester combination. Allows multiple unfinalized drafts.';
+
+
+--
+-- Name: idx_unique_mobile_active; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_unique_mobile_active ON public.students USING btree (mobile) WHERE ((is_archived = false) AND (mobile IS NOT NULL));
+
+
+--
+-- Name: idx_unique_school_id_university_active; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_unique_school_id_university_active ON public.students USING btree (university_id, school_student_id) WHERE ((is_archived = false) AND (school_student_id IS NOT NULL) AND (university_id IS NOT NULL));
 
 
 --
@@ -5302,10 +6753,45 @@ CREATE TRIGGER update_grading_policy_updated_at BEFORE UPDATE ON grading.univers
 
 
 --
+-- Name: student_notification_preferences set_student_notif_prefs_updated_at; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER set_student_notif_prefs_updated_at BEFORE UPDATE ON public.student_notification_preferences FOR EACH ROW EXECUTE FUNCTION public.trg_student_notif_prefs_updated_at();
+
+
+--
+-- Name: students trigger_calculate_graduation_year; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trigger_calculate_graduation_year BEFORE INSERT OR UPDATE OF course, first_registered_academic_year, year_level_id ON public.students FOR EACH ROW EXECUTE FUNCTION public.calculate_expected_graduation_year();
+
+
+--
+-- Name: academic_years trigger_ensure_single_current_year; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trigger_ensure_single_current_year BEFORE INSERT OR UPDATE ON public.academic_years FOR EACH ROW WHEN ((new.is_current = true)) EXECUTE FUNCTION public.ensure_single_current_academic_year();
+
+
+--
+-- Name: students trigger_initialize_year_level_history; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trigger_initialize_year_level_history BEFORE INSERT OR UPDATE OF year_level_id, current_academic_year ON public.students FOR EACH ROW EXECUTE FUNCTION public.initialize_year_level_history();
+
+
+--
 -- Name: students trigger_set_document_upload_needs; Type: TRIGGER; Schema: public; Owner: -
 --
 
-CREATE TRIGGER trigger_set_document_upload_needs BEFORE INSERT OR UPDATE ON public.students FOR EACH ROW EXECUTE FUNCTION public.set_document_upload_needs();
+CREATE TRIGGER trigger_set_document_upload_needs BEFORE INSERT ON public.students FOR EACH ROW EXECUTE FUNCTION public.set_document_upload_needs();
+
+
+--
+-- Name: TRIGGER trigger_set_document_upload_needs ON students; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TRIGGER trigger_set_document_upload_needs ON public.students IS 'Sets needs_document_upload flag for new student registrations. Fires on INSERT only to allow manual updates during document rejection workflow.';
 
 
 --
@@ -5313,6 +6799,20 @@ CREATE TRIGGER trigger_set_document_upload_needs BEFORE INSERT OR UPDATE ON publ
 --
 
 CREATE TRIGGER trigger_track_school_student_id AFTER INSERT ON public.students FOR EACH ROW EXECUTE FUNCTION public.track_school_student_id();
+
+
+--
+-- Name: academic_years trigger_update_academic_years_timestamp; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trigger_update_academic_years_timestamp BEFORE UPDATE ON public.academic_years FOR EACH ROW EXECUTE FUNCTION public.update_academic_years_updated_at();
+
+
+--
+-- Name: courses_mapping trigger_update_courses_mapping_timestamp; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trigger_update_courses_mapping_timestamp BEFORE UPDATE ON public.courses_mapping FOR EACH ROW EXECUTE FUNCTION public.update_courses_mapping_updated_at();
 
 
 --
@@ -5328,6 +6828,14 @@ CREATE TRIGGER update_municipalities_updated_at BEFORE UPDATE ON public.municipa
 
 ALTER TABLE ONLY grading.university_passing_policy
     ADD CONSTRAINT university_passing_policy_university_key_fkey FOREIGN KEY (university_key) REFERENCES public.universities(code);
+
+
+--
+-- Name: academic_years academic_years_advanced_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.academic_years
+    ADD CONSTRAINT academic_years_advanced_by_fkey FOREIGN KEY (advanced_by) REFERENCES public.admins(admin_id) ON DELETE SET NULL;
 
 
 --
@@ -5384,6 +6892,30 @@ ALTER TABLE ONLY public.blacklisted_students
 
 ALTER TABLE ONLY public.blacklisted_students
     ADD CONSTRAINT blacklisted_students_student_id_fkey FOREIGN KEY (student_id) REFERENCES public.students(student_id);
+
+
+--
+-- Name: courses_mapping courses_mapping_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.courses_mapping
+    ADD CONSTRAINT courses_mapping_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.admins(admin_id) ON DELETE SET NULL;
+
+
+--
+-- Name: courses_mapping courses_mapping_university_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.courses_mapping
+    ADD CONSTRAINT courses_mapping_university_id_fkey FOREIGN KEY (university_id) REFERENCES public.universities(university_id) ON DELETE SET NULL;
+
+
+--
+-- Name: courses_mapping courses_mapping_verified_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.courses_mapping
+    ADD CONSTRAINT courses_mapping_verified_by_fkey FOREIGN KEY (verified_by) REFERENCES public.admins(admin_id) ON DELETE SET NULL;
 
 
 --
@@ -5515,6 +7047,14 @@ ALTER TABLE ONLY public.students
 
 
 --
+-- Name: students fk_unarchived_by; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.students
+    ADD CONSTRAINT fk_unarchived_by FOREIGN KEY (unarchived_by) REFERENCES public.admins(admin_id) ON DELETE SET NULL;
+
+
+--
 -- Name: qr_codes qr_codes_student_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -5568,6 +7108,14 @@ ALTER TABLE ONLY public.student_active_sessions
 
 ALTER TABLE ONLY public.student_login_history
     ADD CONSTRAINT student_login_history_student_id_fkey FOREIGN KEY (student_id) REFERENCES public.students(student_id) ON DELETE CASCADE;
+
+
+--
+-- Name: student_notification_preferences student_notification_preferences_student_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.student_notification_preferences
+    ADD CONSTRAINT student_notification_preferences_student_id_fkey FOREIGN KEY (student_id) REFERENCES public.students(student_id) ON DELETE CASCADE;
 
 
 --

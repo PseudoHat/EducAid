@@ -34,20 +34,20 @@
       }).then(res => res.json()).then(data => {
         if (data.status === 'success') {
           document.getElementById('emailOtpStatus').textContent = "OTP sent! Check email.";
-          document.getElementById('emailOtpStatus').className = 'form-success position-absolute';
+          document.getElementById('emailOtpStatus').className = 'form-success';
           document.getElementById('otpSection').style.display = 'block';
           document.getElementById('verifyOtpBtn').disabled = false;
           document.getElementById('resendOtpBtn').style.display = 'none';
           startOtpTimer();
         } else {
           document.getElementById('emailOtpStatus').textContent = data.message;
-          document.getElementById('emailOtpStatus').className = 'form-error position-absolute';
+          document.getElementById('emailOtpStatus').className = 'form-error';
           this.disabled = false;
           this.textContent = "Send OTP";
         }
       }).catch(()=>{
         document.getElementById('emailOtpStatus').textContent = "Failed to send. Try again.";
-        document.getElementById('emailOtpStatus').className = 'form-error position-absolute';
+        document.getElementById('emailOtpStatus').className = 'form-error';
         this.disabled = false; this.textContent = "Send OTP";
       });
     };
@@ -75,7 +75,7 @@
       }).then(res=>res.json()).then(data=>{
         if (data.status === 'success') {
           document.getElementById('emailOtpStatus').textContent = "OTP verified!";
-          document.getElementById('emailOtpStatus').className = 'form-success position-absolute';
+          document.getElementById('emailOtpStatus').className = 'form-success';
           otpVerified = true;
           document.getElementById('otpInput').disabled = true;
           document.getElementById('saveEmailBtn').style.display = 'inline-block';
@@ -97,7 +97,7 @@
     document.getElementById('emailUpdateForm').onsubmit = function(e) {
       if (!otpVerified) {
         document.getElementById('emailOtpStatus').textContent = "You must verify OTP before saving.";
-        document.getElementById('emailOtpStatus').className = 'form-error position-absolute';
+        document.getElementById('emailOtpStatus').className = 'form-error';
         e.preventDefault();
         return false;
       }

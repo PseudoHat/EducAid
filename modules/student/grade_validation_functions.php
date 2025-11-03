@@ -142,7 +142,7 @@ if (!function_exists('extractGradesFromTSV')) {
         if (!empty($studentData['university_name'])) {
             $universityValidation = validateUniversity($fullOcrText, $studentData['university_name']);
             
-            if (!$universityValidation['match']) {
+            if (!$universityValidation['matched']) {
                 return [
                     'all_passing' => false,
                     'grades' => [],
@@ -513,7 +513,7 @@ if (!function_exists('validateUniversity')) {
         }
 
         return [
-            'match' => $match,
+            'matched' => $match,
             'confidence' => $confidence,
             'found_text' => trim($foundText)
         ];

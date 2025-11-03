@@ -1,6 +1,7 @@
 <?php
 include __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../includes/CSRFProtection.php';
+require_once __DIR__ . '/../../services/BlacklistService.php';
 session_start();
 
 use PHPMailer\PHPMailer\PHPMailer;
@@ -33,13 +34,6 @@ if (!$admin) {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // CSRF Protection - validate token first
-    $csrfToken = $_POST['csrf_token'] ?? '';
-    if (!CSRFProtection::validateToken('blacklist_operation', $csrfToken)) {
-        echo json_encode(['status' => 'error', 'message' => 'Invalid security token. Please refresh the page.']);
-        exit;
-    }
-    
     $action = $_POST['action'] ?? '';
     
     // Debug logging
@@ -176,6 +170,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     // Step 2: Verify OTP and complete blacklist
     if ($action === 'complete_blacklist') {
+        // CSRF Protection - validate token for final action
+        $csrfToken = $_POST['csrf_token'] ?? '';
+        if (!CSRFProtection::validateToken('blacklist_operation', $csrfToken)) {
+            echo json_encode(['status' => 'error', 'message' => 'Invalid security token. Please refresh the page.']);
+            exit;
+        }
+        
         // Debug logging
         error_log("Complete blacklist action received");
         error_log("POST data: " . print_r($_POST, true));
@@ -257,40 +258,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         }
         
-        // Begin transaction
-        pg_query($connection, "BEGIN");
-        
+        // Use BlacklistService to handle the blacklisting
         try {
             // Decode session data to get stored form information
             $session_data = json_decode($verification['session_data'], true);
             
-            // Update student status to blacklisted
-            $updateStudent = pg_query_params($connection,
-                "UPDATE students SET status = 'blacklisted' WHERE student_id = $1",
-                [$student_id]
+            // Initialize BlacklistService
+            $blacklistService = new BlacklistService($connection);
+            
+            // Blacklist the student using the service
+            $result = $blacklistService->blacklistStudent(
+                $student_id,
+                $session_data['reason_category'],
+                $session_data['detailed_reason'],
+                $admin_id,
+                $session_data['admin_notes'],
+                $verification['email'] // Admin email
             );
             
-            if (!$updateStudent) {
-                throw new Exception('Failed to update student status');
-            }
-            
-            // Insert blacklist record using the correct table structure
-            $insertBlacklist = pg_query_params($connection,
-                "INSERT INTO blacklisted_students 
-                 (student_id, reason_category, detailed_reason, blacklisted_by, admin_email, admin_notes) 
-                 VALUES ($1, $2, $3, $4, $5, $6)",
-                [
-                    $student_id,
-                    $session_data['reason_category'],
-                    $session_data['detailed_reason'],
-                    $admin_id,
-                    $verification['email'], // This is the admin email from verification table
-                    $session_data['admin_notes']
-                ]
-            );
-            
-            if (!$insertBlacklist) {
-                throw new Exception('Failed to create blacklist record');
+            if (!$result['success']) {
+                throw new Exception($result['message']);
             }
             
             // Mark verification as used
@@ -299,19 +286,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 [$verification['id']]
             );
             
-            // Add admin notification
-            $notification_msg = "BLACKLIST: {$session_data['student_name']} has been permanently blacklisted by {$session_data['admin_name']}";
-            pg_query_params($connection, "INSERT INTO admin_notifications (message) VALUES ($1)", [$notification_msg]);
-            
-            pg_query($connection, "COMMIT");
+            // Log success
+            error_log("Blacklist: Student {$student_id} successfully blacklisted");
+            if ($result['compression'] && $result['compression']['success']) {
+                error_log("Blacklist: Files compressed - {$result['compression']['files_added']} files archived to blacklisted_students/");
+            }
             
             echo json_encode([
                 'status' => 'success',
-                'message' => 'Student has been successfully blacklisted'
+                'message' => 'Student has been successfully blacklisted and files archived'
             ]);
             
         } catch (Exception $e) {
-            pg_query($connection, "ROLLBACK");
+            error_log("Blacklist: Error - " . $e->getMessage());
             echo json_encode(['status' => 'error', 'message' => 'Failed to blacklist student: ' . $e->getMessage()]);
         }
         
