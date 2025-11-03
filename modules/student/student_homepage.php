@@ -267,8 +267,8 @@ if (!isset($_SESSION['schedule_modal_shown'])) {
             </div>
             <div class="welcome-actions">
               <button class="btn btn-outline-primary btn-sm">
-                <i class="bi bi-gear me-1"></i>
-                Settings
+                <i class="bi bi-person-gear me-1"></i>
+                Edit Profile
               </button>
             </div>
           </div>

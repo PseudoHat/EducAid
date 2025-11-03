@@ -1069,38 +1069,7 @@ unset($_SESSION['profile_flash'], $_SESSION['profile_flash_type']);
         <!-- YouTube-style Layout: Sidebar + Content -->
         <div class="row g-4">
           <!-- Settings Navigation Sidebar -->
-          <div class="col-12 col-lg-3">
-            <div class="settings-nav sticky-top" style="top: 100px;">
-              <a href="#account" class="settings-nav-item active">
-                <i class="bi bi-person-circle me-2"></i>
-                Account
-              </a>
-              <a href="#security" class="settings-nav-item">
-                <i class="bi bi-shield-lock me-2"></i>
-                Security & Privacy
-              </a>
-              <a href="#notifications" class="settings-nav-item">
-                <i class="bi bi-envelope-open me-2"></i>
-                Notification Preferences
-              </a>
-              <a href="#privacy-data" class="settings-nav-item">
-                <i class="bi bi-incognito me-2"></i>
-                Privacy & Data
-              </a>
-              <a href="accessibility.php" class="settings-nav-item">
-                <i class="bi bi-universal-access me-2"></i>
-                Accessibility
-              </a>
-              <a href="active_sessions.php" class="settings-nav-item">
-                <i class="bi bi-laptop me-2"></i>
-                Active Sessions
-              </a>
-              <a href="security_activity.php" class="settings-nav-item">
-                <i class="bi bi-clock-history me-2"></i>
-                Security Activity
-              </a>
-            </div>
-          </div>
+          <?php include __DIR__ . '/../../includes/student/settings_sidebar.php'; ?>
 
           <!-- Settings Content -->
           <div class="col-12 col-lg-9">
