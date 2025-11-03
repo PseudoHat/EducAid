@@ -266,10 +266,10 @@ if (!isset($_SESSION['schedule_modal_shown'])) {
               </div>
             </div>
             <div class="welcome-actions">
-              <button class="btn btn-outline-primary btn-sm">
+              <a href="student_settings.php#account" class="btn btn-outline-primary btn-sm">
                 <i class="bi bi-person-gear me-1"></i>
                 Edit Profile
-              </button>
+              </a>
             </div>
           </div>
         </div>
