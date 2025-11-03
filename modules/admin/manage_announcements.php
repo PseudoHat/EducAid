@@ -26,12 +26,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     $aid = (int)$_POST['announcement_id'];
     $toggle = (int)$_POST['toggle_active']; // 1 => set active, 0 => deactivate
+    
     if ($toggle === 1) {
-      pg_query($connection, "UPDATE announcements SET is_active = FALSE");
-      pg_query_params($connection, "UPDATE announcements SET is_active=TRUE, updated_at=now() WHERE announcement_id=$1", [$aid]);
+      // Deactivate all first
+      $deactivate_all = pg_query($connection, "UPDATE announcements SET is_active = FALSE");
+      if (!$deactivate_all) {
+        error_log("Failed to deactivate all announcements: " . pg_last_error($connection));
+        header('Location: ' . $_SERVER['PHP_SELF'] . '?error=toggle_failed');
+        exit;
+      }
+      
+      // Activate the selected one
+      $activate_result = pg_query_params($connection, "UPDATE announcements SET is_active=TRUE, updated_at=now() WHERE announcement_id=$1", [$aid]);
+      if (!$activate_result) {
+        error_log("Failed to activate announcement {$aid}: " . pg_last_error($connection));
+        header('Location: ' . $_SERVER['PHP_SELF'] . '?error=toggle_failed');
+        exit;
+      }
+      
+      // Verify the update affected a row
+      if (pg_affected_rows($activate_result) === 0) {
+        error_log("No rows affected when activating announcement {$aid}");
+        header('Location: ' . $_SERVER['PHP_SELF'] . '?error=announcement_not_found');
+        exit;
+      }
     } else {
-      pg_query_params($connection, "UPDATE announcements SET is_active=FALSE, updated_at=now() WHERE announcement_id=$1", [$aid]);
+      // Deactivate the selected one
+      $deactivate_result = pg_query_params($connection, "UPDATE announcements SET is_active=FALSE, updated_at=now() WHERE announcement_id=$1", [$aid]);
+      if (!$deactivate_result) {
+        error_log("Failed to deactivate announcement {$aid}: " . pg_last_error($connection));
+        header('Location: ' . $_SERVER['PHP_SELF'] . '?error=toggle_failed');
+        exit;
+      }
+      
+      // Verify the update affected a row
+      if (pg_affected_rows($deactivate_result) === 0) {
+        error_log("No rows affected when deactivating announcement {$aid}");
+        header('Location: ' . $_SERVER['PHP_SELF'] . '?error=announcement_not_found');
+        exit;
+      }
     }
+    
     header('Location: ' . $_SERVER['PHP_SELF'] . '?toggled=1');
     exit;
   }
@@ -48,44 +83,161 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $location = !empty($_POST['location']) ? trim($_POST['location']) : null;
     $image_path = null;
 
-    // Handle image upload (optional)
-    if (!empty($_FILES['image']['name']) && is_uploaded_file($_FILES['image']['tmp_name'])) {
-      $uploadDir = __DIR__ . '/../../assets/uploads/announcements';
-      if (!is_dir($uploadDir)) { @mkdir($uploadDir, 0775, true); }
-      $ext = strtolower(pathinfo($_FILES['image']['name'], PATHINFO_EXTENSION));
-      if (!in_array($ext, ['jpg','jpeg','png','gif','webp'])) {
-        $ext = 'jpg'; // normalize
+    // Server-side validation for required fields
+    if (empty($title) || strlen($title) > 255) {
+      header('Location: ' . $_SERVER['PHP_SELF'] . '?error=invalid_title');
+      exit;
+    }
+    if (empty($remarks) || strlen($remarks) > 5000) {
+      header('Location: ' . $_SERVER['PHP_SELF'] . '?error=invalid_remarks');
+      exit;
+    }
+    
+    // Validate event date is not in the past
+    if ($event_date) {
+      $today = date('Y-m-d');
+      if ($event_date < $today) {
+        header('Location: ' . $_SERVER['PHP_SELF'] . '?error=past_date');
+        exit;
       }
-      $fname = 'ann_' . date('Ymd_His') . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
-      $dest = $uploadDir . '/' . $fname;
-      if (move_uploaded_file($_FILES['image']['tmp_name'], $dest)) {
-        // Store relative path for serving
-        $image_path = 'assets/uploads/announcements/' . $fname;
+      
+      // Check for duplicate event date (warn but allow with confirmation)
+      $duplicate_check = pg_query_params(
+        $connection, 
+        "SELECT announcement_id, title FROM announcements WHERE event_date = $1", 
+        [$event_date]
+      );
+      
+      if ($duplicate_check && pg_num_rows($duplicate_check) > 0) {
+        // If user hasn't confirmed the duplicate, redirect with warning
+        if (!isset($_POST['confirm_duplicate'])) {
+          $existing = pg_fetch_assoc($duplicate_check);
+          $_SESSION['pending_announcement'] = [
+            'title' => $title,
+            'remarks' => $remarks,
+            'event_date' => $event_date,
+            'event_time' => $event_time,
+            'location' => $location,
+            'existing_title' => $existing['title']
+          ];
+          
+          // If there's an uploaded file, store it temporarily
+          if (!empty($_FILES['image']['tmp_name']) && is_uploaded_file($_FILES['image']['tmp_name'])) {
+            $_SESSION['pending_image'] = [
+              'name' => $_FILES['image']['name'],
+              'type' => $_FILES['image']['type'],
+              'tmp_name' => $_FILES['image']['tmp_name'],
+              'size' => $_FILES['image']['size']
+            ];
+          }
+          
+          header('Location: ' . $_SERVER['PHP_SELF'] . '?warning=duplicate_date');
+          exit;
+        }
+        // User confirmed, proceed with posting
+        unset($_SESSION['pending_announcement']);
+        unset($_SESSION['pending_image']);
       }
     }
 
-    // Deactivate previous active
-    pg_query($connection, "UPDATE announcements SET is_active = FALSE");
-    $query = "INSERT INTO announcements (title, remarks, event_date, event_time, location, image_path, is_active) VALUES ($1,$2,$3,$4,$5,$6,TRUE)";
-    $result = pg_query_params($connection, $query, [$title, $remarks, $event_date, $event_time, $location, $image_path]);
-    if ($result) {
-      // Create admin notification
-      $notification_msg = "New announcement posted: " . $title;
-      pg_query_params($connection, "INSERT INTO admin_notifications (message) VALUES ($1)", [$notification_msg]);
-      
-      // Create student notifications for all active students
-      $student_notif_title = "New Announcement: " . $title;
-      $student_notif_message = $remarks;
-      
-      // Add event details to message if available
-      if ($event_date || $event_time || $location) {
-        $student_notif_message .= "\n\n";
-        if ($event_date) $student_notif_message .= "Date: " . date('F j, Y', strtotime($event_date)) . "\n";
-        if ($event_time) $student_notif_message .= "Time: " . $event_time . "\n";
-        if ($location) $student_notif_message .= "Location: " . $location;
+    // Handle image upload (optional)
+    if (!empty($_FILES['image']['name']) && is_uploaded_file($_FILES['image']['tmp_name'])) {
+      // Check for upload errors
+      if ($_FILES['image']['error'] !== UPLOAD_ERR_OK) {
+        error_log("Upload error code: " . $_FILES['image']['error']);
+        header('Location: ' . $_SERVER['PHP_SELF'] . '?error=upload_failed');
+        exit;
       }
       
-      // Use helper function to send notifications (handles both bell notifications and emails automatically)
+      // Check file size (5MB max)
+      if ($_FILES['image']['size'] > 5 * 1024 * 1024) {
+        header('Location: ' . $_SERVER['PHP_SELF'] . '?error=file_too_large');
+        exit;
+      }
+      
+      $uploadDir = __DIR__ . '/../../assets/uploads/announcements';
+      
+      // Check if directory exists and is writable
+      if (!is_dir($uploadDir)) {
+        if (!@mkdir($uploadDir, 0775, true)) {
+          error_log("Failed to create upload directory: " . $uploadDir);
+          header('Location: ' . $_SERVER['PHP_SELF'] . '?error=directory_failed');
+          exit;
+        }
+      }
+      
+      if (!is_writable($uploadDir)) {
+        error_log("Upload directory not writable: " . $uploadDir);
+        header('Location: ' . $_SERVER['PHP_SELF'] . '?error=directory_not_writable');
+        exit;
+      }
+      
+      $ext = strtolower(pathinfo($_FILES['image']['name'], PATHINFO_EXTENSION));
+      
+      // Strict extension validation
+      if (!in_array($ext, ['jpg','jpeg','png','gif','webp'])) {
+        header('Location: ' . $_SERVER['PHP_SELF'] . '?error=invalid_extension');
+        exit;
+      }
+      
+      $fname = 'ann_' . date('Ymd_His') . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
+      $dest = $uploadDir . '/' . $fname;
+      
+      if (!move_uploaded_file($_FILES['image']['tmp_name'], $dest)) {
+        error_log("Failed to move uploaded file to: " . $dest);
+        header('Location: ' . $_SERVER['PHP_SELF'] . '?error=move_failed');
+        exit;
+      }
+      
+      // Store relative path for serving
+      $image_path = 'assets/uploads/announcements/' . $fname;
+    }
+
+    // Deactivate previous active
+    $deactivate_result = pg_query($connection, "UPDATE announcements SET is_active = FALSE");
+    if (!$deactivate_result) {
+      error_log("Failed to deactivate announcements: " . pg_last_error($connection));
+      // Continue anyway as this is not critical
+    }
+    
+    $query = "INSERT INTO announcements (title, remarks, event_date, event_time, location, image_path, is_active) VALUES ($1,$2,$3,$4,$5,$6,TRUE)";
+    $result = pg_query_params($connection, $query, [$title, $remarks, $event_date, $event_time, $location, $image_path]);
+    
+    if (!$result) {
+      error_log("Announcement insert failed: " . pg_last_error($connection));
+      
+      // Clean up uploaded image if database insert failed
+      if ($image_path && file_exists(__DIR__ . '/../../' . $image_path)) {
+        @unlink(__DIR__ . '/../../' . $image_path);
+      }
+      
+      header('Location: ' . $_SERVER['PHP_SELF'] . '?error=db_insert');
+      exit;
+    }
+    
+    // Create admin notification
+    $notification_msg = "New announcement posted: " . $title;
+    $admin_notif_result = pg_query_params($connection, "INSERT INTO admin_notifications (message) VALUES ($1)", [$notification_msg]);
+    
+    if (!$admin_notif_result) {
+      error_log("Failed to create admin notification: " . pg_last_error($connection));
+      // Continue as this is not critical
+    }
+    
+    // Create student notifications for all active students
+    $student_notif_title = "New Announcement: " . $title;
+    $student_notif_message = $remarks;
+    
+    // Add event details to message if available
+    if ($event_date || $event_time || $location) {
+      $student_notif_message .= "\n\n";
+      if ($event_date) $student_notif_message .= "Date: " . date('F j, Y', strtotime($event_date)) . "\n";
+      if ($event_time) $student_notif_message .= "Time: " . $event_time . "\n";
+      if ($location) $student_notif_message .= "Location: " . $location;
+    }
+    
+    // Use helper function to send notifications (handles both bell notifications and emails automatically)
+    try {
       createBulkStudentNotification(
         $connection,
         $student_notif_title,
@@ -94,7 +246,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'medium',
         '../../website/announcements.php'
       );
+    } catch (Exception $e) {
+      error_log("Failed to create student notifications: " . $e->getMessage());
+      // Continue as announcement was posted successfully
     }
+    
     header('Location: ' . $_SERVER['PHP_SELF'] . '?posted=1');
     exit;
   }
@@ -164,7 +320,7 @@ $posted = isset($_GET['posted']);
           <div class="event-block mb-3">
             <h6><i class="bi bi-calendar-event me-1"></i> Event Schedule (Optional)</h6>
             <div class="event-inline mb-2">
-              <input type="date" name="event_date" class="form-control" aria-label="Event Date">
+              <input type="date" name="event_date" class="form-control" aria-label="Event Date" id="eventDate" min="<?= date('Y-m-d') ?>">
               <input type="time" name="event_time" class="form-control" aria-label="Event Time">
             </div>
             <input type="text" name="location" class="form-control" placeholder="Location / Venue" aria-label="Location">
@@ -187,7 +343,94 @@ $posted = isset($_GET['posted']);
         </form>
         <?php if ($posted): ?>
           <div class="alert alert-success alert-dismissible fade show mt-3" role="alert">
-            Announcement posted successfully!
+            <i class="bi bi-check-circle me-2"></i>Announcement posted successfully!
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+        <?php endif; ?>
+        
+        <?php if (isset($_GET['toggled'])): ?>
+          <div class="alert alert-success alert-dismissible fade show mt-3" role="alert">
+            <i class="bi bi-check-circle me-2"></i>Announcement status updated successfully!
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+        <?php endif; ?>
+        
+        <?php if (isset($_GET['warning']) && $_GET['warning'] === 'duplicate_date' && isset($_SESSION['pending_announcement'])): ?>
+          <?php $pending = $_SESSION['pending_announcement']; ?>
+          <div class="alert alert-warning alert-dismissible fade show mt-3" role="alert">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+            <strong>Duplicate Event Date Warning!</strong><br>
+            You already have an announcement "<strong><?= htmlspecialchars($pending['existing_title']) ?></strong>" scheduled for <strong><?= date('F j, Y', strtotime($pending['event_date'])) ?></strong>.<br>
+            Are you sure you want to post another announcement for the same date?
+            <div class="mt-3">
+              <form method="POST" style="display:inline;" id="confirmDuplicateForm">
+                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfTokenPost) ?>">
+                <input type="hidden" name="post_announcement" value="1">
+                <input type="hidden" name="confirm_duplicate" value="1">
+                <input type="hidden" name="title" value="<?= htmlspecialchars($pending['title']) ?>">
+                <input type="hidden" name="remarks" value="<?= htmlspecialchars($pending['remarks']) ?>">
+                <input type="hidden" name="event_date" value="<?= htmlspecialchars($pending['event_date']) ?>">
+                <input type="hidden" name="event_time" value="<?= htmlspecialchars($pending['event_time']) ?>">
+                <input type="hidden" name="location" value="<?= htmlspecialchars($pending['location']) ?>">
+                <button type="submit" class="btn btn-warning btn-sm me-2">
+                  <i class="bi bi-check-circle me-1"></i>Yes, Post Anyway
+                </button>
+              </form>
+              <a href="<?= $_SERVER['PHP_SELF'] ?>" class="btn btn-secondary btn-sm" onclick="<?php unset($_SESSION['pending_announcement']); unset($_SESSION['pending_image']); ?>">
+                <i class="bi bi-x-circle me-1"></i>Cancel
+              </a>
+            </div>
+          </div>
+        <?php endif; ?>
+        
+        <?php if (isset($_GET['error'])): ?>
+          <div class="alert alert-danger alert-dismissible fade show mt-3" role="alert">
+            <i class="bi bi-exclamation-triangle me-2"></i>
+            <?php 
+            switch ($_GET['error']) {
+              case 'csrf': 
+                echo 'Security validation failed. Please refresh and try again.'; 
+                break;
+              case 'invalid_title': 
+                echo 'Invalid title. Title must be between 1-255 characters.'; 
+                break;
+              case 'invalid_remarks': 
+                echo 'Invalid remarks. Remarks must be between 1-5000 characters.'; 
+                break;
+              case 'upload_failed': 
+                echo 'Image upload failed. Please try again.'; 
+                break;
+              case 'file_too_large': 
+                echo 'Image file is too large. Maximum size is 5MB.'; 
+                break;
+              case 'invalid_extension': 
+                echo 'Invalid image format. Please use JPG, PNG, GIF, or WebP files only.'; 
+                break;
+              case 'directory_failed': 
+                echo 'Failed to create upload directory. Please contact administrator.'; 
+                break;
+              case 'directory_not_writable': 
+                echo 'Upload directory is not writable. Please contact administrator.'; 
+                break;
+              case 'move_failed': 
+                echo 'Failed to save uploaded image. Please try again.'; 
+                break;
+              case 'db_insert': 
+                echo 'Failed to save announcement to database. Please try again.'; 
+                break;
+              case 'toggle_failed': 
+                echo 'Failed to update announcement status. Please try again.'; 
+                break;
+              case 'announcement_not_found': 
+                echo 'Announcement not found or already deleted.'; 
+                break;
+              case 'past_date': 
+                echo 'Event date cannot be in the past. Please select today or a future date.'; 
+                break;
+              default: 
+                echo 'An unexpected error occurred. Please try again.';
+            }
+            ?>
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
           </div>
         <?php endif; ?>

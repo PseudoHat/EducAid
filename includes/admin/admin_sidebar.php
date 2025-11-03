@@ -42,8 +42,8 @@ if (isset($_SESSION['admin_id'])) {
 }
 
 $role_label = match($admin_role) {
-  'super_admin' => 'Super Admin',
-  'sub_admin', 'admin' => 'Administrator',
+  'super_admin' => 'Admin',
+  'sub_admin', 'admin' => 'Sub Admin',
   default => ucfirst(str_replace('_',' ', $admin_role))
 };
 
