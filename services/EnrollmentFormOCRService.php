@@ -245,6 +245,7 @@ class EnrollmentFormOCRService {
     
     /**
      * Extract student name and verify
+     * IMPROVED: Better handling of long/compound names
      */
     private function extractStudentName($words, $studentData) {
         $firstName = $studentData['first_name'] ?? '';
@@ -263,28 +264,40 @@ class EnrollmentFormOCRService {
         
         $fullText = strtolower(implode(' ', array_column($words, 'text')));
         
-        // Check first name
+        error_log("=== NAME EXTRACTION DEBUG ===");
+        error_log("Looking for: First='{$firstName}', Middle='{$middleName}', Last='{$lastName}'");
+        error_log("OCR Text: " . substr($fullText, 0, 300));
+        
+        // Check first name - Use improved matching for compound/long names
         if (!empty($firstName)) {
-            $similarity = $this->fuzzyMatch($firstName, $fullText);
-            $result['first_name_found'] = $similarity >= 70;
+            $similarity = $this->fuzzyMatchName($firstName, $fullText);
+            // VERY RELAXED: 33% threshold (at least 1/3 of words must match)
+            // This handles cases like "Reb Miguel Luys" where even if 1-2 words match it's likely correct
+            $result['first_name_found'] = $similarity >= 33;
             $result['first_name_similarity'] = $similarity;
+            error_log("First name '{$firstName}' similarity: {$similarity}% - " . ($result['first_name_found'] ? '✓ FOUND' : '✗ NOT FOUND'));
         }
         
         // Check middle name (optional)
         if (!empty($middleName)) {
-            $similarity = $this->fuzzyMatch($middleName, $fullText);
-            $result['middle_name_found'] = $similarity >= 60;
+            $similarity = $this->fuzzyMatchName($middleName, $fullText);
+            // VERY RELAXED: 33% threshold for middle names (often abbreviated or missing)
+            $result['middle_name_found'] = $similarity >= 33;
             $result['middle_name_similarity'] = $similarity;
+            error_log("Middle name '{$middleName}' similarity: {$similarity}% - " . ($result['middle_name_found'] ? '✓ FOUND' : '✗ NOT FOUND'));
         } else {
             $result['middle_name_found'] = true; // Not required
             $result['middle_name_similarity'] = 100;
+            error_log("Middle name: Not provided (skipped)");
         }
         
-        // Check last name
+        // Check last name - Use improved matching
         if (!empty($lastName)) {
-            $similarity = $this->fuzzyMatch($lastName, $fullText);
-            $result['last_name_found'] = $similarity >= 75;
+            $similarity = $this->fuzzyMatchName($lastName, $fullText);
+            // RELAXED: 50% threshold for last names (usually single word but could be compound)
+            $result['last_name_found'] = $similarity >= 50;
             $result['last_name_similarity'] = $similarity;
+            error_log("Last name '{$lastName}' similarity: {$similarity}% - " . ($result['last_name_found'] ? '✓ FOUND' : '✗ NOT FOUND'));
         }
         
         // Calculate overall confidence
@@ -294,6 +307,9 @@ class EnrollmentFormOCRService {
             $result['last_name_similarity'] ?? 0
         ];
         $result['confidence'] = round(array_sum($confidences) / 3, 1);
+        
+        error_log("Overall name confidence: {$result['confidence']}%");
+        error_log("=============================");
         
         return $result;
     }
@@ -737,6 +753,109 @@ class EnrollmentFormOCRService {
         $fuzzyMatchPercent = count($needleWords) > 0 ? ($fuzzyMatchedWords / count($needleWords)) * 100 : 0;
         
         return max($wordMatchPercent, $fuzzyMatchPercent);
+    }
+    
+    /**
+     * Improved fuzzy matching specifically for names (handles long compound names better)
+     * - Checks partial matches (any word from name appears in text)
+     * - Handles 2-character words (common in Filipino names like "DY", "GO", "TY")
+     * - More lenient scoring for compound names
+     */
+    private function fuzzyMatchName($needle, $haystack) {
+        $needle = strtolower(trim($needle));
+        $haystack = strtolower($haystack);
+        
+        // Normalize both strings - remove ALL punctuation (commas, periods, etc.)
+        $needleNormalized = preg_replace('/[^\w\s]/u', ' ', $needle);
+        $needleNormalized = preg_replace('/\s+/', ' ', $needleNormalized);
+        $needleNormalized = trim($needleNormalized);
+        
+        $haystackNormalized = preg_replace('/[^\w\s]/u', ' ', $haystack);
+        $haystackNormalized = preg_replace('/\s+/', ' ', $haystackNormalized);
+        $haystackNormalized = trim($haystackNormalized);
+        
+        error_log("  → Searching for: '{$needleNormalized}' in '{$haystackNormalized}'");
+        
+        // IMPROVEMENT 1: Exact substring match (100% confidence)
+        if (strpos($haystackNormalized, $needleNormalized) !== false) {
+            error_log("  → EXACT MATCH FOUND!");
+            return 100;
+        }
+        
+        // IMPROVEMENT 2: Split into words and count matches (handles compound names)
+        $needleWords = preg_split('/\s+/', $needleNormalized);
+        $haystackWords = preg_split('/\s+/', $haystackNormalized);
+        
+        error_log("  → Needle words: " . implode(', ', $needleWords));
+        error_log("  → Haystack words: " . implode(', ', $haystackWords));
+        
+        $matchedWords = 0;
+        $partialMatches = 0;
+        $matchDetails = [];
+        
+        foreach ($needleWords as $nWord) {
+            // IMPROVEMENT 3: Allow 2-character words (for "DY", "GO", "TY", etc.)
+            if (strlen($nWord) >= 2) {
+                $bestMatch = 0;
+                $matchedWith = '';
+                
+                foreach ($haystackWords as $hWord) {
+                    // Exact word match
+                    if ($nWord === $hWord) {
+                        $matchedWords++;
+                        $bestMatch = 100;
+                        $matchedWith = $hWord;
+                        break;
+                    }
+                    
+                    // Partial match (word starts with or contains needle)
+                    if (strlen($hWord) >= 2 && strpos($hWord, $nWord) !== false) {
+                        if ($bestMatch < 75) {
+                            $partialMatches++;
+                            $bestMatch = 75;
+                            $matchedWith = $hWord . ' (partial)';
+                        }
+                    }
+                    
+                    // Levenshtein distance for typos (only for words >= 3 chars)
+                    if (strlen($nWord) >= 3 && strlen($hWord) >= 3) {
+                        $distance = levenshtein($nWord, $hWord);
+                        $maxLen = max(strlen($nWord), strlen($hWord));
+                        $similarity = max(0, 100 - ($distance / $maxLen) * 100);
+                        
+                        if ($similarity >= 70 && $similarity > $bestMatch) {
+                            $bestMatch = $similarity;
+                            $matchedWith = $hWord . ' (fuzzy ' . round($similarity) . '%)';
+                        }
+                    }
+                }
+                
+                // RELAXED: Lower threshold from 75 to 70 for counting matches
+                if ($bestMatch >= 70) {
+                    $matchedWords++;
+                    $matchDetails[] = "'{$nWord}' → '{$matchedWith}' ({$bestMatch}%)";
+                } else {
+                    $matchDetails[] = "'{$nWord}' → NOT FOUND";
+                }
+            }
+        }
+        
+        error_log("  → Match details: " . implode('; ', $matchDetails));
+        
+        // IMPROVEMENT 4: Calculate percentage based on matched words
+        $totalWords = count($needleWords);
+        if ($totalWords === 0) return 0;
+        
+        $exactMatchPercent = ($matchedWords / $totalWords) * 100;
+        
+        // IMPROVEMENT 5: Bonus for partial matches (helps with OCR errors)
+        $bonusPercent = min(20, ($partialMatches / $totalWords) * 50);
+        
+        $finalScore = min(100, $exactMatchPercent + $bonusPercent);
+        
+        error_log("  → FINAL: {$finalScore}% (matched: {$matchedWords}/{$totalWords} words, partials: {$partialMatches})");
+        
+        return $finalScore;
     }
     
     /**

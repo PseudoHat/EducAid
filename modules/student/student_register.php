@@ -240,13 +240,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processEnrollmentOcr'
     // DELETE OLD FILES: Remove previous upload and OCR results when new file is uploaded
     // This prevents bypassing validation by keeping old correct documents
     $sessionPrefix = $_SESSION['file_prefix'] ?? 'session';
-    $oldFiles = glob($uploadDir . $sessionPrefix . '_EAF.*');
-    foreach ($oldFiles as $oldFile) {
-        @unlink($oldFile); // Delete old enrollment form image
-        @unlink($oldFile . '.txt'); // Delete old OCR text
-        @unlink($oldFile . '.tsv'); // Delete old OCR TSV data
-        @unlink($oldFile . '.verify.json'); // Delete old verification results
-    }
+    cleanup_old_document_files($uploadDir, $sessionPrefix, '_EAF');
     
     // Use session prefix for file naming to prevent conflicts
     $sessionPrefix = $_SESSION['file_prefix'] ?? 'session';
@@ -259,6 +253,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processEnrollmentOcr'
     $sessionFileName = $sessionPrefix . '_EAF.' . $fileExtension;
     $targetPath = $uploadDir . $sessionFileName;
 
+    // FILENAME VALIDATION DISABLED: Allow any filename format
+    // Students can now upload files with any name - system will rename automatically
+    /*
     // Validate filename format: Lastname_Firstname_EAF
     $formFirstName = trim($_POST['first_name'] ?? '');
     $formLastName = trim($_POST['last_name'] ?? '');
@@ -280,6 +277,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processEnrollmentOcr'
         ]);
         exit;
     }
+    */
 
     if (!move_uploaded_file($uploadedFile['tmp_name'], $targetPath)) {
         echo json_encode(['status' => 'error', 'message' => 'Failed to save uploaded file.']);
@@ -517,6 +515,63 @@ if (!function_exists('json_response')) {
         
         flush();
         exit;
+    }
+}
+
+// Helper function to cleanup old document files when reuploading
+if (!function_exists('cleanup_old_document_files')) {
+    /**
+     * Delete all old files for a specific document type to prevent validation bypass
+     * and ensure fresh OCR processing on each upload
+     * 
+     * @param string $uploadDir Directory where files are stored
+     * @param string $sessionPrefix Session-based file prefix (e.g., "Dela Cruz_Juan_abc123")
+     * @param string $filePattern Pattern to match files (e.g., "_EAF", "_idpic", "_Grades", "_Letter*")
+     * @return int Number of files deleted
+     */
+    function cleanup_old_document_files(string $uploadDir, string $sessionPrefix, string $filePattern): int {
+        $deletedCount = 0;
+        
+        // Build the full glob pattern - handle wildcards in filePattern
+        // If filePattern already has extension wildcard (like "_Letter*"), use it as-is
+        // Otherwise, add .* to match any extension
+        $globPattern = $uploadDir . $sessionPrefix . $filePattern;
+        if (strpos($filePattern, '*') === false) {
+            $globPattern .= '.*';
+        }
+        
+        // Find all matching files
+        $oldFiles = glob($globPattern);
+        
+        foreach ($oldFiles as $oldFile) {
+            // Delete main file
+            if (@unlink($oldFile)) {
+                $deletedCount++;
+                error_log("✓ Deleted old file: " . basename($oldFile));
+            }
+            
+            // Delete associated OCR/verification files
+            $associatedFiles = [
+                $oldFile . '.txt',              // Plain text OCR output
+                $oldFile . '.tsv',              // Tesseract TSV output
+                $oldFile . '.ocr.txt',          // Extracted OCR text
+                $oldFile . '.verify.json',      // Verification results
+                $oldFile . '.confidence.json'   // Confidence scores
+            ];
+            
+            foreach ($associatedFiles as $assocFile) {
+                if (file_exists($assocFile) && @unlink($assocFile)) {
+                    $deletedCount++;
+                    error_log("✓ Deleted associated file: " . basename($assocFile));
+                }
+            }
+        }
+        
+        if ($deletedCount > 0) {
+            error_log("✓ Cleanup complete: {$deletedCount} file(s) deleted for pattern '{$filePattern}'");
+        }
+        
+        return $deletedCount;
     }
 }
 
@@ -1441,13 +1496,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processIdPictureOcr']
 
     // DELETE OLD FILES: Remove previous upload and OCR results when new file is uploaded
     $sessionPrefix = $_SESSION['file_prefix'] ?? 'session';
-    $oldFiles = glob($uploadDir . $sessionPrefix . '_idpic.*');
-    foreach ($oldFiles as $oldFile) {
-        @unlink($oldFile); // Delete old ID picture image
-        @unlink($oldFile . '.txt'); // Delete old OCR text
-        @unlink($oldFile . '.tsv'); // Delete old OCR TSV data
-        @unlink($oldFile . '.verify.json'); // Delete old verification results
-    }
+    cleanup_old_document_files($uploadDir, $sessionPrefix, '_idpic');
     
     // Session-based file naming to prevent conflicts
     $fileExt = pathinfo($_FILES['id_picture']['name'], PATHINFO_EXTENSION);
@@ -2153,13 +2202,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processLetterOcr'])) 
 
     // DELETE OLD FILES: Remove previous upload and OCR results when new file is uploaded
     $sessionPrefix = $_SESSION['file_prefix'] ?? 'session';
-    $oldFiles = glob($uploadDir . $sessionPrefix . '_Letter*');
-    foreach ($oldFiles as $oldFile) {
-        @unlink($oldFile); // Delete old letter image
-        @unlink($oldFile . '.txt'); // Delete old OCR text
-        @unlink($oldFile . '.tsv'); // Delete old OCR TSV data
-        @unlink($oldFile . '.verify.json'); // Delete old verification results
-    }
+    cleanup_old_document_files($uploadDir, $sessionPrefix, '_Letter*');
     
     // Use session-based file naming
     $fileExt = pathinfo($_FILES['letter_to_mayor']['name'], PATHINFO_EXTENSION);
@@ -2525,13 +2568,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processCertificateOcr
 
     // DELETE OLD FILES: Remove previous upload and OCR results when new file is uploaded
     $sessionPrefix = $_SESSION['file_prefix'] ?? 'session';
-    $oldFiles = glob($uploadDir . $sessionPrefix . '_Indigency.*');
-    foreach ($oldFiles as $oldFile) {
-        @unlink($oldFile); // Delete old certificate image
-        @unlink($oldFile . '.txt'); // Delete old OCR text
-        @unlink($oldFile . '.tsv'); // Delete old OCR TSV data
-        @unlink($oldFile . '.verify.json'); // Delete old verification results
-    }
+    cleanup_old_document_files($uploadDir, $sessionPrefix, '_Indigency');
     
     // Use session-based file naming
     $fileExt = pathinfo($_FILES['certificate_of_indigency']['name'], PATHINFO_EXTENSION);
@@ -2895,13 +2932,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processGradesOcr'])) 
 
         // DELETE OLD FILES: Remove previous upload and OCR results when new file is uploaded
         $sessionPrefix = $_SESSION['file_prefix'] ?? 'session';
-        $oldFiles = glob($uploadDir . $sessionPrefix . '_Grades.*');
-        foreach ($oldFiles as $oldFile) {
-            @unlink($oldFile); // Delete old grades image
-            @unlink($oldFile . '.txt'); // Delete old OCR text
-            @unlink($oldFile . '.tsv'); // Delete old OCR TSV data
-            @unlink($oldFile . '.verify.json'); // Delete old verification results
-        }
+        cleanup_old_document_files($uploadDir, $sessionPrefix, '_Grades');
         
         // Use session-based file naming
         $fileExt = pathinfo($_FILES['grades_document']['name'], PATHINFO_EXTENSION);
@@ -5458,11 +5489,12 @@ if (!$isAjaxRequest) {
                         <label class="form-label">Upload Enrollment Assessment Form</label>
                         <small class="form-text text-muted d-block">
                             Please upload a clear photo of your Enrollment Assessment Form<br>
-                            <strong>Required filename format:</strong> Lastname_Firstname_EAF (e.g., Santos_Juan_EAF.jpg)
+                            <!-- Filename format requirement removed - system will auto-rename files -->
+                            <em>Accepted formats: JPG, PNG, PDF</em>
                         </small>
                         <input type="file" class="form-control" name="enrollment_form" id="enrollmentForm" accept="image/*" required />
                         <div id="filenameError" class="text-danger mt-1" style="display: none;">
-                            <small><i class="bi bi-exclamation-triangle me-1"></i>Filename must follow format: Lastname_Firstname_EAF</small>
+                            <small><i class="bi bi-exclamation-triangle me-1"></i>Please upload a valid image file</small>
                         </div>
                     </div>
                     <div id="uploadPreview" class="d-none">
@@ -5483,7 +5515,7 @@ if (!$isAjaxRequest) {
                                 <i class="bi bi-search me-2"></i>Process Document
                             </button>
                             <small class="text-muted d-block mt-1">
-                                <i class="bi bi-info-circle me-1"></i>Upload a file with correct filename format to enable processing
+                                <i class="bi bi-info-circle me-1"></i>Upload a file to enable document processing
                             </small>
                         </div>
                         <div id="ocrResults" class="d-none">
@@ -6534,6 +6566,9 @@ function validateCurrentStepFields() {
                 field: enrollmentFile
             });
         } else if (enrollmentFile && enrollmentFile.files[0]) {
+            // FILENAME VALIDATION DISABLED - System auto-renames files
+            // Students can now upload files with any name
+            /*
             // Validate filename format
             const filename = enrollmentFile.files[0].name;
             const namePattern = /^[A-Za-z]+_[A-Za-z]+_EAF\.(jpg|jpeg|png|pdf)$/i;
@@ -6545,6 +6580,7 @@ function validateCurrentStepFields() {
                     error: 'Filename must follow format: Lastname_Firstname_EAF.jpg (e.g., Santos_Juan_EAF.jpg)'
                 });
             }
+            */
         }
     }
     
@@ -7124,11 +7160,18 @@ function handleEnrollmentFileUpload(fileInput) {
         reader.readAsDataURL(file);
     }
     
+    // FILENAME VALIDATION DISABLED - Allow any filename
+    // System will auto-rename files using session prefix
+    // Always show OCR section and enable process button when file is uploaded
+    const alwaysValid = true; // Replace filename pattern check
+    
+    /*
     // Validate filename format
     const filename = file.name;
     const namePattern = /^[A-Za-z]+_[A-Za-z]+_EAF\.(jpg|jpeg|png)$/i;
+    */
     
-    if (namePattern.test(filename)) {
+    if (alwaysValid) {
         // Show OCR section and enable process button
         if (ocrSection) ocrSection.classList.remove('d-none');
         if (processBtn) {
@@ -7143,6 +7186,8 @@ function handleEnrollmentFileUpload(fileInput) {
             };
         }
     } else {
+        // This code is now unreachable but kept for reference
+        /*
         // Hide OCR section and disable button
         if (ocrSection) ocrSection.classList.add('d-none');
         if (processBtn) {
@@ -7153,6 +7198,7 @@ function handleEnrollmentFileUpload(fileInput) {
         
         // Show filename error
         showNotifier('Filename must follow format: Lastname_Firstname_EAF.jpg (e.g., Santos_Juan_EAF.jpg)', 'error');
+        */
     }
 }
 

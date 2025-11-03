@@ -259,76 +259,238 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['migration_action'])) 
             $fh = fopen($csv['tmp_name'], 'r');
             if ($fh) {
                 $header = null; $map = [];
-                // Header synonyms mapping to internal keys
+                $headerDetected = false;
+                $detectedHeaders = [];
+                
+                // Comprehensive header synonyms mapping - supporting all student table fields
                 $syn = [
-                    'last_name' => ['lastname','last name','surname','family name','last'],
-                    'first_name'=> ['firstname','first name','given name','first','given'],
-                    'middle_name'=>['middlename','middle name','mi','m.i.','middle','mname','m name'],
-                    'extension_name'=>['extension','suffix','name extension','ext'],
-                    'age' => ['age','years','yrs','yr'],
-                    'bdate' => ['birthdate','birth date','bday','date of birth','dob'],
-                    'sex' => ['sex','gender'],
-                    'barangay_name'=>['barangay','brgy','bgry','bgy','village','barangay name'],
-                    'university_name'=>['university','school','college','univ','institution','campus'],
-                    'year_level_name'=>['year level','year','level','yr level','grade'],
-                    'email'=>['email','e-mail','email address'],
-                    'mobile'=>['mobile','contact number','phone','number','contact','cellphone','cp number','mobile number','phone number','contact no','contact #']
+                    // Basic Name Fields
+                    'last_name' => ['lastname','last name','surname','family name','last','apellido'],
+                    'first_name'=> ['firstname','first name','given name','first','given','nombre'],
+                    'middle_name'=>['middlename','middle name','mi','m.i.','middle','mname','m name','middle initial'],
+                    'extension_name'=>['extension','suffix','name extension','ext','name suffix','jr','sr','iii'],
+                    
+                    // Personal Information
+                    'age' => ['age','years','yrs','yr','edad'],
+                    'bdate' => ['birthdate','birth date','bday','date of birth','dob','birthday','birth day'],
+                    'sex' => ['sex','gender','sexo'],
+                    'civil_status' => ['civil status','marital status','status','civil','marital'],
+                    'religion' => ['religion','religious affiliation','faith'],
+                    'citizenship' => ['citizenship','nationality','citizen'],
+                    
+                    // Contact Information
+                    'email'=>['email','e-mail','email address','e mail','correo'],
+                    'mobile'=>['mobile','contact number','phone','number','contact','cellphone','cp number','mobile number','phone number','contact no','contact #','cell','cell phone'],
+                    'telephone'=>['telephone','tel','landline','phone','tel no','telephone number'],
+                    
+                    // Address Fields
+                    'barangay_name'=>['barangay','brgy','bgry','bgy','village','barangay name','baranggay'],
+                    'house_number'=>['house number','house no','house #','street number','house','bldg no'],
+                    'street'=>['street','street name','st','calle'],
+                    'subdivision'=>['subdivision','subd','village','sitio'],
+                    'city'=>['city','municipality','town','ciudad'],
+                    'province'=>['province','provincia'],
+                    'zip_code'=>['zip','zip code','postal code','postal','zipcode'],
+                    
+                    // Academic Information
+                    'university_name'=>['university','school','college','univ','institution','campus','university name','school name'],
+                    'course'=>['course','program','degree','major','course name','program name'],
+                    'year_level_name'=>['year level','year','level','yr level','grade','year lvl','grade level'],
+                    'semester'=>['semester','sem','term','period'],
+                    'school_student_id'=>['school id','student id','school student id','student number','id number','id no','school number'],
+                    'gwa'=>['gwa','general weighted average','weighted average','average','grade','general average'],
+                    
+                    // Scholarship Information
+                    'scholarship_type'=>['scholarship type','type of scholarship','scholarship','type','scholar type'],
+                    'application_date'=>['application date','date applied','apply date','registration date','reg date'],
+                    'first_registered_academic_year'=>['first registered','first year','initial year','first academic year','year registered'],
+                    
+                    // Parent/Guardian Information
+                    'father_name'=>['father name','father','father\'s name','fathers name','parent father'],
+                    'father_occupation'=>['father occupation','father work','father job','father\'s occupation'],
+                    'mother_name'=>['mother name','mother','mother\'s name','mothers name','parent mother'],
+                    'mother_occupation'=>['mother occupation','mother work','mother job','mother\'s occupation'],
+                    'guardian_name'=>['guardian name','guardian','guardian\'s name'],
+                    'guardian_relationship'=>['guardian relationship','relationship','relation to guardian'],
+                    
+                    // Financial Information
+                    'family_income'=>['family income','income','monthly income','annual income','household income'],
+                    'siblings_in_college'=>['siblings in college','siblings','college siblings','number of siblings'],
                 ];
-                $normalizeHeader = function($s){ return strtolower(trim(preg_replace('/\s+|\_|\-/',' ', (string)$s))); };
+                
+                $normalizeHeader = function($s){ 
+                    return strtolower(trim(preg_replace('/\s+|\_|\-/',' ', (string)$s))); 
+                };
+                
                 $recognize = function($label) use ($syn,$normalizeHeader){
                     $l = $normalizeHeader($label);
                     foreach ($syn as $key => $arr) {
-                        foreach ($arr as $cand) { if ($l === $normalizeHeader($cand)) return $key; }
+                        foreach ($arr as $cand) { 
+                            if ($l === $normalizeHeader($cand)) return $key; 
+                        }
                     }
                     return null;
                 };
 
                 $rowIndex = 0;
+                $detectedHeaders = [];
+                
                 while (($data = fgetcsv($fh)) !== false) {
                     $rowIndex++;
-                    // Attempt to detect header in first row
+                    
+                    // FIRST ROW: MUST be header - detect column mappings
                     if ($rowIndex === 1) {
-                        $isHeader = false; $hdr = [];
+                        $hdr = [];
+                        $recognizedCount = 0;
+                        
                         foreach ($data as $i => $col) {
                             $key = $recognize($col);
-                            if ($key) { $hdr[$key] = $i; $isHeader = true; }
+                            if ($key) { 
+                                $hdr[$key] = $i; 
+                                $recognizedCount++;
+                                $detectedHeaders[] = $col;
+                            }
                         }
-                        if ($isHeader) { $header = $data; $map = $hdr; continue; }
-                        // else no header, fall through to positional mapping
+                        
+                        // Require at least 5 recognized columns to consider it a valid header
+                        if ($recognizedCount >= 5) {
+                            $header = $data; 
+                            $map = $hdr; 
+                            $headerDetected = true;
+                            continue; // Skip to next row (actual data)
+                        } else {
+                            // Not enough headers detected - show error
+                            $_SESSION['migration_result'] = [
+                                'inserted'=>0, 
+                                'errors'=>['CSV must have a header row. Only ' . $recognizedCount . ' columns were recognized. Please ensure the first row contains column headers like: Last Name, First Name, Email, Mobile, etc.'], 
+                                'status'=>'error'
+                            ];
+                            fclose($fh);
+                            header('Location: ' . $_SERVER['PHP_SELF']);
+                            exit;
+                        }
                     }
 
-                    // Build row using header map if present, else positional fallback
-                    $get = function($key) use ($map,$data){ return isset($map[$key]) ? ($data[$map[$key]] ?? '') : null; };
-                    if ($map) {
-                        $last = $get('last_name');
-                        $first = $get('first_name');
-                        $mid = $get('middle_name');
-                        $ext = $get('extension_name');
-                        $ageVal = $get('age');
-                        $bdateVal = $get('bdate');
-                        $gender = $get('sex');
-                        $barangayName = $get('barangay_name');
-                        $universityName = $get('university_name');
-                        $yearLevelName = $get('year_level_name');
-                        $email = $get('email');
-                        $mobile = $get('mobile');
-                    } else {
-                        if (count($data) < 11) continue; // insufficient columns in positional mode
-                        list($last,$first,$ext,$mid,$ageVal,$gender,$barangayName,$universityName,$yearLevelName,$email,$mobile) = $data;
-                        $bdateVal = null;
-                    }
+                    // Skip empty rows
+                    if (empty(array_filter($data))) continue;
 
-                    // Normalize values
-                    $email = trim((string)$email);
-                    $mobile = preg_replace('/[^0-9]/','', (string)$mobile);
+                    // Build row using header map
+                    $get = function($key) use ($map,$data){ 
+                        return isset($map[$key]) ? trim((string)($data[$map[$key]] ?? '')) : ''; 
+                    };
+                    
+                    // Extract all possible fields from CSV
+                    $last = $get('last_name');
+                    $first = $get('first_name');
+                    $mid = $get('middle_name');
+                    $ext = $get('extension_name');
+                    $ageVal = $get('age');
+                    $bdateVal = $get('bdate');
+                    $gender = $get('sex');
+                    $civilStatus = $get('civil_status');
+                    $religion = $get('religion');
+                    $citizenship = $get('citizenship');
+                    
+                    // Contact
+                    $email = trim($get('email'));
+                    $mobile = preg_replace('/[^0-9]/','', $get('mobile'));
+                    $telephone = $get('telephone');
+                    
+                    // Address
+                    $barangayName = $get('barangay_name');
+                    $houseNumber = $get('house_number');
+                    $street = $get('street');
+                    $subdivision = $get('subdivision');
+                    $city = $get('city');
+                    $province = $get('province');
+                    $zipCode = $get('zip_code');
+                    
+                    // Academic
+                    $universityName = $get('university_name');
+                    $course = $get('course');
+                    $yearLevelName = $get('year_level_name');
+                    $semester = $get('semester');
+                    $schoolStudentId = $get('school_student_id');
+                    $gwa = $get('gwa');
+                    
+                    // Scholarship
+                    $scholarshipType = $get('scholarship_type');
+                    $applicationDate = $get('application_date');
+                    $firstRegisteredYear = $get('first_registered_academic_year');
+                    
+                    // Parents/Guardian
+                    $fatherName = $get('father_name');
+                    $fatherOccupation = $get('father_occupation');
+                    $motherName = $get('mother_name');
+                    $motherOccupation = $get('mother_occupation');
+                    $guardianName = $get('guardian_name');
+                    $guardianRelationship = $get('guardian_relationship');
+                    
+                    // Financial
+                    $familyIncome = $get('family_income');
+                    $siblingsInCollege = $get('siblings_in_college');
+
+                    // Normalize mobile number
                     if (strlen($mobile) === 10) $mobile = '0' . $mobile;
+                    
+                    // Parse birthdate (try bdate first, then age)
                     $bdate = $bdateVal ? to_bdate_from_age($bdateVal) : to_bdate_from_age($ageVal);
+                    
+                    // Normalize gender
                     $sex = map_gender($gender);
 
                     $rows[] = [
-                        'first_name'=>trim((string)$first), 'middle_name'=>trim((string)$mid), 'last_name'=>trim((string)$last), 'extension_name'=>trim((string)$ext),
-                        'bdate'=>$bdate, 'sex'=>$sex, 'barangay_name'=>trim((string)$barangayName), 'university_name'=>trim((string)$universityName),
-                        'year_level_name'=>trim((string)$yearLevelName), 'email'=>$email, 'mobile'=>$mobile, 'municipality_id'=>$municipality_id,
+                        // Basic info
+                        'first_name'=>$first, 
+                        'middle_name'=>$mid, 
+                        'last_name'=>$last, 
+                        'extension_name'=>$ext,
+                        'bdate'=>$bdate, 
+                        'sex'=>$sex,
+                        'civil_status'=>$civilStatus,
+                        'religion'=>$religion,
+                        'citizenship'=>$citizenship ?: 'Filipino', // Default to Filipino
+                        
+                        // Contact
+                        'email'=>$email, 
+                        'mobile'=>$mobile,
+                        'telephone'=>$telephone,
+                        
+                        // Address
+                        'barangay_name'=>$barangayName,
+                        'house_number'=>$houseNumber,
+                        'street'=>$street,
+                        'subdivision'=>$subdivision,
+                        'city'=>$city,
+                        'province'=>$province,
+                        'zip_code'=>$zipCode,
+                        
+                        // Academic
+                        'university_name'=>$universityName,
+                        'course'=>$course,
+                        'year_level_name'=>$yearLevelName,
+                        'semester'=>$semester,
+                        'school_student_id'=>$schoolStudentId,
+                        'gwa'=>$gwa,
+                        
+                        // Scholarship
+                        'scholarship_type'=>$scholarshipType,
+                        'application_date'=>$applicationDate,
+                        'first_registered_academic_year'=>$firstRegisteredYear,
+                        
+                        // Parents
+                        'father_name'=>$fatherName,
+                        'father_occupation'=>$fatherOccupation,
+                        'mother_name'=>$motherName,
+                        'mother_occupation'=>$motherOccupation,
+                        'guardian_name'=>$guardianName,
+                        'guardian_relationship'=>$guardianRelationship,
+                        
+                        // Financial
+                        'family_income'=>$familyIncome,
+                        'siblings_in_college'=>$siblingsInCollege,
+                        
+                        'municipality_id'=>$municipality_id,
                         'include'=>true,
                     ];
                 }
@@ -350,26 +512,52 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['migration_action'])) 
                 $brgy = $barangays ? find_best_barangay($r['barangay_name'], $barangays) : null;
 
                 $conflicts = [];
-                if (!$r['bdate']) $conflicts[] = 'Birthdate missing/invalid (age column)';
+                
+                // Required field validation
+                if (empty($r['last_name'])) $conflicts[] = 'Last name is required';
+                if (empty($r['first_name'])) $conflicts[] = 'First name is required';
+                if (!$r['bdate']) $conflicts[] = 'Birthdate missing/invalid';
                 if (!$r['sex']) $conflicts[] = 'Gender unknown';
-                if (!$uni) $conflicts[] = 'University not recognized';
-                if (!$yl) $conflicts[] = 'Year level unknown';
-                if (!$brgy) $conflicts[] = 'Barangay not found';
-                if (!filter_var($r['email'], FILTER_VALIDATE_EMAIL)) $conflicts[] = 'Invalid email';
-                // Duplicate email/mobile check
-                $dupEmail = pg_fetch_assoc(pg_query_params($connection, "SELECT 1 FROM students WHERE email = $1", [$r['email']])) ? true : false;
-                $dupMobile = $r['mobile'] ? (pg_fetch_assoc(pg_query_params($connection, "SELECT 1 FROM students WHERE mobile = $1", [$r['mobile']])) ? true : false) : false;
-                if ($dupEmail) $conflicts[] = 'Email already exists';
-                if ($dupMobile) $conflicts[] = 'Mobile already exists';
+                if (!$uni) $conflicts[] = 'University not recognized: ' . htmlspecialchars($r['university_name']);
+                if (!$yl) $conflicts[] = 'Year level unknown: ' . htmlspecialchars($r['year_level_name']);
+                if (!$brgy) $conflicts[] = 'Barangay not found: ' . htmlspecialchars($r['barangay_name']);
+                if (!filter_var($r['email'], FILTER_VALIDATE_EMAIL)) $conflicts[] = 'Invalid email format';
+                if (empty($r['mobile'])) $conflicts[] = 'Mobile number is required';
+                
+                // Duplicate checks
+                if (!empty($r['email'])) {
+                    $dupEmail = pg_fetch_assoc(pg_query_params($connection, "SELECT student_id, CONCAT(first_name, ' ', last_name) as name FROM students WHERE email = $1 AND status != 'archived'", [$r['email']]));
+                    if ($dupEmail) $conflicts[] = 'Email already exists (Student: ' . htmlspecialchars($dupEmail['name']) . ')';
+                }
+                if (!empty($r['mobile'])) {
+                    $dupMobile = pg_fetch_assoc(pg_query_params($connection, "SELECT student_id, CONCAT(first_name, ' ', last_name) as name FROM students WHERE mobile = $1 AND status != 'archived'", [$r['mobile']]));
+                    if ($dupMobile) $conflicts[] = 'Mobile already exists (Student: ' . htmlspecialchars($dupMobile['name']) . ')';
+                }
 
                 $preview[] = [
                     'row'=>$r,
-                    'university'=>$uni, 'year_level'=>$yl, 'barangay'=>$brgy,
+                    'university'=>$uni, 
+                    'year_level'=>$yl, 
+                    'barangay'=>$brgy,
                     'conflicts'=>$conflicts,
                 ];
             }
-            $_SESSION['migration_preview'] = ['municipality_id'=>$municipality_id, 'rows'=>$preview];
+            
+            $_SESSION['migration_preview'] = [
+                'municipality_id'=>$municipality_id, 
+                'rows'=>$preview,
+                'detected_headers'=>$detectedHeaders ?? []
+            ];
+            
             // Redirect to avoid form re-submission warnings (PRG pattern)
+            header('Location: ' . $_SERVER['PHP_SELF']);
+            exit;
+        } else {
+            $_SESSION['migration_result'] = [
+                'inserted'=>0, 
+                'errors'=>['File upload failed. Please try again.'], 
+                'status'=>'error'
+            ];
             header('Location: ' . $_SERVER['PHP_SELF']);
             exit;
         }
@@ -418,15 +606,82 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['migration_action'])) 
                 if (!isset($selected[(string)$idx])) continue; // not selected
                 $r = $row['row']; $uni = $row['university']; $yl = $row['year_level']; $brgy = $row['barangay'];
                 if (!$r['bdate'] || !$r['sex'] || !$uni || !$yl || !$brgy || !filter_var($r['email'], FILTER_VALIDATE_EMAIL)) { $errors[] = "Row #$idx has unresolved fields"; continue; }
+                
                 // generate password
                 $plain = rand_password_12(); $hashed = password_hash($plain, PASSWORD_DEFAULT);
+                
                 // student id
                 $stud_id = generateUniqueStudentId_admin($connection, $yl['year_level_id']);
                 if (!$stud_id) { $errors[] = "Row #$idx could not generate student id"; continue; }
-                // insert
-                $insert = pg_query_params($connection, "INSERT INTO students (student_id, municipality_id, first_name, middle_name, last_name, extension_name, email, mobile, password, sex, status, payroll_no, qr_code, has_received, application_date, bdate, barangay_id, university_id, year_level_id, slot_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'applicant',0,0,FALSE,NOW(),$11,$12,$13,$14,$15)", [
-                    $stud_id, $municipality_id, $r['first_name'], $r['middle_name'], $r['last_name'], $r['extension_name'], $r['email'], $r['mobile'], $hashed, $r['sex'], $r['bdate'], $brgy['barangay_id'], $uni['university_id'], $yl['year_level_id'], null
+                
+                // Prepare application date
+                $appDate = !empty($r['application_date']) ? $r['application_date'] : null;
+                if ($appDate === null) $appDate = date('Y-m-d');
+                
+                // insert with all available fields
+                $insert = pg_query_params($connection, "
+                    INSERT INTO students (
+                        student_id, municipality_id, 
+                        first_name, middle_name, last_name, extension_name, 
+                        email, mobile, telephone, password, 
+                        sex, civil_status, religion, citizenship,
+                        bdate, 
+                        house_number, street, subdivision, city, province, zip_code,
+                        barangay_id, university_id, year_level_id, 
+                        course, semester, school_student_id, gwa,
+                        scholarship_type, first_registered_academic_year,
+                        father_name, father_occupation, 
+                        mother_name, mother_occupation,
+                        guardian_name, guardian_relationship,
+                        family_income, siblings_in_college,
+                        status, payroll_no, qr_code, has_received, application_date, slot_id
+                    ) VALUES (
+                        $1, $2, 
+                        $3, $4, $5, $6, 
+                        $7, $8, $9, $10, 
+                        $11, $12, $13, $14,
+                        $15, 
+                        $16, $17, $18, $19, $20, $21,
+                        $22, $23, $24, 
+                        $25, $26, $27, $28,
+                        $29, $30,
+                        $31, $32,
+                        $33, $34,
+                        $35, $36,
+                        $37, $38,
+                        'applicant', 0, 0, FALSE, $39, $40
+                    )", [
+                    // $1-$2: IDs
+                    $stud_id, $municipality_id, 
+                    // $3-$6: Name
+                    $r['first_name'], $r['middle_name'], $r['last_name'], $r['extension_name'], 
+                    // $7-$10: Contact & Password
+                    $r['email'], $r['mobile'], $r['telephone'] ?: null, $hashed, 
+                    // $11-$14: Personal Info
+                    $r['sex'], $r['civil_status'] ?: null, $r['religion'] ?: null, $r['citizenship'] ?: 'Filipino',
+                    // $15: Birthdate
+                    $r['bdate'], 
+                    // $16-$21: Address
+                    $r['house_number'] ?: null, $r['street'] ?: null, $r['subdivision'] ?: null, 
+                    $r['city'] ?: null, $r['province'] ?: null, $r['zip_code'] ?: null,
+                    // $22-$24: Location IDs
+                    $brgy['barangay_id'], $uni['university_id'], $yl['year_level_id'], 
+                    // $25-$28: Academic Details
+                    $r['course'] ?: null, $r['semester'] ?: null, $r['school_student_id'] ?: null, $r['gwa'] ?: null,
+                    // $29-$30: Scholarship
+                    $r['scholarship_type'] ?: null, $r['first_registered_academic_year'] ?: null,
+                    // $31-$32: Father
+                    $r['father_name'] ?: null, $r['father_occupation'] ?: null,
+                    // $33-$34: Mother
+                    $r['mother_name'] ?: null, $r['mother_occupation'] ?: null,
+                    // $35-$36: Guardian
+                    $r['guardian_name'] ?: null, $r['guardian_relationship'] ?: null,
+                    // $37-$38: Financial
+                    $r['family_income'] ?: null, $r['siblings_in_college'] ?: null,
+                    // $39-$40: Application & Slot
+                    $appDate, null
                 ]);
+                
                 if ($insert) {
                     $inserted++;
                     send_migration_email($r['email'], $r['first_name'] . ' ' . $r['last_name'], $plain);
@@ -1864,12 +2119,17 @@ if ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '' === 'XMLHttpRequest' || (isset($_GET
                     <div class="modal-header">
                         <div>
                             <h5 class="modal-title mb-0"><i class="bi bi-upload me-2"></i>CSV Migration</h5>
-                            <small class="text-muted">Upload your CSV, review conflicts, select rows, then confirm to migrate.</small>
+                            <small class="text-muted">Upload your CSV with headers in the first row, review conflicts, select rows, then confirm to migrate.</small>
                         </div>
-                                <form method="POST" class="ms-auto" id="migrationCancelForm">
-                                    <input type="hidden" name="migration_action" value="cancel">
-                                </form>
-                                <button class="btn-close" data-bs-dismiss="modal" aria-label="Close" id="migrationCloseBtn"></button>
+                        <div class="d-flex gap-2 align-items-center ms-auto">
+                            <a href="../../assets/templates/student_migration_template.csv" download class="btn btn-sm btn-outline-primary" title="Download CSV Template">
+                                <i class="bi bi-download me-1"></i>Download Template
+                            </a>
+                            <form method="POST" class="" id="migrationCancelForm">
+                                <input type="hidden" name="migration_action" value="cancel">
+                            </form>
+                            <button class="btn-close" data-bs-dismiss="modal" aria-label="Close" id="migrationCloseBtn"></button>
+                        </div>
                     </div>
             <div class="modal-body">
         <?php /* Migration result is now shown via JS alert after reload; avoid unsetting here to prevent race */ ?>
@@ -1881,7 +2141,15 @@ if ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '' === 'XMLHttpRequest' || (isset($_GET
                                                 <div class="col-12 col-md-6">
                                                     <label class="form-label fw-semibold text-primary">CSV File</label>
                                                     <input type="file" name="csv_file" id="csvFileInput" class="form-control" accept=".csv" required>
-                                                    <div class="form-text">Format: Lastname, firstname, extension name, middle name, age, gender, barangay, university, year level, email, number</div>
+                                                    <div class="form-text">
+                                                        <strong>Required:</strong> First row must be headers<br>
+                                                        <small class="text-muted">
+                                                            Supported headers: Last Name, First Name, Middle Name, Extension, Birthdate, Age, Sex/Gender, 
+                                                            Email, Mobile, Telephone, Barangay, University, Year Level, Course, Semester, School ID, GWA, 
+                                                            Civil Status, Religion, Citizenship, Address (House No, Street, Subdivision, City, Province, Zip), 
+                                                            Parents (Father Name/Occupation, Mother Name/Occupation, Guardian), Financial (Family Income, Siblings in College), etc.
+                                                        </small>
+                                                    </div>
                                                     <div id="csvFilename" class="small text-muted mt-1" aria-live="polite"></div>
                                                 </div>
                                                             <div class="col-12 col-md-4">
@@ -1906,6 +2174,31 @@ if ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '' === 'XMLHttpRequest' || (isset($_GET
                 </form>
 
                         <?php if (!empty($_SESSION['migration_preview'])): $mp = $_SESSION['migration_preview']; ?>
+                    <div class="alert alert-info mb-3">
+                        <div class="d-flex align-items-start">
+                            <i class="bi bi-info-circle me-2 mt-1"></i>
+                            <div>
+                                <strong>Headers Detected:</strong>
+                                <div class="mt-1">
+                                    <?php 
+                                    if (!empty($mp['detected_headers'])) {
+                                        echo '<small class="text-muted">' . count($mp['detected_headers']) . ' columns recognized: </small>';
+                                        echo '<div class="d-flex flex-wrap gap-1 mt-1">';
+                                        foreach (array_slice($mp['detected_headers'], 0, 15) as $header) {
+                                            echo '<span class="badge bg-light text-dark border">' . htmlspecialchars($header) . '</span>';
+                                        }
+                                        if (count($mp['detected_headers']) > 15) {
+                                            echo '<span class="badge bg-light text-dark border">+' . (count($mp['detected_headers']) - 15) . ' more</span>';
+                                        }
+                                        echo '</div>';
+                                    } else {
+                                        echo '<small class="text-warning">No headers detected in CSV</small>';
+                                    }
+                                    ?>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                     <form method="POST" id="migrationForm">
                         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfMigrationToken) ?>">
                         <input type="hidden" name="migration_action" value="confirm">

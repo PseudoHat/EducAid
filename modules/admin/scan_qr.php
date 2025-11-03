@@ -19,6 +19,17 @@ if (!$workflow_status['has_payroll_qr']) {
     exit;
 }
 
+// CRITICAL: Check if schedule is published
+$settingsPath = __DIR__ . '/../../data/municipal_settings.json';
+$settings = file_exists($settingsPath) ? json_decode(file_get_contents($settingsPath), true) : [];
+$schedule_published = $settings['schedule_published'] ?? false;
+
+if (!$schedule_published) {
+    $_SESSION['error_message'] = "Cannot access QR scanner. Distribution schedule must be published first. Please go to 'Generate Schedule' and publish the schedule.";
+    header("Location: generate_schedule.php?error=schedule_not_published");
+    exit;
+}
+
 // ADDITIONAL CHECK: Ensure there are actual students with payroll and QR codes
 $student_check_query = "
     SELECT COUNT(*) as count 
@@ -511,13 +522,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm_distribution'
             $snapshot_id = $snapshot['snapshot_id'];
         } else {
             // Create a temporary snapshot for ongoing distribution
+            // CRITICAL: Set finalized_at = NULL explicitly to prevent auto-completion
             $temp_snapshot_query = "
                 INSERT INTO distribution_snapshots 
-                (distribution_date, location, total_students_count, academic_year, semester, finalized_by, notes, distribution_id)
+                (distribution_date, location, total_students_count, academic_year, semester, 
+                 finalized_by, finalized_at, notes, distribution_id)
                 VALUES (CURRENT_DATE, 'Ongoing', 0, 
                     (SELECT value FROM config WHERE key = 'current_academic_year'),
                     (SELECT value FROM config WHERE key = 'current_semester'),
-                    $1, 'Auto-created during QR scanning', 
+                    $1, NULL, 'Auto-created during QR scanning', 
                     'TEMP-' || TO_CHAR(NOW(), 'YYYY-MM-DD-HH24MISS'))
                 RETURNING snapshot_id
             ";
@@ -525,7 +538,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm_distribution'
             if ($temp_result) {
                 $temp_row = pg_fetch_assoc($temp_result);
                 $snapshot_id = $temp_row['snapshot_id'];
-                error_log("Created temporary distribution snapshot: $snapshot_id");
+                error_log("Created temporary distribution snapshot: $snapshot_id (finalized_at = NULL - ongoing)");
             }
         }
         

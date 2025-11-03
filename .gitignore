@@ -629,3 +629,8 @@ assets/uploads/student/letter_mayor/GENERALTRIAS-2025-3-437MSD/GENERALTRIAS-2025
 assets/uploads/student/letter_mayor/GENERALTRIAS-2025-3-437MSD/GENERALTRIAS-2025-3-2MRZ9W_letter_to_mayor_1762047008_20251102023045.ocr.txt
 assets/uploads/student/letter_mayor/GENERALTRIAS-2025-3-437MSD/GENERALTRIAS-2025-3-2MRZ9W_letter_to_mayor_1762047008_20251102023045.verify.json
 assets/uploads/announcements/ann_20251103_204830_76c9e229.jpg
+assets/templates/README.md
+assets/templates/student_migration_template.csv
+chatbot/chatbot_errors.log
+data/security_verifications_debug.log
+data/security_verifications.log
