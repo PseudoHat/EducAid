@@ -1,4 +1,4 @@
-<?php /* Chatbot widget include */ ?>
+<?php /* Chatbot widget TEST copy with typing fix */ ?>
 <div class="ea-chat">
   <button class="ea-chat__toggle" id="eaToggle"><i class="bi bi-chat-dots-fill"></i> Chat with EducAid</button>
   <div class="ea-chat__panel" id="eaPanel" style="display:none">
@@ -8,7 +8,7 @@
     </div>
     <div class="ea-chat__body" id="eaBody">
       <div class="ea-chat__msg"><div class="ea-chat__bubble">👋 Hi! I'm your EducAid Assistant. Ask me about eligibility, documents, process, deadlines, or contact info.</div></div>
-      <!-- Typing indicator will be dynamically inserted at the end -->
+      <!-- Typing indicator will be dynamically inserted at the end, not here -->
     </div>
     <div class="ea-chat__footer">
       <input class="ea-chat__input" id="eaInput" placeholder="Type your message…" />

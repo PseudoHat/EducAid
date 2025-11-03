@@ -431,3 +431,53 @@
     "code": 404,
     "message": "models/gemini-1.5-flash-latest is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of availabl
 [03-Nov-2025 18:03:01 Europe/Berlin] [FastChatbot] Response time: 1789ms | HTTP: 200 | Model: gemini-2.0-flash-exp
+[03-Nov-2025 19:21:11 Europe/Berlin] [FastChatbot] Response time: 1515ms | HTTP: 200 | Model: gemini-2.0-flash-exp
+[03-Nov-2025 19:21:21 Europe/Berlin] [FastChatbot] Response time: 1775ms | HTTP: 200 | Model: gemini-2.0-flash-exp
+[03-Nov-2025 19:21:52 Europe/Berlin] [FastChatbot] Response time: 1285ms | HTTP: 200 | Model: gemini-2.0-flash-exp
+[03-Nov-2025 19:21:59 Europe/Berlin] [FastChatbot] Response time: 1695ms | HTTP: 200 | Model: gemini-2.0-flash-exp
+[03-Nov-2025 19:22:06 Europe/Berlin] [FastChatbot] Response time: 1595ms | HTTP: 200 | Model: gemini-2.0-flash-exp
+[03-Nov-2025 19:22:21 Europe/Berlin] [FastChatbot] Response time: 6459ms | HTTP: 200 | Model: gemini-2.0-flash-exp
+[03-Nov-2025 19:23:11 Europe/Berlin] [FastChatbot] Response time: 1407ms | HTTP: 200 | Model: gemini-2.0-flash-exp
+[03-Nov-2025 19:23:15 Europe/Berlin] [FastChatbot] Response time: 1784ms | HTTP: 200 | Model: gemini-2.0-flash-exp
+[03-Nov-2025 19:23:21 Europe/Berlin] [FastChatbot] Response time: 1350ms | HTTP: 200 | Model: gemini-2.0-flash-exp
+[03-Nov-2025 19:23:27 Europe/Berlin] [FastChatbot] Response time: 1263ms | HTTP: 200 | Model: gemini-2.0-flash-exp
+[03-Nov-2025 19:23:36 Europe/Berlin] [FastChatbot] Response time: 1532ms | HTTP: 200 | Model: gemini-2.0-flash-exp
+[03-Nov-2025 19:26:22 Europe/Berlin] [FastChatbot] Response time: 1112ms | HTTP: 200 | Model: gemini-2.0-flash-exp
+[03-Nov-2025 19:26:25 Europe/Berlin] [FastChatbot] Response time: 1913ms | HTTP: 200 | Model: gemini-2.0-flash-exp
+[03-Nov-2025 19:26:37 Europe/Berlin] [FastChatbot] Response time: 1593ms | HTTP: 200 | Model: gemini-2.0-flash-exp
+[03-Nov-2025 19:26:42 Europe/Berlin] [FastChatbot] Response time: 2486ms | HTTP: 200 | Model: gemini-2.0-flash-exp
+[03-Nov-2025 19:26:51 Europe/Berlin] [FastChatbot] Response time: 1216ms | HTTP: 200 | Model: gemini-2.0-flash-exp
+[03-Nov-2025 19:30:11 Europe/Berlin] [GeminiAttempt] {"model":"gemini-2.0-flash-lite","api_version":"v1","attempt_index":1,"retry_count":0,"http_code":429,"status":"retrying","retry_after":null,"backoff_seconds":0.473,"response_snippet":"{\n  \"error\": {\n    \"code\": 429,\n    \"message\": \"Resource exhausted. Please try again later. Please refer to https://cloud.google.com/vertex-ai/generative-ai/docs/error-code-429 for more details.\",\n    \"status\": \"RESOURCE_EXHAUSTED\"\n  }\n}\n"}
+[03-Nov-2025 19:30:26 Europe/Berlin] [GeminiAttempt] {"model":"gemini-2.0-flash-lite","api_version":"v1","attempt_index":2,"retry_count":1,"http_code":429,"status":"retrying","retry_after":null,"backoff_seconds":0.276,"response_snippet":"{\n  \"error\": {\n    \"code\": 429,\n    \"message\": \"Resource exhausted. Please try again later. Please refer to https://cloud.google.com/vertex-ai/generative-ai/docs/error-code-429 for more details.\",\n    \"status\": \"RESOURCE_EXHAUSTED\"\n  }\n}\n"}
+[03-Nov-2025 19:30:27 Europe/Berlin] [GeminiAttempt] {"model":"gemini-2.0-flash-lite","api_version":"v1","attempt_index":3,"retry_count":2,"http_code":429,"status":"retrying","retry_after":null,"backoff_seconds":2.594,"response_snippet":"{\n  \"error\": {\n    \"code\": 429,\n    \"message\": \"Resource exhausted. Please try again later. Please refer to https://cloud.google.com/vertex-ai/generative-ai/docs/error-code-429 for more details.\",\n    \"status\": \"RESOURCE_EXHAUSTED\"\n  }\n}\n"}
+[03-Nov-2025 19:30:30 Europe/Berlin] [GeminiAttempt] {"model":"gemini-2.0-flash-lite","api_version":"v1","attempt_index":4,"retry_count":3,"http_code":429,"status":"retrying","retry_after":null,"backoff_seconds":1.326,"response_snippet":"{\n  \"error\": {\n    \"code\": 429,\n    \"message\": \"Resource exhausted. Please try again later. Please refer to https://cloud.google.com/vertex-ai/generative-ai/docs/error-code-429 for more details.\",\n    \"status\": \"RESOURCE_EXHAUSTED\"\n  }\n}\n"}
+[03-Nov-2025 19:30:38 Europe/Berlin] [GeminiAttempt] {"model":"gemini-2.0-flash-lite","api_version":"v1","attempt_index":5,"retry_count":4,"http_code":429,"status":"retrying","retry_after":null,"backoff_seconds":3.717,"response_snippet":"{\n  \"error\": {\n    \"code\": 429,\n    \"message\": \"Resource exhausted. Please try again later. Please refer to https://cloud.google.com/vertex-ai/generative-ai/docs/error-code-429 for more details.\",\n    \"status\": \"RESOURCE_EXHAUSTED\"\n  }\n}\n"}
+[03-Nov-2025 19:30:48 Europe/Berlin] [GeminiAttempt] {"model":"gemini-2.0-flash-lite","api_version":"v1","attempt_index":6,"retry_count":5,"http_code":429,"status":"retry_limit_reached","response_snippet":"{\n  \"error\": {\n    \"code\": 429,\n    \"message\": \"Resource exhausted. Please try again later. Please refer to https://cloud.google.com/vertex-ai/generative-ai/docs/error-code-429 for more details.\",\n    \"status\": \"RESOURCE_EXHAUSTED\"\n  }\n}\n"}
+[03-Nov-2025 19:31:00 Europe/Berlin] [GeminiAttempt] {"model":"gemini-2.0-flash-lite-001","api_version":"v1","attempt_index":7,"retry_count":0,"http_code":429,"status":"retrying","retry_after":null,"backoff_seconds":0.987,"response_snippet":"{\n  \"error\": {\n    \"code\": 429,\n    \"message\": \"Resource exhausted. Please try again later. Please refer to https://cloud.google.com/vertex-ai/generative-ai/docs/error-code-429 for more details.\",\n    \"status\": \"RESOURCE_EXHAUSTED\"\n  }\n}\n"}
+[03-Nov-2025 19:31:02 Europe/Berlin] [GeminiAttempt] {"model":"gemini-2.0-flash-lite-001","api_version":"v1","attempt_index":8,"retry_count":1,"http_code":429,"status":"retrying","retry_after":null,"backoff_seconds":0.481,"response_snippet":"{\n  \"error\": {\n    \"code\": 429,\n    \"message\": \"Resource exhausted. Please try again later. Please refer to https://cloud.google.com/vertex-ai/generative-ai/docs/error-code-429 for more details.\",\n    \"status\": \"RESOURCE_EXHAUSTED\"\n  }\n}\n"}
+[03-Nov-2025 19:31:03 Europe/Berlin] [GeminiAttempt] {"model":"gemini-2.0-flash-lite-001","api_version":"v1","attempt_index":9,"retry_count":2,"http_code":429,"status":"retrying","retry_after":null,"backoff_seconds":1.055,"response_snippet":"{\n  \"error\": {\n    \"code\": 429,\n    \"message\": \"Resource exhausted. Please try again later. Please refer to https://cloud.google.com/vertex-ai/generative-ai/docs/error-code-429 for more details.\",\n    \"status\": \"RESOURCE_EXHAUSTED\"\n  }\n}\n"}
+[03-Nov-2025 19:31:05 Europe/Berlin] [GeminiAttempt] {"model":"gemini-2.0-flash-lite-001","api_version":"v1","attempt_index":10,"retry_count":3,"http_code":429,"status":"retrying","retry_after":null,"backoff_seconds":4.976,"response_snippet":"{\n  \"error\": {\n    \"code\": 429,\n    \"message\": \"Resource exhausted. Please try again later. Please refer to https://cloud.google.com/vertex-ai/generative-ai/docs/error-code-429 for more details.\",\n    \"status\": \"RESOURCE_EXHAUSTED\"\n  }\n}\n"}
+[03-Nov-2025 19:31:17 Europe/Berlin] [GeminiAttempt] {"model":"gemini-2.0-flash-lite-001","api_version":"v1","attempt_index":11,"retry_count":4,"http_code":429,"status":"retrying","retry_after":null,"backoff_seconds":5.553,"response_snippet":"{\n  \"error\": {\n    \"code\": 429,\n    \"message\": \"Resource exhausted. Please try again later. Please refer to https://cloud.google.com/vertex-ai/generative-ai/docs/error-code-429 for more details.\",\n    \"status\": \"RESOURCE_EXHAUSTED\"\n  }\n}\n"}
+[03-Nov-2025 19:31:23 Europe/Berlin] [GeminiAttempt] {"model":"gemini-2.0-flash-lite-001","api_version":"v1","attempt_index":12,"retry_count":5,"http_code":429,"status":"retry_limit_reached","response_snippet":"{\n  \"error\": {\n    \"code\": 429,\n    \"message\": \"Resource exhausted. Please try again later. Please refer to https://cloud.google.com/vertex-ai/generative-ai/docs/error-code-429 for more details.\",\n    \"status\": \"RESOURCE_EXHAUSTED\"\n  }\n}\n"}
+[03-Nov-2025 19:31:25 Europe/Berlin] [GeminiAttempt] {"model":"gemini-2.0-flash","api_version":"v1","attempt_index":13,"retry_count":0,"http_code":200,"status":"success","response_id":"_PQIafriJPSZ0-kPrfqSmAQ","total_tokens":171}
+[03-Nov-2025 19:32:42 Europe/Berlin] [FastChatbot] Response time: 4331ms | HTTP: 429 | Model: gemini-2.0-flash-exp
+[03-Nov-2025 19:32:42 Europe/Berlin] [FastChatbot] HTTP 429 | Response: {
+  "error": {
+    "code": 429,
+    "message": "Resource exhausted. Please try again later. Please refer to https://cloud.google.com/vertex-ai/generative-ai/docs/error-code-429 for more details.",
+   
+[03-Nov-2025 19:32:45 Europe/Berlin] [FastChatbot] Response time: 848ms | HTTP: 429 | Model: gemini-2.0-flash-exp
+[03-Nov-2025 19:32:45 Europe/Berlin] [FastChatbot] HTTP 429 | Response: {
+  "error": {
+    "code": 429,
+    "message": "Resource exhausted. Please try again later. Please refer to https://cloud.google.com/vertex-ai/generative-ai/docs/error-code-429 for more details.",
+   
+[03-Nov-2025 19:33:19 Europe/Berlin] [FastChatbot] Response time: 1912ms | HTTP: 200 | Model: gemini-2.0-flash-exp
+[03-Nov-2025 19:39:56 Europe/Berlin] [FastChatbot] Response time: 1051ms | HTTP: 429 | Model: gemini-2.0-flash-exp
+[03-Nov-2025 19:39:56 Europe/Berlin] [FastChatbot] Rate limit (429) | Response: {
+  "error": {
+    "code": 429,
+    "message": "Resource exhausted. Please try again later. Please refer to https://cloud.google.com/vertex-ai/generative-ai/docs/error-code-429 for more details.",
+   
+[03-Nov-2025 19:40:06 Europe/Berlin] [FastChatbot] Response time: 6707ms | HTTP: 200 | Model: gemini-2.0-flash-exp
+[03-Nov-2025 19:40:25 Europe/Berlin] [FastChatbot] Response time: 5218ms | HTTP: 200 | Model: gemini-2.0-flash-exp

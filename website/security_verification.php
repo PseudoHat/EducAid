@@ -81,6 +81,10 @@
                 padding: 1.5rem;
             }
         }
+
+        /* Inline message area positioned below the button */
+        #messageArea { min-height: 1.75rem; }
+        #messageArea .alert { margin-bottom: 0; padding: 0.5rem 0.75rem; }
     </style>
 </head>
 <body>
@@ -113,6 +117,9 @@
                 <button type="submit" id="continueBtn" class="btn continue-btn" disabled>
                     Continue
                 </button>
+
+                <!-- Non-blocking inline status/error message -->
+                <div id="messageArea" class="mt-3" aria-live="polite" aria-atomic="true"></div>
             </form>
         </div>
     </div>
@@ -123,6 +130,19 @@
             document.getElementById('continueBtn').disabled = false;
         }
         
+        function setMessage(type, html) {
+            const el = document.getElementById('messageArea');
+            if (!el) return;
+            const map = { info: 'alert-info', success: 'alert-success', danger: 'alert-danger', warning: 'alert-warning' };
+            const klass = map[type] || 'alert-info';
+            el.innerHTML = `<div class="alert ${klass}" role="status">${html}</div>`;
+        }
+
+        function clearMessage() {
+            const el = document.getElementById('messageArea');
+            if (el) el.innerHTML = '';
+        }
+
         // Handle form submission
         document.getElementById('verificationForm').addEventListener('submit', async function(e) {
             e.preventDefault();
@@ -131,13 +151,17 @@
             const continueBtn = document.getElementById('continueBtn');
             
             if (!recaptchaResponse) {
-                alert('Please complete the verification');
+                setMessage('warning', 'Please complete the verification.');
                 return;
             }
             
             // Show loading state
             continueBtn.disabled = true;
             continueBtn.textContent = 'Verifying...';
+            setMessage('info', '<div class="d-flex align-items-center">\
+                <div class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></div>\
+                EducAid is verifying…\
+            </div>');
             
             try {
                 const formData = new FormData();
@@ -151,9 +175,11 @@
                 const result = await response.json();
                 
                 if (result.success) {
+                    setMessage('success', 'Verification successful. Redirecting…');
                     window.location.href = 'landingpage.php';
                 } else {
-                    alert('Verification failed. Please try again.');
+                    const details = result && result.message ? ` ${result.message}` : '';
+                    setMessage('danger', 'Verification failed.' + details + ' Please try again.');
                     grecaptcha.reset();
                     continueBtn.disabled = true;
                     continueBtn.textContent = 'Continue';
@@ -161,7 +187,7 @@
                 
             } catch (error) {
                 console.error('Verification error:', error);
-                alert('Error occurred. Please try again.');
+                setMessage('danger', 'Network error occurred. Please try again.');
                 grecaptcha.reset();
                 continueBtn.disabled = true;
                 continueBtn.textContent = 'Continue';

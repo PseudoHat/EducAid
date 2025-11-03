@@ -105,12 +105,31 @@ if ($curlError) {
 
 // Handle non-200 responses
 if ($httpCode !== 200) {
-  error_log("[FastChatbot] HTTP {$httpCode} | Response: " . substr($response, 0, 200));
-  http_response_code(500);
+  $errorData = json_decode($response, true);
+  $errorMessage = 'API error';
+  $userMessage = "HTTP {$httpCode}";
+  
+  // Handle rate limiting specifically
+  if ($httpCode === 429) {
+    $userMessage = "I'm getting too many requests right now. Please wait a moment and try again.";
+    error_log("[FastChatbot] Rate limit (429) | Response: " . substr($response, 0, 200));
+  } 
+  // Handle quota exceeded
+  else if ($httpCode === 403 && isset($errorData['error']['message']) && strpos($errorData['error']['message'], 'quota') !== false) {
+    $userMessage = "The AI service quota has been exceeded. Please try again later or contact support.";
+    error_log("[FastChatbot] Quota exceeded (403) | Response: " . substr($response, 0, 200));
+  }
+  // Generic error
+  else {
+    error_log("[FastChatbot] HTTP {$httpCode} | Response: " . substr($response, 0, 200));
+  }
+  
+  http_response_code(200); // Send 200 so frontend displays the user-friendly message
   echo json_encode([
-    'error' => 'API error',
-    'detail' => "HTTP {$httpCode}",
-    'response_time' => $responseTime
+    'reply' => $userMessage,
+    'error_type' => $httpCode === 429 ? 'rate_limit' : 'api_error',
+    'response_time_ms' => $responseTime,
+    'success' => false
   ]);
   exit;
 }
