@@ -191,12 +191,6 @@ $pageTitle = "Distribution Archives";
         <div class="container-fluid py-4">
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h2><i class="bi bi-archive"></i> Distribution Archives</h2>
-                <nav aria-label="breadcrumb">
-                    <ol class="breadcrumb">
-                        <li class="breadcrumb-item"><a href="dashboard.php">Dashboard</a></li>
-                        <li class="breadcrumb-item active">Distribution Archives</li>
-                    </ol>
-                </nav>
             </div>
 
             <!-- Compression Statistics Banner -->
