@@ -570,26 +570,12 @@ if ($DEMO_MODE) {
             <div class="custom-card">
               <div class="custom-card-header bg-primary text-white d-flex justify-content-between align-items-center">
                 <h5><i class="bi bi-bar-chart-fill me-2"></i>Student Distribution</h5>
-                <div class="d-flex gap-2">
-                  <select id="chartFilter" class="form-select form-select-sm text-dark" style="width: auto;">
-                    <option value="gender">By Gender</option>
-                    <option value="barangay">By Barangay</option>
-                    <option value="university">By University</option>
-                    <option value="yearLevel">By Year Level</option>
-                  </select>
-                  <div class="btn-group">
-                    <button type="button" class="btn btn-sm btn-light dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
-                      <i class="bi bi-three-dots-vertical"></i> Actions
-                    </button>
-                    <ul class="dropdown-menu dropdown-menu-end">
-                      <li><a class="dropdown-item" href="manage_applicants.php"><i class="bi bi-people me-2"></i>View All Students</a></li>
-                      <li><a class="dropdown-item" href="manage_applicants.php?filter=male"><i class="bi bi-gender-male me-2"></i>View Male Students</a></li>
-                      <li><a class="dropdown-item" href="manage_applicants.php?filter=female"><i class="bi bi-gender-female me-2"></i>View Female Students</a></li>
-                      <li><hr class="dropdown-divider"></li>
-                      <li><a class="dropdown-item" href="#" onclick="exportChart(); return false;"><i class="bi bi-download me-2"></i>Export Chart Data</a></li>
-                    </ul>
-                  </div>
-                </div>
+                <select id="chartFilter" class="form-select form-select-sm text-dark" style="width: auto;">
+                  <option value="gender">By Gender</option>
+                  <option value="barangay">By Barangay</option>
+                  <option value="university">By University</option>
+                  <option value="yearLevel">By Year Level</option>
+                </select>
               </div>
               <div class="custom-card-body">
                 <canvas id="unifiedChart"></canvas>
