@@ -1,4 +1,4 @@
-<?php
+  <?php
 /** @phpstan-ignore-file */
 include '../../config/database.php';
 session_start();
@@ -1001,24 +1001,32 @@ unset($_SESSION['profile_flash'], $_SESSION['profile_flash_type']);
       border-color: #4299e1;
     }
 
-    /* Modal styling - NO backdrop interference */
+    /* Modal styling - Full screen backdrop that covers everything */
     .modal {
-      z-index: 200000 !important;
-      background: rgba(0, 0, 0, 0.5) !important; /* Built-in backdrop effect */
+      z-index: 999999 !important;
+      background: rgba(0, 0, 0, 0.6) !important; /* Dark backdrop */
+      position: fixed !important;
+      top: 0 !important;
+      left: 0 !important;
+      width: 100vw !important;
+      height: 100vh !important;
+      overflow: auto !important;
     }
 
     .modal.fade.show {
-      z-index: 200000 !important;
+      z-index: 999999 !important;
     }
 
     .modal-dialog {
-      z-index: 200001 !important;
-      position: relative;
+      z-index: 1000000 !important;
+      position: relative !important;
+      margin: auto !important;
     }
 
     .modal-content {
-      z-index: 200002 !important;
-      position: relative;
+      z-index: 1000001 !important;
+      position: relative !important;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3) !important;
     }
 
     /* Hide any Bootstrap-generated backdrop */
@@ -1029,12 +1037,19 @@ unset($_SESSION['profile_flash'], $_SESSION['profile_flash_type']);
     /* Ensure modal is clickable and centered */
     .modal.show {
       display: flex !important;
-      align-items: center;
-      justify-content: center;
+      align-items: center !important;
+      justify-content: center !important;
     }
 
     .modal.show .modal-dialog {
       pointer-events: auto !important;
+    }
+    
+    /* Ensure sidebar, topbar, header are below modal */
+    .sidebar,
+    .topbar,
+    .header {
+      z-index: 1000 !important;
     }
   </style>
 </head>
@@ -1447,22 +1462,29 @@ unset($_SESSION['profile_flash'], $_SESSION['profile_flash_type']);
   <script src="../../assets/js/student/student_profile.js"></script>
   
   <script>
-    // Fix modal z-index and remove backdrop interference
+    // Fix modal z-index and ensure backdrop covers everything
     document.addEventListener('DOMContentLoaded', function() {
       const allModals = document.querySelectorAll('.modal');
+      
       allModals.forEach(modal => {
         modal.addEventListener('shown.bs.modal', function() {
-          // Set modal z-index
-          this.style.zIndex = '200000';
+          // Set modal z-index and full viewport coverage
+          this.style.zIndex = '999999';
           this.style.display = 'flex';
           this.style.alignItems = 'center';
           this.style.justifyContent = 'center';
-          this.style.background = 'rgba(0, 0, 0, 0.5)'; // Built-in backdrop
+          this.style.background = 'rgba(0, 0, 0, 0.6)'; // Dark backdrop
+          this.style.position = 'fixed';
+          this.style.top = '0';
+          this.style.left = '0';
+          this.style.width = '100vw';
+          this.style.height = '100vh';
+          this.style.overflow = 'auto';
           
           // Set dialog z-index higher
           const dialog = this.querySelector('.modal-dialog');
           if (dialog) {
-            dialog.style.zIndex = '200001';
+            dialog.style.zIndex = '1000000';
             dialog.style.pointerEvents = 'auto';
             dialog.style.position = 'relative';
           }
@@ -1470,8 +1492,9 @@ unset($_SESSION['profile_flash'], $_SESSION['profile_flash_type']);
           // Set content z-index even higher
           const content = this.querySelector('.modal-content');
           if (content) {
-            content.style.zIndex = '200002';
+            content.style.zIndex = '1000001';
             content.style.position = 'relative';
+            content.style.boxShadow = '0 10px 40px rgba(0, 0, 0, 0.3)';
           }
           
           // Remove any Bootstrap-generated backdrop that might interfere
