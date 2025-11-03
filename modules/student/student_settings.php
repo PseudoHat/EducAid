@@ -1068,8 +1068,13 @@ unset($_SESSION['profile_flash'], $_SESSION['profile_flash_type']);
     <section class="home-section" id="page-content-wrapper">
       <div class="container-fluid py-4 px-4">
         <!-- Settings Header -->
-        <div class="settings-header mb-4">
-          <h1 class="mb-1">Settings</h1>
+        <div class="settings-header mb-4 d-flex justify-content-between align-items-center">
+          <div>
+            <h1 class="mb-1">Settings</h1>
+          </div>
+          <a href="student_homepage.php" class="back-btn">
+            <i class="bi bi-arrow-left me-2"></i>Back to Profile
+          </a>
         </div>
 
         <!-- Flash Messages -->
