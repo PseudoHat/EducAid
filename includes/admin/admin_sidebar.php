@@ -101,7 +101,6 @@ $sysControlsFiles = [
     'blacklist_archive.php',
     'archived_students.php',
     'advance_year_levels.php',
-    'document_archives.php',
     'admin_management.php',
     'municipality_content.php',
     'system_data.php',
@@ -321,11 +320,6 @@ $isSysControlsActive = in_array($current, $sysControlsFiles, true);
           <li>
             <a class="submenu-link <?= is_active('advance_year_levels.php', $current) ? 'active' : '' ?>" href="advance_year_levels.php">
               <i class="bi bi-arrow-up-circle me-2"></i> Advance Year Levels
-            </a>
-          </li>
-          <li>
-            <a class="submenu-link <?= is_active('document_archives.php', $current) ? 'active' : '' ?>" href="document_archives.php">
-              <i class="bi bi-archive me-2"></i> Document Archives
             </a>
           </li>
           <li>
