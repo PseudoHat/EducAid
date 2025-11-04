@@ -5,7 +5,7 @@
  */
 session_start();
 include __DIR__ . '/../../config/database.php';
-require_once '../../includes/SessionManager.php';
+require_once __DIR__ . '/../../includes/SessionManager.php';
 ?>
 <!DOCTYPE html>
 <html lang="en">

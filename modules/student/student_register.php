@@ -9,7 +9,7 @@ if (isset($_POST['processIdPictureOcr']) || isset($_POST['processGradesOcr']) ||
 }
 
 // Move all AJAX processing to the very top to avoid headers already sent error
-include_once '../../config/database.php';
+include_once __DIR__ . '/../../config/database.php';
 // Include reCAPTCHA v3 configuration (site key + secret key constants)
 include_once __DIR__ . '/../../config/recaptcha_config.php';
 session_start();
