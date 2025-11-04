@@ -3,6 +3,10 @@
 
 [phases.setup]
 nixPkgs = ['tesseract', 'imagemagick']
+nixLibs = ['tesseract']
 
 [phases.install]
 cmds = ['echo "Tesseract and ImageMagick installed successfully"']
+
+[start]
+cmd = 'php -S 0.0.0.0:${PORT:-8080} router.php'
