@@ -6,6 +6,11 @@
 
 $requestUri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 
+// Strip /EducAid/ prefix if present (Railway deployment path)
+if (strpos($requestUri, '/EducAid/') === 0) {
+    $requestUri = substr($requestUri, strlen('/EducAid'));
+}
+
 // If requesting root, serve security verification or landing page
 if ($requestUri === '/' || $requestUri === '') {
     chdir(__DIR__ . '/website');
