@@ -79,8 +79,17 @@ class EnrollmentFormOCRService {
             
             exec($command, $output, $returnCode);
             
-            if ($returnCode !== 0 || !file_exists($tsvFile)) {
-                throw new Exception("Tesseract execution failed");
+            // Log command and output for debugging
+            error_log("Tesseract command: " . $command);
+            error_log("Tesseract return code: " . $returnCode);
+            error_log("Tesseract output: " . implode("\n", $output));
+            
+            if ($returnCode !== 0) {
+                throw new Exception("Tesseract execution failed with code $returnCode: " . implode(' ', $output));
+            }
+            
+            if (!file_exists($tsvFile)) {
+                throw new Exception("TSV file not created at: $tsvFile");
             }
             
             // Parse TSV data
