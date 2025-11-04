@@ -1,0 +1,8 @@
+# Nixpacks configuration for Railway deployment
+# Installs Tesseract OCR and ImageMagick for document processing
+
+[phases.setup]
+nixPkgs = ['tesseract', 'imagemagick']
+
+[phases.install]
+cmds = ['echo "Tesseract and ImageMagick installed successfully"']
