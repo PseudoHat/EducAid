@@ -173,7 +173,7 @@ $isSysControlsActive = in_array($current, $sysControlsFiles, true);
 
     // Render a custom menu item so we can display a shorter visible label while keeping
     // a descriptive tooltip for hover and screen readers.
-    $phm_href = '/EducAid/modules/admin/household_duplicates.php';
+    $phm_href = 'household_duplicates.php';
     $phm_active = is_active('household_duplicates.php', $current);
     $visibleLabel = 'Household Duplicates';
     $tooltipLabel = 'Resolve Household Duplicate Registrations';
@@ -435,7 +435,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Polling function to update count
-    const apiUrl = '/EducAid/modules/admin/review_registrations.php?api=badge_count';
+    const apiUrl = 'review_registrations.php?api=badge_count';
     async function updateBadge() {
       try {
         const res = await fetch(apiUrl, {cache: 'no-store'});
