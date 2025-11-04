@@ -3,7 +3,9 @@
   "description": "EducAid web application",
   "type": "project",
   "require": {
-    "php": ">=8.0"
+    "php": ">=8.0",
+    "ext-pgsql": "*",
+    "ext-pdo_pgsql": "*"
   },
   "autoload": {
     "psr-4": {
