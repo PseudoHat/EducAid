@@ -3,16 +3,6 @@
 
 set -euo pipefail
 
-# Install Tesseract OCR and ImageMagick if not already installed
-if ! command -v tesseract &> /dev/null; then
-    echo "Installing Tesseract OCR and ImageMagick..."
-    apt-get update -qq
-    apt-get install -y -qq tesseract-ocr tesseract-ocr-eng imagemagick
-    echo "Tesseract and ImageMagick installed successfully"
-else
-    echo "Tesseract already installed: $(tesseract --version | head -n 1)"
-fi
-
 PORT=${PORT:-8080}
 # Default document root: the repository's website landing page directory
 # Changeable via DOC_ROOT environment variable (e.g., set to 'modules/student' or other)
