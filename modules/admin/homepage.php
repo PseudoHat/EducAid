@@ -1,4 +1,4 @@
-  <?php
+<?php
 session_start();
 
 // Demo mode handling: support a persistent toggle via session + robust query parsing
