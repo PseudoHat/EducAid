@@ -1761,7 +1761,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processIdPictureOcr']
         }
         
         // Apply fuzzy transformations for common OCR errors
-        $fuzzyNeedle = applyFuzzyTransforms($needle)
+        $fuzzyNeedle = applyFuzzyTransforms($needle);
         foreach ($fuzzyNeedle as $variant) {
             if (stripos($haystack, $variant) !== false) {
                 return 95; // Fuzzy match, slightly lower than exact
