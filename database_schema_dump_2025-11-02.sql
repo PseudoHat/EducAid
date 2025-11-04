@@ -1,48 +1,4 @@
---
--- PostgreSQL database dump
---
 
--- Dumped from database version 17.5
--- Dumped by pg_dump version 17.5
-
-SET statement_timeout = 0;
-SET lock_timeout = 0;
-SET idle_in_transaction_session_timeout = 0;
-SET transaction_timeout = 0;
-SET client_encoding = 'UTF8';
-SET standard_conforming_strings = on;
-SELECT pg_catalog.set_config('search_path', '', false);
-SET check_function_bodies = false;
-SET xmloption = content;
-SET client_min_messages = warning;
-SET row_security = off;
-
---
--- Name: grading; Type: SCHEMA; Schema: -; Owner: postgres
---
-
-CREATE SCHEMA grading;
-
-
-ALTER SCHEMA grading OWNER TO postgres;
-
---
--- Name: pg_trgm; Type: EXTENSION; Schema: -; Owner: -
---
-
-CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA public;
-
-
---
--- Name: EXTENSION pg_trgm; Type: COMMENT; Schema: -; Owner: 
---
-
-COMMENT ON EXTENSION pg_trgm IS 'text similarity measurement and index searching based on trigrams';
-
-
---
--- Name: grading_is_passing(text, text); Type: FUNCTION; Schema: grading; Owner: postgres
---
 
 CREATE FUNCTION grading.grading_is_passing(p_university_key text, p_raw_grade text) RETURNS boolean
     LANGUAGE plpgsql STABLE

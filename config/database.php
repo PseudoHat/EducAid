@@ -14,7 +14,10 @@ if (!function_exists('pg_connect')) {
 
 // Read DATABASE_PUBLIC_URL from Railway, then fall back to individual env vars or local defaults
 $databaseUrl = getenv('DATABASE_PUBLIC_URL');
+
+// Debug: log if DATABASE_PUBLIC_URL was found
 if ($databaseUrl) {
+    error_log('DATABASE_PUBLIC_URL found, parsing connection string');
     // Parse DATABASE_PUBLIC_URL: postgresql://user:pass@host:port/dbname
     $parts = parse_url($databaseUrl);
     $dbHost = $parts['host'] ?? 'localhost';
@@ -23,6 +26,7 @@ if ($databaseUrl) {
     $dbUser = $parts['user'] ?? 'postgres';
     $dbPass = $parts['pass'] ?? '';
 } else {
+    error_log('DATABASE_PUBLIC_URL not found, using fallback/local config');
     // Fallback: individual env vars or local defaults
     $dbHost = getenv('DB_HOST') ?: 'localhost';
     $dbName = getenv('DB_NAME') ?: 'educaid';
@@ -31,8 +35,9 @@ if ($databaseUrl) {
     $dbPort = getenv('DB_PORT') ?: '5432';
 }
 
+// Add connection timeout to prevent 30-second hangs
 $connString = sprintf(
-    'host=%s port=%s dbname=%s user=%s password=%s',
+    'host=%s port=%s dbname=%s user=%s password=%s connect_timeout=10',
     $dbHost,
     $dbPort,
     $dbName,
@@ -40,6 +45,7 @@ $connString = sprintf(
     $dbPass
 );
 
+error_log(sprintf('Attempting DB connection: host=%s port=%s dbname=%s user=%s', $dbHost, $dbPort, $dbName, $dbUser));
 $connection = @pg_connect($connString);
 if (!$connection) {
     error_log(sprintf('Database connection failed: host=%s port=%s dbname=%s user=%s', $dbHost, $dbPort, $dbName, $dbUser));
