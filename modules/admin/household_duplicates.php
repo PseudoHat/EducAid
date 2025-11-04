@@ -486,12 +486,12 @@ if (isset($_GET['api'])) {
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Household Duplicates - Admin</title>
-    <link href="/EducAid/assets/css/bootstrap.min.css" rel="stylesheet">
-    <link href="/EducAid/assets/css/bootstrap-icons.css" rel="stylesheet">
-    <link href="/EducAid/assets/css/admin/homepage.css" rel="stylesheet">
-    <link href="/EducAid/assets/css/admin/sidebar.css" rel="stylesheet">
-    <script src="/EducAid/assets/js/admin/sidebar.js" defer></script>
-    <script src="/EducAid/assets/js/admin/notification_bell.js" defer></script>
+    <link href="../../assets/css/bootstrap.min.css" rel="stylesheet">
+    <link href="../../assets/css/bootstrap-icons.css" rel="stylesheet">
+    <link href="../../assets/css/admin/homepage.css" rel="stylesheet">
+    <link href="../../assets/css/admin/sidebar.css" rel="stylesheet">
+    <script src="../../assets/js/admin/sidebar.js" defer></script>
+    <script src="../../assets/js/admin/notification_bell.js" defer></script>
     <style>
         .table-fixed { width:100%; table-layout:fixed }
         .table-fixed td { overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
@@ -779,7 +779,7 @@ if (isset($_GET['api'])) {
         </div>
     </div>
 
-    <script src="/EducAid/assets/js/bootstrap.bundle.min.js"></script>
+    <script src="../../assets/js/bootstrap.bundle.min.js"></script>
     <script>
         const endpoint = 'household_duplicates.php';
         const csrfToken = '<?php echo CSRFProtection::generateToken('household_actions'); ?>';
@@ -1237,11 +1237,11 @@ if (isset($_GET['api'])) {
                             </td>
                             <td>
                                 ${!isArchived ? 
-                                    `<a href="/EducAid/modules/admin/manage_applicants.php?student_id=${encodeURIComponent(member.student_id)}" 
+                                    `<a href="manage_applicants.php?student_id=${encodeURIComponent(member.student_id)}" 
                                        class="btn btn-xs btn-outline-primary" target="_blank" title="View student details">
                                         <i class="bi bi-eye"></i>
                                     </a>` : 
-                                    `<a href="/EducAid/modules/admin/archived_students.php" 
+                                    `<a href="archived_students.php" 
                                        class="btn btn-xs btn-outline-secondary" target="_blank" title="View in archived students">
                                         <i class="bi bi-archive"></i>
                                     </a>`
