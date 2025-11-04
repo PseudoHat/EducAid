@@ -41,22 +41,24 @@ if (isset($connection)) {
     // First try to get from session
     $muni_id = isset($_SESSION['active_municipality_id']) ? (int)$_SESSION['active_municipality_id'] : null;
     
-    // If no session, get the admin's first assigned municipality
+    // If no session, use default municipality (1) or get from admins table
     if (!$muni_id && isset($_SESSION['admin_id'])) {
         $admin_id = (int)$_SESSION['admin_id'];
-        $assign_result = pg_query_params(
+        
+        // Get municipality_id from admins table if it exists
+        $admin_result = pg_query_params(
             $connection,
-            "SELECT municipality_id FROM admin_municipality_assignments 
-             WHERE admin_id = $1 
-             ORDER BY municipality_id ASC 
-             LIMIT 1",
+            "SELECT municipality_id FROM admins WHERE admin_id = $1",
             [$admin_id]
         );
         
-        if ($assign_result && pg_num_rows($assign_result) > 0) {
-            $assign_data = pg_fetch_assoc($assign_result);
-            $muni_id = (int)$assign_data['municipality_id'];
-            pg_free_result($assign_result);
+        if ($admin_result && pg_num_rows($admin_result) > 0) {
+            $admin_data = pg_fetch_assoc($admin_result);
+            $muni_id = isset($admin_data['municipality_id']) ? (int)$admin_data['municipality_id'] : 1;
+            pg_free_result($admin_result);
+        } else {
+            // Default to municipality_id 1 if not found
+            $muni_id = 1;
         }
     }
     

@@ -9,7 +9,7 @@ session_start();
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
 
-require 'C:/xampp/htdocs/EducAid/phpmailer/vendor/autoload.php';
+require __DIR__ . '/../../phpmailer/vendor/autoload.php';
 
 if (!isset($_SESSION['admin_username'])) {
     header("Location: ../../unified_login.php");

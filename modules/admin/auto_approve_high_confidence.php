@@ -7,7 +7,7 @@ session_start();
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
 
-require 'C:/xampp/htdocs/EducAid/phpmailer/vendor/autoload.php';
+require __DIR__ . '/../../phpmailer/vendor/autoload.php';
 
 header('Content-Type: application/json');
 
