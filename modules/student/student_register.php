@@ -3007,6 +3007,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processGradesOcr'])) 
                 // Process the document
                 $ocrResult = $ocrProcessor->processGradeDocument($targetPath);
                 
+                error_log("Grades OCR Result: " . json_encode($ocrResult));
+                
                 if ($ocrResult['success'] && !empty($ocrResult['subjects'])) {
                     // Build OCR text from extracted subjects for backward compatibility
                     $ocrText = "Grade Document Analysis:\n";
@@ -3488,9 +3490,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processGradesOcr'])) 
 
     } catch (Throwable $e) {
         error_log("Grades OCR Error: " . $e->getMessage());
+        error_log("Grades OCR Stack Trace: " . $e->getTraceAsString());
         json_response([
             'status' => 'error',
-            'message' => 'An error occurred during processing',
+            'message' => 'An error occurred during processing: ' . $e->getMessage(),
             'suggestions' => [
                 'Try uploading a clearer image',
                 'Ensure grades are clearly visible',
