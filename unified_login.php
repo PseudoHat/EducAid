@@ -113,7 +113,7 @@ if (isset($_SESSION['admin_role']) && $_SESSION['admin_role'] === 'super_admin' 
 
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
-require 'C:/xampp/htdocs/EducAid/phpmailer/vendor/autoload.php';
+require __DIR__ . '/phpmailer/vendor/autoload.php';
 
 // Include our professional email template
 require_once __DIR__ . '/includes/email_templates/otp_email_template.php';

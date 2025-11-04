@@ -14,7 +14,7 @@ include __DIR__ . '/../../includes/student_session_tracker.php';
 // PHPMailer setup
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
-require 'C:/xampp/htdocs/EducAid/phpmailer/vendor/autoload.php';
+require __DIR__ . '/../../phpmailer/vendor/autoload.php';
 
 // --------- Handle AJAX OTP Requests -----------
 // Email Change OTP

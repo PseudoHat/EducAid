@@ -640,7 +640,7 @@ if (!function_exists('verify_recaptcha_v3')) {
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
 
-require 'C:/xampp/htdocs/EducAid/phpmailer/vendor/autoload.php';
+require __DIR__ . '/../../phpmailer/vendor/autoload.php';
 
 // Check if this is an AJAX request (OCR, OTP processing, cleanup, or duplicate check)
 $isAjaxRequest = isset($_POST['sendOtp']) || isset($_POST['verifyOtp']) ||

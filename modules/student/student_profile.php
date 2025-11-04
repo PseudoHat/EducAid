@@ -12,7 +12,7 @@ $student_id = $_SESSION['student_id'];
 // PHPMailer setup
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
-require 'C:/xampp/htdocs/EducAid/phpmailer/vendor/autoload.php';
+require __DIR__ . '/../../phpmailer/vendor/autoload.php';
 
 // --------- Handle AJAX OTP Requests -----------
 // Email Change OTP
