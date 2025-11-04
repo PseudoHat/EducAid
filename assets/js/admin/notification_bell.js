@@ -88,9 +88,33 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Don't update immediately on page load to avoid conflicts with server-rendered count
     // Only start auto-refresh after initial delay
+    let pollInterval;
+    
+    function startPolling() {
+        // Clear any existing interval
+        if (pollInterval) clearInterval(pollInterval);
+        
+        // Auto-refresh notification count every 60 seconds (increased from 30)
+        pollInterval = setInterval(() => {
+            // Only poll if page is visible
+            if (!document.hidden) {
+                updateNotificationCount();
+            }
+        }, 60000);
+    }
+    
     setTimeout(() => {
         updateNotificationCount();
-        // Auto-refresh notification count every 30 seconds
-        setInterval(updateNotificationCount, 30000);
+        startPolling();
     }, 2000); // Wait 2 seconds before first JavaScript update
+    
+    // Pause polling when page is hidden, resume when visible
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) {
+            updateNotificationCount(); // Update immediately when page becomes visible
+            startPolling();
+        } else if (pollInterval) {
+            clearInterval(pollInterval);
+        }
+    });
 });

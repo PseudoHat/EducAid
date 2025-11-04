@@ -458,9 +458,33 @@ document.addEventListener('DOMContentLoaded', function() {
       }
     }
 
-    // initial update shortly after load and then every 45s
-    setTimeout(updateBadge, 300);
-    setInterval(updateBadge, 45000);
+    // initial update shortly after load and then every 90s (increased from 45s)
+    let badgePollInterval;
+    
+    function startBadgePolling() {
+      if (badgePollInterval) clearInterval(badgePollInterval);
+      badgePollInterval = setInterval(() => {
+        // Only poll if page is visible
+        if (!document.hidden) {
+          updateBadge();
+        }
+      }, 90000);
+    }
+    
+    setTimeout(() => {
+      updateBadge();
+      startBadgePolling();
+    }, 300);
+    
+    // Pause polling when page is hidden
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) {
+        updateBadge();
+        startBadgePolling();
+      } else if (badgePollInterval) {
+        clearInterval(badgePollInterval);
+      }
+    });
   } catch (err) {
     console.debug('review badge init error', err);
   }
