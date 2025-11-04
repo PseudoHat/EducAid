@@ -4762,11 +4762,28 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['register'])) {
         error_log("DATABASE INSERT FAILED!");
         error_log("PostgreSQL Error: " . ($error ?: 'No error message'));
         error_log("PHP Error: " . json_encode($errorDetail));
+        
+        // Check for constraint violations manually
+        $checkEmail = pg_query_params($connection, "SELECT student_id FROM students WHERE email = $1 LIMIT 1", [$email]);
+        $checkMobile = pg_query_params($connection, "SELECT student_id FROM students WHERE mobile = $1 LIMIT 1", [$mobile]);
+        $checkSchoolId = pg_query_params($connection, "SELECT student_id FROM students WHERE school_student_id = $1 AND university_id = $2 LIMIT 1", [$school_student_id, $university]);
+        
+        if ($checkEmail && pg_num_rows($checkEmail) > 0) {
+            error_log("CONSTRAINT VIOLATION: Email '$email' already exists in database");
+        }
+        if ($checkMobile && pg_num_rows($checkMobile) > 0) {
+            error_log("CONSTRAINT VIOLATION: Mobile '$mobile' already exists in database");
+        }
+        if ($checkSchoolId && pg_num_rows($checkSchoolId) > 0) {
+            error_log("CONSTRAINT VIOLATION: School Student ID '$school_student_id' already exists for this university");
+        }
+        
         error_log("Query: $insertQuery");
         error_log("Parameters: " . json_encode([
             'student_id' => $student_id,
             'municipality_id' => $municipality_id,
             'email' => $email,
+            'mobile' => $mobile,
             'school_student_id' => $school_student_id,
             'course' => $course
         ]));
