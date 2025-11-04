@@ -4696,6 +4696,27 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['register'])) {
         }
     }
 
+    // Check if student_id already exists in related tables (orphaned records from manual deletion)
+    $orphanCheck = pg_query_params($connection, "SELECT 
+        (SELECT COUNT(*) FROM documents WHERE student_id = $1) as doc_count,
+        (SELECT COUNT(*) FROM distributions WHERE student_id = $1) as dist_count,
+        (SELECT COUNT(*) FROM qr_logs WHERE student_id = $1) as qr_count,
+        (SELECT COUNT(*) FROM grade_uploads WHERE student_id = $1) as grade_count", [$student_id]);
+    
+    if ($orphanCheck) {
+        $orphans = pg_fetch_assoc($orphanCheck);
+        if ($orphans['doc_count'] > 0 || $orphans['dist_count'] > 0 || $orphans['qr_count'] > 0 || $orphans['grade_count'] > 0) {
+            error_log("WARNING: Orphaned records found for student_id $student_id");
+            error_log("Documents: {$orphans['doc_count']}, Distributions: {$orphans['dist_count']}, QR Logs: {$orphans['qr_count']}, Grades: {$orphans['grade_count']}");
+            // Clean up orphaned records
+            pg_query_params($connection, "DELETE FROM documents WHERE student_id = $1", [$student_id]);
+            pg_query_params($connection, "DELETE FROM distributions WHERE student_id = $1", [$student_id]);
+            pg_query_params($connection, "DELETE FROM qr_logs WHERE student_id = $1", [$student_id]);
+            pg_query_params($connection, "DELETE FROM grade_uploads WHERE student_id = $1", [$student_id]);
+            error_log("Cleaned up orphaned records for $student_id");
+        }
+    }
+    
     $insertQuery = "INSERT INTO students (
         student_id, municipality_id, first_name, middle_name, last_name, extension_name, 
         email, mobile, password, sex, status, payroll_no, application_date, bdate, 
@@ -4708,6 +4729,12 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['register'])) {
         FALSE, FALSE, NULL, NULL
     ) RETURNING student_id";
 
+    error_log("=== INSERTING STUDENT INTO DATABASE ===");
+    error_log("Student ID: $student_id");
+    error_log("Email: $email");
+    error_log("School Student ID: $school_student_id");
+    error_log("Course: $course");
+    
     $result = pg_query_params($connection, $insertQuery, [
         $student_id,
         $municipality_id,
@@ -4729,6 +4756,23 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['register'])) {
         $course_verified ? 'true' : 'false'  // Convert boolean to PostgreSQL boolean string
     ]);
 
+    if (!$result) {
+        $error = pg_last_error($connection);
+        $errorDetail = error_get_last();
+        error_log("DATABASE INSERT FAILED!");
+        error_log("PostgreSQL Error: " . ($error ?: 'No error message'));
+        error_log("PHP Error: " . json_encode($errorDetail));
+        error_log("Query: $insertQuery");
+        error_log("Parameters: " . json_encode([
+            'student_id' => $student_id,
+            'municipality_id' => $municipality_id,
+            'email' => $email,
+            'school_student_id' => $school_student_id,
+            'course' => $course
+        ]));
+    } else {
+        error_log("✓ Student inserted successfully into database");
+    }
 
     if ($result) {
         $student_id_row = pg_fetch_assoc($result);
@@ -5207,13 +5251,17 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['register'])) {
 
         unset($_SESSION['otp_verified']);
 
+        error_log("=== REGISTRATION COMPLETE ===");
         echo "<script>alert('Registration submitted successfully! Your application is under review. You will receive an email notification once approved.'); window.location.href = '../../unified_login.php';</script>";
         exit;
     } else {
         // Log the PostgreSQL error for debugging
         $error = pg_last_error($connection);
-        error_log("Registration Database Error: " . $error);
-        echo "<script>alert('Registration failed due to a database error: " . addslashes($error) . "'); window.location.href = window.location.href;</script>";
+        $detailedError = $error ?: "Unknown database error - query returned false but no PostgreSQL error message";
+        error_log("=== REGISTRATION FAILED ===");
+        error_log("Registration Database Error: " . $detailedError);
+        error_log("Connection status: " . (pg_connection_status($connection) === PGSQL_CONNECTION_OK ? 'OK' : 'BAD'));
+        echo "<script>alert('Registration failed due to a database error: " . addslashes($detailedError) . "\\n\\nPlease contact support.'); window.location.href = window.location.href;</script>";
         exit;
     }
 
