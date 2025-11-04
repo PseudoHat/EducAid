@@ -204,6 +204,57 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['debug_test'])) {
     exit;
 }
 
+// --- DEFINE HELPER FUNCTIONS BEFORE OCR PROCESSING ---
+
+// Helper function to cleanup old document files when reuploading
+if (!function_exists('cleanup_old_document_files')) {
+    /**
+     * Cleanup old document files when a new file is uploaded for the same document type.
+     * Prevents bypassing validation by keeping old correct documents.
+     * 
+     * @param string $uploadDir Directory containing uploaded files
+     * @param string $sessionPrefix Session-based file prefix
+     * @param string $filePattern Pattern to match (e.g., '_EAF', '_idpic')
+     * @return int Number of files deleted
+     */
+    function cleanup_old_document_files(string $uploadDir, string $sessionPrefix, string $filePattern): int {
+        $deletedCount = 0;
+        
+        // Find all files matching pattern: sessionPrefix + filePattern + any extension
+        $pattern = $uploadDir . $sessionPrefix . $filePattern . '*';
+        $matchingFiles = glob($pattern);
+        
+        if ($matchingFiles === false) {
+            return 0;
+        }
+        
+        foreach ($matchingFiles as $file) {
+            if (is_file($file)) {
+                // Delete main file and associated OCR files
+                @unlink($file);
+                $deletedCount++;
+                
+                // Delete associated files: .ocr.txt, .tsv, .verify.json, .ocr.json
+                $associatedFiles = [
+                    $file . '.ocr.txt',
+                    $file . '.tsv',
+                    $file . '.verify.json',
+                    $file . '.ocr.json'
+                ];
+                
+                foreach ($associatedFiles as $assocFile) {
+                    if (file_exists($assocFile)) {
+                        @unlink($assocFile);
+                        $deletedCount++;
+                    }
+                }
+            }
+        }
+        
+        return $deletedCount;
+    }
+}
+
 // --- MOVE OCR PROCESSING HERE BEFORE ANY HTML OUTPUT ---
 // Document OCR Processing
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processEnrollmentOcr'])) {
@@ -283,6 +334,11 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processEnrollmentOcr'
         echo json_encode(['status' => 'error', 'message' => 'Failed to save uploaded file.']);
         exit;
     }
+
+    // Get form data from POST (these were previously defined in commented validation section)
+    $formFirstName = trim($_POST['first_name'] ?? '');
+    $formLastName = trim($_POST['last_name'] ?? '');
+    $formMiddleName = trim($_POST['middle_name'] ?? '');
 
     // Get form data for comparison
     $formData = [
@@ -515,63 +571,6 @@ if (!function_exists('json_response')) {
         
         flush();
         exit;
-    }
-}
-
-// Helper function to cleanup old document files when reuploading
-if (!function_exists('cleanup_old_document_files')) {
-    /**
-     * Delete all old files for a specific document type to prevent validation bypass
-     * and ensure fresh OCR processing on each upload
-     * 
-     * @param string $uploadDir Directory where files are stored
-     * @param string $sessionPrefix Session-based file prefix (e.g., "Dela Cruz_Juan_abc123")
-     * @param string $filePattern Pattern to match files (e.g., "_EAF", "_idpic", "_Grades", "_Letter*")
-     * @return int Number of files deleted
-     */
-    function cleanup_old_document_files(string $uploadDir, string $sessionPrefix, string $filePattern): int {
-        $deletedCount = 0;
-        
-        // Build the full glob pattern - handle wildcards in filePattern
-        // If filePattern already has extension wildcard (like "_Letter*"), use it as-is
-        // Otherwise, add .* to match any extension
-        $globPattern = $uploadDir . $sessionPrefix . $filePattern;
-        if (strpos($filePattern, '*') === false) {
-            $globPattern .= '.*';
-        }
-        
-        // Find all matching files
-        $oldFiles = glob($globPattern);
-        
-        foreach ($oldFiles as $oldFile) {
-            // Delete main file
-            if (@unlink($oldFile)) {
-                $deletedCount++;
-                error_log("✓ Deleted old file: " . basename($oldFile));
-            }
-            
-            // Delete associated OCR/verification files
-            $associatedFiles = [
-                $oldFile . '.txt',              // Plain text OCR output
-                $oldFile . '.tsv',              // Tesseract TSV output
-                $oldFile . '.ocr.txt',          // Extracted OCR text
-                $oldFile . '.verify.json',      // Verification results
-                $oldFile . '.confidence.json'   // Confidence scores
-            ];
-            
-            foreach ($associatedFiles as $assocFile) {
-                if (file_exists($assocFile) && @unlink($assocFile)) {
-                    $deletedCount++;
-                    error_log("✓ Deleted associated file: " . basename($assocFile));
-                }
-            }
-        }
-        
-        if ($deletedCount > 0) {
-            error_log("✓ Cleanup complete: {$deletedCount} file(s) deleted for pattern '{$filePattern}'");
-        }
-        
-        return $deletedCount;
     }
 }
 

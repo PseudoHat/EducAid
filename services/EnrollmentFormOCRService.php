@@ -266,7 +266,9 @@ class EnrollmentFormOCRService {
         
         error_log("=== NAME EXTRACTION DEBUG ===");
         error_log("Looking for: First='{$firstName}', Middle='{$middleName}', Last='{$lastName}'");
-        error_log("OCR Text: " . substr($fullText, 0, 300));
+        error_log("Total words in array: " . count($words));
+        error_log("Sample words: " . json_encode(array_slice(array_column($words, 'text'), 0, 50)));
+        error_log("OCR Text: " . substr($fullText, 0, 500));
         
         // Check first name - Use improved matching for compound/long names
         if (!empty($firstName)) {
