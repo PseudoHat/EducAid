@@ -12,7 +12,7 @@ if [ -x "./vendor/bin/heroku-php-apache2" ]; then
   echo "Starting heroku-php-apache2 (provided by buildpack)..."
   exec ./vendor/bin/heroku-php-apache2 "$DOC_ROOT"
 else
-  echo "vendor/bin/heroku-php-apache2 not found — falling back to php -S on port $PORT (doc root: $DOC_ROOT)"
-  # Built-in server is single-process and not for heavy production use; OK for simple staging/testing
-  exec php -S 0.0.0.0:"$PORT" -t "$DOC_ROOT"
+  echo "vendor/bin/heroku-php-apache2 not found — falling back to php -S on port $PORT with router"
+  # Use router.php to properly serve static assets and route PHP requests
+  exec php -S 0.0.0.0:"$PORT" router.php
 fi
