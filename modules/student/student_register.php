@@ -5073,6 +5073,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['register'])) {
                 }
             }
         }
+    }
 
         // === SAVE CERTIFICATE OF INDIGENCY USING UnifiedFileService ===
         $tempIndigencyDir = '../../assets/uploads/temp/indigency/';
