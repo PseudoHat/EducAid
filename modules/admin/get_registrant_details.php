@@ -29,6 +29,7 @@ if (!$student) {
 }
 
 // Fetch documents (latest per type) using document_type_code
+error_log("=== get_registrant_details.php: Fetching documents for student: $student_id ===");
 $docQuery = "SELECT document_type_code, file_path, ocr_confidence, verification_score,
                     verification_status, verification_details, status
              FROM documents 
@@ -37,7 +38,10 @@ $docQuery = "SELECT document_type_code, file_path, ocr_confidence, verification_
 $docResult = pg_query_params($connection, $docQuery, [$student_id]);
 $documents = [];
 if ($docResult) {
+    $docCount = pg_num_rows($docResult);
+    error_log("Found $docCount documents in database for student $student_id");
     while ($row = pg_fetch_assoc($docResult)) {
+        error_log("Document: Type={$row['document_type_code']}, Status={$row['status']}, Path={$row['file_path']}");
         $code = $row['document_type_code'];
         if (!isset($documents[$code])) { // keep first (latest due to DESC)
             // Use ocr_confidence and verification_score directly from DB columns
@@ -93,6 +97,7 @@ if ($docResult) {
 
 // If no documents in database, check temp folder for under_registration students
 if (empty($documents) && $student['status'] === 'under_registration') {
+    error_log("No documents found in DB, checking temp folders for student $student_id");
     // Check temp folders for registrants
     $tempFolders = [
         '04' => __DIR__ . '/../../assets/uploads/temp/id_pictures/',
@@ -103,6 +108,7 @@ if (empty($documents) && $student['status'] === 'under_registration') {
     ];
     
     foreach ($tempFolders as $code => $folder) {
+        error_log("Checking temp folder: $folder");
         if (is_dir($folder)) {
             $files = glob($folder . $student_id . '_*');
             foreach ($files as $file) {

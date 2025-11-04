@@ -4817,12 +4817,13 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['register'])) {
                     }
                     
                     // Save using UnifiedFileService
+                    error_log("Calling saveDocument for ID Picture - Student: $student_id, Path: $idTempPath");
                     $saveResult = $fileService->saveDocument($student_id, 'id_picture', $idTempPath, $idOcrData);
                     
                     if ($saveResult['success']) {
-                        error_log("UnifiedFileService: Saved ID Picture - " . $saveResult['document_id']);
+                        error_log("✓ UnifiedFileService: Saved ID Picture - " . $saveResult['document_id']);
                     } else {
-                        error_log("UnifiedFileService: Failed to save ID Picture - " . ($saveResult['error'] ?? 'Unknown error'));
+                        error_log("✗ UnifiedFileService: Failed to save ID Picture - " . ($saveResult['error'] ?? 'Unknown error'));
                     }
                     
                     // Clean up original temp file (main image file)
@@ -4917,12 +4918,13 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['register'])) {
                     }
                     
                     // Save using UnifiedFileService
+                    error_log("Calling saveDocument for EAF - Student: $student_id, Path: $tempEnrollmentPath");
                     $saveResult = $fileService->saveDocument($student_id, 'eaf', $tempEnrollmentPath, $eafOcrData);
                     
                     if ($saveResult['success']) {
-                        error_log("UnifiedFileService: Saved EAF - " . $saveResult['document_id']);
+                        error_log("✓ UnifiedFileService: Saved EAF - " . $saveResult['document_id']);
                     } else {
-                        error_log("UnifiedFileService: Failed to save EAF - " . ($saveResult['error'] ?? 'Unknown error'));
+                        error_log("✗ UnifiedFileService: Failed to save EAF - " . ($saveResult['error'] ?? 'Unknown error'));
                     }
                     
                     @unlink($tempFile);
@@ -4995,14 +4997,15 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['register'])) {
                             ];
                         }
                     }
-                    
                     // Save using UnifiedFileService
+                    error_log("Calling saveDocument for Letter - Student: $student_id, Path: $letterTempPath");
                     $saveResult = $fileService->saveDocument($student_id, 'letter_to_mayor', $letterTempPath, $letterOcrData);
                     
                     if ($saveResult['success']) {
-                        error_log("UnifiedFileService: Saved Letter - " . $saveResult['document_id']);
+                        error_log("✓ UnifiedFileService: Saved Letter - " . $saveResult['document_id']);
                     } else {
-                        error_log("UnifiedFileService: Failed to save Letter - " . ($saveResult['error'] ?? 'Unknown error'));
+                        error_log("✗ UnifiedFileService: Failed to save Letter - " . ($saveResult['error'] ?? 'Unknown error'));
+                    }   error_log("UnifiedFileService: Failed to save Letter - " . ($saveResult['error'] ?? 'Unknown error'));
                     }
 
                     @unlink($letterTempFile);
@@ -5077,12 +5080,13 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['register'])) {
                     }
                     
                     // Save using UnifiedFileService
+                    error_log("Calling saveDocument for Certificate - Student: $student_id, Path: $certificateTempPath");
                     $saveResult = $fileService->saveDocument($student_id, 'certificate_of_indigency', $certificateTempPath, $certOcrData);
                     
                     if ($saveResult['success']) {
-                        error_log("UnifiedFileService: Saved Certificate - " . $saveResult['document_id']);
+                        error_log("✓ UnifiedFileService: Saved Certificate - " . $saveResult['document_id']);
                     } else {
-                        error_log("UnifiedFileService: Failed to save Certificate - " . ($saveResult['error'] ?? 'Unknown error'));
+                        error_log("✗ UnifiedFileService: Failed to save Certificate - " . ($saveResult['error'] ?? 'Unknown error'));
                     }
 
                     @unlink($certificateTempFile);
@@ -5160,12 +5164,13 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['register'])) {
                     }
                     
                     // Save using UnifiedFileService
+                    error_log("Calling saveDocument for Grades - Student: $student_id, Path: $gradesTempPath");
                     $saveResult = $fileService->saveDocument($student_id, 'academic_grades', $gradesTempPath, $gradesOcrData);
                     
                     if ($saveResult['success']) {
-                        error_log("UnifiedFileService: Saved Grades - " . $saveResult['document_id']);
+                        error_log("✓ UnifiedFileService: Saved Grades - " . $saveResult['document_id']);
                     } else {
-                        error_log("UnifiedFileService: Failed to save Grades - " . ($saveResult['error'] ?? 'Unknown error'));
+                        error_log("✗ UnifiedFileService: Failed to save Grades - " . ($saveResult['error'] ?? 'Unknown error'));
                     }
 
                     @unlink($gradesTempFile);

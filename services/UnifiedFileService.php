@@ -635,6 +635,12 @@ class UnifiedFileService {
      */
     public function saveDocument($studentId, $docTypeName, $filePath, $ocrData = []) {
         try {
+            error_log("=== UnifiedFileService::saveDocument START ===");
+            error_log("Student ID: $studentId");
+            error_log("Doc Type: $docTypeName");
+            error_log("File Path: $filePath");
+            error_log("File Exists: " . (file_exists($filePath) ? 'YES' : 'NO'));
+            
             if (!isset(self::DOCUMENT_TYPES[$docTypeName])) {
                 throw new Exception("Invalid document type: {$docTypeName}");
             }
@@ -644,9 +650,11 @@ class UnifiedFileService {
             
             // Generate document ID
             $documentId = $this->generateDocumentId($studentId, $docInfo['code'], $currentYear);
+            error_log("Generated Document ID: $documentId");
             
             // Convert absolute path to web-accessible relative path for storage
             $webPath = $this->convertToWebPath($filePath);
+            error_log("Web Path for DB: $webPath");
             
             // Extract file information
             $fileName = basename($filePath);
@@ -658,7 +666,7 @@ class UnifiedFileService {
             $verificationScore = $ocrData['verification_score'] ?? 0;
             $verificationStatus = $ocrData['verification_status'] ?? 'pending';
             
-            error_log("UnifiedFileService::saveDocument - DocType: {$docTypeName}, OCR: {$ocrConfidence}%, Verification: {$verificationScore}%");
+            error_log("DocType: {$docTypeName}, OCR: {$ocrConfidence}%, Verification: {$verificationScore}%, File Size: {$fileSize} bytes");
             
             // Prepare verification details JSONB
             $verificationDetails = null;
@@ -716,8 +724,14 @@ class UnifiedFileService {
             ]);
             
             if (!$result) {
-                throw new Exception("Database insert failed: " . pg_last_error($this->db));
+                $error = pg_last_error($this->db);
+                error_log("DATABASE INSERT FAILED: $error");
+                throw new Exception("Database insert failed: " . $error);
             }
+            
+            $affectedRows = pg_affected_rows($result);
+            error_log("Database insert successful - Affected rows: $affectedRows");
+            error_log("=== UnifiedFileService::saveDocument SUCCESS ===");
             
             return [
                 'success' => true,
@@ -726,10 +740,13 @@ class UnifiedFileService {
             ];
             
         } catch (Exception $e) {
-            error_log("UnifiedFileService::saveDocument - Error: " . $e->getMessage());
+            error_log("=== UnifiedFileService::saveDocument ERROR ===");
+            error_log("Error: " . $e->getMessage());
+            error_log("Stack trace: " . $e->getTraceAsString());
             return [
                 'success' => false,
-                'message' => $e->getMessage()
+                'message' => $e->getMessage(),
+                'error' => $e->getMessage()
             ];
         }
     }
