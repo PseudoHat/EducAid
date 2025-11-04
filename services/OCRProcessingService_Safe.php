@@ -305,14 +305,17 @@ class OCRProcessingService {
      * Run Tesseract OCR on processed file
      */
     private function runTesseract($filePath) {
-        $tsvFile = $this->tempDir . '/ocr_' . uniqid() . '.tsv';
+        // Generate TSV file in the SAME directory as the input file
+        $fileDir = dirname($filePath);
+        $outputBase = $fileDir . '/ocr_' . uniqid();
+        $tsvFile = $outputBase . '.tsv';
         
         // Build Tesseract command for TSV output
         $command = sprintf(
             '%s %s %s -l eng --oem 1 --psm 6 tsv 2>&1',
             escapeshellarg($this->tesseractPath),
             escapeshellarg($filePath),
-            escapeshellarg(pathinfo($tsvFile, PATHINFO_FILENAME))
+            escapeshellarg($outputBase)
         );
         
         // Execute Tesseract
@@ -324,11 +327,11 @@ class OCRProcessingService {
         }
         
         // Read TSV output
-        $tsvContent = file_get_contents($tsvFile . '.tsv');
+        $tsvContent = file_get_contents($tsvFile);
         
         // Clean up
-        if (file_exists($tsvFile . '.tsv')) {
-            unlink($tsvFile . '.tsv');
+        if (file_exists($tsvFile)) {
+            unlink($tsvFile);
         }
         
         return $tsvContent;

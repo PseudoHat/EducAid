@@ -65,8 +65,9 @@ class EnrollmentFormOCRService {
             // Handle PDF conversion if needed
             $processedFile = $this->preprocessFile($filePath);
             
-            // Generate unique output filename
-            $outputBase = $this->tempDir . 'enrollment_ocr_' . uniqid();
+            // Generate unique output filename in the SAME directory as the input file
+            $fileDir = dirname($filePath);
+            $outputBase = $fileDir . '/enrollment_ocr_' . uniqid();
             $tsvFile = $outputBase . '.tsv';
             
             // Run Tesseract for TSV output

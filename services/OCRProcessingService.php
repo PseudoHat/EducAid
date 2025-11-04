@@ -328,11 +328,9 @@ class OCRProcessingService {
         $psm = intval($options['psm'] ?? 6);
         $oem = intval($options['oem'] ?? 1);
 
-        // Clean up temp directory path to avoid double slashes
-        $cleanTempDir = rtrim($this->tempDir, '/\\');
-        
-        // Generate output base name WITHOUT extension - Tesseract adds .tsv automatically
-        $outputBase = $cleanTempDir . '/ocr_' . uniqid();
+        // Generate output base name in the SAME directory as the input file
+        $fileDir = dirname($filePath);
+        $outputBase = $fileDir . '/ocr_' . uniqid();
         $tsvFile = $outputBase . '.tsv'; // This is where Tesseract will create the file
 
         // Build Tesseract command for TSV output
