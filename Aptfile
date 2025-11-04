@@ -1,3 +1,4 @@
+# Required for OCR document processing
 tesseract-ocr
 tesseract-ocr-eng
 imagemagick
