@@ -79,7 +79,7 @@ $reasonCategories = [
 ];
 ?>
 
-<?php $page_title='Blacklist Archive'; include '../../includes/admin/admin_head.php'; ?>
+<?php $page_title='Blacklist Archive'; include __DIR__ . '/../../includes/admin/admin_head.php'; ?>
 <style>
     .blacklist-hero{background:linear-gradient(135deg,#dc3545,#b71f28);color:#fff;border-radius:18px;padding:1.75rem 1.75rem;margin-bottom:1.75rem;position:relative;overflow:hidden;}
     .blacklist-hero:before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 85% 15%,rgba(255,255,255,.25),transparent 60%);pointer-events:none;}
@@ -111,10 +111,10 @@ $reasonCategories = [
 </style>
 </head>
 <body>
-<?php include '../../includes/admin/admin_topbar.php'; ?>
+<?php include __DIR__ . '/../../includes/admin/admin_topbar.php'; ?>
 <div id="wrapper" class="admin-wrapper">
-    <?php include '../../includes/admin/admin_sidebar.php'; ?>
-    <?php include '../../includes/admin/admin_header.php'; ?>
+    <?php include __DIR__ . '/../../includes/admin/admin_sidebar.php'; ?>
+    <?php include __DIR__ . '/../../includes/admin/admin_header.php'; ?>
     <section class="home-section" id="mainContent">
         <div class="container-fluid py-4 px-4">
             <div class="blacklist-hero mb-3">

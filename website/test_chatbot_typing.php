@@ -81,7 +81,7 @@
 </div>
 
 <!-- Include the TEST chatbot widget -->
-<?php include '../includes/website/chatbot_widget_test.php'; ?>
+<?php include __DIR__ . '/../includes/website/chatbot_widget_test.php'; ?>
 
 <!-- jQuery (if needed by other scripts) -->
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>

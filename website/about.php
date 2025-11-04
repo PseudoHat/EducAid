@@ -34,7 +34,7 @@ if ($is_super_admin && isset($_GET['edit']) && $_GET['edit'] == '1') { $IS_EDIT_
         'page_title' => 'About Page',
         'exit_url' => 'about.php'
       ];
-      include '../includes/website/edit_toolbar.php';
+      include __DIR__ . '/../includes/website/edit_toolbar.php';
     ?>
   <?php endif; ?>
 
@@ -48,9 +48,9 @@ $custom_nav_links = [
   ['href' => 'announcements.php', 'label' => 'Announcements', 'active' => false],
   ['href' => 'contact.php', 'label' => 'Contact', 'active' => false]
 ];
-include '../includes/website/topbar.php';
-include '../includes/website/navbar.php';
-include '../includes/website/cookie_consent.php';
+include __DIR__ . '/../includes/website/topbar.php';
+include __DIR__ . '/../includes/website/navbar.php';
+include __DIR__ . '/../includes/website/cookie_consent.php';
 ?>
 
   <!-- Hero Section -->

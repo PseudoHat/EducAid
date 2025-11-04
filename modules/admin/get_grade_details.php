@@ -5,7 +5,7 @@ if (!isset($_SESSION['admin_username'])) {
     exit;
 }
 
-include '../../config/database.php';
+include __DIR__ . '/../../config/database.php';
 header('Content-Type: application/json');
 
 $uploadId = intval($_GET['upload_id'] ?? 0);

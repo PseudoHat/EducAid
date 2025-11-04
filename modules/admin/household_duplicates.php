@@ -7,7 +7,7 @@ if (!isset($_SESSION['admin_username'])) {
     header("Location: ../../unified_login.php");
     exit;
 }
-include '../../config/database.php';
+include __DIR__ . '/../../config/database.php';
 
 // Initialize services
 $archivalService = new StudentArchivalService($connection);

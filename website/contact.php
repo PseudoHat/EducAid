@@ -101,7 +101,7 @@ function esc($v){ return htmlspecialchars($v ?? '', ENT_QUOTES, 'UTF-8'); }
         'page_title' => 'Contact Page',
         'exit_url' => 'contact.php'
     ];
-    include '../includes/website/edit_toolbar.php';
+    include __DIR__ . '/../includes/website/edit_toolbar.php';
     ?>
   <?php endif; ?>
   
@@ -116,9 +116,9 @@ function esc($v){ return htmlspecialchars($v ?? '', ENT_QUOTES, 'UTF-8'); }
     ['href' => 'contact.php', 'label' => 'Contact', 'active' => true]
   ];
   
-  include '../includes/website/topbar.php';
-  include '../includes/website/navbar.php';
-  include '../includes/website/cookie_consent.php';
+  include __DIR__ . '/../includes/website/topbar.php';
+  include __DIR__ . '/../includes/website/navbar.php';
+  include __DIR__ . '/../includes/website/cookie_consent.php';
   ?>
 
   <style>

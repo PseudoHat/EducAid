@@ -143,7 +143,7 @@ include __DIR__ . '/../../config/database.php';
 
 $page_title = 'Advance Year Levels';
 $extra_css = [];
-include '../../includes/admin/admin_head.php';
+include __DIR__ . '/../../includes/admin/admin_head.php';
 ?>
 <style>
     .status-banner {
@@ -482,10 +482,10 @@ include '../../includes/admin/admin_head.php';
 </style>
 </head>
 <body>
-<?php include '../../includes/admin/admin_topbar.php'; ?>
+<?php include __DIR__ . '/../../includes/admin/admin_topbar.php'; ?>
 <div id="wrapper" class="admin-wrapper">
-    <?php include '../../includes/admin/admin_sidebar.php'; ?>
-    <?php include '../../includes/admin/admin_header.php'; ?>
+    <?php include __DIR__ . '/../../includes/admin/admin_sidebar.php'; ?>
+    <?php include __DIR__ . '/../../includes/admin/admin_header.php'; ?>
 
     <section class="home-section" id="mainContent">
         <div class="container-fluid py-4 px-4">

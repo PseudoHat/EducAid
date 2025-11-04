@@ -781,7 +781,7 @@ $universities = pg_fetch_all(pg_query($connection, "SELECT university_id, name F
 $yearLevels = pg_fetch_all(pg_query($connection, "SELECT year_level_id, name FROM year_levels ORDER BY sort_order"));
 ?>
 
-<?php $page_title='Review Registrations'; $extra_css=[]; include '../../includes/admin/admin_head.php'; ?>
+<?php $page_title='Review Registrations'; $extra_css=[]; include __DIR__ . '/../../includes/admin/admin_head.php'; ?>
 <style>
     /* existing page styles */
         .filter-section {
@@ -900,10 +900,10 @@ $yearLevels = pg_fetch_all(pg_query($connection, "SELECT year_level_id, name FRO
     </style>
 </head>
 <body>
-    <?php include '../../includes/admin/admin_topbar.php'; ?>
+    <?php include __DIR__ . '/../../includes/admin/admin_topbar.php'; ?>
     <div id="wrapper" class="admin-wrapper">
-        <?php include '../../includes/admin/admin_sidebar.php'; ?>
-        <?php include '../../includes/admin/admin_header.php'; ?>
+        <?php include __DIR__ . '/../../includes/admin/admin_sidebar.php'; ?>
+        <?php include __DIR__ . '/../../includes/admin/admin_header.php'; ?>
         
         <section class="home-section" id="mainContent">
 
@@ -1697,7 +1697,7 @@ $yearLevels = pg_fetch_all(pg_query($connection, "SELECT year_level_id, name FRO
     </script>
 
     <!-- Include Blacklist Modal -->
-    <?php include '../../includes/admin/blacklist_modal.php'; ?>
+    <?php include __DIR__ . '/../../includes/admin/blacklist_modal.php'; ?>
     
     <script>
     async function loadValidationData(docType, studentId) {
@@ -2096,7 +2096,7 @@ $yearLevels = pg_fetch_all(pg_query($connection, "SELECT year_level_id, name FRO
     </div>
 
     <!-- Include Blacklist Modal -->
-    <?php include '../../includes/admin/blacklist_modal.php'; ?>
+    <?php include __DIR__ . '/../../includes/admin/blacklist_modal.php'; ?>
 </body>
 </html>
 

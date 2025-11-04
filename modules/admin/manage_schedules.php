@@ -4,8 +4,8 @@ if (!isset($_SESSION['admin_username'])) {
     header("Location: ../../unified_login.php");
     exit;
 }
-include '../../config/database.php';
-include '../../includes/workflow_control.php';
+include __DIR__ . '/../../config/database.php';
+include __DIR__ . '/../../includes/workflow_control.php';
 require_once __DIR__ . '/../../includes/CSRFProtection.php';
 
 // Check workflow status - prevent access if payroll/QR not ready
@@ -405,7 +405,7 @@ if ($usedDatesResult) {
     }
 }
 ?>
-<?php $page_title='Manage Schedules'; include '../../includes/admin/admin_head.php'; ?>
+<?php $page_title='Manage Schedules'; include __DIR__ . '/../../includes/admin/admin_head.php'; ?>
     <style>
         .batch-card {
             border: 2px solid #e9ecef;
@@ -441,10 +441,10 @@ if ($usedDatesResult) {
     </style>
     </head>
 <body>
-<?php include '../../includes/admin/admin_topbar.php'; ?>
+<?php include __DIR__ . '/../../includes/admin/admin_topbar.php'; ?>
 <div id="wrapper" class="admin-wrapper">
-    <?php include '../../includes/admin/admin_sidebar.php'; ?>
-    <?php include '../../includes/admin/admin_header.php'; ?>
+    <?php include __DIR__ . '/../../includes/admin/admin_sidebar.php'; ?>
+    <?php include __DIR__ . '/../../includes/admin/admin_header.php'; ?>
     <section class="home-section" id="mainContent">
         <div class="container-fluid py-4 px-4">
             <div class="section-header mb-4">

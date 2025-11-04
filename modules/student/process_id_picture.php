@@ -16,7 +16,7 @@ if (!isset($_FILES['id_picture']) || $_FILES['id_picture']['error'] !== UPLOAD_E
     exit;
 }
 
-include '../../config/database.php';
+include __DIR__ . '/../../config/database.php';
 
 $uploadDir = '../../assets/uploads/temp/id_pictures/';
 if (!file_exists($uploadDir)) {

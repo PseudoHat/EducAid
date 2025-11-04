@@ -5,7 +5,7 @@ if (!isset($_SESSION['admin_username'])) {
     header("Location: ../../unified_login.php");
     exit;
 }
-include '../../config/database.php';
+include __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../includes/student_notification_helper.php';
 
 // Get workflow permissions to control approval actions
@@ -1969,12 +1969,12 @@ if ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '' === 'XMLHttpRequest' || (isset($_GET
 
 // Normal page output below...
 ?>
-<?php $page_title='Manage Applicants'; $extra_css=['../../assets/css/admin/manage_applicants.css']; include '../../includes/admin/admin_head.php'; ?>
+<?php $page_title='Manage Applicants'; $extra_css=['../../assets/css/admin/manage_applicants.css']; include __DIR__ . '/../../includes/admin/admin_head.php'; ?>
 <body>
-<?php include '../../includes/admin/admin_topbar.php'; ?>
+<?php include __DIR__ . '/../../includes/admin/admin_topbar.php'; ?>
 <div id="wrapper" class="admin-wrapper">
-    <?php include '../../includes/admin/admin_sidebar.php'; ?>
-    <?php include '../../includes/admin/admin_header.php'; ?>
+    <?php include __DIR__ . '/../../includes/admin/admin_sidebar.php'; ?>
+    <?php include __DIR__ . '/../../includes/admin/admin_header.php'; ?>
     <section class="home-section" id="mainContent">
     <div class="container-fluid py-4 px-4">
             <?php if (!empty($_SESSION['error_message']) || !empty($_SESSION['error'])): ?>
@@ -2039,7 +2039,7 @@ if ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '' === 'XMLHttpRequest' || (isset($_GET
 </div>
 
 <!-- Include Blacklist Modal -->
-<?php include '../../includes/admin/blacklist_modal.php'; ?>
+<?php include __DIR__ . '/../../includes/admin/blacklist_modal.php'; ?>
 
 <!-- Archive Student Modal -->
 <div class="modal fade" id="archiveModal" tabindex="-1" aria-labelledby="archiveModalLabel" aria-hidden="true">

@@ -46,7 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_sidebar_theme'
 }
 ?>
 
-<?php $page_title='Sidebar Theme Settings'; $extra_css=[]; include '../../includes/admin/admin_head.php'; ?>
+<?php $page_title='Sidebar Theme Settings'; $extra_css=[]; include __DIR__ . '/../../includes/admin/admin_head.php'; ?>
 <style>
   body.sidebar-settings-page .preview-sidebar {
     background: linear-gradient(180deg, <?= htmlspecialchars($currentSettings['sidebar_bg_start']) ?> 0%, <?= htmlspecialchars($currentSettings['sidebar_bg_end']) ?> 100%);
@@ -73,10 +73,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_sidebar_theme'
   body.sidebar-settings-page .color-input-group input[type=text]{width:80px;font-family:monospace;text-transform:uppercase;}
 </style>
 <body class="sidebar-settings-page">
-    <?php include '../../includes/admin/admin_topbar.php'; ?>
+    <?php include __DIR__ . '/../../includes/admin/admin_topbar.php'; ?>
     <div id="wrapper" class="admin-wrapper">
-        <?php include '../../includes/admin/admin_sidebar.php'; ?>
-        <?php include '../../includes/admin/admin_header.php'; ?>
+        <?php include __DIR__ . '/../../includes/admin/admin_sidebar.php'; ?>
+        <?php include __DIR__ . '/../../includes/admin/admin_header.php'; ?>
 
         <section class="home-section" id="mainContent">
             <div class="container-fluid py-4 px-4">

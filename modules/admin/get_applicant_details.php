@@ -16,7 +16,7 @@ if (!isset($_SESSION['admin_username'])) {
     exit;
 }
 
-include '../../config/database.php';
+include __DIR__ . '/../../config/database.php';
 
 // Validate student_id parameter
 if (!isset($_GET['student_id'])) {

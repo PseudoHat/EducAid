@@ -1,7 +1,7 @@
 <?php
 /* filepath: c:\xampp\htdocs\EducAid\modules\student\upload_handler.php */
-include '../../config/database.php';
-require '../../services/DocumentUploadService.php';
+include __DIR__ . '/../../config/database.php';
+require __DIR__ . '/../../services/DocumentUploadService.php';
 
 session_start();
 

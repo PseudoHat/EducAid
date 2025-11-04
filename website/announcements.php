@@ -133,7 +133,7 @@ $custom_nav_links = [
       'page_title' => 'Announcements Page',
       'exit_url' => 'announcements.php'
     ];
-    include '../includes/website/edit_toolbar.php';
+    include __DIR__ . '/../includes/website/edit_toolbar.php';
   ?>
 <?php endif; ?>
 
@@ -149,9 +149,9 @@ $custom_nav_links = [
     ['href' => 'contact.php', 'label' => 'Contact', 'active' => false]
   ];
   // Modular includes placed inside body to mirror landing page structure
-  include '../includes/website/topbar.php';
-  include '../includes/website/navbar.php';
-  include '../includes/website/cookie_consent.php';
+  include __DIR__ . '/../includes/website/topbar.php';
+  include __DIR__ . '/../includes/website/navbar.php';
+  include __DIR__ . '/../includes/website/cookie_consent.php';
 ?>
 
 <!-- Hero (mirrors landing page hero pattern) -->

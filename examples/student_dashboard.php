@@ -30,7 +30,7 @@
   ];
   
   // Skip topbar for student portal
-  include '../includes/website/navbar.php';
+  include __DIR__ . '/../includes/website/navbar.php';
   ?>
 
   <!-- Student Dashboard Content -->

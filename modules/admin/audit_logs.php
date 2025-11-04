@@ -7,7 +7,7 @@ if (!isset($_SESSION['admin_username']) || !isset($_SESSION['admin_role']) || $_
     exit;
 }
 
-include '../../config/database.php';
+include __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../services/AuditLogger.php';
 
 // Initialize variables
@@ -192,7 +192,7 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
     exit;
 }
 ?>
-<?php $page_title='Audit Trail'; include '../../includes/admin/admin_head.php'; ?>
+<?php $page_title='Audit Trail'; include __DIR__ . '/../../includes/admin/admin_head.php'; ?>
 <style>
     .stat-card {
         border-radius: 12px;
@@ -300,10 +300,10 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
 </style>
 </head>
 <body>
-<?php include '../../includes/admin/admin_topbar.php'; ?>
+<?php include __DIR__ . '/../../includes/admin/admin_topbar.php'; ?>
 <div id="wrapper" class="admin-wrapper">
-    <?php include '../../includes/admin/admin_sidebar.php'; ?>
-    <?php include '../../includes/admin/admin_header.php'; ?>
+    <?php include __DIR__ . '/../../includes/admin/admin_sidebar.php'; ?>
+    <?php include __DIR__ . '/../../includes/admin/admin_header.php'; ?>
     
     <section class="home-section" id="mainContent">
         <div class="container-fluid py-4 px-4">

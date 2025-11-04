@@ -1,7 +1,7 @@
 Student Profile.php
 <?php
 /** @phpstan-ignore-file */
-include '../../config/database.php';
+include __DIR__ . '/../../config/database.php';
 session_start();
 if (!isset($_SESSION['student_username'])) {
     header("Location: ../../unified_login.php");

@@ -59,12 +59,12 @@ function getNotificationIcon($type) {
 }
 ?>
 
-<?php $page_title='Notifications'; $extra_css=['../../assets/css/admin/notification.css']; include '../../includes/admin/admin_head.php'; ?>
+<?php $page_title='Notifications'; $extra_css=['../../assets/css/admin/notification.css']; include __DIR__ . '/../../includes/admin/admin_head.php'; ?>
 <body>
-  <?php include '../../includes/admin/admin_topbar.php'; ?>
+  <?php include __DIR__ . '/../../includes/admin/admin_topbar.php'; ?>
   <div id="wrapper" class="admin-wrapper">
-    <?php include '../../includes/admin/admin_sidebar.php'; ?>
-    <?php include '../../includes/admin/admin_header.php'; ?>
+    <?php include __DIR__ . '/../../includes/admin/admin_sidebar.php'; ?>
+    <?php include __DIR__ . '/../../includes/admin/admin_header.php'; ?>
 
     <section class="home-section" id="mainContent">
 

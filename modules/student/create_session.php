@@ -4,7 +4,7 @@
  * Visit this page in your browser while logged in
  */
 session_start();
-include '../../config/database.php';
+include __DIR__ . '/../../config/database.php';
 require_once '../../includes/SessionManager.php';
 ?>
 <!DOCTYPE html>

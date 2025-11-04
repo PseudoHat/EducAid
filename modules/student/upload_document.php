@@ -1237,13 +1237,13 @@ $page_title = 'Upload Documents';
 </head>
 <body>
     <!-- Student Topbar -->
-    <?php include '../../includes/student/student_topbar.php'; ?>
+    <?php include __DIR__ . '/../../includes/student/student_topbar.php'; ?>
     
     <div id="wrapper" style="padding-top: var(--topbar-h, 60px);">
-    <?php include '../../includes/student/student_sidebar.php'; ?>
+    <?php include __DIR__ . '/../../includes/student/student_sidebar.php'; ?>
     
     <!-- Main Header -->
-    <?php include '../../includes/student/student_header.php'; ?>
+    <?php include __DIR__ . '/../../includes/student/student_header.php'; ?>
     
     <section class="home-section" id="page-content-wrapper">
         <div class="container-fluid">
@@ -1740,7 +1740,7 @@ $page_title = 'Upload Documents';
     </div><!-- #wrapper -->
     
     <!-- Priority Notification Modal (for rejected documents) -->
-    <?php include '../../includes/student/priority_notification_modal.php'; ?>
+    <?php include __DIR__ . '/../../includes/student/priority_notification_modal.php'; ?>
     
     <!-- Document Viewer Modal -->
     <div class="modal fade" id="documentViewerModal" tabindex="-1">

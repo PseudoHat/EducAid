@@ -301,13 +301,13 @@ while ($row = pg_fetch_assoc($barangayResult)) {
 /* Check workflow status for UI decisions */
 // This is now calculated after POST actions above
 ?>
-<?php $page_title='Verify Students'; $extra_css=['../../assets/css/admin/verify_students.css']; include '../../includes/admin/admin_head.php'; ?>
+<?php $page_title='Verify Students'; $extra_css=['../../assets/css/admin/verify_students.css']; include __DIR__ . '/../../includes/admin/admin_head.php'; ?>
 </head>
 <body>
-<?php include '../../includes/admin/admin_topbar.php'; ?>
+<?php include __DIR__ . '/../../includes/admin/admin_topbar.php'; ?>
 <div id="wrapper" class="admin-wrapper">
-  <?php include '../../includes/admin/admin_sidebar.php'; ?>
-  <?php include '../../includes/admin/admin_header.php'; ?>
+  <?php include __DIR__ . '/../../includes/admin/admin_sidebar.php'; ?>
+  <?php include __DIR__ . '/../../includes/admin/admin_header.php'; ?>
   <section class="home-section" id="mainContent">
     <div class="container-fluid py-4 px-4">
       <div class="section-header mb-3">
@@ -619,7 +619,7 @@ while ($row = pg_fetch_assoc($barangayResult)) {
 </div>
 
 <!-- Include Blacklist Modal -->
-<?php include '../../includes/admin/blacklist_modal.php'; ?>
+<?php include __DIR__ . '/../../includes/admin/blacklist_modal.php'; ?>
 
 <!-- JS -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>

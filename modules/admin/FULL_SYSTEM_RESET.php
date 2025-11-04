@@ -274,7 +274,7 @@ foreach ($file_dirs as $key => $dir) {
 $csrf_token = CSRFProtection::generateToken('nuclear_reset');
 ?>
 
-<?php $page_title = 'Full System Reset'; include '../../includes/admin/admin_head.php'; ?>
+<?php $page_title = 'Full System Reset'; include __DIR__ . '/../../includes/admin/admin_head.php'; ?>
 <style>
     .danger-zone {
         border: 3px solid #dc3545;
@@ -326,10 +326,10 @@ $csrf_token = CSRFProtection::generateToken('nuclear_reset');
 </style>
 </head>
 <body>
-<?php include '../../includes/admin/admin_topbar.php'; ?>
+<?php include __DIR__ . '/../../includes/admin/admin_topbar.php'; ?>
 <div id="wrapper" class="admin-wrapper">
     <?php include __DIR__ . '/../../includes/admin/admin_sidebar.php'; ?>
-    <?php include '../../includes/admin/admin_header.php'; ?>
+    <?php include __DIR__ . '/../../includes/admin/admin_header.php'; ?>
     <section class="home-section" id="page-content-wrapper">
         <div class="container py-5">
             <div class="d-flex justify-content-between align-items-center mb-4">

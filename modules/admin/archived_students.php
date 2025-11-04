@@ -5,7 +5,7 @@ if (!isset($_SESSION['admin_username'])) {
     exit;
 }
 
-include '../../config/database.php';
+include __DIR__ . '/../../config/database.php';
 require_once '../../services/AuditLogger.php';
 
 // Get admin info
@@ -414,7 +414,7 @@ $statsQuery = "
 $statsResult = pg_query($connection, $statsQuery);
 $stats = pg_fetch_assoc($statsResult);
 ?>
-<?php $page_title='Archived Students'; $extra_css=['../../assets/css/admin/manage_applicants.css']; include '../../includes/admin/admin_head.php'; ?>
+<?php $page_title='Archived Students'; $extra_css=['../../assets/css/admin/manage_applicants.css']; include __DIR__ . '/../../includes/admin/admin_head.php'; ?>
 <style>
     :root {
         --primary-color: #2c3e50;
@@ -550,10 +550,10 @@ $stats = pg_fetch_assoc($statsResult);
     }
 </style>
 <body>
-<?php include '../../includes/admin/admin_topbar.php'; ?>
+<?php include __DIR__ . '/../../includes/admin/admin_topbar.php'; ?>
 <div id="wrapper" class="admin-wrapper">
-    <?php include '../../includes/admin/admin_sidebar.php'; ?>
-    <?php include '../../includes/admin/admin_header.php'; ?>
+    <?php include __DIR__ . '/../../includes/admin/admin_sidebar.php'; ?>
+    <?php include __DIR__ . '/../../includes/admin/admin_header.php'; ?>
 
     <section class="home-section" id="mainContent">
         <div class="container-fluid py-4 px-4">

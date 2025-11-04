@@ -139,7 +139,7 @@ $page_title = 'System Data Management';
 </head>
 <body>
 <div id="wrapper">
-    <?php include '../../includes/admin/admin_sidebar.php'; ?>
+    <?php include __DIR__ . '/../../includes/admin/admin_sidebar.php'; ?>
     <div class="sidebar-backdrop d-none" id="sidebar-backdrop"></div>
     <?php // Topbar / header (adds consistency with other admin pages)
           if (file_exists(__DIR__ . '/../../includes/admin/admin_topbar.php')) {

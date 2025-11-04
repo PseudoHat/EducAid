@@ -5,7 +5,7 @@ if (!isset($_SESSION['admin_username'])) {
     exit;
 }
 
-include '../../config/database.php';
+include __DIR__ . '/../../config/database.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['student_id'])) {
     $student_id = $_POST['student_id'];

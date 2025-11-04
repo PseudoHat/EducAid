@@ -216,7 +216,7 @@ if (!$isAjaxRequest) {
         ['href' => '../../website/landingpage.php', 'label' => '<i class="bi bi-house me-1"></i>Back to Home', 'active' => false]
     ];
     $simple_nav_style = true;
-    include '../../includes/website/navbar.php'; 
+    include __DIR__ . '/../../includes/website/navbar.php'; 
     // Hidden input to store the reCAPTCHA v3 token for final submission (non-AJAX form posts)
     ?>
     <input type="hidden" id="g-recaptcha-response" name="g-recaptcha-response" form="finalRegistrationForm" />

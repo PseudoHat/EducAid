@@ -316,7 +316,7 @@ $csrf_email_token = CSRFProtection::generateToken('email_otp_request');
 $csrf_password_token = CSRFProtection::generateToken('password_otp_request');
 ?>
 
-<?php $page_title = 'My Profile'; include '../../includes/admin/admin_head.php'; ?>
+<?php $page_title = 'My Profile'; include __DIR__ . '/../../includes/admin/admin_head.php'; ?>
 <style>
   /* Profile-specific styles */
   .profile-header {
@@ -533,10 +533,10 @@ $csrf_password_token = CSRFProtection::generateToken('password_otp_request');
   }
 </style>
 <body>
-<?php include '../../includes/admin/admin_topbar.php'; ?>
+<?php include __DIR__ . '/../../includes/admin/admin_topbar.php'; ?>
 <div id="wrapper" class="admin-wrapper">
   <?php include __DIR__ . '/../../includes/admin/admin_sidebar.php'; ?>
-  <?php include '../../includes/admin/admin_header.php'; ?>
+  <?php include __DIR__ . '/../../includes/admin/admin_header.php'; ?>
   
   <section class="home-section" id="page-content-wrapper">
     <div class="container-fluid px-4">

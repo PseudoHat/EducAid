@@ -8,7 +8,7 @@ if (!isset($_SESSION['student_id']) && !isset($_SESSION['admin_id'])) {
     exit;
 }
 
-include '../../config/database.php';
+include __DIR__ . '/../../config/database.php';
 
 // Get data from either GET (for AJAX fetch) or POST (for JSON body)
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {

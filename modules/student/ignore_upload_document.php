@@ -1,7 +1,7 @@
 <?php
-include '../../config/database.php';
+include __DIR__ . '/../../config/database.php';
 include 'debug_logger.php';
-include '../../includes/workflow_control.php';
+include __DIR__ . '/../../includes/workflow_control.php';
 // Lightweight JSON wrappers in case ext/json is unavailable in some environments
 if (!function_exists('safe_json_encode')) {
   function safe_json_encode($data) {

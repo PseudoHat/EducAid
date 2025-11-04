@@ -9,10 +9,10 @@ if (!isset($_SESSION['admin_username'])) {
     exit;
 }
 
-include '../../config/database.php';
-include '../../includes/permissions.php';
-include '../../includes/workflow_control.php';
-include '../../includes/CSRFProtection.php';
+include __DIR__ . '/../../config/database.php';
+include __DIR__ . '/../../includes/permissions.php';
+include __DIR__ . '/../../includes/workflow_control.php';
+include __DIR__ . '/../../includes/CSRFProtection.php';
 
 // Check if user is super admin
 $admin_role = getCurrentAdminRole($connection);
@@ -623,7 +623,7 @@ if ($current_year_check && pg_num_rows($current_year_check) > 0) {
 
 <!DOCTYPE html>
 <html lang="en">
-<?php $page_title='Distribution Control Center'; include '../../includes/admin/admin_head.php'; ?>
+<?php $page_title='Distribution Control Center'; include __DIR__ . '/../../includes/admin/admin_head.php'; ?>
 <style>
   /* Modern Distribution Control Styling */
   .control-header {
@@ -851,11 +851,11 @@ if ($current_year_check && pg_num_rows($current_year_check) > 0) {
   }
 </style>
 <body>
-<?php include '../../includes/admin/admin_topbar.php'; ?>
+<?php include __DIR__ . '/../../includes/admin/admin_topbar.php'; ?>
 
 <div id="wrapper" class="admin-wrapper">
-    <?php include '../../includes/admin/admin_sidebar.php'; ?>
-    <?php include '../../includes/admin/admin_header.php'; ?>
+    <?php include __DIR__ . '/../../includes/admin/admin_sidebar.php'; ?>
+    <?php include __DIR__ . '/../../includes/admin/admin_header.php'; ?>
     
     <section class="home-section" id="mainContent">
         <div class="container-fluid px-4">

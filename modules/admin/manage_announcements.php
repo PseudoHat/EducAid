@@ -259,7 +259,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // Check for success flag
 $posted = isset($_GET['posted']);
 ?>
-<?php $page_title='Manage Announcements'; $extra_css=['../../assets/css/admin/manage_announcements.css']; include '../../includes/admin/admin_head.php'; ?>
+<?php $page_title='Manage Announcements'; $extra_css=['../../assets/css/admin/manage_announcements.css']; include __DIR__ . '/../../includes/admin/admin_head.php'; ?>
 <style>
   .card:hover { transform:none!important; transition:none!important; }
   .card h5 { font-size:1.25rem; font-weight:600; color:#333; }
@@ -302,10 +302,10 @@ $posted = isset($_GET['posted']);
 </style>
 </head>
 <body>
-<?php include '../../includes/admin/admin_topbar.php'; ?>
+<?php include __DIR__ . '/../../includes/admin/admin_topbar.php'; ?>
 <div id="wrapper" class="admin-wrapper">
-  <?php include '../../includes/admin/admin_sidebar.php'; ?>
-  <?php include '../../includes/admin/admin_header.php'; ?>
+  <?php include __DIR__ . '/../../includes/admin/admin_sidebar.php'; ?>
+  <?php include __DIR__ . '/../../includes/admin/admin_header.php'; ?>
   <section class="home-section" id="mainContent">
   <div class="container-fluid py-4 px-4">
       <h2 class="fw-bold mb-4"><i class="bi bi-megaphone-fill text-primary me-2"></i>Manage Announcements</h2>

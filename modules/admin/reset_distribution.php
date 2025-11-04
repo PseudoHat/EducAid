@@ -257,10 +257,10 @@ $qr_stats = $qr_stats_result ? pg_fetch_assoc($qr_stats_result) : [
     </style>
 </head>
 <body>
-    <?php include '../../includes/admin/admin_topbar.php'; ?>
+    <?php include __DIR__ . '/../../includes/admin/admin_topbar.php'; ?>
     <div id="wrapper" class="admin-wrapper">
         <?php include __DIR__ . '/../../includes/admin/admin_sidebar.php'; ?>
-        <?php include '../../includes/admin/admin_header.php'; ?>
+        <?php include __DIR__ . '/../../includes/admin/admin_header.php'; ?>
         
         <section class="home-section" id="page-content-wrapper">
             <div class="container py-5">

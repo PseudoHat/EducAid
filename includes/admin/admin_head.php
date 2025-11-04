@@ -3,7 +3,7 @@
 // Usage:
 //   $page_title = 'Dashboard'; // optional
 //   $extra_css = ['../../assets/css/admin/manage_applicants.css']; // optional array of extra CSS hrefs
-// Then: include '../../includes/admin/admin_head.php';
+// Then: include __DIR__ . '/../../includes/admin/admin_head.php';
 if (!isset($page_title) || trim($page_title) === '') {
     $page_title = 'Admin';
 }

@@ -117,12 +117,12 @@ $filteredDistributions = array_filter($allDistributions, function($dist) use ($f
 
 $pageTitle = "Distribution Archives";
 ?>
-<?php $page_title='Distribution Archives'; include '../../includes/admin/admin_head.php'; ?>
+<?php $page_title='Distribution Archives'; include __DIR__ . '/../../includes/admin/admin_head.php'; ?>
 <body>
-<?php include '../../includes/admin/admin_topbar.php'; ?>
+<?php include __DIR__ . '/../../includes/admin/admin_topbar.php'; ?>
     <div id="wrapper" class="admin-wrapper">
         <?php include __DIR__ . '/../../includes/admin/admin_sidebar.php'; ?>
-        <?php include '../../includes/admin/admin_header.php'; ?>
+        <?php include __DIR__ . '/../../includes/admin/admin_header.php'; ?>
         <section class="home-section" id="mainContent">
             <div class="container-fluid py-4 px-4">
     <style>

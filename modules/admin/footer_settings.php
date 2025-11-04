@@ -80,7 +80,7 @@ $current_settings = $footerService->getCurrentSettings();
 // Page title and extra CSS
 $page_title = 'Footer Settings';
 $extra_css = [];
-include '../../includes/admin/admin_head.php';
+include __DIR__ . '/../../includes/admin/admin_head.php';
 ?>
 <style>
   /* Footer Settings Page Styling */
@@ -195,11 +195,11 @@ include '../../includes/admin/admin_head.php';
   }
 </style>
 <body class="footer-settings-page">
-  <?php include '../../includes/admin/admin_topbar.php'; ?>
+  <?php include __DIR__ . '/../../includes/admin/admin_topbar.php'; ?>
   
   <div id="wrapper" class="admin-wrapper">
-    <?php include '../../includes/admin/admin_sidebar.php'; ?>
-    <?php include '../../includes/admin/admin_header.php'; ?>
+    <?php include __DIR__ . '/../../includes/admin/admin_sidebar.php'; ?>
+    <?php include __DIR__ . '/../../includes/admin/admin_header.php'; ?>
 
     <section class="home-section" id="mainContent">
       <div class="container-fluid py-4 px-4">
@@ -586,11 +586,11 @@ include '../../includes/admin/admin_head.php';
 </body>
 </html>
 <body>
-  <?php include '../../includes/admin/admin_topbar.php'; ?>
+  <?php include __DIR__ . '/../../includes/admin/admin_topbar.php'; ?>
   
   <div id="wrapper" class="admin-wrapper">
-    <?php include '../../includes/admin/admin_sidebar.php'; ?>
-    <?php include '../../includes/admin/admin_header.php'; ?>
+    <?php include __DIR__ . '/../../includes/admin/admin_sidebar.php'; ?>
+    <?php include __DIR__ . '/../../includes/admin/admin_header.php'; ?>
 
     <section class="home-section" id="mainContent">
       <div class="container-fluid py-4 px-4">

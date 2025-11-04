@@ -807,7 +807,7 @@ if (!$isAjaxRequest) {
         </script>
 </head>
 <body class="registration-page has-header-offset">
-    <?php include '../../includes/website/topbar.php'; ?>
+    <?php include __DIR__ . '/../../includes/website/topbar.php'; ?>
 
     <?php 
     $custom_brand_config = [
@@ -828,7 +828,7 @@ if (!$isAjaxRequest) {
         ]
     ];
     $simple_nav_style = true;
-    include '../../includes/website/navbar.php'; 
+    include __DIR__ . '/../../includes/website/navbar.php'; 
     // Hidden input to store the reCAPTCHA v3 token for final submission (non-AJAX form posts)
     ?>
     <input type="hidden" id="g-recaptcha-response" name="g-recaptcha-response" form="finalRegistrationForm" />

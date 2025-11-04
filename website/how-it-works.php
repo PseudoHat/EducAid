@@ -38,7 +38,7 @@ if ($is_super_admin && isset($_GET['edit']) && $_GET['edit'] == '1') { $IS_EDIT_
         'page_title' => 'How It Works Page',
         'exit_url' => 'how-it-works.php'
       ];
-      include '../includes/website/edit_toolbar.php';
+      include __DIR__ . '/../includes/website/edit_toolbar.php';
     ?>
   <?php endif; ?>
 
@@ -53,9 +53,9 @@ if ($is_super_admin && isset($_GET['edit']) && $_GET['edit'] == '1') { $IS_EDIT_
     ['href' => 'contact.php', 'label' => 'Contact', 'active' => false]
   ];
   
-  include '../includes/website/topbar.php';
-  include '../includes/website/navbar.php';
-  include '../includes/website/cookie_consent.php';
+  include __DIR__ . '/../includes/website/topbar.php';
+  include __DIR__ . '/../includes/website/navbar.php';
+  include __DIR__ . '/../includes/website/cookie_consent.php';
   ?>
 
   <!-- Hero Section -->

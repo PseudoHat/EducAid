@@ -843,7 +843,7 @@ $csrf_confirm_token = CSRFProtection::generateToken('confirm_distribution');
 $csrf_complete_token = CSRFProtection::generateToken('complete_distribution');
 ?>
 
-<?php $page_title='QR Code Scanner'; include '../../includes/admin/admin_head.php'; ?>
+<?php $page_title='QR Code Scanner'; include __DIR__ . '/../../includes/admin/admin_head.php'; ?>
   <style>
     body { font-family: 'Poppins', sans-serif; }
     #reader { 
@@ -882,10 +882,10 @@ $csrf_complete_token = CSRFProtection::generateToken('complete_distribution');
   </style>
   </head>
 <body>
-  <?php include '../../includes/admin/admin_topbar.php'; ?>
+  <?php include __DIR__ . '/../../includes/admin/admin_topbar.php'; ?>
   <div id="wrapper" class="admin-wrapper">
     <?php include __DIR__ . '/../../includes/admin/admin_sidebar.php'; ?>
-    <?php include '../../includes/admin/admin_header.php'; ?>
+    <?php include __DIR__ . '/../../includes/admin/admin_header.php'; ?>
     <section class="home-section" id="page-content-wrapper">
       <div class="container py-5">
         <div class="d-flex justify-content-between align-items-center mb-4">

@@ -179,7 +179,7 @@ if (empty($preview_text_color)) {
   $preview_text_color = $defaults['topbar_text_color'] ?? '#ffffff';
 }
 ?>
-<?php $page_title='Topbar Settings'; $extra_css=[]; include '../../includes/admin/admin_head.php'; ?>
+<?php $page_title='Topbar Settings'; $extra_css=[]; include __DIR__ . '/../../includes/admin/admin_head.php'; ?>
 <style>
   /* Page-specific styling (scoped where possible) */
   body.topbar-settings-page .settings-card {
@@ -208,11 +208,11 @@ if (empty($preview_text_color)) {
   }
 </style>
 <body class="topbar-settings-page">
-  <?php include '../../includes/admin/admin_topbar.php'; ?>
+  <?php include __DIR__ . '/../../includes/admin/admin_topbar.php'; ?>
   
   <div id="wrapper" class="admin-wrapper">
-    <?php include '../../includes/admin/admin_sidebar.php'; ?>
-    <?php include '../../includes/admin/admin_header.php'; ?>
+    <?php include __DIR__ . '/../../includes/admin/admin_sidebar.php'; ?>
+    <?php include __DIR__ . '/../../includes/admin/admin_header.php'; ?>
 
     <section class="home-section" id="mainContent">
       <div class="container-fluid py-4 px-4">

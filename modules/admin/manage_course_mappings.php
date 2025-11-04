@@ -274,7 +274,7 @@ $statsResult = pg_query($connection, $statsQuery);
 $stats = pg_fetch_assoc($statsResult);
 ?>
 
-<?php $page_title = 'Manage Course Mappings'; include '../../includes/admin/admin_head.php'; ?>
+<?php $page_title = 'Manage Course Mappings'; include __DIR__ . '/../../includes/admin/admin_head.php'; ?>
 <style>
     .stats-card {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -352,10 +352,10 @@ $stats = pg_fetch_assoc($statsResult);
 </style>
 </head>
 <body>
-    <?php include '../../includes/admin/admin_topbar.php'; ?>
+    <?php include __DIR__ . '/../../includes/admin/admin_topbar.php'; ?>
     <div id="wrapper" class="admin-wrapper">
-        <?php include '../../includes/admin/admin_sidebar.php'; ?>
-        <?php include '../../includes/admin/admin_header.php'; ?>
+        <?php include __DIR__ . '/../../includes/admin/admin_sidebar.php'; ?>
+        <?php include __DIR__ . '/../../includes/admin/admin_header.php'; ?>
         
         <section class="home-section" id="mainContent">
             <div class="container-fluid py-4 px-4">

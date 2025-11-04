@@ -139,7 +139,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 ?>
-<?php $page_title='Settings'; $extra_css=[]; include '../../includes/admin/admin_head.php'; ?>
+<?php $page_title='Settings'; $extra_css=[]; include __DIR__ . '/../../includes/admin/admin_head.php'; ?>
 <style>
     td button.btn-outline-danger {
       padding: 4px 8px;
@@ -150,10 +150,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   </style>
 </head>
 <body>
-<?php include '../../includes/admin/admin_topbar.php'; ?>
+<?php include __DIR__ . '/../../includes/admin/admin_topbar.php'; ?>
 <div id="wrapper" class="admin-wrapper">
-  <?php include '../../includes/admin/admin_sidebar.php'; ?>
-  <?php include '../../includes/admin/admin_header.php'; ?>
+  <?php include __DIR__ . '/../../includes/admin/admin_sidebar.php'; ?>
+  <?php include __DIR__ . '/../../includes/admin/admin_header.php'; ?>
   <section class="home-section" id="mainContent">
   <div class="container-fluid py-4 px-4">
       <h4 class="fw-bold mb-4"><i class="bi bi-gear me-2 text-primary"></i>Settings</h4>

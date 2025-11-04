@@ -48,12 +48,12 @@ $storagePercent = ($totalStorage / $maxStorageBytes) * 100;
 
 $pageTitle = "Storage Dashboard";
 ?>
-<?php $page_title='Storage Dashboard'; include '../../includes/admin/admin_head.php'; ?>
+<?php $page_title='Storage Dashboard'; include __DIR__ . '/../../includes/admin/admin_head.php'; ?>
 <body>
-<?php include '../../includes/admin/admin_topbar.php'; ?>
+<?php include __DIR__ . '/../../includes/admin/admin_topbar.php'; ?>
     <div id="wrapper" class="admin-wrapper">
         <?php include __DIR__ . '/../../includes/admin/admin_sidebar.php'; ?>
-        <?php include '../../includes/admin/admin_header.php'; ?>
+        <?php include __DIR__ . '/../../includes/admin/admin_header.php'; ?>
         <section class="home-section" id="mainContent">
             <div class="container-fluid py-4 px-4">
                 <div class="d-flex justify-content-between align-items-center mb-4">

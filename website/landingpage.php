@@ -163,8 +163,8 @@ function lp_block_style($key){
     ['href' => 'contact.php', 'label' => 'Contact', 'active' => false]
   ];
   
-  include '../includes/website/topbar.php';
-  include '../includes/website/navbar.php';
+  include __DIR__ . '/../includes/website/topbar.php';
+  include __DIR__ . '/../includes/website/navbar.php';
   ?>
   <?php if ($IS_EDIT_MODE): ?>
     <?php
@@ -172,7 +172,7 @@ function lp_block_style($key){
         'page_title' => 'Landing Page',
         'exit_url' => 'landingpage.php'
       ];
-      include '../includes/website/edit_toolbar.php';
+      include __DIR__ . '/../includes/website/edit_toolbar.php';
     ?>
   <?php endif; ?>
 
@@ -600,7 +600,7 @@ function lp_block_style($key){
   <!-- Footer - Dynamic CMS Controlled -->
   <?php include __DIR__ . '/../includes/website/footer.php'; ?>
 
-  <?php include '../includes/website/cookie_consent.php'; ?>
+  <?php include __DIR__ . '/../includes/website/cookie_consent.php'; ?>
 
   <!-- Chatbot Widget -->
 <div class="ea-chat">
