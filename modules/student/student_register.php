@@ -2994,11 +2994,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processGradesOcr'])) 
         } else {
             // Enhanced image processing via OCR service
             try {
-                // Include the enhanced OCR service
-                // changed  to _Safe to prevent errors if service is missing
+                // Include the Safe version (no Imagick dependency, uses GD only)
                 require_once __DIR__ . '/../../services/OCRProcessingService_Safe.php';
                 
-                $ocrProcessor = new OCRProcessingService([
+                $ocrProcessor = new OCRProcessingServiceSafe([
                     'tesseract_path' => 'tesseract',
                     'temp_dir' => $uploadDir, // Use grades temp dir directly
                     'max_file_size' => 10 * 1024 * 1024,

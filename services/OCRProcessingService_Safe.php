@@ -1,10 +1,11 @@
 <?php
 /**
- * OCR Processing Service (Imagick-Safe Version)
+ * OCR Processing Service (Safe Version - Without Imagick dependency)
  * Handles document processing using Tesseract OCR with optional image preprocessing
+ * Uses GD instead of Imagick for broader compatibility
  */
 
-class OCRProcessingService {
+class OCRProcessingServiceSafe {
     private $tesseractPath;
     private $tempDir;
     private $maxFileSize;
