@@ -1611,6 +1611,17 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processIdPictureOcr']
     // OCR Processing
     $fileExtension = strtolower(pathinfo($targetPath, PATHINFO_EXTENSION));
     
+    // Check if Tesseract is installed
+    $tesseractCheck = @shell_exec('tesseract --version 2>&1');
+    if (empty($tesseractCheck) || stripos($tesseractCheck, 'tesseract') === false) {
+        echo json_encode([
+            'status' => 'error',
+            'message' => 'OCR service (Tesseract) is not available on this server. Please contact the administrator to install Tesseract OCR.',
+            'debug' => 'Tesseract not found in system PATH'
+        ]);
+        exit;
+    }
+    
     if ($fileExtension === 'pdf') {
         // Try PDF text extraction
         $pdfTextCommand = "pdftotext " . escapeshellarg($targetPath) . " - 2>nul";
