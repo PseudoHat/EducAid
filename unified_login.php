@@ -398,9 +398,12 @@ if (
         $mail->Body = generateOTPEmailTemplate($otp, $recipient_name, 'login');
 
         $mail->send();
+        error_log('Login OTP - email sent successfully to ' . $em);
         echo json_encode(['status'=>'otp_sent','message'=>'OTP sent to your email.']);
     } catch (Exception $e) {
-        echo json_encode(['status'=>'error','message'=>'Could not send OTP.']);
+        error_log('Login OTP - mail send FAILED for ' . $em . '. Exception: ' . $e->getMessage());
+        error_log('Login OTP - PHPMailer error info: ' . $mail->ErrorInfo);
+        echo json_encode(['status'=>'error','message'=>'Could not send OTP: ' . $e->getMessage()]);
     }
     exit;
 }
