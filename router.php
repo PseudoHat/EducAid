@@ -29,8 +29,15 @@ if (file_exists($fileInWebsite) && !is_dir($fileInWebsite)) {
     return false;
 }
 
-// Also check in repo root for assets (some may be referenced from root)
+// Check in repo root for PHP files (like unified_login.php, etc.)
 $fileInRoot = __DIR__ . $requestUri;
+if (file_exists($fileInRoot) && pathinfo($fileInRoot, PATHINFO_EXTENSION) === 'php') {
+    chdir(__DIR__);
+    require $fileInRoot;
+    return true;
+}
+
+// Also check in repo root for other assets
 if (file_exists($fileInRoot) && !is_dir($fileInRoot)) {
     return false;
 }
