@@ -5216,7 +5216,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['register'])) {
         echo "<script>alert('Registration failed due to a database error: " . addslashes($error) . "'); window.location.href = window.location.href;</script>";
         exit;
     }
-}
 
 // Only output main registration HTML for non-AJAX requests
 if (!$isAjaxRequest) {
