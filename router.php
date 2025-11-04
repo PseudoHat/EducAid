@@ -29,6 +29,22 @@ if (file_exists($fileInWebsite) && !is_dir($fileInWebsite)) {
     return false;
 }
 
+// Check in modules directory for PHP files
+// e.g., /signup_test.php -> modules/admin/signup_test.php
+$possibleModulePaths = [
+    __DIR__ . '/modules/admin' . $requestUri,
+    __DIR__ . '/modules/student' . $requestUri,
+    __DIR__ . '/modules/super_admin' . $requestUri,
+];
+
+foreach ($possibleModulePaths as $modulePath) {
+    if (file_exists($modulePath) && pathinfo($modulePath, PATHINFO_EXTENSION) === 'php') {
+        chdir(dirname($modulePath));
+        require $modulePath;
+        return true;
+    }
+}
+
 // Check in repo root for PHP files (like unified_login.php, etc.)
 $fileInRoot = __DIR__ . $requestUri;
 if (file_exists($fileInRoot) && pathinfo($fileInRoot, PATHINFO_EXTENSION) === 'php') {
