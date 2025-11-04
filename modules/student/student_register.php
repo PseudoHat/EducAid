@@ -1761,7 +1761,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processIdPictureOcr']
         }
         
         // Apply fuzzy transformations for common OCR errors
-        $fuzzyNeedle = applyFuzzyTransforms($needle);
+        $fuzzyNeedle = applyFuzzyTransforms($needle)
         foreach ($fuzzyNeedle as $variant) {
             if (stripos($haystack, $variant) !== false) {
                 return 95; // Fuzzy match, slightly lower than exact
@@ -2995,7 +2995,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processGradesOcr'])) 
             // Enhanced image processing via OCR service
             try {
                 // Include the enhanced OCR service
-                require_once __DIR__ . '/../../services/OCRProcessingService.php';
+                // changed  to _Safe to prevent errors if service is missing
+                require_once __DIR__ . '/../../services/OCRProcessingService_Safe.php';
                 
                 $ocrProcessor = new OCRProcessingService([
                     'tesseract_path' => 'tesseract',
