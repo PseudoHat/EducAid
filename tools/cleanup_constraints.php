@@ -23,20 +23,39 @@ if ($provided_token !== $required_token || $required_token === 'CHANGE_ME_IN_RAI
 // Get action (detect or cleanup)
 $action = $_GET['action'] ?? 'detect';
 
-// Database connection
-require_once __DIR__ . '/../config/database.php';
+// Database connection using same logic as database.php
+$databaseUrl = getenv('DATABASE_PUBLIC_URL');
 
-$db_host = getenv('DB_HOST') ?: 'localhost';
-$db_port = getenv('DB_PORT') ?: '5432';
-$db_name = getenv('DB_NAME') ?: 'educaid';
-$db_user = getenv('DB_USER') ?: 'postgres';
-$db_pass = getenv('DB_PASSWORD') ?: '';
+if ($databaseUrl) {
+    // Parse DATABASE_PUBLIC_URL from Railway
+    $parts = parse_url($databaseUrl);
+    $db_host = $parts['host'] ?? 'localhost';
+    $db_port = $parts['port'] ?? 5432;
+    $db_name = ltrim($parts['path'] ?? '/railway', '/');
+    $db_user = $parts['user'] ?? 'postgres';
+    $db_pass = $parts['pass'] ?? '';
+} else {
+    // Fallback to individual env vars
+    $db_host = getenv('DB_HOST') ?: 'localhost';
+    $db_port = getenv('DB_PORT') ?: '5432';
+    $db_name = getenv('DB_NAME') ?: 'educaid';
+    $db_user = getenv('DB_USER') ?: 'postgres';
+    $db_pass = getenv('DB_PASSWORD') ?: '';
+}
 
-$conn_string = "host=$db_host port=$db_port dbname=$db_name user=$db_user password=$db_pass";
-$conn = pg_connect($conn_string);
+$conn_string = sprintf(
+    'host=%s port=%s dbname=%s user=%s password=%s connect_timeout=10',
+    $db_host,
+    $db_port,
+    $db_name,
+    $db_user,
+    $db_pass
+);
+
+$conn = @pg_connect($conn_string);
 
 if (!$conn) {
-    die('Database connection failed: ' . pg_last_error());
+    die('Database connection failed. Check Railway DATABASE_PUBLIC_URL or DB_* environment variables.');
 }
 
 echo "<html><head><title>Database Constraint Cleanup</title></head><body>";
