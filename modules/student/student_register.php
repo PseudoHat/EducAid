@@ -3961,20 +3961,29 @@ function validatePerSubjectGrades($universityKey, $uploadedFile = null, $subject
         require_once __DIR__ . '/../../services/GradeValidationService.php';
         require_once __DIR__ . '/../../services/OCRProcessingService.php';
         
-        // Initialize services with PDO connection for grade validation
-        $dbHost = getenv('DB_HOST') ?: 'localhost';
-        $dbName = getenv('DB_NAME') ?: 'educaid';
-        $dbUser = getenv('DB_USER') ?: 'postgres';
-        $dbPass = getenv('DB_PASSWORD') ?: '';
-        $dbPort = getenv('DB_PORT') ?: '5432';
-        
-        try {
-            $pdoConnection = new PDO("pgsql:host=$dbHost;port=$dbPort;dbname=$dbName", $dbUser, $dbPass);
-            $pdoConnection->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-        } catch (Exception $e) {
-            error_log("PDO Connection error: " . $e->getMessage());
-            throw new Exception("Database connection failed for grade validation");
+        // Convert existing pg_connect resource to PDO for GradeValidationService
+        // Parse DATABASE_PUBLIC_URL from config/database.php connection
+        $databaseUrl = getenv('DATABASE_PUBLIC_URL');
+        if ($databaseUrl) {
+            // Parse postgresql://user:pass@host:port/dbname
+            $parts = parse_url($databaseUrl);
+            $dbHost = $parts['host'] ?? 'localhost';
+            $dbPort = $parts['port'] ?? 5432;
+            $dbName = ltrim($parts['path'] ?? 'railway', '/');
+            $dbUser = $parts['user'] ?? 'postgres';
+            $dbPass = $parts['pass'] ?? '';
+            
+            try {
+                $pdoConnection = new PDO("pgsql:host=$dbHost;port=$dbPort;dbname=$dbName", $dbUser, $dbPass);
+                $pdoConnection->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+            } catch (Exception $e) {
+                error_log("PDO Connection error: " . $e->getMessage());
+                throw new Exception("Database connection failed for grade validation");
+            }
+        } else {
+            throw new Exception("DATABASE_PUBLIC_URL not found");
         }
+        
         $gradeValidator = new GradeValidationService($pdoConnection);
         $ocrProcessor = new OCRProcessingService([
             'tesseract_path' => 'tesseract',
