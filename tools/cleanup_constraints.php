@@ -164,29 +164,40 @@ if ($action === 'detect') {
     try {
         $total_deleted = 0;
         
+        // Helper function to safely delete orphaned records
+        $safe_delete = function($table_name) use ($conn, &$total_deleted) {
+            // Check if table exists first
+            $check = pg_query($conn, "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = '$table_name')");
+            $exists = pg_fetch_result($check, 0, 0);
+            
+            if ($exists === 't' || $exists === true) {
+                $result = @pg_query($conn, "DELETE FROM $table_name WHERE student_id NOT IN (SELECT student_id FROM students)");
+                if ($result) {
+                    $deleted = pg_affected_rows($result);
+                    echo "<p>✓ Deleted $deleted orphaned records from <strong>$table_name</strong></p>";
+                    $total_deleted += $deleted;
+                    return $deleted;
+                } else {
+                    echo "<p>⚠ Skipped $table_name (error: " . pg_last_error($conn) . ")</p>";
+                    return 0;
+                }
+            } else {
+                echo "<p>ℹ Skipped $table_name (table does not exist)</p>";
+                return 0;
+            }
+        };
+        
         // 1. Delete orphaned documents
-        $result = pg_query($conn, "DELETE FROM documents WHERE student_id NOT IN (SELECT student_id FROM students)");
-        $deleted = pg_affected_rows($result);
-        echo "<p>✓ Deleted $deleted orphaned documents</p>";
-        $total_deleted += $deleted;
+        $safe_delete('documents');
         
         // 2. Delete orphaned distributions
-        $result = pg_query($conn, "DELETE FROM distributions WHERE student_id NOT IN (SELECT student_id FROM students)");
-        $deleted = pg_affected_rows($result);
-        echo "<p>✓ Deleted $deleted orphaned distributions</p>";
-        $total_deleted += $deleted;
+        $safe_delete('distributions');
         
         // 3. Delete orphaned qr_logs
-        $result = pg_query($conn, "DELETE FROM qr_logs WHERE student_id NOT IN (SELECT student_id FROM students)");
-        $deleted = pg_affected_rows($result);
-        echo "<p>✓ Deleted $deleted orphaned qr_logs</p>";
-        $total_deleted += $deleted;
+        $safe_delete('qr_logs');
         
         // 4. Delete orphaned grade_uploads
-        $result = pg_query($conn, "DELETE FROM grade_uploads WHERE student_id NOT IN (SELECT student_id FROM students)");
-        $deleted = pg_affected_rows($result);
-        echo "<p>✓ Deleted $deleted orphaned grade_uploads</p>";
-        $total_deleted += $deleted;
+        $safe_delete('grade_uploads');
         
         echo "<hr>";
         
