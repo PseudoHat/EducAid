@@ -321,45 +321,8 @@
             });
         }
 
-        // Forgot Password Form Handler
-        const forgotForm = document.getElementById('forgotForm');
-        if (forgotForm) {
-            forgotForm.addEventListener('submit', function(e) {
-                e.preventDefault();
-                
-                const email = document.getElementById('forgot_email').value.trim();
-                
-                if (!email || !isValidEmail(email)) {
-                    showMessage('Please enter a valid email address.', 'danger');
-                    return;
-                }
-                
-                const formData = new FormData();
-                formData.append('forgot_action', 'send_otp');
-                formData.append('forgot_email', email);
-                
-                const submitBtn = this.querySelector('button[type="submit"]');
-                const originalText = submitBtn.innerHTML;
-
-                setButtonLoading(submitBtn, true);
-
-                makeRequest('unified_login.php', formData,
-                    function(data) {
-                        setButtonLoading(submitBtn, false, originalText);
-                        
-                        if (data.status === 'success') {
-                            showForgotStep2();
-                            showMessage('Reset code sent to your email!', 'success');
-                        } else {
-                            showMessage(data.message, 'danger');
-                        }
-                    },
-                    function(error) {
-                        setButtonLoading(submitBtn, false, originalText);
-                    }
-                );
-            });
-        }
+        // Forgot Password Form Handler - NO EVENT LISTENER
+        // The reCAPTCHA modal handler in unified_login.php will handle this instead
 
         // Forgot Password OTP Form Handler
         const forgotOtpForm = document.getElementById('forgotOtpForm');
