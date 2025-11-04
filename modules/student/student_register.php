@@ -4697,19 +4697,22 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['register'])) {
     }
 
     // Check if student_id already exists in related tables (orphaned records from manual deletion)
-    // Only check tables that exist
-    $orphanCheck = @pg_query_params($connection, "SELECT 
+    $orphanCheck = pg_query_params($connection, "SELECT 
         (SELECT COUNT(*) FROM documents WHERE student_id = $1) as doc_count,
-        (SELECT COUNT(*) FROM qr_logs WHERE student_id = $1) as qr_count", [$student_id]);
+        (SELECT COUNT(*) FROM distributions WHERE student_id = $1) as dist_count,
+        (SELECT COUNT(*) FROM qr_logs WHERE student_id = $1) as qr_count,
+        (SELECT COUNT(*) FROM grade_uploads WHERE student_id = $1) as grade_count", [$student_id]);
     
     if ($orphanCheck) {
         $orphans = pg_fetch_assoc($orphanCheck);
-        if ($orphans['doc_count'] > 0 || $orphans['qr_count'] > 0) {
+        if ($orphans['doc_count'] > 0 || $orphans['dist_count'] > 0 || $orphans['qr_count'] > 0 || $orphans['grade_count'] > 0) {
             error_log("WARNING: Orphaned records found for student_id $student_id");
-            error_log("Documents: {$orphans['doc_count']}, QR Logs: {$orphans['qr_count']}");
+            error_log("Documents: {$orphans['doc_count']}, Distributions: {$orphans['dist_count']}, QR Logs: {$orphans['qr_count']}, Grades: {$orphans['grade_count']}");
             // Clean up orphaned records
-            @pg_query_params($connection, "DELETE FROM documents WHERE student_id = $1", [$student_id]);
-            @pg_query_params($connection, "DELETE FROM qr_logs WHERE student_id = $1", [$student_id]);
+            pg_query_params($connection, "DELETE FROM documents WHERE student_id = $1", [$student_id]);
+            pg_query_params($connection, "DELETE FROM distributions WHERE student_id = $1", [$student_id]);
+            pg_query_params($connection, "DELETE FROM qr_logs WHERE student_id = $1", [$student_id]);
+            pg_query_params($connection, "DELETE FROM grade_uploads WHERE student_id = $1", [$student_id]);
             error_log("Cleaned up orphaned records for $student_id");
         }
     }
@@ -4750,43 +4753,28 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['register'])) {
         $slot_id,
         $school_student_id,  // School/University-issued ID number
         $course,             // Course/Program from OCR
-        $course_verified ? 'true' : 'false'  // Convert boolean to PostgreSQL boolean string
+        $course_verified ? 't' : 'f'  // PostgreSQL boolean: 't' for true, 'f' for false
     ]);
 
     if (!$result) {
         $error = pg_last_error($connection);
         $errorDetail = error_get_last();
-        
-        // Try to get more detailed error using pg_result_error
-        $detailedError = '';
-        if (function_exists('pg_result_error_field')) {
-            $detailedError = @pg_result_error_field($result, PGSQL_DIAG_MESSAGE_PRIMARY);
-        }
-        
-        error_log("===========================================");
         error_log("DATABASE INSERT FAILED!");
-        error_log("===========================================");
-        error_log("PostgreSQL Error (pg_last_error): " . ($error ?: 'No error message'));
-        error_log("PostgreSQL Detailed Error: " . ($detailedError ?: 'Not available'));
+        error_log("PostgreSQL Error: " . ($error ?: 'No error message'));
         error_log("PHP Error: " . json_encode($errorDetail));
-        error_log("Connection Status: " . (pg_connection_status($connection) === PGSQL_CONNECTION_OK ? 'OK' : 'BAD'));
         
         // Check for constraint violations manually
-        $violations = [];
-        $checkEmail = @pg_query_params($connection, "SELECT student_id FROM students WHERE email = $1 LIMIT 1", [$email]);
-        $checkMobile = @pg_query_params($connection, "SELECT student_id FROM students WHERE mobile = $1 LIMIT 1", [$mobile]);
-        $checkSchoolId = @pg_query_params($connection, "SELECT student_id FROM students WHERE school_student_id = $1 AND university_id = $2 LIMIT 1", [$school_student_id, $university]);
+        $checkEmail = pg_query_params($connection, "SELECT student_id FROM students WHERE email = $1 LIMIT 1", [$email]);
+        $checkMobile = pg_query_params($connection, "SELECT student_id FROM students WHERE mobile = $1 LIMIT 1", [$mobile]);
+        $checkSchoolId = pg_query_params($connection, "SELECT student_id FROM students WHERE school_student_id = $1 AND university_id = $2 LIMIT 1", [$school_student_id, $university]);
         
         if ($checkEmail && pg_num_rows($checkEmail) > 0) {
-            $violations[] = "Email '$email' already exists";
             error_log("CONSTRAINT VIOLATION: Email '$email' already exists in database");
         }
         if ($checkMobile && pg_num_rows($checkMobile) > 0) {
-            $violations[] = "Mobile '$mobile' already exists";
             error_log("CONSTRAINT VIOLATION: Mobile '$mobile' already exists in database");
         }
         if ($checkSchoolId && pg_num_rows($checkSchoolId) > 0) {
-            $violations[] = "School ID '$school_student_id' already exists";
             error_log("CONSTRAINT VIOLATION: School Student ID '$school_student_id' already exists for this university");
         }
         
@@ -4797,21 +4785,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['register'])) {
             'email' => $email,
             'mobile' => $mobile,
             'school_student_id' => $school_student_id,
-            'course' => $course,
-            'bdate' => $bdate,
-            'barangay' => $barangay,
-            'university' => $university,
-            'year_level' => $year_level
+            'course' => $course
         ]));
-        error_log("===========================================");
-        
-        // If we found constraint violations, return specific error message
-        if (!empty($violations)) {
-            json_response([
-                'status' => 'error',
-                'message' => 'Registration failed: ' . implode(', ', $violations)
-            ]);
-        }
     } else {
         error_log("✓ Student inserted successfully into database");
     }
@@ -5091,7 +5066,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['register'])) {
                         error_log("✓ UnifiedFileService: Saved Letter - " . $saveResult['document_id']);
                     } else {
                         error_log("✗ UnifiedFileService: Failed to save Letter - " . ($saveResult['error'] ?? 'Unknown error'));
-                    }   error_log("UnifiedFileService: Failed to save Letter - " . ($saveResult['error'] ?? 'Unknown error'));
                     }
 
                     @unlink($letterTempFile);
