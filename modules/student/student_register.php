@@ -784,26 +784,40 @@ if (!$isAjaxRequest) {
         }
         </style>
         <!-- reCAPTCHA v3 -->
-        <script src="https://www.google.com/recaptcha/api.js?render=<?php echo RECAPTCHA_SITE_KEY; ?>"></script>
+        <script src="https://www.google.com/recaptcha/api.js?render=<?php echo RECAPTCHA_SITE_KEY; ?>" async defer></script>
         <script>window.RECAPTCHA_SITE_KEY = '<?php echo RECAPTCHA_SITE_KEY; ?>';</script>
         <script>
             // Acquire token as early as possible and refresh periodically (v3 tokens expire quickly)
             let recaptchaToken = '';
             function executeRecaptcha(){
-                if (typeof grecaptcha === 'undefined') return;
+                if (typeof grecaptcha === 'undefined' || !grecaptcha.execute) {
+                    console.log('grecaptcha not ready yet, will retry...');
+                    return;
+                }
                 grecaptcha.execute('<?php echo RECAPTCHA_SITE_KEY; ?>', {action: 'register'}).then(function(token){
                     recaptchaToken = token;
                     const hidden = document.getElementById('g-recaptcha-response');
                     if (hidden) hidden.value = token;
+                }).catch(function(error) {
+                    console.error('reCAPTCHA execution error:', error);
                 });
             }
-            window.addEventListener('DOMContentLoaded', function(){
-                grecaptcha.ready(function(){
-                    executeRecaptcha();
-                    // refresh token every 90 seconds
-                    setInterval(executeRecaptcha, 90000);
-                });
-            });
+            
+            // Wait for both DOM and grecaptcha to be ready
+            function initRecaptcha() {
+                if (typeof grecaptcha !== 'undefined' && grecaptcha.ready) {
+                    grecaptcha.ready(function(){
+                        executeRecaptcha();
+                        // refresh token every 90 seconds
+                        setInterval(executeRecaptcha, 90000);
+                    });
+                } else {
+                    // Retry if grecaptcha not loaded yet
+                    setTimeout(initRecaptcha, 100);
+                }
+            }
+            
+            window.addEventListener('DOMContentLoaded', initRecaptcha);
         </script>
 </head>
 <body class="registration-page has-header-offset">

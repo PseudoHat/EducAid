@@ -3,8 +3,9 @@
 require_once __DIR__ . '/env.php';
 
 // Allow fallbacks (e.g., test keys) if not set; encourage overriding in .env
-$siteKey   = getenv('RECAPTCHA_SITE_KEY')   ?: '6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI'; // Test key
-$secretKey = getenv('RECAPTCHA_SECRET_KEY') ?: '6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4WifJWe'; // Test secret
+// Check for both RECAPTCHA_V3_* and RECAPTCHA_* variable names
+$siteKey   = getenv('RECAPTCHA_V3_SITE_KEY') ?: getenv('RECAPTCHA_SITE_KEY') ?: '6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI'; // Test key
+$secretKey = getenv('RECAPTCHA_V3_SECRET_KEY') ?: getenv('RECAPTCHA_SECRET_KEY') ?: '6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4WifJWe'; // Test secret
 
 // Optional: separate v2 keys (if you use v2 widget alongside v3)
 $v2SiteKey   = getenv('RECAPTCHA_V2_SITE_KEY')   ?: $siteKey;
