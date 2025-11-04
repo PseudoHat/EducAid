@@ -12,8 +12,8 @@ if (!function_exists('pg_connect')) {
     die('Server error: PostgreSQL extension not available. Contact administrator.');
 }
 
-// Prefer DATABASE_URL (Railway standard), then individual env vars, then local fallback
-$databaseUrl = getenv('DATABASE_URL');
+// Prefer DATABASE_URL or DATABASE_PUBLIC_URL (Railway), then individual env vars, then local fallback
+$databaseUrl = getenv('DATABASE_URL') ?: getenv('DATABASE_PUBLIC_URL');
 if ($databaseUrl) {
     // Parse DATABASE_URL: postgresql://user:pass@host:port/dbname
     $parts = parse_url($databaseUrl);
