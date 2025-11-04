@@ -2,7 +2,7 @@
 /**
  * generate_and_apply_theme.php
  * AJAX endpoint to generate and apply theme colors from primary/secondary colors
- * Applies to sidebar and topbar themes (universal across all pages)
+ * Applies to sidebar, topbar, and footer themes (universal across all pages)
  */
 
 session_start();
@@ -10,6 +10,7 @@ require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../includes/permissions.php';
 require_once __DIR__ . '/../../includes/CSRFProtection.php';
 require_once __DIR__ . '/../../services/ThemeGeneratorService.php';
+require_once __DIR__ . '/../../services/FooterThemeService.php';
 
 // Prevent any output before JSON
 ob_start();
@@ -104,6 +105,29 @@ try {
         exit;
     }
 
+    // Also generate and apply footer theme colors
+    error_log("THEME GEN: Starting footer theme generation...");
+    $footerService = new FooterThemeService($connection);
+    $footerColors = $footerService->generateFromTheme(
+        $municipality['primary_color'],
+        $municipality['secondary_color']
+    );
+    
+    // Save footer colors
+    $footerSaveData = array_merge(
+        $footerColors,
+        [
+            'footer_title' => 'EducAid',
+            'footer_description' => 'Making education accessible throughout General Trias City through innovative scholarship solutions.',
+            'contact_address' => 'General Trias City Hall, Cavite',
+            'contact_phone' => '+63 (046) 123-4567',
+            'contact_email' => 'info@educaid-gentrias.gov.ph'
+        ]
+    );
+    
+    $footerResult = $footerService->save($footerSaveData, $_SESSION['admin_id'], $municipalityId);
+    error_log("THEME GEN: Footer generation result - " . json_encode($footerResult));
+
     // Return success
     error_log("THEME GEN: Success! Colors applied: " . ($result['colors_applied'] ?? 'unknown'));
     ob_end_clean();
@@ -114,6 +138,7 @@ try {
             'municipality_name' => $municipality['name'],
             'sidebar_updated' => true,
             'topbar_updated' => true,
+            'footer_updated' => isset($footerResult['success']) ? $footerResult['success'] : true,
             'colors_applied' => $result['colors_applied'] ?? 19
         ]
     ]);

@@ -1165,7 +1165,7 @@ document.getElementById('saveColorsBtn')?.addEventListener('click', async functi
       <div class="modal-body">
         <div class="alert alert-info mb-3">
           <i class="bi bi-info-circle me-2"></i>
-          <strong>What this does:</strong> This will automatically generate all sidebar and topbar colors based on your Primary and Secondary colors.
+          <strong>What this does:</strong> This will automatically generate all sidebar, topbar, and footer colors based on your Primary and Secondary colors.
         </div>
         
         <p class="mb-3"><strong>⚠️ Important:</strong> This will:</p>
@@ -1173,6 +1173,7 @@ document.getElementById('saveColorsBtn')?.addEventListener('click', async functi
           <li>Generate 19+ colors from your Primary Color (<code><?= htmlspecialchars($activeMunicipality['primary_color'] ?? '#2e7d32') ?></code>) and Secondary Color (<code><?= htmlspecialchars($activeMunicipality['secondary_color'] ?? '#1b5e20') ?></code>)</li>
           <li>Apply these colors to the <strong>Sidebar Theme</strong> (all pages)</li>
           <li>Apply these colors to the <strong>Topbar Theme</strong> (all pages)</li>
+          <li>Apply these colors to the <strong>Footer Theme</strong> (all pages)</li>
           <li>Override any existing theme colors you've set</li>
           <li>Follow WCAG accessibility standards for contrast</li>
         </ul>
@@ -1260,7 +1261,8 @@ document.getElementById('confirmGenerateThemeBtn')?.addEventListener('click', as
             alert('✅ Theme generated successfully!\n\n' +
                   `• ${result.data.colors_applied || 19} colors applied\n` +
                   '• Sidebar theme updated\n' +
-                  '• Topbar theme updated\n\n' +
+                  '• Topbar theme updated\n' +
+                  '• Footer theme updated\n\n' +
                   'Refresh the page to see changes.');
             
             // Reload page after 1 second
