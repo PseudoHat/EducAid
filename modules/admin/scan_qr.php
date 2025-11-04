@@ -19,12 +19,31 @@ if (!$workflow_status['has_payroll_qr']) {
     exit;
 }
 
-// CRITICAL: Check if schedule is published
+// CRITICAL: Check if schedule is published (only if distribution not completed yet)
 $settingsPath = __DIR__ . '/../../data/municipal_settings.json';
 $settings = file_exists($settingsPath) ? json_decode(file_get_contents($settingsPath), true) : [];
 $schedule_published = $settings['schedule_published'] ?? false;
 
-if (!$schedule_published) {
+// Get current academic period to check if distribution is completed
+$slot_check_query = "SELECT academic_year, semester FROM signup_slots WHERE is_active = true LIMIT 1";
+$slot_check_result = pg_query($connection, $slot_check_query);
+$current_slot = $slot_check_result ? pg_fetch_assoc($slot_check_result) : null;
+
+$check_academic_year = $current_slot['academic_year'] ?? '';
+$check_semester = $current_slot['semester'] ?? '';
+
+// Check if distribution is already completed for current period
+$distribution_completed_check = false;
+if ($check_academic_year && $check_semester) {
+    $completed_query = "SELECT snapshot_id FROM distribution_snapshots 
+                       WHERE academic_year = $1 AND semester = $2 
+                       AND finalized_at IS NOT NULL LIMIT 1";
+    $completed_result = pg_query_params($connection, $completed_query, [$check_academic_year, $check_semester]);
+    $distribution_completed_check = ($completed_result && pg_num_rows($completed_result) > 0);
+}
+
+// Only enforce schedule validation if distribution is NOT completed yet
+if (!$schedule_published && !$distribution_completed_check) {
     $_SESSION['error_message'] = "Cannot access QR scanner. Distribution schedule must be published first. Please go to 'Generate Schedule' and publish the schedule.";
     header("Location: generate_schedule.php?error=schedule_not_published");
     exit;
