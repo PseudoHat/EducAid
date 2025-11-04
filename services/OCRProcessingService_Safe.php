@@ -309,7 +309,7 @@ class OCRProcessingService {
         
         // Build Tesseract command for TSV output
         $command = sprintf(
-            '%s "%s" "%s" -l eng --oem 1 --psm 6 tsv 2>&1',
+            '%s %s %s -l eng --oem 1 --psm 6 tsv 2>&1',
             escapeshellarg($this->tesseractPath),
             escapeshellarg($filePath),
             escapeshellarg(pathinfo($tsvFile, PATHINFO_FILENAME))

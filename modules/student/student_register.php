@@ -1544,11 +1544,12 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processIdPictureOcr']
     // ========================================
     function preprocessIdImage($inputPath, $outputPath) {
         // Check if ImageMagick is available (best option)
-        $hasImageMagick = @shell_exec('magick -version 2>nul');
+        // On Linux, ImageMagick commands are 'convert' not 'magick'
+        $hasImageMagick = @shell_exec('convert -version 2>&1');
         
         if ($hasImageMagick && stripos($hasImageMagick, 'imagemagick') !== false) {
             // ImageMagick preprocessing - handles scratches, glare, distortion
-            $cmd = "magick " . escapeshellarg($inputPath) . " " .
+            $cmd = "convert " . escapeshellarg($inputPath) . " " .
                    "-colorspace Gray " .                    // Convert to grayscale
                    "-contrast-stretch 2%x1% " .             // Enhance contrast
                    "-sharpen 0x1 " .                        // Sharpen text
@@ -1557,7 +1558,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processIdPictureOcr']
                    "-despeckle " .                          // Remove noise/scratches
                    "-deskew 40% " .                         // Auto-straighten tilted images
                    "-trim +repage " .                       // Remove borders
-                   escapeshellarg($outputPath) . " 2>nul";
+                   escapeshellarg($outputPath) . " 2>&1";
             
             @shell_exec($cmd);
             return file_exists($outputPath);
@@ -1610,18 +1611,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processIdPictureOcr']
 
     // OCR Processing
     $fileExtension = strtolower(pathinfo($targetPath, PATHINFO_EXTENSION));
-    
-    // Check if Tesseract is installed
-    $tesseractCheck = @shell_exec('tesseract --version 2>&1');
-    if (empty($tesseractCheck) || stripos($tesseractCheck, 'tesseract') === false) {
-        echo json_encode([
-            'status' => 'error',
-            'message' => 'OCR service (Tesseract) is not available on this server. Please contact the administrator to install Tesseract OCR.',
-            'debug' => 'Tesseract not found in system PATH'
-        ]);
-        exit;
-    }
-    
     if ($fileExtension === 'pdf') {
         // Try PDF text extraction
         $pdfTextCommand = "pdftotext " . escapeshellarg($targetPath) . " - 2>nul";

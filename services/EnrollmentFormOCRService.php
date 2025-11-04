@@ -71,10 +71,10 @@ class EnrollmentFormOCRService {
             
             // Run Tesseract for TSV output
             $command = sprintf(
-                '"%s" "%s" "%s" -l eng --oem 1 --psm 6 tsv 2>&1',
-                $this->tesseractPath,
-                $processedFile,
-                $outputBase
+                '%s %s %s -l eng --oem 1 --psm 6 tsv 2>&1',
+                escapeshellarg($this->tesseractPath),
+                escapeshellarg($processedFile),
+                escapeshellarg($outputBase)
             );
             
             exec($command, $output, $returnCode);

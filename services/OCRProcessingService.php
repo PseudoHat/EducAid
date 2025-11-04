@@ -338,13 +338,13 @@ class OCRProcessingService {
         // Build Tesseract command for TSV output
         // Note: outputBase should NOT include extension - Tesseract adds it
         $command = sprintf(
-            '"%s" "%s" "%s" -l %s --oem %d --psm %d tsv 2>&1',
-            $this->tesseractPath,
-            $filePath,
-            $outputBase,  // Changed from pathinfo() call - use full path without extension
-            $language,
-            $oem,
-            $psm
+            '%s %s %s -l %s --oem %d --psm %d tsv 2>&1',
+            escapeshellarg($this->tesseractPath),
+            escapeshellarg($filePath),
+            escapeshellarg($outputBase),  // Changed from pathinfo() call - use full path without extension
+            escapeshellarg($language),
+            (int)$oem,
+            (int)$psm
         );
 
         error_log("Tesseract command: " . $command);
