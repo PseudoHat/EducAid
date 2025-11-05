@@ -98,7 +98,7 @@ function lp_block_style($key){
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, user-scalable=yes" />
   <title><?php echo strip_tags(lp_block('page_title','EducAid – City of General Trias')); ?></title>
   <meta name="description" content="Educational Assistance Management System for the City of General Trias" />
   <?php if ($IS_EDIT_MODE): ?>

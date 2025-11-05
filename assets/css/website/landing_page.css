@@ -23,10 +23,49 @@
   --shadow: 0 8px 24px rgba(2, 6, 23, .08);
 }
 
+/* CRITICAL: Prevent horizontal scroll on mobile */
+* {
+  box-sizing: border-box;
+}
+
+html {
+  overflow-x: hidden;
+  max-width: 100%;
+}
+
+body {
+  overflow-x: hidden;
+  max-width: 100%;
+  position: relative;
+}
+
 html, body {
   font-family: var(--thm-font);
   background: var(--thm-light-bg);
   color: var(--thm-black);
+  margin: 0;
+  padding: 0;
+}
+
+/* Prevent all containers from causing horizontal scroll */
+.container,
+.container-fluid,
+.row {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* Fix Bootstrap row negative margins on mobile */
+@media (max-width: 767.98px) {
+  .row {
+    margin-left: 0;
+    margin-right: 0;
+  }
+  
+  .row > * {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
 }
 
 /* Top info bar */
@@ -1675,18 +1714,49 @@ footer a {
 
 /* Responsive Design - Hero and Quick Links Spacing */
 @media (max-width: 768px) {
+  /* CRITICAL: Prevent all images from overflowing */
+  img {
+    max-width: 100%;
+    height: auto;
+  }
+  
+  /* Prevent flex items from causing overflow */
+  .d-flex,
+  .flex-wrap,
+  .flex-nowrap {
+    flex-wrap: wrap !important;
+  }
+  
+  /* Ensure all text wraps properly */
+  h1, h2, h3, h4, h5, h6, p, span, div {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    hyphens: auto;
+  }
+  
+  /* Fix button groups */
+  .btn-group,
+  .btn-toolbar {
+    flex-wrap: wrap !important;
+    justify-content: center;
+  }
+  
   .hero {
     min-height: 50vh;
     padding: 1.5rem 0;
+    overflow: hidden;
   }
   
   .hero-card {
     padding: 1.5rem;
     margin: 1rem;
+    max-width: calc(100vw - 2rem);
+    width: 100%;
   }
   
   .hero h1 {
     font-size: 2rem;
+    word-break: break-word;
   }
   
   .hero p {
@@ -1694,25 +1764,41 @@ footer a {
     margin-bottom: 1.5rem;
   }
   
+  .hero .btn-group,
+  .hero .d-flex {
+    width: 100%;
+    max-width: 100%;
+  }
+  
+  .hero .btn {
+    max-width: 100%;
+    white-space: normal;
+  }
+  
   .quick-links {
     margin-top: 1.5rem;
     margin-bottom: 3rem;
+    padding-left: 1rem;
+    padding-right: 1rem;
   }
   
   .ql-card {
     padding: 0.8rem 1rem;
     gap: 0.7rem;
+    max-width: 100%;
   }
   
   .ql-icon {
     width: 40px;
     height: 40px;
     font-size: 1rem;
+    flex-shrink: 0;
   }
   
   /* Optimize sections spacing */
   section {
     padding: 3rem 0;
+    overflow: hidden;
   }
   
   .section-title {
@@ -1722,19 +1808,33 @@ footer a {
 }
 
 @media (max-width: 576px) {
+  /* CRITICAL: Extra mobile safety */
+  * {
+    max-width: 100vw;
+  }
+  
+  img, video, iframe, embed {
+    max-width: 100%;
+    height: auto;
+  }
+  
   .hero {
     min-height: 45vh;
     padding: 1rem 0;
+    overflow-x: hidden;
   }
   
   .hero-card {
     padding: 1.25rem;
     margin: 0.75rem;
+    max-width: calc(100vw - 1.5rem);
+    box-sizing: border-box;
   }
   
   .hero h1 {
     font-size: 1.75rem;
     line-height: 1.2;
+    word-break: break-word;
   }
   
   .hero p {
@@ -1743,18 +1843,23 @@ footer a {
   }
   
   .hero .d-flex {
-    flex-direction: column;
+    flex-direction: column !important;
     gap: 0.75rem;
+    width: 100%;
   }
   
   .hero .btn {
     font-size: 0.95rem;
     padding: 0.75rem 1.25rem;
+    width: 100%;
+    max-width: 100%;
   }
   
   .quick-links {
     margin-top: 1rem;
     margin-bottom: 2rem;
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
   }
   
   .ql-card {
@@ -1775,6 +1880,7 @@ footer a {
   /* Further optimize sections spacing on small screens */
   section {
     padding: 2rem 0;
+    overflow-x: hidden;
   }
   
   .section-title {
@@ -1790,5 +1896,19 @@ footer a {
   .container {
     padding-left: 1rem;
     padding-right: 1rem;
+    max-width: 100%;
+  }
+  
+  /* Fix Bootstrap columns on mobile */
+  [class*="col-"] {
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+    max-width: 100%;
+  }
+  
+  /* Ensure no negative margins cause overflow */
+  .row {
+    margin-left: -0.5rem;
+    margin-right: -0.5rem;
   }
 }
