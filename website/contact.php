@@ -92,6 +92,9 @@ function esc($v){ return htmlspecialchars($v ?? '', ENT_QUOTES, 'UTF-8'); }
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Contact • EducAid – City of General Trias</title>
   <meta name="description" content="Official contact & helpdesk page for EducAid – City of General Trias" />
+  <?php if ($IS_EDIT_MODE): ?>
+  <meta name="csrf-token" content="<?php echo CSRFProtection::generateToken('cms_content'); ?>" />
+  <?php endif; ?>
   <!-- Google Fonts -->
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
   <link href="../assets/css/bootstrap.min.css" rel="stylesheet" />

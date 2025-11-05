@@ -101,6 +101,9 @@ function lp_block_style($key){
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title><?php echo strip_tags(lp_block('page_title','EducAid – City of General Trias')); ?></title>
   <meta name="description" content="Educational Assistance Management System for the City of General Trias" />
+  <?php if ($IS_EDIT_MODE): ?>
+  <meta name="csrf-token" content="<?php echo CSRFProtection::generateToken('cms_content'); ?>" />
+  <?php endif; ?>
 
   <!-- Google Fonts -->
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700&display=swap" rel="stylesheet" />

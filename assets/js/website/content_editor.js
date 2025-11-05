@@ -11,6 +11,32 @@
     if(!s) return '';
     return String(s).replace(/[-_]+/g,' ').replace(/\b\w/g,ch=>ch.toUpperCase());
   };
+  
+  // CSRF token helper function
+  const getCSRFToken=()=>{
+    const meta=document.querySelector('meta[name="csrf-token"]');
+    return meta ? meta.getAttribute('content') : '';
+  };
+  
+  // Enhanced fetch with CSRF token
+  const fetchWithCSRF=(url,options={})=>{
+    const token=getCSRFToken();
+    const headers=options.headers || {};
+    headers['X-CSRF-Token']=token;
+    
+    // If body is JSON, also include token in POST data
+    if(options.body && typeof options.body === 'string'){
+      try{
+        const bodyData=JSON.parse(options.body);
+        bodyData.csrf_token=token;
+        options.body=JSON.stringify(bodyData);
+      }catch(e){
+        // If not valid JSON, skip
+      }
+    }
+    
+    return fetch(url,{...options,headers});
+  };
 
   CE.init=function(cfg){
     cfg=Object.assign({page:'generic'},cfg||{});
@@ -53,10 +79,10 @@
     if(tc) tc.addEventListener('input',()=>{ if(state.target){ state.target.style.color=tc.value; dirty(state.target);} });
     if(bc) bc.addEventListener('input',()=>{ if(state.target){ state.target.style.backgroundColor=bc.value; dirty(state.target);} });
     if(resetBtn) resetBtn.addEventListener('click',()=>{ if(!state.target) return; const k=state.target.dataset.lpKey; const orig=state.original.get(k); if(orig!==undefined) state.target.innerHTML=orig; state.target.style.color=''; state.target.style.backgroundColor=''; state.target.removeAttribute('data-lp-dirty'); saveBtn.disabled=!qsa('[data-lp-dirty="1"]').length; setStatus('Block reset'); });
-    if(resetAllBtn && cfg.resetAllEndpoint) resetAllBtn.addEventListener('click',async()=>{ if(!confirm('Reset ALL blocks?')) return; setStatus('Resetting...'); try{ const r=await fetch(cfg.resetAllEndpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'reset_all'})}); const d=await r.json(); if(d.success){ els.forEach(el=>{ const o=state.original.get(el.dataset.lpKey); if(o!==undefined) el.innerHTML=o; el.style.color=''; el.style.backgroundColor=''; el.removeAttribute('data-lp-dirty'); }); if(saveBtn) saveBtn.disabled=true; setStatus('All reset','success'); } else setStatus(d.message||'Reset failed','error'); }catch(e){ setStatus(e.message,'error'); }});
+    if(resetAllBtn && cfg.resetAllEndpoint) resetAllBtn.addEventListener('click',async()=>{ if(!confirm('Reset ALL blocks?')) return; setStatus('Resetting...'); try{ const r=await fetchWithCSRF(cfg.resetAllEndpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'reset_all'})}); const d=await r.json(); if(d.success){ els.forEach(el=>{ const o=state.original.get(el.dataset.lpKey); if(o!==undefined) el.innerHTML=o; el.style.color=''; el.style.backgroundColor=''; el.removeAttribute('data-lp-dirty'); }); if(saveBtn) saveBtn.disabled=true; setStatus('All reset','success'); } else setStatus(d.message||'Reset failed','error'); }catch(e){ setStatus(e.message,'error'); }});
     if(hiBtn) hiBtn.addEventListener('click',()=>{ const on=hiBtn.getAttribute('data-active')==='1'; qsa('.lp-edit-highlight').forEach(el=>el.style.outline= on?'none':''); hiBtn.setAttribute('data-active',on?'0':'1'); hiBtn.innerHTML= on?'<i class="bi bi-bounding-box"></i> Show Boxes':'<i class="bi bi-bounding-box-circles"></i> Hide Boxes'; });
 
-    const save=async(dirtyOnly)=>{ if(state.saving) return; const list=dirtyOnly? qsa('[data-lp-dirty="1"]'): qsa('[data-lp-key]'); if(!list.length){ setStatus('Nothing to save'); return; } const payload=list.map(el=>({key:el.dataset.lpKey,html:el.innerHTML,styles:{color:el.style.color||'',backgroundColor:el.style.backgroundColor||''}})); state.saving=true; setStatus('Saving...'); if(saveBtn) saveBtn.disabled=true; if(!dirtyOnly && saveAllBtn) saveAllBtn.disabled=true; try{ const res=await fetch(cfg.saveEndpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({blocks:payload})}); const data=await res.json(); if(!data.success) throw new Error(data.message||'Save failed'); list.forEach(el=>el.removeAttribute('data-lp-dirty')); if(cfg.refreshAfterSave) await cfg.refreshAfterSave(payload.map(p=>p.key)); setStatus('Saved','success'); }catch(e){ setStatus(e.message,'error'); if(saveBtn) saveBtn.disabled=false; if(!dirtyOnly && saveAllBtn) saveAllBtn.disabled=false; } finally { state.saving=false; } };
+    const save=async(dirtyOnly)=>{ if(state.saving) return; const list=dirtyOnly? qsa('[data-lp-dirty="1"]'): qsa('[data-lp-key]'); if(!list.length){ setStatus('Nothing to save'); return; } const payload=list.map(el=>({key:el.dataset.lpKey,html:el.innerHTML,styles:{color:el.style.color||'',backgroundColor:el.style.backgroundColor||''}})); state.saving=true; setStatus('Saving...'); if(saveBtn) saveBtn.disabled=true; if(!dirtyOnly && saveAllBtn) saveAllBtn.disabled=true; try{ const res=await fetchWithCSRF(cfg.saveEndpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({blocks:payload})}); const data=await res.json(); if(!data.success) throw new Error(data.message||'Save failed'); list.forEach(el=>el.removeAttribute('data-lp-dirty')); if(cfg.refreshAfterSave) await cfg.refreshAfterSave(payload.map(p=>p.key)); setStatus('Saved','success'); }catch(e){ setStatus(e.message,'error'); if(saveBtn) saveBtn.disabled=false; if(!dirtyOnly && saveAllBtn) saveAllBtn.disabled=false; } finally { state.saving=false; } };
     if(saveBtn) saveBtn.addEventListener('click',()=>save(true));
     if(saveAllBtn) saveAllBtn.addEventListener('click',()=>save(false));
     window.addEventListener('beforeunload',e=>{ if(qsa('[data-lp-dirty="1"]').length){ e.preventDefault(); e.returnValue=''; }});
@@ -75,14 +101,14 @@
         listEl.addEventListener('click',e=>{ const item=e.target.closest('.lp-hist-item'); if(!item) return; qsa('.lp-hist-item',listEl).forEach(x=>x.classList.remove('active')); item.classList.add('active'); preview.innerHTML=item._html||'(empty)'; preview.style.color=item._textColor||''; preview.style.backgroundColor=item._bgColor||'#f8fafc'; applyBtn.disabled=false; applyBtn._sel=item; });
         applyBtn.addEventListener('click',()=>{ const it=applyBtn._sel; if(!it) return; const key=it.getAttribute('data-key'); const target=document.querySelector('[data-lp-key="'+CSS.escape(key)+'"]'); if(!target){ alert('Block not on page'); return; } if(live && live.key!==key) revert(); if(!live){ live={ key, el:target, originalHtml:target.innerHTML, originalTextColor:target.style.color, originalBgColor:target.style.backgroundColor }; } target.innerHTML=it._html||''; target.style.color=it._textColor||''; target.style.backgroundColor=it._bgColor||''; notice.style.display='block'; cancelBtn.disabled=false; });
         cancelBtn.addEventListener('click',()=>revert());
-        if(cfg.history.rollbackEndpoint){ preview.addEventListener('dblclick', async ()=>{ const sel=applyBtn._sel; if(!sel) return; if(!confirm('Apply rollback permanently?')) return; try{ const r=await fetch(cfg.history.rollbackEndpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({audit_id: sel.getAttribute('data-id')})}); const d=await r.json(); if(!d.success) throw new Error(d.message||'Rollback failed'); if(cfg.refreshAfterSave) await cfg.refreshAfterSave([d.block_key]); alert('Rollback applied'); }catch(err){ alert('Rollback error: '+err.message); } }); }
+        if(cfg.history.rollbackEndpoint){ preview.addEventListener('dblclick', async ()=>{ const sel=applyBtn._sel; if(!sel) return; if(!confirm('Apply rollback permanently?')) return; try{ const r=await fetchWithCSRF(cfg.history.rollbackEndpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({audit_id: sel.getAttribute('data-id')})}); const d=await r.json(); if(!d.success) throw new Error(d.message||'Rollback failed'); if(cfg.refreshAfterSave) await cfg.refreshAfterSave([d.block_key]); alert('Rollback applied'); }catch(err){ alert('Rollback error: '+err.message); } }); }
       }
       function revert(){ if(!live) return; const {el,originalHtml,originalTextColor,originalBgColor}=live; el.innerHTML=originalHtml; el.style.color=originalTextColor; el.style.backgroundColor=originalBgColor; live=null; cancelBtn.disabled=true; applyBtn.disabled=!applyBtn._sel; notice.style.display='none'; }
       async function load(){
         listEl.innerHTML='<div class="text-muted small">Loading...</div>';
         const block=blockSel.value.trim(); const limit=limitSel.value; const action=actionSel.value.trim();
         try{
-          const r=await fetch(cfg.history.fetchEndpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({block,limit,action_type:action})});
+          const r=await fetchWithCSRF(cfg.history.fetchEndpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({block,limit,action_type:action})});
           const d=await r.json();
           if(!d.success){ listEl.innerHTML='<div class="text-danger small">Failed</div>'; return; }
           const recs=d.records||[];
