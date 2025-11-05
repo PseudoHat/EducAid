@@ -73,4 +73,3 @@ if (!function_exists('educaid_load_env_layered')) {
 }
 
 educaid_load_env_layered(dirname(__DIR__));
-?>

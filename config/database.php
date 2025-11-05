@@ -55,4 +55,3 @@ if (!$connection) {
 
 // Log successful connection (no sensitive data)
 error_log(sprintf('Database connected: host=%s port=%s dbname=%s', $dbHost, $dbPort, $dbName));
-?>

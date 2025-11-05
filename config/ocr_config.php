@@ -13,5 +13,3 @@ define('OCR_LANGUAGE', 'eng');
 define('OCR_DPI', 300);
 define('OCR_PSM', 6);
 
-?>
-

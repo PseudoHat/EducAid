@@ -161,4 +161,3 @@ $summary = [
 ];
 
 echo json_encode(['summary' => $summary, 'checks' => $results], JSON_PRETTY_PRINT);
-?>

@@ -196,9 +196,6 @@ function lp_block_style($key){
                   <a href="<?php echo $base_path; ?>unified_login.php" class="btn cta-btn btn-outline-custom" data-lp-key="hero_cta_signin"><i class="bi bi-box-arrow-in-right me-2"></i>Sign In</a>
                 </div>
               </div>
-              <div class="text-center">
-                <img src="https://images.unsplash.com/photo-1587825140708-dfaf72ae4b04?q=80&w=1000&auto=format&fit=crop" alt="Students" class="img-fluid rounded-2xl shadow-soft" style="max-width:360px" />
-              </div>
             </div>
           </div>
         </div>
