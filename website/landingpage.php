@@ -397,7 +397,7 @@ function lp_block_style($key){
         </div>
         <div class="col-lg-6">
           <div class="soft-card p-4">
-            <h5 class="fw-bold">At a glance</h5>
+            <h5 class="fw-bold">Hello World</h5>
             <div class="row text-center g-3 mt-1">
               <div class="col-6 col-md-3"><div class="p-3 rounded-2xl bg-body-tertiary"><div class="h4 mb-0">50+</div><small class="text-body-secondary">Barangays</small></div></div>
               <div class="col-6 col-md-3"><div class="p-3 rounded-2xl bg-body-tertiary"><div class="h4 mb-0">5k+</div><small class="text-body-secondary">Beneficiaries</small></div></div>
