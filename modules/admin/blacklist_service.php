@@ -36,6 +36,13 @@ if (!$admin) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
     
+    // CSRF Protection - validate token for all POST actions
+    $csrfToken = $_POST['csrf_token'] ?? '';
+    if (!CSRFProtection::validateToken('blacklist_operation', $csrfToken, false)) {
+        echo json_encode(['status' => 'error', 'message' => 'Invalid security token. Please refresh the page.']);
+        exit;
+    }
+    
     // Debug logging
     error_log("=== BLACKLIST SERVICE DEBUG ===");
     error_log("Action received: " . $action);
@@ -170,13 +177,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     // Step 2: Verify OTP and complete blacklist
     if ($action === 'complete_blacklist') {
-        // CSRF Protection - validate token for final action
-        $csrfToken = $_POST['csrf_token'] ?? '';
-        if (!CSRFProtection::validateToken('blacklist_operation', $csrfToken)) {
-            echo json_encode(['status' => 'error', 'message' => 'Invalid security token. Please refresh the page.']);
-            exit;
-        }
-        
         // Debug logging
         error_log("Complete blacklist action received");
         error_log("POST data: " . print_r($_POST, true));

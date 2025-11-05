@@ -3,11 +3,21 @@
  * Newsletter Subscription Handler (No CAPTCHA)
  */
 
+session_start();
+require_once __DIR__ . '/../includes/CSRFProtection.php';
+
 // Set JSON response header
 header('Content-Type: application/json');
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     echo json_encode(['success' => false, 'message' => 'Invalid request method']);
+    exit;
+}
+
+// CSRF Protection
+$token = $_POST['csrf_token'] ?? '';
+if (!CSRFProtection::validateToken('newsletter_subscribe', $token)) {
+    echo json_encode(['success' => false, 'message' => 'Security validation failed. Please refresh the page.']);
     exit;
 }
 

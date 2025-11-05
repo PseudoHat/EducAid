@@ -8,6 +8,7 @@ $IS_EDIT_SUPER_ADMIN = false;
 
 // Load database and permissions
 @include_once __DIR__ . '/../config/database.php';
+@include_once __DIR__ . '/../includes/CSRFProtection.php';
 @include_once __DIR__ . '/../includes/permissions.php';
 
 // Check if user is super admin AND in edit mode
@@ -47,32 +48,38 @@ if (!$IS_EDIT_MODE) {
 $errors = [];
 $successMsg = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_inquiry'])) {
-    $name = trim($_POST['name'] ?? '');
-    $email = trim($_POST['email'] ?? '');
-    $subject = trim($_POST['subject'] ?? '');
-    $message = trim($_POST['message'] ?? '');
+    // CSRF Protection
+    $token = $_POST['csrf_token'] ?? '';
+    if (!CSRFProtection::validateToken('contact_form', $token)) {
+        $errors[] = 'Security validation failed. Please refresh the page and try again.';
+    } else {
+        $name = trim($_POST['name'] ?? '');
+        $email = trim($_POST['email'] ?? '');
+        $subject = trim($_POST['subject'] ?? '');
+        $message = trim($_POST['message'] ?? '');
 
-    if ($name === '' || strlen($name) < 2) $errors[] = 'Name is required.';
-    if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) $errors[] = 'Valid email required.';
-    if ($subject === '' || strlen($subject) < 3) $errors[] = 'Subject must be at least 3 characters.';
-    if ($message === '' || strlen($message) < 10) $errors[] = 'Message must be at least 10 characters.';
+        if ($name === '' || strlen($name) < 2) $errors[] = 'Name is required.';
+        if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) $errors[] = 'Valid email required.';
+        if ($subject === '' || strlen($subject) < 3) $errors[] = 'Subject must be at least 3 characters.';
+        if ($message === '' || strlen($message) < 10) $errors[] = 'Message must be at least 10 characters.';
 
-    if (!$errors) {
-        $entry = [
-            'ts' => date('c'),
-            'ip' => $_SERVER['REMOTE_ADDR'] ?? '',
-            'ua' => substr($_SERVER['HTTP_USER_AGENT'] ?? '',0,180),
-            'name' => $name,
-            'email' => $email,
-            'subject' => $subject,
-            'message' => $message
-        ];
-        $logFile = __DIR__ . '/../data/contact_messages.log';
-        // ensure directory exists
-        @mkdir(dirname($logFile), 0775, true);
-        @file_put_contents($logFile, json_encode($entry, JSON_UNESCAPED_SLASHES) . PHP_EOL, FILE_APPEND | LOCK_EX);
-        $successMsg = 'Your inquiry was received. A staff member may reach out via email if needed.';
-        $_POST = []; // clear form data
+        if (!$errors) {
+            $entry = [
+                'ts' => date('c'),
+                'ip' => $_SERVER['REMOTE_ADDR'] ?? '',
+                'ua' => substr($_SERVER['HTTP_USER_AGENT'] ?? '',0,180),
+                'name' => $name,
+                'email' => $email,
+                'subject' => $subject,
+                'message' => $message
+            ];
+            $logFile = __DIR__ . '/../data/contact_messages.log';
+            // ensure directory exists
+            @mkdir(dirname($logFile), 0775, true);
+            @file_put_contents($logFile, json_encode($entry, JSON_UNESCAPED_SLASHES) . PHP_EOL, FILE_APPEND | LOCK_EX);
+            $successMsg = 'Your inquiry was received. A staff member may reach out via email if needed.';
+            $_POST = []; // clear form data
+        }
     }
 }
 
@@ -223,6 +230,7 @@ function esc($v){ return htmlspecialchars($v ?? '', ENT_QUOTES, 'UTF-8'); }
             <div class="alert alert-success py-2 mb-3"><?= esc($successMsg) ?></div>
           <?php endif; ?>
           <form method="POST" novalidate>
+            <input type="hidden" name="csrf_token" value="<?php echo CSRFProtection::generateToken('contact_form'); ?>">
             <div class="row g-3">
               <div class="col-md-6">
                 <label class="form-label fw-semibold">Name <span class="text-danger">*</span></label>

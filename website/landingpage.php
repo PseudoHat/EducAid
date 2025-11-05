@@ -2,6 +2,7 @@
 // Landing page with optional super admin inline edit mode
 // Start session
 session_start();
+require_once __DIR__ . '/../includes/CSRFProtection.php';
 
 $IS_EDIT_SUPER_ADMIN = false;
 // Detect super admin attempting to edit (bypass captcha gate)
@@ -684,6 +685,7 @@ function lp_block_style($key){
       try {
         const formData = new FormData();
         formData.append('email', email);
+        formData.append('csrf_token', '<?php echo CSRFProtection::generateToken("newsletter_subscribe"); ?>');
         
         const response = await fetch('newsletter_subscribe.php', {
           method: 'POST',

@@ -1,5 +1,6 @@
 <?php
 include __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../../includes/CSRFProtection.php';
 require_once __DIR__ . '/../../services/UnifiedFileService.php';
 require_once __DIR__ . '/../../services/DocumentService.php';
 require_once __DIR__ . '/../../includes/student_notification_helper.php';
@@ -37,6 +38,14 @@ $fileService = new UnifiedFileService($connection);
 
 // Handle approval/rejection
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // CSRF Protection - validate token first
+    $token = $_POST['csrf_token'] ?? '';
+    if (!CSRFProtection::validateToken('review_registrations', $token)) {
+        $_SESSION['error_message'] = 'Security validation failed. Please refresh the page.';
+        header('Location: ' . $_SERVER['PHP_SELF']);
+        exit;
+    }
+    
     // Handle bulk actions
     if (isset($_POST['bulk_action']) && isset($_POST['student_ids'])) {
         $action = $_POST['bulk_action'];
@@ -1246,6 +1255,7 @@ $yearLevels = pg_fetch_all(pg_query($connection, "SELECT year_level_id, name FRO
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <form method="POST">
+                    <input type="hidden" name="csrf_token" value="<?php echo CSRFProtection::generateToken('review_registrations'); ?>">
                     <div class="modal-body">
                         <input type="hidden" name="student_id" id="modal_student_id">
                         <input type="hidden" name="action" id="modal_action">
