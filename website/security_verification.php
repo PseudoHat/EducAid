@@ -1,3 +1,16 @@
+<?php
+// Include reCAPTCHA configuration
+require_once '../config/recaptcha_v2_config.php';
+
+// Start session FIRST before any output
+session_start();
+
+// Check if user is already verified
+if (isset($_SESSION['captcha_verified']) && $_SESSION['captcha_verified'] === true) {
+    header('Location: landingpage.php');
+    exit;
+}
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -88,18 +101,6 @@
     </style>
 </head>
 <body>
-    <?php
-    // Include reCAPTCHA configuration
-    require_once '../config/recaptcha_v2_config.php';
-    
-    // Check if user is already verified
-    session_start();
-    if (isset($_SESSION['captcha_verified']) && $_SESSION['captcha_verified'] === true) {
-        header('Location: landingpage.php');
-        exit;
-    }
-    ?>
-
     <div class="verification-container">
         <div class="verification-box">
             <h1 class="site-title">EducAid</h1>
