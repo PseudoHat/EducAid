@@ -2,10 +2,14 @@
 session_start();
 header('Content-Type: application/json');
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../includes/CSRFProtection.php';
 @include_once __DIR__ . '/../includes/permissions.php';
 
 function out($ok,$msg=''){echo json_encode(['success'=>$ok,'message'=>$msg]);exit;}
 if($_SERVER['REQUEST_METHOD']!=='POST'){out(false,'Invalid method');}
+// CSRF Protection
+$token = $_POST['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+if (!CSRFProtection::validateToken('cms_content', $token)) out(false, 'Security validation failed. Please refresh the page.');
 if(!isset($_SESSION['admin_id']) || !function_exists('getCurrentAdminRole')) out(false,'Unauthorized');
 $role = @getCurrentAdminRole($connection);
 if($role!=='super_admin') out(false,'Forbidden');

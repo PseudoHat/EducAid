@@ -3,10 +3,14 @@
 session_start();
 header('Content-Type: application/json');
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../includes/CSRFProtection.php';
 @include_once __DIR__ . '/../includes/permissions.php';
 
 function resp($ok,$msg='',$extra=[]){echo json_encode(array_merge(['success'=>$ok,'message'=>$msg],$extra));exit;}
 if($_SERVER['REQUEST_METHOD']!=='POST') resp(false,'Invalid method');
+// CSRF Protection
+$token = $_POST['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+if (!CSRFProtection::validateToken('cms_content', $token)) resp(false, 'Security validation failed. Please refresh the page.');
 $is_super_admin=false; if(isset($_SESSION['admin_id']) && function_exists('getCurrentAdminRole')){ $role=@getCurrentAdminRole($connection); if($role==='super_admin') $is_super_admin=true; }
 if(!$is_super_admin) resp(false,'Unauthorized');
 $raw=file_get_contents('php://input'); $data=json_decode($raw,true);
