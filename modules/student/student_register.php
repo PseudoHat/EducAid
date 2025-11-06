@@ -107,8 +107,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['cleanup_session_files
         $currentSessionPrefix = $_SESSION['file_prefix'] ?? '';
         $sessionStartTime = $_SESSION['registration_start_time'] ?? time();
         
-        // IMPORTANT: When page refreshes, we want to DELETE all files from current session
-        // because user will re-upload them. We keep files from OTHER sessions for a while.
+        // IMPORTANT: Only delete files from ACTIVE session (current page refresh)
+        // Do NOT delete files from completed registrations waiting for admin review!
         
         foreach ($tempDirs as $dir) {
             if (!is_dir($dir)) continue;
@@ -120,15 +120,18 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['cleanup_session_files
                 $fileName = basename($file);
                 $fileAge = time() - filemtime($file);
                 
-                // Delete file if ANY of these conditions are true:
-                // 1. File is from current session (cleanup on refresh)
-                // 2. File is older than 1 hour (abandoned session cleanup)
+                // Only delete files from the CURRENT active session (user refreshed during registration)
+                // Files from completed registrations should stay until admin approval/rejection
+                // Orphaned files (older than 24 hours) will be cleaned by a separate maintenance task
                 
                 $isCurrentSessionFile = !empty($currentSessionPrefix) && 
                                        strpos($fileName, $currentSessionPrefix) !== false;
                 
-                // Delete file if it's from current session OR older than 30 minutes
-                if ($isCurrentSessionFile || $fileAge > 1800) {
+                // ONLY delete if it's from current active session AND session is less than 30 minutes old
+                // This ensures we don't delete completed registration files waiting for admin review
+                $isActiveSession = (time() - $sessionStartTime) < 1800;
+                
+                if ($isCurrentSessionFile && $isActiveSession) {
                     @unlink($file);
                     $cleanupCount++;
                 }
