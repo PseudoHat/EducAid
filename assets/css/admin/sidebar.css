@@ -31,6 +31,9 @@
   border-bottom-right-radius: 12px;
   display: flex;
   flex-direction: column;
+  /* Help the GPU prepare the element for transform animations */
+  will-change: transform;
+  backface-visibility: hidden;
 }
 
 /* Mobile: sidebar covers entire screen including topbar when open */
@@ -39,7 +42,9 @@
     top: 0;
     height: 100vh;
     z-index: 1060; /* above topbar (1050) and header (1030) */
-    /* transition removed - using JavaScript animation */
+    /* Use translate3d to leverage GPU during JS-driven animations */
+    transform: translate3d(-100%, 0, 0);
+    /* transition removed - animations are driven by JS requestAnimationFrame */
   }
 }
 
@@ -224,23 +229,24 @@
     top: 0;
     height: 100vh;
     width: 280px;
-    transform: translateX(-100%);
+    transform: translate3d(-100%, 0, 0);
     border-radius: 0;
-    /* transition removed - using JavaScript animation */
   }
 
   .sidebar.open {
-    transform: translateX(0);
+    transform: translate3d(0, 0, 0);
   }
 
   .sidebar.close {
-    transform: translateX(-100%);
+    transform: translate3d(-100%, 0, 0);
     width: 280px; /* Keep same width */
   }
 
   .sidebar-backdrop {
     display: block;
     z-index: 1055; /* Below sidebar (1060) */
+    will-change: opacity;
+    backface-visibility: hidden;
   }
 
   .home-section {
