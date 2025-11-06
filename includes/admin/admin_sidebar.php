@@ -922,7 +922,8 @@ document.addEventListener('DOMContentLoaded', function(){
 
   toggleBtn.addEventListener('click', function(e){
     e.stopPropagation();
-    const expanding = sidebar.classList.contains('close');
+    // On mobile: toggle based on 'open' class; On desktop: toggle based on 'close' class
+    const expanding = isMobile() ? !sidebar.classList.contains('open') : sidebar.classList.contains('close');
     animateSidebar(expanding);
   });
 
