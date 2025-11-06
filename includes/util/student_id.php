@@ -96,4 +96,3 @@ if (!function_exists('generateSystemStudentId')) {
     }
 }
 
-?>

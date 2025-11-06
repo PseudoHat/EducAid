@@ -1,5 +1,6 @@
-  <?php
+<?php
 session_start();
+require_once __DIR__ . '/../includes/CSRFProtection.php';
 // Determine super admin edit mode for About page (?edit=1)
 $IS_EDIT_MODE = false; $is_super_admin = false;
 @include_once __DIR__ . '/../config/database.php';
@@ -19,6 +20,9 @@ if ($is_super_admin && isset($_GET['edit']) && $_GET['edit'] == '1') { $IS_EDIT_
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title><?php echo strip_tags(about_block('about_page_title','About EducAid – City of General Trias')); ?></title>
   <meta name="description" content="<?php echo htmlspecialchars(strip_tags(about_block('about_page_meta_desc','Learn more about EducAid - Educational Assistance Management System for General Trias students'))); ?>" />
+  <?php if ($IS_EDIT_MODE): ?>
+  <meta name="csrf-token" content="<?php echo CSRFProtection::generateToken('cms_content'); ?>" />
+  <?php endif; ?>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
   <link href="../assets/css/bootstrap.min.css" rel="stylesheet" />
   <link href="../assets/css/bootstrap-icons.css" rel="stylesheet" />

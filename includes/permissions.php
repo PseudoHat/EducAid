@@ -42,4 +42,3 @@ function isRestrictedPage($page_name) {
     global $super_admin_pages;
     return in_array($page_name, $super_admin_pages);
 }
-?>

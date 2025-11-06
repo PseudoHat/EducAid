@@ -174,4 +174,3 @@ function getStudentCounts($connection) {
         ];
     }
 }
-?>

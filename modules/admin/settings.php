@@ -1,6 +1,7 @@
 <?php
 /** @phpstan-ignore-file */
 include __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../../includes/CSRFProtection.php';
 include __DIR__ . '/../../services/OTPService.php';
 
 session_start();
@@ -76,6 +77,14 @@ if (isset($_GET['success']) && isset($_GET['msg'])) {
 
 // Handle form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+  // CSRF Protection - validate token first
+  $token = $_POST['csrf_token'] ?? '';
+  if (!CSRFProtection::validateToken('admin_settings', $token)) {
+    $_SESSION['error_message'] = 'Security validation failed. Please refresh the page.';
+    header('Location: ' . $_SERVER['PHP_SELF']);
+    exit;
+  }
+  
   // Check if this is an AJAX request
   $isAjaxRequest = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest';
   
@@ -226,6 +235,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           <?php endif; ?>
           
           <form method="POST">
+            <input type="hidden" name="csrf_token" value="<?php echo CSRFProtection::generateToken('admin_settings'); ?>">
             <div class="row">
               <div class="col-md-8">
                 <div class="mb-3">
@@ -259,6 +269,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <form method="POST" id="capacityForm">
+        <input type="hidden" name="csrf_token" value="<?php echo CSRFProtection::generateToken('admin_settings'); ?>">
         <div class="modal-body">
           <div class="alert alert-info">
             <i class="bi bi-info-circle me-2"></i>

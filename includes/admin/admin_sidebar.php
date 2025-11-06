@@ -740,6 +740,12 @@ document.addEventListener('DOMContentLoaded', function(){
 <script>
 // Admin sidebar open/close behavior (mobile + desktop)
 document.addEventListener('DOMContentLoaded', function(){
+  // Prevent double-binding with external controller (assets/js/admin/sidebar.js)
+  if (window.__ADMIN_SIDEBAR_BOUND) {
+    // Another sidebar controller already attached; skip binding here
+    return;
+  }
+  window.__ADMIN_SIDEBAR_BOUND = 'inline';
   const sidebar = document.getElementById('sidebar');
   const toggleBtn = document.getElementById('menu-toggle');
   const backdrop = document.getElementById('sidebar-backdrop');
@@ -922,7 +928,8 @@ document.addEventListener('DOMContentLoaded', function(){
 
   toggleBtn.addEventListener('click', function(e){
     e.stopPropagation();
-    const expanding = sidebar.classList.contains('close');
+    // On mobile: toggle based on 'open' class; On desktop: toggle based on 'close' class
+    const expanding = isMobile() ? !sidebar.classList.contains('open') : sidebar.classList.contains('close');
     animateSidebar(expanding);
   });
 

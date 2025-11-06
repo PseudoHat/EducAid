@@ -4,6 +4,7 @@ session_start();
 header('Content-Type: application/json');
 
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../includes/CSRFProtection.php';
 @include_once __DIR__ . '/../includes/permissions.php';
 
 function resp($ok, $msg = '', $extra = []) {
@@ -13,6 +14,12 @@ function resp($ok, $msg = '', $extra = []) {
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
   resp(false, 'Invalid method');
+}
+
+// CSRF Protection
+$token = $_POST['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+if (!CSRFProtection::validateToken('cms_content', $token)) {
+  resp(false, 'Security validation failed. Please refresh the page.');
 }
 
 // Role check

@@ -23,10 +23,41 @@
   --shadow: 0 8px 24px rgba(2, 6, 23, .08);
 }
 
+/* Universal box-sizing for consistent layout */
+* {
+  box-sizing: border-box;
+}
+
 html, body {
   font-family: var(--thm-font);
   background: var(--thm-light-bg);
   color: var(--thm-black);
+  margin: 0;
+  padding: 0;
+}
+
+/* Prevent horizontal scroll ONLY on mobile */
+@media (max-width: 991.98px) {
+  html {
+    overflow-x: hidden;
+  }
+  
+  body {
+    overflow-x: hidden;
+  }
+}
+
+/* Fix Bootstrap row negative margins on mobile ONLY */
+@media (max-width: 767.98px) {
+  .row {
+    margin-left: 0;
+    margin-right: 0;
+  }
+  
+  .row > * {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
 }
 
 /* Top info bar */
@@ -300,8 +331,8 @@ body.navbar-open {
 .hero {
   position: relative;
   isolation: isolate;
-  min-height: 65vh;
-  padding: 3rem 0;
+  min-height: 60vh;
+  padding: 4rem 0;
   display: grid;
   place-items: center;
   background: var(--thm-light-bg);
@@ -320,7 +351,7 @@ body.navbar-open {
 .hero-card {
   backdrop-filter: saturate(140%) blur(6px);
   background: rgba(255,255,255,.75);
-  padding: 2rem;
+  padding: 3rem 2rem;
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   position: relative;
@@ -328,20 +359,51 @@ body.navbar-open {
   opacity: 0;
   transform: scale(0.9);
   animation: cardZoomIn 0.8s ease-out 0.6s forwards;
+  max-width: 900px;
+  margin: 0 auto;
+  text-align: center;
 }
+
+/* Center all content in hero since there's no image */
+.hero-card .d-flex.flex-column.flex-lg-row {
+  justify-content: center;
+  text-align: center;
+}
+
+.hero-card .flex-grow-1 {
+  max-width: 100%;
+}
+
+.hero .badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .hero h1 {
   font-weight: 800;
   letter-spacing: .2px;
   opacity: 0;
   transform: translateY(20px);
   animation: textSlideUp 0.6s ease-out 0.8s forwards;
+  text-align: center;
 }
 .hero p {
   color: var(--thm-gray);
   opacity: 0;
   transform: translateY(20px);
   animation: textSlideUp 0.6s ease-out 1s forwards;
+  text-align: center;
+  max-width: 700px;
+  margin-left: auto;
+  margin-right: auto;
 }
+
+/* Center button group */
+.hero .d-flex.gap-2 {
+  justify-content: center !important;
+}
+
 .cta-btn {
   border: none;
   border-radius: 999px;
@@ -1675,86 +1737,86 @@ footer a {
 
 /* Responsive Design - Hero and Quick Links Spacing */
 @media (max-width: 768px) {
+  /* CRITICAL: Prevent all images from overflowing */
+  img {
+    max-width: 100%;
+    height: auto;
+  }
+  
+  /* Prevent flex items from causing overflow */
+  .d-flex,
+  .flex-wrap,
+  .flex-nowrap {
+    flex-wrap: wrap !important;
+  }
+  
+  /* Ensure all text wraps properly */
+  h1, h2, h3, h4, h5, h6, p, span, div {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+  }
+  
+  /* Fix button groups */
+  .btn-group,
+  .btn-toolbar {
+    flex-wrap: wrap !important;
+    justify-content: center;
+  }
+  
   .hero {
-    min-height: 50vh;
-    padding: 1.5rem 0;
+    min-height: auto;
+    padding: 3rem 0 1.5rem;
+    overflow: hidden;
   }
   
   .hero-card {
-    padding: 1.5rem;
-    margin: 1rem;
+    padding: 2rem 1rem;
+    margin: 0 auto;
+    max-width: 800px;
+  }
+  
+  /* Center all hero content since there's no image */
+  .hero-card .d-flex.flex-column.flex-lg-row {
+    flex-direction: column !important;
+    text-align: center;
   }
   
   .hero h1 {
     font-size: 2rem;
-  }
-  
-  .hero p {
-    font-size: 0.95rem;
-    margin-bottom: 1.5rem;
-  }
-  
-  .quick-links {
-    margin-top: 1.5rem;
-    margin-bottom: 3rem;
-  }
-  
-  .ql-card {
-    padding: 0.8rem 1rem;
-    gap: 0.7rem;
-  }
-  
-  .ql-icon {
-    width: 40px;
-    height: 40px;
-    font-size: 1rem;
-  }
-  
-  /* Optimize sections spacing */
-  section {
-    padding: 3rem 0;
-  }
-  
-  .section-title {
-    font-size: 1.8rem;
+    text-align: center;
     margin-bottom: 1rem;
   }
-}
-
-@media (max-width: 576px) {
-  .hero {
-    min-height: 45vh;
-    padding: 1rem 0;
-  }
-  
-  .hero-card {
-    padding: 1.25rem;
-    margin: 0.75rem;
-  }
-  
-  .hero h1 {
-    font-size: 1.75rem;
-    line-height: 1.2;
-  }
   
   .hero p {
-    font-size: 0.9rem;
-    margin-bottom: 1.25rem;
+    font-size: 1rem;
+    margin-bottom: 1.5rem;
+    text-align: center;
   }
   
-  .hero .d-flex {
-    flex-direction: column;
-    gap: 0.75rem;
+  .hero .d-flex.gap-2 {
+    flex-direction: column !important;
+    width: 100%;
   }
   
   .hero .btn {
-    font-size: 0.95rem;
-    padding: 0.75rem 1.25rem;
+    width: 100%;
+    justify-content: center;
   }
   
+  /* Fix quick-links spacing */
   .quick-links {
-    margin-top: 1rem;
+    margin-top: 0.5rem;
     margin-bottom: 2rem;
+    padding: 0 0.75rem;
+  }
+  
+  .quick-links .row {
+    margin: 0 -0.5rem;
+  }
+  
+  .quick-links .row > * {
+    padding: 0 0.5rem;
+    margin-bottom: 0.75rem;
   }
   
   .ql-card {
@@ -1762,14 +1824,98 @@ footer a {
     gap: 0.6rem;
   }
   
-  .ql-card span {
-    font-size: 0.9rem;
-  }
-  
   .ql-icon {
     width: 36px;
     height: 36px;
     font-size: 0.9rem;
+    flex-shrink: 0;
+  }
+  
+  /* Optimize sections spacing */
+  section {
+    padding: 2.5rem 0;
+  }
+  
+  .section-title {
+    font-size: 1.6rem;
+    margin-bottom: 1rem;
+  }
+}
+
+@media (max-width: 576px) {
+  /* CRITICAL: Prevent images from overflowing on small screens */
+  img, video, iframe, embed {
+    max-width: 100%;
+    height: auto;
+  }
+  
+  .hero {
+    min-height: auto;
+    padding: 2rem 0 1rem;
+    overflow-x: hidden;
+  }
+  
+  .hero-card {
+    padding: 1.5rem 0.75rem;
+    margin: 0 auto;
+    max-width: 600px;
+  }
+  
+  .hero h1 {
+    font-size: 1.6rem;
+    line-height: 1.3;
+    text-align: center;
+    margin-bottom: 0.75rem;
+  }
+  
+  .hero p {
+    font-size: 0.9rem;
+    margin-bottom: 1.25rem;
+    text-align: center;
+    line-height: 1.5;
+  }
+  
+  .hero .d-flex {
+    flex-direction: column !important;
+    gap: 0.75rem;
+    width: 100%;
+  }
+  
+  .hero .btn {
+    font-size: 0.9rem;
+    padding: 0.7rem 1rem;
+    width: 100%;
+  }
+  
+  /* Optimize quick-links for small screens */
+  .quick-links {
+    margin-top: 0.5rem;
+    margin-bottom: 1.5rem;
+    padding: 0 0.5rem;
+  }
+  
+  .quick-links .row {
+    margin: 0 -0.25rem;
+  }
+  
+  .quick-links .row > * {
+    padding: 0 0.25rem;
+    margin-bottom: 0.5rem;
+  }
+  
+  .ql-card {
+    padding: 0.65rem;
+    gap: 0.5rem;
+  }
+  
+  .ql-card span {
+    font-size: 0.85rem;
+  }
+  
+  .ql-icon {
+    width: 32px;
+    height: 32px;
+    font-size: 0.85rem;
   }
   
   /* Further optimize sections spacing on small screens */
@@ -1778,17 +1924,17 @@ footer a {
   }
   
   .section-title {
-    font-size: 1.6rem;
+    font-size: 1.4rem;
     margin-bottom: 0.75rem;
   }
   
   .section-lead {
-    font-size: 0.95rem;
+    font-size: 0.9rem;
   }
   
   /* Optimize container padding */
   .container {
-    padding-left: 1rem;
-    padding-right: 1rem;
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
   }
 }

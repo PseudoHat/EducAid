@@ -26,4 +26,3 @@ if (!defined('RECAPTCHA_V2_SECRET_KEY')) {
 if (!defined('RECAPTCHA_VERIFY_URL')) {
 	define('RECAPTCHA_VERIFY_URL', 'https://www.google.com/recaptcha/api/siteverify');
 }
-?>

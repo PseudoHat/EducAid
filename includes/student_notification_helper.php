@@ -306,4 +306,3 @@ function student_get_or_create_email_prefs($connection, $student_id) {
     if ($ins && ($n = pg_fetch_assoc($ins))) return $n;
     return null;
 }
-?>

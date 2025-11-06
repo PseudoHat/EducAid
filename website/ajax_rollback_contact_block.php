@@ -9,12 +9,17 @@ session_start();
 header('Content-Type: application/json');
 
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../includes/CSRFProtection.php';
 @include_once __DIR__ . '/../includes/permissions.php';
 
 function resp_roll($ok, $msg = '', $extra = []) {
     echo json_encode(array_merge(['success' => $ok, 'message' => $msg], $extra));
     exit;
 }
+
+// CSRF Protection
+$token = $_POST['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+if (!CSRFProtection::validateToken('cms_content', $token)) resp_roll(false, 'Security validation failed. Please refresh the page.');
 
 if (!isset($connection)) {
     resp_roll(false, 'Database unavailable');

@@ -2,6 +2,7 @@
 // Landing page with optional super admin inline edit mode
 // Start session
 session_start();
+require_once __DIR__ . '/../includes/CSRFProtection.php';
 
 $IS_EDIT_SUPER_ADMIN = false;
 // Detect super admin attempting to edit (bypass captcha gate)
@@ -37,9 +38,9 @@ if (!$IS_EDIT_SUPER_ADMIN) {
 }
 
 // Include reCAPTCHA v2 configuration
-require_once '../config/recaptcha_v2_config.php';
+require_once __DIR__ . '/../config/recaptcha_v2_config.php';
 // Bring in database for dynamic announcements preview
-require_once '../config/database.php';
+require_once __DIR__ . '/../config/database.php';
 @include_once __DIR__ . '/../includes/permissions.php';
 
 $IS_EDIT_MODE = false;
@@ -97,9 +98,12 @@ function lp_block_style($key){
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, user-scalable=yes" />
   <title><?php echo strip_tags(lp_block('page_title','EducAid – City of General Trias')); ?></title>
   <meta name="description" content="Educational Assistance Management System for the City of General Trias" />
+  <?php if ($IS_EDIT_MODE): ?>
+  <meta name="csrf-token" content="<?php echo CSRFProtection::generateToken('cms_content'); ?>" />
+  <?php endif; ?>
 
   <!-- Google Fonts -->
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
@@ -191,9 +195,6 @@ function lp_block_style($key){
                   <a href="<?php echo $base_path; ?>register.php" class="btn cta-btn btn-primary-custom" data-lp-key="hero_cta_apply"><i class="bi bi-journal-text me-2"></i>Apply Now</a>
                   <a href="<?php echo $base_path; ?>unified_login.php" class="btn cta-btn btn-outline-custom" data-lp-key="hero_cta_signin"><i class="bi bi-box-arrow-in-right me-2"></i>Sign In</a>
                 </div>
-              </div>
-              <div class="text-center">
-                <img src="https://images.unsplash.com/photo-1587825140708-dfaf72ae4b04?q=80&w=1000&auto=format&fit=crop" alt="Students" class="img-fluid rounded-2xl shadow-soft" style="max-width:360px" />
               </div>
             </div>
           </div>
@@ -684,6 +685,7 @@ function lp_block_style($key){
       try {
         const formData = new FormData();
         formData.append('email', email);
+        formData.append('csrf_token', '<?php echo CSRFProtection::generateToken("newsletter_subscribe"); ?>');
         
         const response = await fetch('newsletter_subscribe.php', {
           method: 'POST',

@@ -197,4 +197,3 @@ function studentTimeAgo($datetime) {
     
     return date('M j, Y', strtotime($datetime));
 }
-?>
