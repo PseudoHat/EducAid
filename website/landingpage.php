@@ -38,9 +38,9 @@ if (!$IS_EDIT_SUPER_ADMIN) {
 }
 
 // Include reCAPTCHA v2 configuration
-require_once '../config/recaptcha_v2_config.php';
+require_once __DIR__ . '/../config/recaptcha_v2_config.php';
 // Bring in database for dynamic announcements preview
-require_once '../config/database.php';
+require_once __DIR__ . '/../config/database.php';
 @include_once __DIR__ . '/../includes/permissions.php';
 
 $IS_EDIT_MODE = false;
