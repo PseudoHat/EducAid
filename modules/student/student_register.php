@@ -13,6 +13,9 @@ include_once __DIR__ . '/../../config/database.php';
 // Include reCAPTCHA v3 configuration (site key + secret key constants)
 include_once __DIR__ . '/../../config/recaptcha_config.php';
 
+// Ensure database connection is accessible globally
+global $connection;
+
 // Start session if not already started
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -20,10 +23,9 @@ if (session_status() === PHP_SESSION_NONE) {
 
 // Database connection is validated in database.php (will die if connection fails)
 // The $connection variable is available globally after include
-// Ensure connection is accessible in this scope
-global $connection;
 
 $municipality_id = $_SESSION['active_municipality_id'] ?? 1;
+error_log('REGISTRATION PAGE: municipality_id=' . $municipality_id . ', session municipality=' . ($_SESSION['active_municipality_id'] ?? 'not set'));
 $municipality_logo = null;
 $municipality_name = 'General Trias';
 
@@ -1185,7 +1187,9 @@ if ($_SERVER["REQUEST_METHOD"] !== "POST") {
             $slotInfo = pg_fetch_assoc($slotRes);
         
             if ($slotInfo) {
-                error_log('SLOT CHECK: Found active slot - slot_id=' . $slotInfo['slot_id'] . ', max_slots=' . $slotInfo['max_slots']);
+                // Use slot_count (the actual database column name)
+                $maxSlots = (int)($slotInfo['max_slots'] ?? $slotInfo['slot_count'] ?? 0);
+                error_log('SLOT CHECK: Found active slot - slot_id=' . $slotInfo['slot_id'] . ', slot_count/max_slots=' . $maxSlots);
                 
                 // There is an active slot, check if it's full
                 $countRes = pg_query_params($connection, "
@@ -1195,7 +1199,6 @@ if ($_SERVER["REQUEST_METHOD"] !== "POST") {
                 
                 $countRow = pg_fetch_assoc($countRes);
                 $currentCount = (int)$countRow['total'];
-                $maxSlots = (int)$slotInfo['max_slots'];
                 $slotsLeft = max(0, $maxSlots - $currentCount);
                 
                 error_log('SLOT CHECK: Current count=' . $currentCount . ', Max slots=' . $maxSlots . ', Slots left=' . $slotsLeft);
