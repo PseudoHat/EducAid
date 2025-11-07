@@ -45,6 +45,11 @@ class SessionTimeoutMiddleware {
             return ['status' => 'not_authenticated'];
         }
         
+        // Skip timeout enforcement for admin sessions (admins have their own session management)
+        if (isset($_SESSION['admin_id'])) {
+            return ['status' => 'admin_session', 'skip_timeout' => true];
+        }
+        
         // Check if "Remember Me" is active (skip timeouts)
         if ($this->hasRememberMeToken()) {
             $this->updateActivity();
