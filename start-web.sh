@@ -4,32 +4,58 @@
 set -euo pipefail
 
 # CRITICAL: Create upload directory structure in the Railway volume
+echo "========================================="
 echo "Initializing upload directory structure..."
+echo "========================================="
 
 # Check if Railway volume exists
 if [ -d "/mnt/assets/uploads" ]; then
-  echo "Railway volume detected at /mnt/assets/uploads"
+  echo "✓ Railway volume detected at /mnt/assets/uploads"
   
   # Create Railway volume directory structure with short folder names
-  mkdir -p /mnt/assets/uploads/temp/EAF
-  mkdir -p /mnt/assets/uploads/temp/ID
-  mkdir -p /mnt/assets/uploads/temp/Letter
-  mkdir -p /mnt/assets/uploads/temp/Indigency
-  mkdir -p /mnt/assets/uploads/temp/Grades
-  mkdir -p /mnt/assets/uploads/student/EAF
-  mkdir -p /mnt/assets/uploads/student/ID
-  mkdir -p /mnt/assets/uploads/student/Letter
-  mkdir -p /mnt/assets/uploads/student/Indigency
-  mkdir -p /mnt/assets/uploads/student/Grades
-  chmod -R 755 /mnt/assets/uploads
+  echo "Creating directory structure..."
+  mkdir -p /mnt/assets/uploads/temp/EAF || echo "⚠ Failed to create temp/EAF"
+  mkdir -p /mnt/assets/uploads/temp/ID || echo "⚠ Failed to create temp/ID"
+  mkdir -p /mnt/assets/uploads/temp/Letter || echo "⚠ Failed to create temp/Letter"
+  mkdir -p /mnt/assets/uploads/temp/Indigency || echo "⚠ Failed to create temp/Indigency"
+  mkdir -p /mnt/assets/uploads/temp/Grades || echo "⚠ Failed to create temp/Grades"
+  mkdir -p /mnt/assets/uploads/student/EAF || echo "⚠ Failed to create student/EAF"
+  mkdir -p /mnt/assets/uploads/student/ID || echo "⚠ Failed to create student/ID"
+  mkdir -p /mnt/assets/uploads/student/Letter || echo "⚠ Failed to create student/Letter"
+  mkdir -p /mnt/assets/uploads/student/Indigency || echo "⚠ Failed to create student/Indigency"
+  mkdir -p /mnt/assets/uploads/student/Grades || echo "⚠ Failed to create student/Grades"
+  echo "✓ Directories created"
+  
+  echo "Setting permissions..."
+  chmod -R 755 /mnt/assets/uploads || echo "⚠ Failed to set permissions"
+  echo "✓ Permissions set to 755"
   
   # Create symlink so /app/assets/uploads points to volume
-  mkdir -p /app/assets
-  rm -rf /app/assets/uploads  # Remove if exists
-  ln -sf /mnt/assets/uploads /app/assets/uploads
-  echo "✓ Railway volume directories created and symlinked to /app/assets/uploads"
+  echo "Creating symlink..."
+  mkdir -p /app/assets || echo "⚠ Failed to create /app/assets"
+  
+  # Remove existing directory/symlink if exists
+  if [ -e /app/assets/uploads ] || [ -L /app/assets/uploads ]; then
+    echo "Removing existing /app/assets/uploads..."
+    rm -rf /app/assets/uploads || echo "⚠ Failed to remove existing uploads"
+  fi
+  
+  # Create symlink
+  ln -sf /mnt/assets/uploads /app/assets/uploads || echo "⚠ Failed to create symlink"
+  
+  # Verify symlink
+  if [ -L /app/assets/uploads ]; then
+    LINK_TARGET=$(readlink /app/assets/uploads)
+    echo "✓ Symlink created: /app/assets/uploads -> $LINK_TARGET"
+  else
+    echo "✗ ERROR: Symlink creation failed!"
+  fi
+  
+  echo "✓ Railway volume setup complete!"
+  echo "✓ Railway volume setup complete!"
 else
-  echo "No Railway volume detected - using local /app/assets/uploads"
+  echo "✗ No Railway volume detected at /mnt/assets/uploads"
+  echo "Using local /app/assets/uploads (ephemeral - will be deleted on redeploy)"
   
   # Create local directory structure for development/non-Railway deploys
   mkdir -p /app/assets/uploads/temp/enrollment_forms
@@ -45,6 +71,8 @@ else
   chmod -R 755 /app/assets/uploads
   echo "✓ Local upload directories created"
 fi
+
+echo "========================================="
 
 PORT=${PORT:-8080}
 # Default document root: the repository's website landing page directory
