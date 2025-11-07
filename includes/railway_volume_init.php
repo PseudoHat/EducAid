@@ -32,22 +32,41 @@ if (file_exists('/mnt/assets/uploads/')) {
             @mkdir('/app/assets', 0755, true);
         }
         
-        // Remove existing file/directory/symlink
+        // AGGRESSIVELY remove existing file/directory/symlink
         if (file_exists($symlinkPath) || is_link($symlinkPath)) {
             if (is_link($symlinkPath)) {
                 @unlink($symlinkPath);
             } else {
-                // It's a directory - try to remove it
-                // Don't recursively delete in case there are files we want to keep
-                @rmdir($symlinkPath);
+                // It's a directory - use shell command for forceful removal
+                $output = [];
+                $return = 0;
+                @exec('rm -rf ' . escapeshellarg($symlinkPath) . ' 2>&1', $output, $return);
+                if ($return !== 0) {
+                    error_log("Railway volume auto-setup: Failed to remove directory: " . implode("\n", $output));
+                    // Try PHP removal as fallback
+                    @chmod($symlinkPath, 0777);
+                    @rmdir($symlinkPath);
+                }
             }
         }
         
         // Create symlink
         if (@symlink($volumePath, $symlinkPath)) {
             error_log("Railway volume auto-setup: ✓ Symlink created successfully");
+            // Verify it worked
+            if (is_link($symlinkPath) && readlink($symlinkPath) === $volumePath) {
+                error_log("Railway volume auto-setup: ✓ Symlink verified: " . readlink($symlinkPath));
+            }
         } else {
-            error_log("Railway volume auto-setup: ✗ Failed to create symlink");
+            // Try shell command as fallback
+            $output = [];
+            $return = 0;
+            @exec('ln -sf ' . escapeshellarg($volumePath) . ' ' . escapeshellarg($symlinkPath) . ' 2>&1', $output, $return);
+            if ($return === 0) {
+                error_log("Railway volume auto-setup: ✓ Symlink created via shell command");
+            } else {
+                error_log("Railway volume auto-setup: ✗ Failed to create symlink: " . implode("\n", $output));
+            }
         }
     }
 }
