@@ -2248,7 +2248,16 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processLetterOcr'])) 
     @error_reporting(0);
     
     $captcha = verify_recaptcha_v3($_POST['g-recaptcha-response'] ?? '', 'process_letter_ocr');
-    if (!$captcha['ok']) { json_response(['status'=>'error','message'=>'Security verification failed (captcha).']); }
+    if (!$captcha['ok']) { 
+        // Provide more detailed error message
+        $reason = $captcha['reason'] ?? 'unknown';
+        $score = $captcha['score'] ?? 0;
+        json_response([
+            'status'=>'error',
+            'message'=>'Security verification failed (captcha).',
+            'debug' => 'Reason: ' . $reason . ', Score: ' . $score
+        ]); 
+    }
     if (!isset($_FILES['letter_to_mayor']) || $_FILES['letter_to_mayor']['error'] !== UPLOAD_ERR_OK) {
         json_response(['status' => 'error', 'message' => 'No letter file uploaded or upload error.']);
     }
@@ -8536,6 +8545,13 @@ console.log('✅ Enhanced navigation with validation ready');
             } else {
                 // Enhanced error display for PDFs and suggestions
                 let errorMessage = data.message;
+                
+                // Add debug info if available
+                if (data.debug) {
+                    console.error('Letter verification error:', data.debug);
+                    errorMessage += '\n\nTechnical details: ' + data.debug;
+                }
+                
                 if (data.suggestions && data.suggestions.length > 0) {
                     errorMessage += '\n\nSuggestions:\n' + data.suggestions.join('\n');
                 }
