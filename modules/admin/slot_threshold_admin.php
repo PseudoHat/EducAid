@@ -5,7 +5,9 @@
  * Allows admins to manually trigger slot threshold checks and view notification history
  */
 
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 require_once '../config/database.php';
 require_once '../includes/permissions.php';
 

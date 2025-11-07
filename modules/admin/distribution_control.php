@@ -3,7 +3,9 @@
  * Distribution Control Center
  * Main hub for managing distribution lifecycle
  */
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 if (!isset($_SESSION['admin_username'])) {
     header("Location: ../../unified_login.php");
     exit;

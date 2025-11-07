@@ -2,7 +2,9 @@
 // Load secure session configuration (must be before session_start)
 require_once __DIR__ . '../../config/session_config.php';
 
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../includes/CSRFProtection.php';
 require_once __DIR__ . '/../../includes/student_notification_helper.php';

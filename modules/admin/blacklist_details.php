@@ -1,6 +1,8 @@
 <?php
 include __DIR__ . '/../../config/database.php';
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 if (!isset($_SESSION['admin_username']) || !isset($_GET['student_id'])) {
     exit('Unauthorized');

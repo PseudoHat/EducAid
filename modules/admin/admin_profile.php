@@ -7,7 +7,9 @@ require_once __DIR__ . '/../../includes/CSRFProtection.php';
 // Load secure session configuration (must be before session_start)
 require_once __DIR__ . '../../config/session_config.php';
 
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 if (!isset($_SESSION['admin_username'])) {
   header("Location: ../../unified_login.php");
   exit;

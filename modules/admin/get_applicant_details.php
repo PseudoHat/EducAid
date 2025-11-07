@@ -9,7 +9,9 @@
  * Folders: indigency, grades, id_pictures, enrollment_forms, letter_mayor
  */
 
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 if (!isset($_SESSION['admin_username'])) {
     http_response_code(401);
     echo json_encode(['error' => 'Unauthorized']);

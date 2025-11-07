@@ -3,7 +3,9 @@
  * Web-accessible page to create active session for currently logged-in student
  * Visit this page in your browser while logged in
  */
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 include __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../includes/SessionManager.php';
 ?>

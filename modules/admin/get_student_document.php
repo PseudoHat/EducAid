@@ -1,6 +1,8 @@
 <?php
 include __DIR__ . '/../../config/database.php';
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 // Function to convert absolute server paths to web-accessible relative paths
 function convertToWebPath($inputPath) {

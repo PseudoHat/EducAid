@@ -2,7 +2,9 @@
 include __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../includes/CSRFProtection.php';
 require_once __DIR__ . '/../../includes/student_notification_helper.php';
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 if (!isset($_SESSION['admin_username'])) {
     header("Location: ../../unified_login.php");
     exit;

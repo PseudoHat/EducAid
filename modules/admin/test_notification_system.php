@@ -1,5 +1,7 @@
 <?php
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 $_SESSION['admin_username'] = 'test_admin'; // Simulate admin login for testing
 ?>
 <!DOCTYPE html>

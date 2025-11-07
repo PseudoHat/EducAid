@@ -1,6 +1,8 @@
 <?php
 
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 // Ensure the admin is logged in, otherwise redirect to the login page
 if (!isset($_SESSION['admin_username'])) {

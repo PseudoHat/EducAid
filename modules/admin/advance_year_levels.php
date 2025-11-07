@@ -2,7 +2,9 @@
 // AJAX endpoint for preview - handle BEFORE any other output
 if (isset($_GET['action']) && $_GET['action'] === 'preview') {
     // Start session and load dependencies
+    if (session_status() === PHP_SESSION_NONE) {
     session_start();
+}
     include __DIR__ . '/../../config/database.php';
     
     // Clear any output that might have occurred
@@ -49,7 +51,9 @@ if (isset($_GET['action']) && $_GET['action'] === 'preview') {
 // AJAX endpoint for execution - handle BEFORE any other output
 if (isset($_POST['action']) && $_POST['action'] === 'execute') {
     // Start session and load dependencies
+    if (session_status() === PHP_SESSION_NONE) {
     session_start();
+}
     include __DIR__ . '/../../config/database.php';
     
     // Clear any output that might have occurred
@@ -138,7 +142,9 @@ if (isset($_POST['action']) && $_POST['action'] === 'execute') {
 // Regular page load - start output buffering
 ob_start();
 
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 include __DIR__ . '/../../config/database.php';
 
 $page_title = 'Advance Year Levels';

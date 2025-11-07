@@ -4,7 +4,9 @@
  * Expects ?sid=STUDENT_ID . Validates session ownership (student) or future admin role.
  * Reads stored path from DB, decrypts if encrypted, sets proper headers, streams bytes.
  */
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 if (!isset($_SESSION['student_id'])) {
     http_response_code(401);
     echo 'Unauthorized (no active session)';

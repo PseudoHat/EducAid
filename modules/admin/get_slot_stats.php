@@ -1,7 +1,9 @@
 <?php
 // AJAX endpoint for real-time slot updates
 include __DIR__ . '/../../config/database.php';
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 // Security check
 if (!isset($_SESSION['admin_username'])) {

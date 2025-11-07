@@ -5,7 +5,9 @@
 include_once '../../config/database.php';
 include_once '../../config/env.php';
 include_once '../../config/validate_env.php';
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 // Basic auth gate (adjust according to your existing admin auth mechanism)
 if (!isset($_SESSION['admin_id'])) {

@@ -1,5 +1,7 @@
 <?php
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 // Log logout before destroying session
 if (isset($_SESSION['student_id']) && isset($_SESSION['student_username'])) {

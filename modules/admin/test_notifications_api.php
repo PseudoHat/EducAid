@@ -1,6 +1,8 @@
 <?php
 // Test the notification API functionality
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 $_SESSION['admin_username'] = 'test'; // Simulate admin session
 
 // Test get_count action

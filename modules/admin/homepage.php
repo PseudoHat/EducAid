@@ -1,5 +1,7 @@
 <?php
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 // Demo mode handling: support a persistent toggle via session + robust query parsing
 // 1) Toggle: ?toggle_demo=1 -> flips the current mode and redirects (PRG)

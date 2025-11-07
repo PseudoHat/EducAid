@@ -7,7 +7,9 @@
 include __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../services/StudentArchivalService.php';
 require_once __DIR__ . '/../../services/BlacklistService.php';
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 // Require admin authentication
 if (!isset($_SESSION['admin_username'])) {

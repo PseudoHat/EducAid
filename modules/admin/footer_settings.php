@@ -2,7 +2,9 @@
 // Start output buffering to prevent any accidental output before JSON response
 ob_start();
 
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 // Security checks for regular page load
 if (!isset($_SESSION['admin_username'])) {

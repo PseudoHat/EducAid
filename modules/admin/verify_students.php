@@ -2,7 +2,9 @@
 include __DIR__ . '/../../config/database.php';
 include __DIR__ . '/../../includes/workflow_control.php';
 require_once __DIR__ . '/../../includes/CSRFProtection.php';
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 if (!isset($_SESSION['admin_username'])) {
     header("Location: ../../unified_login.php");
     exit;

@@ -3,7 +3,9 @@
  * Get detailed information about a distribution archive
  * Returns JSON with student list, file manifest, and metadata
  */
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 header('Content-Type: application/json');
 
 if (!isset($_SESSION['admin_username'])) {

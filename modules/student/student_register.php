@@ -12,7 +12,18 @@ if (isset($_POST['processIdPictureOcr']) || isset($_POST['processGradesOcr']) ||
 include_once __DIR__ . '/../../config/database.php';
 // Include reCAPTCHA v3 configuration (site key + secret key constants)
 include_once __DIR__ . '/../../config/recaptcha_config.php';
-session_start();
+
+// Start session if not already started
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+// Check database connection
+if (!isset($connection) || !$connection) {
+    error_log('ERROR: Database connection not available in student_register.php');
+    http_response_code(500);
+    die('Database connection error. Please try again later.');
+}
 
 $municipality_id = $_SESSION['active_municipality_id'] ?? 1;
 $municipality_logo = null;

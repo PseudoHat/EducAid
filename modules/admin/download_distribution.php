@@ -3,7 +3,9 @@
  * Secure Distribution Archive Download Handler
  * Prevents direct access to files and ensures proper MIME type
  */
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 if (!isset($_SESSION['admin_username'])) {
     http_response_code(403);
     die('Access denied');

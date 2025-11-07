@@ -1,6 +1,8 @@
 <?php
 include __DIR__ . '/../../config/database.php';
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 // Check if student is logged in
 if (!isset($_SESSION['student_username']) || !isset($_SESSION['student_id'])) {

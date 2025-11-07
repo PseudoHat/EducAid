@@ -8,7 +8,9 @@
  * No cron job required - runs on-demand when admins login.
  */
 
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 require_once __DIR__ . '/../../config/database.php';
 
 // Only run for super admins
