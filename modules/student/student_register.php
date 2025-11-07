@@ -9,12 +9,9 @@ if (isset($_POST['processIdPictureOcr']) || isset($_POST['processGradesOcr']) ||
 }
 
 // Move all AJAX processing to the very top to avoid headers already sent error
-include_once __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../../config/database.php';
 // Include reCAPTCHA v3 configuration (site key + secret key constants)
-include_once __DIR__ . '/../../config/recaptcha_config.php';
-
-// Ensure database connection is accessible globally
-global $connection;
+require_once __DIR__ . '/../../config/recaptcha_config.php';
 
 // Start session if not already started
 if (session_status() === PHP_SESSION_NONE) {
@@ -25,7 +22,6 @@ if (session_status() === PHP_SESSION_NONE) {
 // The $connection variable is available globally after include
 
 $municipality_id = $_SESSION['active_municipality_id'] ?? 1;
-error_log('REGISTRATION PAGE: municipality_id=' . $municipality_id . ', session municipality=' . ($_SESSION['active_municipality_id'] ?? 'not set'));
 $municipality_logo = null;
 $municipality_name = 'General Trias';
 
@@ -1169,48 +1165,39 @@ if ($_SERVER["REQUEST_METHOD"] !== "POST") {
     $noSlotsAvailable = false;
     $slotsFull = false;
     
-    // Debug: Check connection status
-    if (!isset($connection)) {
-        error_log('SLOT CHECK ERROR: $connection variable is not set at line 1167');
-        $noSlotsAvailable = true;
-    } elseif (!$connection) {
-        error_log('SLOT CHECK ERROR: $connection is false/null at line 1169');
-        $noSlotsAvailable = true;
-    } else {
-        // Connection is available, proceed with slot check
-        $slotRes = @pg_query_params($connection, "SELECT * FROM signup_slots WHERE is_active = TRUE AND municipality_id = $1 ORDER BY created_at DESC LIMIT 1", [$municipality_id]);
+    // Debug: Log connection status
+    error_log("SLOT CHECK: Connection status - isset: " . (isset($connection) ? 'true' : 'false') . ", value: " . ($connection ? 'valid' : 'invalid'));
+    error_log("SLOT CHECK: Municipality ID: " . $municipality_id);
+    
+    // Check if there's an active slot for this municipality (only if connection is available)
+    if (isset($connection) && $connection) {
+        error_log("SLOT CHECK: Querying for active slots...");
+        $slotRes = pg_query_params($connection, "SELECT * FROM signup_slots WHERE is_active = TRUE AND municipality_id = $1 ORDER BY created_at DESC LIMIT 1", [$municipality_id]);
+        $slotInfo = pg_fetch_assoc($slotRes);
         
-        if (!$slotRes) {
-            error_log('SLOT CHECK ERROR: Query failed - ' . pg_last_error($connection));
-            $noSlotsAvailable = true;
-        } else {
-            $slotInfo = pg_fetch_assoc($slotRes);
-        
-            if ($slotInfo) {
-                // Use slot_count (the actual database column name)
-                $maxSlots = (int)($slotInfo['max_slots'] ?? $slotInfo['slot_count'] ?? 0);
-                error_log('SLOT CHECK: Found active slot - slot_id=' . $slotInfo['slot_id'] . ', slot_count/max_slots=' . $maxSlots);
-                
-                // There is an active slot, check if it's full
-                $countRes = pg_query_params($connection, "
-                    SELECT COUNT(*) AS total FROM students
-                    WHERE slot_id = $1
-                ", [$slotInfo['slot_id']]);
-                
-                $countRow = pg_fetch_assoc($countRes);
-                $currentCount = (int)$countRow['total'];
-                $slotsLeft = max(0, $maxSlots - $currentCount);
-                
-                error_log('SLOT CHECK: Current count=' . $currentCount . ', Max slots=' . $maxSlots . ', Slots left=' . $slotsLeft);
-                
-                if ($currentCount >= $maxSlots) {
-                    $slotsFull = true;
-                }
-            } else {
-                error_log('SLOT CHECK: No active slot found for municipality_id=' . $municipality_id);
-                $noSlotsAvailable = true;
+        error_log("SLOT CHECK: Slot info - " . ($slotInfo ? json_encode($slotInfo) : 'NULL'));
+    
+        if ($slotInfo) {
+            // There is an active slot, check if it's full
+            $countRes = pg_query_params($connection, "
+                SELECT COUNT(*) AS total FROM students
+                WHERE slot_id = $1
+            ", [$slotInfo['slot_id']]);
+            
+            $countRow = pg_fetch_assoc($countRes);
+            $currentCount = (int)$countRow['total'];
+            $maxSlots = (int)$slotInfo['max_slots'];
+            $slotsLeft = max(0, $maxSlots - $currentCount);
+            
+            if ($currentCount >= $maxSlots) {
+                $slotsFull = true;
             }
+        } else {
+            $noSlotsAvailable = true;
         }
+    } else {
+        // No database connection - treat as no slots available
+        $noSlotsAvailable = true;
     }
     
     if ($noSlotsAvailable || $slotsFull) {
