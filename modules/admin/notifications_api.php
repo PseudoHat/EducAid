@@ -1,6 +1,9 @@
 <?php
 // AJAX endpoint to mark admin notifications as read
 include __DIR__ . '/../../config/database.php';
+// Load secure session configuration (must be before session_start)
+require_once __DIR__ . '../../config/session_config.php';
+
 session_start();
 
 if (!isset($_SESSION['admin_username'])) {

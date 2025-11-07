@@ -1,4 +1,7 @@
 <?php
+// Load secure session configuration (must be before session_start)
+require_once __DIR__ . '../../config/session_config.php';
+
 session_start();
 include_once __DIR__ . '/../../config/database.php';
 include_once __DIR__ . '/../../includes/permissions.php';

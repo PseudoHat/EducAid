@@ -1,0 +1,14 @@
+# Deny direct access to core router file
+# Only accessible through the entry point router.php
+
+<Files "AppRouter.php">
+    Require all denied
+</Files>
+
+# Alternative for older Apache versions
+<IfModule !mod_authz_core.c>
+    <Files "AppRouter.php">
+        Order deny,allow
+        Deny from all
+    </Files>
+</IfModule>

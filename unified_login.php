@@ -2,6 +2,9 @@
 // Load security headers first (before any output)
 require_once __DIR__ . '/config/security_headers.php';
 
+// Load secure session configuration (must be before session_start)
+require_once __DIR__ . '/config/session_config.php';
+
 include __DIR__ . '/config/database.php';
 include __DIR__ . '/config/recaptcha_config.php';
 require_once __DIR__ . '/services/AuditLogger.php';

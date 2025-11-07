@@ -2,6 +2,9 @@
 // Start output buffering to prevent any accidental output before JSON response
 ob_start();
 
+// Load secure session configuration (must be before session_start)
+require_once __DIR__ . '../../config/session_config.php';
+
 session_start();
 
 // Security checks for regular page load

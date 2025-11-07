@@ -1,4 +1,7 @@
 <?php
+// Load secure session configuration (must be before session_start)
+require_once __DIR__ . '../../config/session_config.php';
+
 session_start();
 
 // Log logout before destroying session
