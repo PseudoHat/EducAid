@@ -31,4 +31,18 @@ if (!isset($page_title) || trim($page_title) === '') {
   <!-- Admin JavaScript -->
   <script src="../../assets/js/admin/sidebar.js"></script>
   <script src="../../assets/js/admin/notification_bell.js"></script>
+  
+<?php if (isset($GLOBALS['session_timeout_status']) && $GLOBALS['session_timeout_status']['status'] === 'active'): ?>
+  <!-- Session Timeout Warning System -->
+  <link rel="stylesheet" href="../../assets/css/session-timeout-warning.css">
+  <script>
+    window.sessionTimeoutConfig = {
+      idle_timeout_minutes: <?= $GLOBALS['session_timeout_status']['idle_timeout_seconds'] / 60 ?>,
+      absolute_timeout_hours: <?= $GLOBALS['session_timeout_status']['absolute_timeout_seconds'] / 3600 ?>,
+      warning_before_logout_seconds: <?= $GLOBALS['session_timeout_status']['warning_threshold'] ?>,
+      enabled: true
+    };
+  </script>
+  <script src="../../assets/js/session-timeout-warning.js"></script>
+<?php endif; ?>
 </head>

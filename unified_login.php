@@ -1150,6 +1150,49 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
     include 'includes/website/navbar.php';
     ?>
     
+    <?php
+    // Display session timeout messages
+    if (isset($_GET['timeout'])) {
+        $timeoutReason = htmlspecialchars($_GET['timeout']);
+        $timeoutMessages = [
+            'idle_timeout' => [
+                'icon' => 'clock-history',
+                'title' => 'Session Expired',
+                'message' => 'Your session expired due to inactivity. Please log in again to continue.'
+            ],
+            'absolute_timeout' => [
+                'icon' => 'shield-exclamation',
+                'title' => 'Session Expired',
+                'message' => 'Your session exceeded the maximum duration for security reasons. Please log in again.'
+            ],
+            'session_not_found' => [
+                'icon' => 'x-circle',
+                'title' => 'Session Invalid',
+                'message' => 'Your session was not found. Please log in again.'
+            ]
+        ];
+        
+        $messageData = $timeoutMessages[$timeoutReason] ?? [
+            'icon' => 'info-circle',
+            'title' => 'Session Ended',
+            'message' => 'Your session has ended. Please log in again.'
+        ];
+        
+        echo '<div class="container mt-4">';
+        echo '<div class="alert alert-warning alert-dismissible fade show" role="alert" style="max-width: 600px; margin: 0 auto;">';
+        echo '<div class="d-flex align-items-center">';
+        echo '<i class="bi bi-' . $messageData['icon'] . ' fs-4 me-3"></i>';
+        echo '<div>';
+        echo '<h5 class="alert-heading mb-1">' . $messageData['title'] . '</h5>';
+        echo '<p class="mb-0">' . $messageData['message'] . '</p>';
+        echo '</div>';
+        echo '</div>';
+        echo '<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>';
+        echo '</div>';
+        echo '</div>';
+    }
+    ?>
+    
     <!-- Main Login Container - Using unique classes to isolate from navbar -->
     <div class="login-content-container">
         <div class="login-main-wrapper">
