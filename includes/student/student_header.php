@@ -1,6 +1,12 @@
 <?php
 // Student Header with dynamic theming
 // Requires: $_SESSION['student_username'], $_SESSION['student_id']
+
+// Load security headers first (if not already loaded)
+if (!defined('SECURITY_HEADERS_LOADED')) {
+    require_once __DIR__ . '/../../config/security_headers.php';
+}
+
 $studentDisplay = htmlspecialchars($_SESSION['student_username'] ?? 'Student');
 $studentId = $_SESSION['student_id'] ?? null;
 

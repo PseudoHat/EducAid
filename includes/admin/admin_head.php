@@ -4,6 +4,12 @@
 //   $page_title = 'Dashboard'; // optional
 //   $extra_css = ['../../assets/css/admin/manage_applicants.css']; // optional array of extra CSS hrefs
 // Then: include __DIR__ . '/../../includes/admin/admin_head.php';
+
+// Load security headers first (if not already loaded)
+if (!defined('SECURITY_HEADERS_LOADED')) {
+    require_once __DIR__ . '/../../config/security_headers.php';
+}
+
 if (!isset($page_title) || trim($page_title) === '') {
     $page_title = 'Admin';
 }

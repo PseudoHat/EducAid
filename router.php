@@ -4,6 +4,9 @@
  * Serves static files correctly and routes PHP requests
  */
 
+// Load security headers first (before any output)
+require_once __DIR__ . '/config/security_headers.php';
+
 $requestUri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 
 // Strip /EducAid/ prefix if present (Railway deployment path)
