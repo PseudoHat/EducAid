@@ -13,6 +13,9 @@ require_once __DIR__ . '/../../config/database.php';
 // Include reCAPTCHA v3 configuration (site key + secret key constants)
 require_once __DIR__ . '/../../config/recaptcha_config.php';
 
+// Make connection variable available in this scope
+global $connection;
+
 // Start session if not already started
 if (session_status() === PHP_SESSION_NONE) {
     session_start();

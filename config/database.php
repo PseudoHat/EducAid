@@ -46,7 +46,11 @@ $connString = sprintf(
 );
 
 error_log(sprintf('Attempting DB connection: host=%s port=%s dbname=%s user=%s', $dbHost, $dbPort, $dbName, $dbUser));
+
+// Make connection globally accessible
+global $connection;
 $connection = @pg_connect($connString);
+
 if (!$connection) {
     error_log(sprintf('Database connection failed: host=%s port=%s dbname=%s user=%s', $dbHost, $dbPort, $dbName, $dbUser));
     error_log('Last PostgreSQL error: ' . (function_exists('pg_last_error') ? pg_last_error() : 'N/A'));
