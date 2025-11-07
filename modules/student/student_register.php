@@ -18,12 +18,8 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// Check database connection
-if (!isset($connection) || !$connection) {
-    error_log('ERROR: Database connection not available in student_register.php');
-    http_response_code(500);
-    die('Database connection error. Please try again later.');
-}
+// Database connection is validated in database.php (will die if connection fails)
+// The $connection variable is available globally after include
 
 $municipality_id = $_SESSION['active_municipality_id'] ?? 1;
 $municipality_logo = null;
