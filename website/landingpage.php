@@ -1,5 +1,8 @@
 <?php
 // Landing page with optional super admin inline edit mode
+// Load security headers first (before session_start)
+require_once __DIR__ . '/../config/security_headers.php';
+
 // Start session
 session_start();
 require_once __DIR__ . '/../includes/CSRFProtection.php';

@@ -1,6 +1,12 @@
 <?php
 // Student Header with dynamic theming
 // Requires: $_SESSION['student_username'], $_SESSION['student_id']
+
+// Load security headers first (if not already loaded)
+if (!defined('SECURITY_HEADERS_LOADED')) {
+    require_once __DIR__ . '/../../config/security_headers.php';
+}
+
 $studentDisplay = htmlspecialchars($_SESSION['student_username'] ?? 'Student');
 $studentId = $_SESSION['student_id'] ?? null;
 
@@ -269,4 +275,20 @@ document.addEventListener('DOMContentLoaded', function(){
   }
   */
 });
+
+// Initialize session timeout warning system
+<?php if (isset($GLOBALS['session_timeout_status']) && $GLOBALS['session_timeout_status']['status'] === 'active'): ?>
+window.sessionTimeoutConfig = {
+  idle_timeout_minutes: <?= $GLOBALS['session_timeout_status']['idle_timeout_seconds'] / 60 ?>,
+  absolute_timeout_hours: <?= $GLOBALS['session_timeout_status']['absolute_timeout_seconds'] / 3600 ?>,
+  warning_before_logout_seconds: <?= $GLOBALS['session_timeout_status']['warning_threshold'] ?>,
+  enabled: true
+};
+<?php endif; ?>
 </script>
+
+<?php if (isset($GLOBALS['session_timeout_status']) && $GLOBALS['session_timeout_status']['status'] === 'active'): ?>
+<!-- Session Timeout Warning System -->
+<link rel="stylesheet" href="/EducAid/assets/css/session-timeout-warning.css">
+<script src="/EducAid/assets/js/session-timeout-warning.js"></script>
+<?php endif; ?>

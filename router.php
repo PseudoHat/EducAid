@@ -4,7 +4,28 @@
  * Serves static files correctly and routes PHP requests
  */
 
+// Load security headers first (before any output)
+require_once __DIR__ . '/config/security_headers.php';
+
+// Start session if not already started (required for timeout middleware)
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+// Apply session timeout middleware for authenticated pages
+// Skip for login/public pages and static assets
+$publicPages = ['/unified_login.php', '/website/index.php', '/website/landingpage.php'];
 $requestUri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+$isStaticAsset = preg_match('/\.(css|js|jpg|jpeg|png|gif|svg|woff|woff2|ttf|eot|ico)$/i', $requestUri);
+
+if (!$isStaticAsset && !in_array($requestUri, $publicPages)) {
+    require_once __DIR__ . '/includes/SessionTimeoutMiddleware.php';
+    $timeoutMiddleware = new SessionTimeoutMiddleware();
+    $timeoutStatus = $timeoutMiddleware->handle();
+    
+    // Store timeout status in global variable for access in pages
+    $GLOBALS['session_timeout_status'] = $timeoutStatus;
+}
 
 // Strip /EducAid/ prefix if present (Railway deployment path)
 if (strpos($requestUri, '/EducAid/') === 0) {
