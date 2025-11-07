@@ -3,8 +3,10 @@
 // Load security headers first (before session_start)
 require_once __DIR__ . '/../config/security_headers.php';
 
-// Start session
-session_start();
+// Start session if not already started
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 require_once __DIR__ . '/../includes/CSRFProtection.php';
 
 $IS_EDIT_SUPER_ADMIN = false;

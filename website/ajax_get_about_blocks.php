@@ -1,7 +1,9 @@
 <?php
 // Return current about page blocks for given keys (used to refresh after save / rollback)
 header('Content-Type: application/json');
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 @include_once __DIR__ . '/../config/database.php';
 
 if (!isset($connection)) { echo json_encode(['success'=>false,'message'=>'DB unavailable']); exit; }

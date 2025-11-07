@@ -1,5 +1,7 @@
 <?php
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 require_once __DIR__ . '/../includes/CSRFProtection.php';
 // Determine super admin edit mode for Requirements page (?edit=1)
 $IS_EDIT_MODE = false; $is_super_admin = false;

@@ -1,6 +1,8 @@
 <?php
 // Super admin only about page content save endpoint (separate storage)
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 header('Content-Type: application/json');
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../includes/CSRFProtection.php';

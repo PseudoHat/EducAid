@@ -1,7 +1,9 @@
 <?php
 // Return current landing page blocks for given keys (used for post-save refresh)
 header('Content-Type: application/json');
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 @include_once __DIR__ . '/../config/database.php';
 
 if (!isset($connection)) {

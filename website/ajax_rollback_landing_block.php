@@ -1,6 +1,8 @@
 <?php
 // Apply a historical audit entry's content to the current landing_content_blocks (rollback action)
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 header('Content-Type: application/json');
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../includes/CSRFProtection.php';

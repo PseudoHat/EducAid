@@ -1,5 +1,7 @@
 <?php
-session_start(); header('Content-Type: application/json');
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+} header('Content-Type: application/json');
 require_once __DIR__.'/../config/database.php';
 require_once __DIR__ . '/../includes/CSRFProtection.php';
 @include_once __DIR__.'/../includes/permissions.php';

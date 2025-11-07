@@ -3,7 +3,9 @@
  * Newsletter Subscription Handler (No CAPTCHA)
  */
 
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 require_once __DIR__ . '/../includes/CSRFProtection.php';
 
 // Set JSON response header

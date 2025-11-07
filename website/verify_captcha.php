@@ -10,7 +10,9 @@
 require_once __DIR__ . '/../config/recaptcha_v2_config.php';
 
 // Start session
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 // Set JSON response header
 header('Content-Type: application/json');

@@ -3,7 +3,9 @@
 require_once '../config/recaptcha_v2_config.php';
 
 // Start session FIRST before any output
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 // Check if user is already verified
 if (isset($_SESSION['captcha_verified']) && $_SESSION['captcha_verified'] === true) {
