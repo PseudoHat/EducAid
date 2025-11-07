@@ -9,9 +9,9 @@ if (isset($_POST['processIdPictureOcr']) || isset($_POST['processGradesOcr']) ||
 }
 
 // Move all AJAX processing to the very top to avoid headers already sent error
-include_once __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../../config/database.php';
 // Include reCAPTCHA v3 configuration (site key + secret key constants)
-include_once __DIR__ . '/../../config/recaptcha_config.php';
+require_once __DIR__ . '/../../config/recaptcha_config.php';
 
 // Start session if not already started
 if (session_status() === PHP_SESSION_NONE) {
@@ -22,6 +22,8 @@ if (session_status() === PHP_SESSION_NONE) {
 // The $connection variable is available globally after include
 
 $municipality_id = $_SESSION['active_municipality_id'] ?? 1;
+error_log("DEBUG student_register.php: municipality_id = " . $municipality_id . ", connection = " . (isset($connection) && $connection ? 'yes' : 'no'));
+
 $municipality_logo = null;
 $municipality_name = 'General Trias';
 
@@ -1167,8 +1169,20 @@ if ($_SERVER["REQUEST_METHOD"] !== "POST") {
     
     // Check if there's an active slot for this municipality (only if connection is available)
     if (isset($connection) && $connection) {
+        error_log("DEBUG: Checking slots for municipality_id: " . $municipality_id);
         $slotRes = pg_query_params($connection, "SELECT * FROM signup_slots WHERE is_active = TRUE AND municipality_id = $1 ORDER BY created_at DESC LIMIT 1", [$municipality_id]);
+        
+        if (!$slotRes) {
+            error_log("DEBUG: Slot query failed: " . pg_last_error($connection));
+        }
+        
         $slotInfo = pg_fetch_assoc($slotRes);
+        
+        if ($slotInfo) {
+            error_log("DEBUG: Found slot - slot_id: " . $slotInfo['slot_id'] . ", max_slots: " . $slotInfo['max_slots']);
+        } else {
+            error_log("DEBUG: No active slot found for municipality " . $municipality_id);
+        }
     
         if ($slotInfo) {
             // There is an active slot, check if it's full
