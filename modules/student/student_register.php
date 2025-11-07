@@ -1160,27 +1160,36 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['check_school_student_
 
 // --- Distribution Control & Slot check ---
 if ($_SERVER["REQUEST_METHOD"] !== "POST") {
-    // Check if there's an active slot for this municipality
-    $slotRes = pg_query_params($connection, "SELECT * FROM signup_slots WHERE is_active = TRUE AND municipality_id = $1 ORDER BY created_at DESC LIMIT 1", [$municipality_id]);
-    $slotInfo = pg_fetch_assoc($slotRes);
+    // Initialize default values
     $slotsLeft = 0;
     $noSlotsAvailable = false;
     $slotsFull = false;
     
-    if ($slotInfo) {
-        // There is an active slot, check if it's full
-        $countRes = pg_query_params($connection, "
-            SELECT COUNT(*) AS total FROM students
-            WHERE slot_id = $1
-        ", [$slotInfo['slot_id']]);
-        $countRow = pg_fetch_assoc($countRes);
-        $slotsLeft = intval($slotInfo['slot_count']) - intval($countRow['total']);
-        
-        if ($slotsLeft <= 0) {
-            $slotsFull = true;
+    // Check if there's an active slot for this municipality (only if connection is available)
+    if (isset($connection) && $connection) {
+        $slotRes = pg_query_params($connection, "SELECT * FROM signup_slots WHERE is_active = TRUE AND municipality_id = $1 ORDER BY created_at DESC LIMIT 1", [$municipality_id]);
+        $slotInfo = pg_fetch_assoc($slotRes);
+    
+        if ($slotInfo) {
+            // There is an active slot, check if it's full
+            $countRes = pg_query_params($connection, "
+                SELECT COUNT(*) AS total FROM students
+                WHERE slot_id = $1
+            ", [$slotInfo['slot_id']]);
+            
+            $countRow = pg_fetch_assoc($countRes);
+            $currentCount = (int)$countRow['total'];
+            $maxSlots = (int)$slotInfo['max_slots'];
+            $slotsLeft = max(0, $maxSlots - $currentCount);
+            
+            if ($currentCount >= $maxSlots) {
+                $slotsFull = true;
+            }
+        } else {
+            $noSlotsAvailable = true;
         }
     } else {
-        // No active slot available
+        // No database connection - treat as no slots available
         $noSlotsAvailable = true;
     }
     
