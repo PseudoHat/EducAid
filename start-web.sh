@@ -34,14 +34,28 @@ if [ -d "/mnt/assets/uploads" ]; then
   echo "Creating symlink..."
   mkdir -p /app/assets || echo "⚠ Failed to create /app/assets"
   
-  # Remove existing directory/symlink if exists
+  # FORCEFULLY remove existing directory/symlink if exists
+  # Use rm -rf to handle directories with content
   if [ -e /app/assets/uploads ] || [ -L /app/assets/uploads ]; then
     echo "Removing existing /app/assets/uploads..."
-    rm -rf /app/assets/uploads || echo "⚠ Failed to remove existing uploads"
+    chmod -R 777 /app/assets/uploads 2>/dev/null || true  # Ensure we can delete
+    rm -rf /app/assets/uploads 2>/dev/null || {
+      echo "⚠ Standard removal failed, trying forced removal..."
+      # Nuclear option: remove even if busy
+      find /app/assets/uploads -type f -delete 2>/dev/null || true
+      find /app/assets/uploads -type d -delete 2>/dev/null || true
+      rmdir /app/assets/uploads 2>/dev/null || rm -f /app/assets/uploads 2>/dev/null || true
+    }
+    echo "✓ Existing uploads removed"
   fi
   
   # Create symlink
-  ln -sf /mnt/assets/uploads /app/assets/uploads || echo "⚠ Failed to create symlink"
+  ln -sf /mnt/assets/uploads /app/assets/uploads || {
+    echo "✗ ERROR: Failed to create symlink!"
+    echo "Attempting alternative symlink creation..."
+    # Try absolute path
+    cd /app/assets && ln -sf /mnt/assets/uploads uploads
+  }
   
   # Verify symlink
   if [ -L /app/assets/uploads ]; then
@@ -49,9 +63,10 @@ if [ -d "/mnt/assets/uploads" ]; then
     echo "✓ Symlink created: /app/assets/uploads -> $LINK_TARGET"
   else
     echo "✗ ERROR: Symlink creation failed!"
+    echo "Directory listing:"
+    ls -la /app/assets/ || echo "Cannot list /app/assets/"
   fi
   
-  echo "✓ Railway volume setup complete!"
   echo "✓ Railway volume setup complete!"
 else
   echo "✗ No Railway volume detected at /mnt/assets/uploads"
