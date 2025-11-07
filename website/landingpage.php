@@ -3,9 +3,6 @@
 // Load security headers first (before session_start)
 require_once __DIR__ . '/../config/security_headers.php';
 
-// Load secure session configuration
-require_once __DIR__ . '/../config/session_config.php';
-
 // Start session
 session_start();
 require_once __DIR__ . '/../includes/CSRFProtection.php';
