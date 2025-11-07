@@ -252,7 +252,8 @@ class SessionTimeoutMiddleware {
         session_destroy();
         
         // Redirect to login with timeout message
-        $redirectUrl = '/EducAid/website/unified_login.php?timeout=' . urlencode($reason);
+        // unified_login.php is in the root directory
+        $redirectUrl = '/unified_login.php?timeout=' . urlencode($reason);
         
         // Handle AJAX requests differently
         if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && 
