@@ -50,7 +50,7 @@ require_once __DIR__ . '/../config/database.php';
 
 $IS_EDIT_MODE = false;
 $is_super_admin = false;
-if (isset($_SESSION['admin_id']) && function_exists('getCurrentAdminRole')) {
+if (isset($_SESSION['admin_id']) && function_exists('getCurrentAdminRole') && isset($connection)) {
   $role = @getCurrentAdminRole($connection);
   if ($role === 'super_admin') {
     $is_super_admin = true;
@@ -62,10 +62,12 @@ if ($is_super_admin && isset($_GET['edit']) && $_GET['edit'] == '1') {
 
 // Fetch latest 3 announcements for landing page preview
 $landing_announcements = [];
-$ann_res = @pg_query($connection, "SELECT announcement_id, title, remarks, posted_at, event_date, event_time, location, image_path, is_active FROM announcements ORDER BY posted_at DESC LIMIT 3");
-if ($ann_res) {
-  while($row = pg_fetch_assoc($ann_res)) { $landing_announcements[] = $row; }
-  pg_free_result($ann_res);
+if (isset($connection) && $connection) {
+  $ann_res = @pg_query($connection, "SELECT announcement_id, title, remarks, posted_at, event_date, event_time, location, image_path, is_active FROM announcements ORDER BY posted_at DESC LIMIT 3");
+  if ($ann_res) {
+    while($row = pg_fetch_assoc($ann_res)) { $landing_announcements[] = $row; }
+    pg_free_result($ann_res);
+  }
 }
 function lp_truncate($text, $limit = 140){ $text = trim($text); return mb_strlen($text) > $limit ? mb_substr($text,0,$limit).'…' : $text; }
 function lp_event_line($row){
@@ -88,10 +90,12 @@ function lp_sanitize_html($html){
 
 // Direct load of landing content blocks (no caching layer)
 $LP_SAVED_BLOCKS = [];
-$resBlocksSSR = @pg_query($connection, "SELECT block_key, html, text_color, bg_color FROM landing_content_blocks WHERE municipality_id=1");
-if ($resBlocksSSR) {
-  while($r = pg_fetch_assoc($resBlocksSSR)) { $LP_SAVED_BLOCKS[$r['block_key']] = $r; }
-  pg_free_result($resBlocksSSR);
+if (isset($connection) && $connection) {
+  $resBlocksSSR = @pg_query($connection, "SELECT block_key, html, text_color, bg_color FROM landing_content_blocks WHERE municipality_id=1");
+  if ($resBlocksSSR) {
+    while($r = pg_fetch_assoc($resBlocksSSR)) { $LP_SAVED_BLOCKS[$r['block_key']] = $r; }
+    pg_free_result($resBlocksSSR);
+  }
 }
 function lp_block($key, $defaultHtml){
   global $LP_SAVED_BLOCKS; if(isset($LP_SAVED_BLOCKS[$key])){ $h=$LP_SAVED_BLOCKS[$key]['html']; $h = lp_sanitize_html($h); return $h!==''? $h : $defaultHtml; } return $defaultHtml; }
@@ -469,8 +473,10 @@ function lp_block_style($key){
       <div class="row g-2 g-lg-3 ann-compact-grid fade-in-stagger" id="annPreviewRow">
         <?php
           $preview_rows = [];
-          $resPrev = @pg_query($connection, "SELECT announcement_id, title, remarks, posted_at, event_date, event_time, location, image_path, is_active FROM announcements ORDER BY is_active DESC, posted_at DESC LIMIT 3");
-          if($resPrev){ while($r = pg_fetch_assoc($resPrev)){ $preview_rows[] = $r; } pg_free_result($resPrev); }
+          if (isset($connection) && $connection) {
+            $resPrev = @pg_query($connection, "SELECT announcement_id, title, remarks, posted_at, event_date, event_time, location, image_path, is_active FROM announcements ORDER BY is_active DESC, posted_at DESC LIMIT 3");
+            if($resPrev){ while($r = pg_fetch_assoc($resPrev)){ $preview_rows[] = $r; } pg_free_result($resPrev); }
+          }
           if(empty($preview_rows)){
             echo '<div class="col-12"><div class="soft-card p-4 text-center"><h6 class="fw-bold mb-1">No announcements yet</h6><p class="small text-body-secondary mb-2">Official updates will appear here once posted.</p><a href="announcements.php" class="small link-primary">See full page</a></div></div>';
           } else {
