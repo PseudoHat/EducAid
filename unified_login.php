@@ -6,7 +6,11 @@ include __DIR__ . '/config/database.php';
 include __DIR__ . '/config/recaptcha_config.php';
 require_once __DIR__ . '/services/AuditLogger.php';
 require_once __DIR__ . '/includes/SessionManager.php';
-session_start();
+
+// Start session if not already started
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 // For AJAX/POST JSON responses, prevent PHP warnings from leaking into output
 if (

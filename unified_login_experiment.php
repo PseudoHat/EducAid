@@ -1,7 +1,11 @@
 <?php
 include __DIR__ . '/config/database.php';
 include __DIR__ . '/config/recaptcha_config.php';
-session_start();
+
+// Start session if not already started
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 // Fetch municipality data for navbar (General Trias as default)
 $municipality_logo = null;
