@@ -1189,8 +1189,10 @@ if ($_SERVER["REQUEST_METHOD"] !== "POST") {
             
             $countRow = pg_fetch_assoc($countRes);
             $currentCount = (int)$countRow['total'];
-            $maxSlots = (int)$slotInfo['max_slots'];
+            $maxSlots = (int)$slotInfo['slot_count'];  // Fixed: Use 'slot_count' not 'max_slots'
             $slotsLeft = max(0, $maxSlots - $currentCount);
+            
+            error_log("SLOT CHECK: Current count: $currentCount, Max slots: $maxSlots, Slots left: $slotsLeft");
             
             if ($currentCount >= $maxSlots) {
                 $slotsFull = true;
