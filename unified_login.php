@@ -845,28 +845,67 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 2rem 1rem;
+            padding: 1.5rem 1rem;
+            min-height: 0;
+            /* Allow content to determine height, not force full viewport */
         }
         
-        /* Container inside form section - Remove fixed heights */
+        /* Container inside form section - CRITICAL: Remove all height constraints */
         .login-page-isolated .form-section .container {
             height: auto !important;
             max-height: none !important;
+            min-height: 0 !important;
             width: 100%;
-            padding-top: 0;
-            padding-bottom: 0;
+            padding: 0;
         }
         
-        /* Row inside container - Auto height, centered */
+        /* Row inside container - CRITICAL: Remove h-100 effects */
         .login-page-isolated .form-section .row {
             height: auto !important;
             min-height: 0 !important;
+            max-height: none !important;
             margin: 0;
+            align-items: flex-start !important; /* Don't force center alignment */
         }
         
-        /* Column wrapper - Natural sizing */
+        /* Column wrapper - Natural sizing, no height constraints */
         .login-page-isolated .form-section [class*="col-"] {
             height: auto !important;
+            min-height: 0 !important;
+        }
+        
+        /* LOGIN CARD - FIT TO VIEWPORT */
+        .login-page-isolated .login-card {
+            /* Maximum height = viewport - navbar - padding (with safety margin) */
+            max-height: calc(100vh - var(--navbar-height) - 3rem);
+            overflow-y: auto; /* Internal scroll if content exceeds viewport */
+            overflow-x: hidden;
+            width: 100%;
+            max-width: 540px;
+            margin: 0 auto;
+            
+            /* Smooth scrolling inside card if needed */
+            scroll-behavior: smooth;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        /* Hide scrollbar but keep functionality (optional, for cleaner look) */
+        .login-page-isolated .login-card::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .login-page-isolated .login-card::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.05);
+            border-radius: 3px;
+        }
+        
+        .login-page-isolated .login-card::-webkit-scrollbar-thumb {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 3px;
+        }
+        
+        .login-page-isolated .login-card::-webkit-scrollbar-thumb:hover {
+            background: rgba(0, 0, 0, 0.3);
         }
         
         /* Ensure login form section adjusts properly - No fixed heights */
@@ -883,12 +922,11 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
             overflow: visible;
         }
         
-        /* Login card responsive optimizations */
+        /* Ensure login card fits viewport at all times */
         .login-page-isolated .login-card {
             max-width: 100%;
             width: 100%;
             margin: 0 auto;
-            overflow: visible;
         }
         
         /* Ensure buttons and form elements don't overflow */
@@ -898,28 +936,74 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
             word-wrap: break-word;
         }
         
-        /* Mobile adjustments */
+        /* Tablets and below */
         @media (max-width: 991.98px) {
             .brand-section,
             .col-lg-6:not(.brand-section) {
-                padding-top: 1.5rem;
-                padding-bottom: 1.5rem;
+                padding-top: 1rem;
+                padding-bottom: 1rem;
             }
             
             .login-page-isolated .form-section {
-                padding: 1.5rem 0.75rem;
+                padding: 1rem 0.75rem;
+            }
+            
+            /* Adjust card max-height for mobile navbar */
+            .login-page-isolated .login-card {
+                max-height: calc(100vh - var(--navbar-height) - 2rem);
             }
         }
         
-        /* Extra small devices */
+        /* Small mobile devices */
         @media (max-width: 575.98px) {
             .login-page-isolated .form-section {
-                padding: 1rem 0.5rem;
+                padding: 0.75rem 0.5rem;
             }
             
             .login-page-isolated .form-section .container {
-                padding-left: 0.5rem;
-                padding-right: 0.5rem;
+                padding-left: 0;
+                padding-right: 0;
+            }
+            
+            /* Even tighter max-height for small screens */
+            .login-page-isolated .login-card {
+                max-height: calc(100vh - var(--navbar-height) - 1.5rem);
+            }
+        }
+        
+        /* Large screens - ensure card doesn't stretch too much */
+        @media (min-width: 1400px) {
+            .login-page-isolated .login-card {
+                max-width: 520px;
+            }
+        }
+        
+        /* Very tall screens - allow more space */
+        @media (min-height: 900px) {
+            .login-page-isolated .login-card {
+                max-height: 800px;
+            }
+        }
+        
+        /* Short screens - prioritize fitting in viewport */
+        @media (max-height: 700px) {
+            .login-page-isolated .login-card {
+                max-height: calc(100vh - var(--navbar-height) - 2rem);
+            }
+            
+            .login-page-isolated .form-section {
+                padding: 0.5rem;
+            }
+        }
+        
+        /* Very short screens (landscape mobile) */
+        @media (max-height: 500px) {
+            .login-page-isolated .login-card {
+                max-height: calc(100vh - var(--navbar-height) - 1rem);
+            }
+            
+            .login-page-isolated .form-section {
+                padding: 0.25rem;
             }
         }
         
@@ -928,6 +1012,11 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
             .login-page-isolated .form-section {
                 max-width: 100vw;
                 overflow-x: hidden;
+            }
+            
+            /* Prevent horizontal overflow at any zoom */
+            .login-page-isolated * {
+                max-width: 100%;
             }
         }
         
