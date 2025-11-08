@@ -1047,6 +1047,7 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
         .form-section {
             display: flex;
             flex-direction: column;
+            overflow: visible; /* Allow natural overflow to page scroll */
         }
         
         .form-section .container {
@@ -1055,21 +1056,59 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
             align-items: center;
             justify-content: center;
             width: 100%;
+            max-width: 100%;
         }
         
         .login-card {
             background: rgba(255, 255, 255, 0.98);
             border-radius: 16px;
-            padding: 2.5rem;
+            padding: 2rem 2.5rem; /* Reduced top/bottom padding */
             box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
             width: 100%;
             max-width: 100%;
+            margin: auto; /* Center the card */
+        }
+        
+        /* Reduce spacing inside login card */
+        .login-card .login-header {
+            margin-bottom: 1.5rem; /* Reduced from default */
+        }
+        
+        .login-card .login-title {
+            margin-bottom: 0.5rem;
+            font-size: 1.75rem; /* Slightly smaller */
+        }
+        
+        .login-card .login-subtitle {
+            margin-bottom: 0;
+            font-size: 0.95rem;
+        }
+        
+        .login-card .form-group,
+        .login-card .mb-3,
+        .login-card .mb-4 {
+            margin-bottom: 1rem !important; /* Tighter spacing */
+        }
+        
+        .login-card .btn {
+            padding: 0.75rem 1.5rem; /* Consistent button padding */
         }
         
         /* Ensure row takes full width and centers properly */
         .form-section .row {
             width: 100%;
             margin: 0;
+        }
+        
+        /* Reduce padding on form section for tighter fit */
+        .form-section .container.py-4 {
+            padding-top: 1.5rem !important;
+            padding-bottom: 1.5rem !important;
+        }
+        
+        .form-section .container.py-lg-0 {
+            padding-top: 2rem !important;
+            padding-bottom: 2rem !important;
         }
     </style>
     
