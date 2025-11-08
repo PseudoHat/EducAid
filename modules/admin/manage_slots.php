@@ -430,6 +430,14 @@ if ($res) {
         $pastReleases[] = $row;
     }
 }
+
+// Get total number of all slots (active + past) for badge display
+$totalSlotsQuery = pg_query_params($connection, "SELECT COUNT(*) as total FROM signup_slots WHERE municipality_id = $1", [$municipality_id]);
+$totalSlots = 0;
+if ($totalSlotsQuery) {
+    $totalSlotsRow = pg_fetch_assoc($totalSlotsQuery);
+    $totalSlots = intval($totalSlotsRow['total']);
+}
 ?>
 <?php $page_title='Manage Signup Slots'; $extra_css=['../../assets/css/admin/manage_slots.css']; include __DIR__ . '/../../includes/admin/admin_head.php'; ?>
 </head>

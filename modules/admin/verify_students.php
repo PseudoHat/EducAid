@@ -312,56 +312,63 @@ while ($row = pg_fetch_assoc($barangayResult)) {
   <?php include __DIR__ . '/../../includes/admin/admin_header.php'; ?>
   <section class="home-section" id="mainContent">
     <div class="container-fluid py-4 px-4">
-      <div class="section-header mb-3">
-        <h2 class="fw-bold">
-          <i class="bi bi-clipboard-check me-2"></i> Manage Student Status
-        </h2>
-        <p class="text-muted mb-0">Lock the active list for payroll generation, or revert students back to applicants.</p>
+      <!-- Page Header - Clean style -->
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+          <h1 class="fw-bold mb-1">Manage Student Status</h1>
+          <p class="text-muted mb-0">Lock the active list for payroll generation, or revert students back to applicants.</p>
+        </div>
+        <div class="text-end">
+          <span class="badge bg-primary fs-6"><?= $student_counts['active_count'] ?> Active</span>
+        </div>
+      </div>
         
-        <!-- Workflow Status Indicators -->
-        <div class="row mt-3">
-          <div class="col-md-12">
-            <div class="d-flex flex-wrap gap-2">
-              <span class="badge <?= $workflow_status['list_finalized'] ? 'bg-success' : 'bg-secondary' ?> p-2">
-                <i class="bi <?= $workflow_status['list_finalized'] ? 'bi-lock-fill' : 'bi-unlock' ?> me-1"></i>
-                List <?= $workflow_status['list_finalized'] ? 'Locked' : 'Not Locked' ?>
-              </span>
-              <span class="badge <?= $workflow_status['has_payroll_qr'] ? 'bg-success' : 'bg-secondary' ?> p-2">
-                <i class="bi <?= $workflow_status['has_payroll_qr'] ? 'bi-check-circle' : 'bi-clock' ?> me-1"></i>
-                Payroll & QR <?= $workflow_status['has_payroll_qr'] ? 'Generated' : 'Pending' ?>
-              </span>
-              <span class="badge <?= $workflow_status['has_schedules'] ? 'bg-primary' : 'bg-secondary' ?> p-2">
-                <i class="bi <?= $workflow_status['has_schedules'] ? 'bi-calendar-check' : 'bi-calendar' ?> me-1"></i>
-                Schedules <?= $workflow_status['has_schedules'] ? 'Created' : 'Not Created' ?>
-              </span>
-              <?php if ($workflow_status['has_schedules']): ?>
-              <span class="badge bg-warning text-dark p-2">
-                <i class="bi bi-exclamation-triangle me-1"></i>
-                Payroll locked due to schedules
-              </span>
-              <?php endif; ?>
-            </div>
+      <!-- Workflow Status Indicators -->
+      <div class="quick-actions mb-4">
+        <div class="d-flex justify-content-between align-items-center">
+          <div>
+            <h5 class="mb-1"><i class="bi bi-info-circle-fill me-2"></i>Workflow Status</h5>
+            <small>Current verification and payroll status</small>
+          </div>
+          <div class="d-flex flex-wrap gap-2">
+            <span class="badge <?= $workflow_status['list_finalized'] ? 'bg-light' : 'bg-white' ?> text-dark p-2" style="border: 1px solid rgba(255,255,255,0.3);">
+              <i class="bi <?= $workflow_status['list_finalized'] ? 'bi-lock-fill' : 'bi-unlock' ?> me-1"></i>
+              List <?= $workflow_status['list_finalized'] ? 'Locked' : 'Not Locked' ?>
+            </span>
+            <span class="badge <?= $workflow_status['has_payroll_qr'] ? 'bg-light' : 'bg-white' ?> text-dark p-2" style="border: 1px solid rgba(255,255,255,0.3);">
+              <i class="bi <?= $workflow_status['has_payroll_qr'] ? 'bi-check-circle' : 'bi-clock' ?> me-1"></i>
+              Payroll & QR <?= $workflow_status['has_payroll_qr'] ? 'Generated' : 'Pending' ?>
+            </span>
+            <span class="badge <?= $workflow_status['has_schedules'] ? 'bg-light' : 'bg-white' ?> text-dark p-2" style="border: 1px solid rgba(255,255,255,0.3);">
+              <i class="bi <?= $workflow_status['has_schedules'] ? 'bi-calendar-check' : 'bi-calendar' ?> me-1"></i>
+              Schedules <?= $workflow_status['has_schedules'] ? 'Created' : 'Not Created' ?>
+            </span>
+            <?php if ($workflow_status['has_schedules']): ?>
+            <span class="badge bg-warning text-dark p-2">
+              <i class="bi bi-exclamation-triangle me-1"></i>
+              Payroll locked due to schedules
+            </span>
+            <?php endif; ?>
           </div>
         </div>
       </div>
 
       <!-- Filters -->
-      <div class="card shadow-sm mb-4">
-        <div class="card-body">
+      <div class="filter-section mb-4">
           <form method="GET" class="row g-3">
             <div class="col-md-4">
-              <label class="form-label fw-semibold" style="color:#1182FF;">Sort by Surname</label>
+              <label class="form-label">Sort by Surname</label>
               <select name="sort" class="form-select">
                 <option value="asc"  <?= $sort === 'asc'  ? 'selected' : '' ?>>A to Z</option>
                 <option value="desc" <?= $sort === 'desc' ? 'selected' : '' ?>>Z to A</option>
               </select>
             </div>
             <div class="col-md-4">
-              <label class="form-label fw-semibold" style="color:#1182FF;">Search by Surname</label>
+              <label class="form-label">Search by Surname</label>
               <input type="text" name="search_surname" class="form-control" value="<?= htmlspecialchars($searchSurname) ?>" placeholder="Enter surname...">
             </div>
             <div class="col-md-4">
-              <label class="form-label fw-semibold" style="color:#1182FF;">Filter by Barangay</label>
+              <label class="form-label">Filter by Barangay</label>
               <select name="barangay" class="form-select">
                 <option value="">All Barangays</option>
                 <?php foreach ($barangayOptions as $b): ?>
@@ -371,11 +378,11 @@ while ($row = pg_fetch_assoc($barangayResult)) {
                 <?php endforeach; ?>
               </select>
             </div>
-            <div class="col-md-4 d-flex align-items-end gap-2">
-              <button type="submit" class="btn btn-primary w-100">
+            <div class="col-md-12 d-flex gap-2">
+              <button type="submit" class="btn btn-primary">
                 <i class="bi bi-funnel me-1"></i> Apply Filters
               </button>
-              <button type="button" class="btn btn-secondary w-100" id="resetFiltersBtn">
+              <button type="button" class="btn btn-outline-secondary" id="resetFiltersBtn">
                 <i class="bi bi-x-circle me-1"></i> Reset
               </button>
             </div>
@@ -386,10 +393,10 @@ while ($row = pg_fetch_assoc($barangayResult)) {
       <!-- Active Students -->
       <form method="POST" id="activeStudentsForm">
         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
-        <div class="card shadow-sm">
-          <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+        <div class="card shadow-sm mb-4">
+          <div class="card-header d-flex justify-content-between align-items-center">
             <span><i class="bi bi-people-fill me-2"></i>Active Students</span>
-            <span class="badge bg-light text-success"><?= $isFinalized ? 'Locked' : 'Not Locked' ?></span>
+            <span class="badge" style="background: rgba(255,255,255,0.2); color: white;"><?= $isFinalized ? 'Locked' : 'Not Locked' ?></span>
           </div>
           <div class="card-body">
             <div class="table-responsive">
