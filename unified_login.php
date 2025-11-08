@@ -1535,6 +1535,61 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
             border-color: #3b82f6;
             box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
         }
+        
+        /* reCAPTCHA Security Modal - Fix z-index and backdrop */
+        #recaptchaModal {
+            z-index: 9999 !important;
+        }
+        
+        #recaptchaModal .modal-dialog {
+            z-index: 10000 !important;
+        }
+        
+        #recaptchaModal .modal-content {
+            border-radius: 1rem;
+            border: none;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+            background: #ffffff;
+        }
+        
+        #recaptchaModal .modal-header {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            color: white;
+            border-radius: 1rem 1rem 0 0;
+            border: none;
+            padding: 1.25rem 1.5rem;
+        }
+        
+        #recaptchaModal .modal-title {
+            font-weight: 600;
+            font-size: 1.25rem;
+        }
+        
+        #recaptchaModal .modal-header .btn-close {
+            filter: brightness(0) invert(1);
+        }
+        
+        #recaptchaModal .modal-body {
+            padding: 2rem 1.5rem;
+        }
+        
+        #recaptchaModal .modal-body p {
+            color: #64748b;
+            margin-bottom: 1.5rem;
+            font-size: 0.9375rem;
+        }
+        
+        /* Ensure modal backdrop appears above login content */
+        .modal-backdrop {
+            z-index: 9998 !important;
+            background-color: rgba(0, 0, 0, 0.6) !important;
+        }
+        
+        /* Fix for reCAPTCHA widget inside modal */
+        #recaptchaWidget {
+            display: inline-block;
+            margin: 0 auto;
+        }
     </style>
     <?php endif; ?>
 
