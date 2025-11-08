@@ -1,5 +1,7 @@
 <?php
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 $IS_EDIT_MODE = false;
 $IS_EDIT_SUPER_ADMIN = false;
@@ -34,7 +36,7 @@ if (!$IS_EDIT_MODE) {
 }
 
 // Load announcements content helper
-require_once '../includes/website/announcements_content_helper.php';
+require_once __DIR__ . '/../includes/website/announcements_content_helper.php';
 
 // Optional deep-link id
 $requested_id = isset($_GET['id']) && ctype_digit($_GET['id']) ? (int)$_GET['id'] : null;
