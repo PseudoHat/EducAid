@@ -1047,6 +1047,100 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
             color: var(--thm-primary) !important;
         }
         
+        /* ============================================
+           COMPACT LOGIN CARD CONTENT
+           ============================================ */
+        
+        /* Reduce login header spacing */
+        .login-page-isolated .login-header {
+            margin-bottom: 1rem !important;
+        }
+        
+        .login-page-isolated .login-title {
+            font-size: 1.5rem !important;
+            margin-bottom: 0.375rem !important;
+        }
+        
+        .login-page-isolated .login-subtitle {
+            font-size: 0.875rem !important;
+            margin-bottom: 0 !important;
+        }
+        
+        /* Reduce form group spacing */
+        .login-page-isolated .form-group {
+            margin-bottom: 0.875rem !important;
+        }
+        
+        .login-page-isolated .form-label {
+            font-size: 0.75rem !important;
+            margin-bottom: 0.375rem !important;
+            font-weight: 600 !important;
+        }
+        
+        /* Reduce form control padding */
+        .login-page-isolated .form-control {
+            padding: 0.625rem 0.875rem !important;
+            font-size: 0.9375rem !important;
+        }
+        
+        /* Compact buttons */
+        .login-page-isolated .btn-lg {
+            padding: 0.75rem 1.5rem !important;
+            font-size: 1rem !important;
+        }
+        
+        /* Reduce margins and paddings */
+        .login-page-isolated .mb-3 {
+            margin-bottom: 0.75rem !important;
+        }
+        
+        .login-page-isolated .mb-4 {
+            margin-bottom: 1rem !important;
+        }
+        
+        .login-page-isolated .mt-3 {
+            margin-top: 0.75rem !important;
+        }
+        
+        .login-page-isolated .mt-4 {
+            margin-top: 1rem !important;
+        }
+        
+        /* Compact alerts */
+        .login-page-isolated .alert {
+            padding: 0.625rem 1rem !important;
+            margin-bottom: 0.75rem !important;
+            font-size: 0.875rem !important;
+        }
+        
+        /* Reduce step indicators spacing */
+        .login-page-isolated .step-indicators {
+            margin-bottom: 0.75rem !important;
+        }
+        
+        /* Compact text helpers */
+        .login-page-isolated small,
+        .login-page-isolated .small {
+            font-size: 0.8125rem !important;
+        }
+        
+        /* Reduce OTP input size */
+        .login-page-isolated .otp-input {
+            font-size: 1.25rem !important;
+            letter-spacing: 0.4em !important;
+            padding: 0.75rem !important;
+        }
+        
+        /* Compact forgot password link */
+        .login-page-isolated .text-center.mt-3 {
+            margin-top: 0.625rem !important;
+        }
+        
+        /* Reduce card padding at base */
+        .login-page-isolated .login-card {
+            padding: 1.5rem 1.25rem !important;
+        }
+        
         /* Adjust login card max-height to account for compact footer */
         .login-page-isolated .login-card {
             max-height: calc(100vh - var(--navbar-height) - 70px); /* 70px = compact footer height + padding */
@@ -1065,6 +1159,21 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
             
             .login-page-isolated .login-card {
                 max-height: calc(100vh - var(--navbar-height) - 80px);
+                padding: 1.25rem 1rem !important;
+            }
+            
+            .login-page-isolated .login-title {
+                font-size: 1.375rem !important;
+            }
+            
+            .login-page-isolated .form-control {
+                padding: 0.5rem 0.75rem !important;
+                font-size: 0.875rem !important;
+            }
+            
+            .login-page-isolated .btn-lg {
+                padding: 0.625rem 1.25rem !important;
+                font-size: 0.9375rem !important;
             }
         }
         
@@ -1081,6 +1190,19 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
             
             .login-page-isolated .login-card {
                 max-height: calc(100vh - var(--navbar-height) - 50px);
+                padding: 1.25rem 1rem !important;
+            }
+            
+            .login-page-isolated .login-header {
+                margin-bottom: 0.75rem !important;
+            }
+            
+            .login-page-isolated .login-title {
+                font-size: 1.375rem !important;
+            }
+            
+            .login-page-isolated .form-group {
+                margin-bottom: 0.625rem !important;
             }
         }
         
@@ -1096,6 +1218,24 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
             
             .login-page-isolated .login-card {
                 max-height: calc(100vh - var(--navbar-height) - 40px);
+                padding: 1rem 0.875rem !important;
+            }
+            
+            .login-page-isolated .login-title {
+                font-size: 1.25rem !important;
+            }
+            
+            .login-page-isolated .login-subtitle {
+                font-size: 0.8125rem !important;
+            }
+            
+            .login-page-isolated .form-group {
+                margin-bottom: 0.5rem !important;
+            }
+            
+            .login-page-isolated .btn-lg {
+                padding: 0.5rem 1rem !important;
+                font-size: 0.875rem !important;
             }
         }
         
@@ -1143,7 +1283,7 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
             z-index: 2;
             width: 100%;
             max-width: 520px;
-            padding: 3rem 2.5rem;
+            padding: 2rem 2rem; /* Reduced from 3rem 2.5rem */
         }
         
         /* Hero Badge */
@@ -1153,20 +1293,20 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
             background: rgba(255, 255, 255, 0.15);
             backdrop-filter: blur(10px);
             color: white;
-            padding: 0.5rem 1.25rem;
+            padding: 0.375rem 1rem; /* Reduced */
             border-radius: 50px;
-            font-size: 0.875rem;
+            font-size: 0.8125rem; /* Reduced */
             font-weight: 600;
-            margin-bottom: 1.5rem;
+            margin-bottom: 1rem; /* Reduced from 1.5rem */
             border: 1px solid rgba(255, 255, 255, 0.2);
         }
         
         /* Hero Title */
         .login-hero-title {
-            font-size: 3rem;
+            font-size: 2.5rem; /* Reduced from 3rem */
             font-weight: 800;
             color: white;
-            margin-bottom: 1rem;
+            margin-bottom: 0.75rem; /* Reduced from 1rem */
             line-height: 1.1;
         }
         
@@ -1179,28 +1319,28 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
         
         /* Hero Subtitle */
         .login-hero-subtitle {
-            font-size: 1.125rem;
+            font-size: 1rem; /* Reduced from 1.125rem */
             color: rgba(255, 255, 255, 0.9);
-            margin-bottom: 2.5rem;
-            line-height: 1.6;
+            margin-bottom: 1.5rem; /* Reduced from 2.5rem */
+            line-height: 1.5; /* Reduced from 1.6 */
         }
         
         /* Feature Cards */
         .feature-cards-grid {
             display: flex;
             flex-direction: column;
-            gap: 1rem;
+            gap: 0.75rem; /* Reduced from 1rem */
         }
         
         .feature-card {
             background: rgba(255, 255, 255, 0.1);
             backdrop-filter: blur(10px);
             border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: 16px;
-            padding: 1.25rem;
+            border-radius: 12px; /* Reduced from 16px */
+            padding: 1rem; /* Reduced from 1.25rem */
             display: flex;
             align-items: flex-start;
-            gap: 1rem;
+            gap: 0.875rem; /* Reduced from 1rem */
             transition: all 0.3s ease;
         }
         
@@ -1210,10 +1350,10 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
         }
         
         .feature-icon {
-            width: 48px;
-            height: 48px;
+            width: 40px; /* Reduced from 48px */
+            height: 40px; /* Reduced from 48px */
             background: rgba(255, 255, 255, 0.2);
-            border-radius: 12px;
+            border-radius: 10px; /* Reduced from 12px */
             display: flex;
             align-items: center;
             justify-content: center;
@@ -1221,21 +1361,21 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
         }
         
         .feature-icon i {
-            font-size: 1.5rem;
+            font-size: 1.25rem; /* Reduced from 1.5rem */
             color: white;
         }
         
         .feature-title {
-            font-size: 1rem;
+            font-size: 0.9375rem; /* Reduced from 1rem */
             font-weight: 700;
             color: white;
-            margin-bottom: 0.25rem;
+            margin-bottom: 0.1875rem; /* Reduced from 0.25rem */
         }
         
         .feature-desc {
-            font-size: 0.875rem;
+            font-size: 0.8125rem; /* Reduced from 0.875rem */
             color: rgba(255, 255, 255, 0.8);
-            line-height: 1.5;
+            line-height: 1.4; /* Reduced from 1.5 */
         }
         
         /* Decorative Circles */
