@@ -23,18 +23,15 @@ body {
 }
 .section-header .bi {
   font-size: 2.25rem;
-  color: #1182FF;
 }
 .section-header h2 {
-  color: #1182FF;
   font-weight: 700;
   font-size: 2.2rem;
   margin: 0;
   line-height: 1.1;
 }
 
-h2.fw-bold {
-  color: #1182FF;
+h1.fw-bold, h2.fw-bold {
   font-weight: 700;
   font-size: 2.2rem;
   letter-spacing: 0.01em;
