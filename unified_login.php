@@ -709,7 +709,7 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=0.8, maximum-scale=2.0, user-scalable=yes">
     <title>EducAid - Login</title>
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Poppins:wght@400;600&display=swap" rel="stylesheet">
     <link href="assets/css/bootstrap-icons.css" rel="stylesheet">
@@ -721,6 +721,11 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
     <script src="https://www.google.com/recaptcha/api.js" async defer></script>
     
     <style>
+        /* Default zoom level for desktop */
+        html {
+            zoom: 80%;
+        }
+        
         /* Navbar enabled with isolation fixes applied */
         :root {
             --topbar-height: 0px;
@@ -733,18 +738,18 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
         body.login-page-isolated {
             padding-top: var(--navbar-height);
             overflow-x: hidden;
+            overflow-y: auto; /* Allow page-level scroll */
             font-family: "Manrope", sans-serif;
-            min-height: 100vh; /* Ensure body fills viewport */
+            min-height: 100vh;
             display: flex;
             flex-direction: column;
         }
         
         /* FIX 2: Unique page wrapper to prevent container-fluid conflicts */
         .login-page-isolated .login-main-wrapper {
-            flex: 1 0 auto; /* Grow to fill space, push footer down */
+            flex: 1 0 auto;
             max-width: 100vw;
-            overflow-x: hidden;
-            overflow-y: visible; /* Allow content to flow naturally */
+            overflow: hidden; /* Hide any internal scrollbars */
             display: flex;
             flex-direction: column;
         }
@@ -823,23 +828,25 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
         
         /* Adjust brand section height to account for navbar and topbar */
         .brand-section {
-            padding-top: 3rem;
-            padding-bottom: 3rem;
+            padding-top: 4rem;
+            padding-bottom: 4rem;
             display: flex;
             align-items: center;
             justify-content: center;
-            flex: 1; /* Allow to grow */
-            min-height: 0; /* Remove height constraints */
+            flex: 1;
+            min-height: calc(100vh - var(--navbar-height) - var(--topbar-height));
+            overflow: hidden; /* No scrollbar in brand section */
         }
         
         /* Ensure login form section adjusts properly */
         .col-lg-6:not(.brand-section) {
             display: flex;
             align-items: center;
-            padding-top: 2rem;
-            padding-bottom: 2rem;
-            flex: 1; /* Allow to grow */
-            min-height: 0; /* Remove height constraints */
+            padding-top: 3rem;
+            padding-bottom: 3rem;
+            flex: 1;
+            min-height: calc(100vh - var(--navbar-height) - var(--topbar-height));
+            overflow: hidden; /* No scrollbar in form section */
         }
         
         /* Mobile adjustments */
@@ -1052,7 +1059,7 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
         .form-section {
             display: flex;
             flex-direction: column;
-            overflow: visible; /* Allow natural overflow to page scroll */
+            overflow: hidden; /* No scrollbar */
         }
         
         .form-section .container {
@@ -1062,24 +1069,23 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
             justify-content: center;
             width: 100%;
             max-width: 100%;
-            padding-top: 1.5rem !important;
-            padding-bottom: 1.5rem !important;
+            padding-top: 2rem !important;
+            padding-bottom: 2rem !important;
         }
         
         .login-card {
             background: rgba(255, 255, 255, 0.98);
-            border-radius: 16px;
-            padding: 1.5rem 2rem;
+            border-radius: 20px;
+            padding: 2rem 2.5rem;
             box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
             width: 100%;
-            max-width: 100%;
-            margin: 1rem auto;
-            /* Removed max-height and overflow-y for natural flow */
+            max-width: 520px;
+            margin: 0 auto;
         }
         
         /* Compress spacing inside login card */
         .login-card .login-header {
-            margin-bottom: 1rem; /* Minimal header spacing */
+            margin-bottom: 1.25rem;
         }
         
         .login-card .login-title {
@@ -1149,22 +1155,38 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
             padding: 0;
             width: 100%;
             max-width: 100%;
-            height: auto;
-            min-height: 0;
+            height: 100%;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
         }
         
         .login-main-wrapper .row {
             margin: 0;
             width: 100%;
-            flex-wrap: nowrap; /* Prevent columns from stacking on zoom */
+            flex: 1;
+            flex-wrap: nowrap;
+            min-height: calc(100vh - var(--navbar-height) - var(--topbar-height));
         }
         
-        /* At higher zoom levels, allow content to breathe */
+        /* Remove scrollbars between sections */
         @media (min-width: 992px) {
             .brand-section,
             .form-section {
-                overflow-y: visible; /* No scrollbars in sections */
-                overflow-x: hidden;
+                overflow: hidden !important; /* No scrollbars */
+                height: 100%;
+            }
+            
+            /* Disable zoom on mobile to prevent layout issues */
+            html {
+                zoom: 80%;
+            }
+        }
+        
+        /* Mobile: reset zoom */
+        @media (max-width: 991.98px) {
+            html {
+                zoom: 100%;
             }
         }
         
