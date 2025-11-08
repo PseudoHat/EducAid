@@ -58,123 +58,132 @@ $pageTitle = "Storage Dashboard";
         <?php include __DIR__ . '/../../includes/admin/admin_header.php'; ?>
         <section class="home-section" id="mainContent">
             <div class="container-fluid py-4 px-4">
+                <!-- Page Header -->
                 <div class="d-flex justify-content-between align-items-center mb-4">
-                    <h2><i class="bi bi-hdd-stack"></i> Storage Dashboard</h2>
+                    <h1 class="mb-0">Storage Dashboard</h1>
                 </div>
 
-                <!-- Storage Capacity Progress -->
-                <div class="card mb-4">
-                    <div class="card-header bg-primary text-white">
-                        <h5 class="mb-0"><i class="bi bi-pie-chart"></i> Storage Capacity</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between mb-2">
-                            <span>
-                                <strong><?php echo number_format($totalStorage / (1024*1024*1024), 2); ?> GB</strong> 
-                                of <?php echo $maxStorageGB; ?> GB used
-                            </span>
-                            <span><strong><?php echo number_format($storagePercent, 1); ?>%</strong></span>
+                <!-- Quick Stats Section -->
+                <div class="quick-actions mb-4" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 25px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                    <div class="row align-items-center">
+                        <div class="col-md-8">
+                            <h5 class="mb-3 fw-bold">Storage Capacity Overview</h5>
+                            <div class="d-flex justify-content-between mb-2">
+                                <span style="font-size: 1.1rem;">
+                                    <strong><?php echo number_format($totalStorage / (1024*1024*1024), 2); ?> GB</strong> 
+                                    of <?php echo $maxStorageGB; ?> GB used
+                                </span>
+                                <span style="font-size: 1.2rem;"><strong><?php echo number_format($storagePercent, 1); ?>%</strong></span>
+                            </div>
+                            <?php
+                            $progressColor = 'bg-success';
+                            if ($storagePercent > 80) {
+                                $progressColor = 'bg-danger';
+                            } elseif ($storagePercent > 60) {
+                                $progressColor = 'bg-warning';
+                            }
+                            ?>
+                            <div class="progress" style="height: 35px; background-color: rgba(255,255,255,0.2);">
+                                <div class="progress-bar <?php echo $progressColor; ?>" 
+                                     role="progressbar" 
+                                     style="width: <?php echo min($storagePercent, 100); ?>%; font-size: 1rem; font-weight: 600;">
+                                    <?php echo number_format($storagePercent, 1); ?>%
+                                </div>
+                            </div>
                         </div>
-                <?php
-                $progressColor = 'bg-success';
-                if ($storagePercent > 80) {
-                    $progressColor = 'bg-danger';
-                } elseif ($storagePercent > 60) {
-                    $progressColor = 'bg-warning';
-                }
-                ?>
-                        <div class="progress" style="height: 30px;">
-                            <div class="progress-bar <?php echo $progressColor; ?>" 
-                                 role="progressbar" 
-                                 style="width: <?php echo min($storagePercent, 100); ?>%;">
-                                <?php echo number_format($storagePercent, 1); ?>%
-                            </div>
-                                <?php if ($storagePercent > 80): ?>
-                            <div class="alert alert-danger mt-3 mb-0">
-                                <i class="bi bi-exclamation-triangle"></i>
-                                <strong>Warning:</strong> Storage capacity is critically high (<?php echo number_format($storagePercent, 1); ?>%). Consider archiving or compressing old distributions.
-                            </div>
-                        <?php elseif ($storagePercent > 60): ?>
-                            <div class="alert alert-warning mt-3 mb-0">
-                                <i class="bi bi-exclamation-circle"></i>
-                                <strong>Notice:</strong> Storage usage is above 60%. Monitor capacity and plan for archiving.
-                            </div>
-                        <?php endif; ?>
+                        <div class="col-md-4 text-end">
+                            <i class="bi bi-hdd-stack" style="font-size: 5rem; opacity: 0.3;"></i>
+                        </div>
                     </div>
+                    <?php if ($storagePercent > 80): ?>
+                    <div class="alert alert-danger mt-3 mb-0" style="background-color: rgba(255,255,255,0.95); color: #dc3545; border: none;">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        <strong>Warning:</strong> Storage capacity is critically high (<?php echo number_format($storagePercent, 1); ?>%). Consider archiving or compressing old distributions.
+                    </div>
+                    <?php elseif ($storagePercent > 60): ?>
+                    <div class="alert alert-warning mt-3 mb-0" style="background-color: rgba(255,255,255,0.95); color: #856404; border: none;">
+                        <i class="bi bi-exclamation-circle"></i>
+                        <strong>Notice:</strong> Storage usage is above 60%. Monitor capacity and plan for archiving.
+                    </div>
+                    <?php endif; ?>
                 </div>
 
                 <!-- Metric Cards -->
                 <div class="row mb-4">
-                    <div class="col-md-3 mb-3">
-                        <div class="card border-left-success shadow h-100 py-2">
+                    <div class="col-lg-3 col-md-6 mb-3">
+                        <div class="card shadow-sm h-100" style="border-left: 4px solid #10b981;">
                             <div class="card-body">
-                                <div class="row no-gutters align-items-center">
-                                    <div class="col mr-2">
-                                        <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Total Storage Used</div>
-                                        <div class="h5 mb-0 font-weight-bold text-gray-800"><?php echo number_format($totalStorage / (1024*1024*1024), 2); ?> GB</div>
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div>
+                                        <div class="text-muted small text-uppercase mb-1" style="font-weight: 600; letter-spacing: 0.5px;">Total Storage</div>
+                                        <div class="h3 mb-0 fw-bold text-dark"><?php echo number_format($totalStorage / (1024*1024*1024), 2); ?> GB</div>
                                     </div>
-                                    <div class="col-auto">
-                                        <i class="bi bi-hdd fs-2 text-gray-300"></i>
+                                    <div class="rounded-circle d-flex align-items-center justify-content-center" 
+                                         style="width: 50px; height: 50px; background-color: rgba(16, 185, 129, 0.1);">
+                                        <i class="bi bi-hdd fs-4" style="color: #10b981;"></i>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
                     
-                    <div class="col-md-3 mb-3">
-                        <div class="card border-left-primary shadow h-100 py-2">
+                    <div class="col-lg-3 col-md-6 mb-3">
+                        <div class="card shadow-sm h-100" style="border-left: 4px solid #3b82f6;">
                             <div class="card-body">
-                                <div class="row no-gutters align-items-center">
-                                    <div class="col mr-2">
-                                        <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Active Students</div>
-                                        <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div>
+                                        <div class="text-muted small text-uppercase mb-1" style="font-weight: 600; letter-spacing: 0.5px;">Active Students</div>
+                                        <div class="h3 mb-0 fw-bold text-dark">
                                             <?php 
                                             $activeStudents = isset($storageByCategory['active']) ? $storageByCategory['active']['student_count'] : 0;
                                             echo number_format($activeStudents); 
                                             ?>
                                         </div>
                                     </div>
-                                    <div class="col-auto">
-                                        <i class="bi bi-people fs-2 text-gray-300"></i>
+                                    <div class="rounded-circle d-flex align-items-center justify-content-center" 
+                                         style="width: 50px; height: 50px; background-color: rgba(59, 130, 246, 0.1);">
+                                        <i class="bi bi-people fs-4" style="color: #3b82f6;"></i>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
                     
-                    <div class="col-md-3 mb-3">
-                        <div class="card border-left-info shadow h-100 py-2">
+                    <div class="col-lg-3 col-md-6 mb-3">
+                        <div class="card shadow-sm h-100" style="border-left: 4px solid #06b6d4;">
                             <div class="card-body">
-                                <div class="row no-gutters align-items-center">
-                                    <div class="col mr-2">
-                                        <div class="text-xs font-weight-bold text-info text-uppercase mb-1">Archived Students</div>
-                                        <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div>
+                                        <div class="text-muted small text-uppercase mb-1" style="font-weight: 600; letter-spacing: 0.5px;">Archived Students</div>
+                                        <div class="h3 mb-0 fw-bold text-dark">
                                             <?php 
                                             $archivedStudents = isset($storageByCategory['archived']) ? $storageByCategory['archived']['student_count'] : 0;
                                             echo number_format($archivedStudents); 
                                             ?>
                                         </div>
                                     </div>
-                                    <div class="col-auto">
-                                        <i class="bi bi-archive fs-2 text-gray-300"></i>
+                                    <div class="rounded-circle d-flex align-items-center justify-content-center" 
+                                         style="width: 50px; height: 50px; background-color: rgba(6, 182, 212, 0.1);">
+                                        <i class="bi bi-archive fs-4" style="color: #06b6d4;"></i>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
                     
-                    <div class="col-md-3 mb-3">
-                        <div class="card border-left-warning shadow h-100 py-2">
+                    <div class="col-lg-3 col-md-6 mb-3">
+                        <div class="card shadow-sm h-100" style="border-left: 4px solid #f59e0b;">
                             <div class="card-body">
-                                <div class="row no-gutters align-items-center">
-                                    <div class="col mr-2">
-                                        <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Space Saved</div>
-                                        <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div>
+                                        <div class="text-muted small text-uppercase mb-1" style="font-weight: 600; letter-spacing: 0.5px;">Space Saved</div>
+                                        <div class="h3 mb-0 fw-bold text-dark">
                                             <?php echo number_format(($compressionStats['total_space_saved'] ?? 0) / (1024*1024), 2); ?> MB
                                         </div>
                                     </div>
-                                    <div class="col-auto">
-                                        <i class="bi bi-file-earmark-zip fs-2 text-gray-300"></i>
+                                    <div class="rounded-circle d-flex align-items-center justify-content-center" 
+                                         style="width: 50px; height: 50px; background-color: rgba(245, 158, 11, 0.1);">
+                                        <i class="bi bi-file-earmark-zip fs-4" style="color: #f59e0b;"></i>
                                     </div>
                                 </div>
                             </div>
@@ -185,9 +194,9 @@ $pageTitle = "Storage Dashboard";
                 <!-- Charts Row -->
                 <div class="row mb-4">
                     <div class="col-lg-6 mb-3">
-                        <div class="card shadow">
-                            <div class="card-header py-3">
-                                <h6 class="m-0 font-weight-bold text-primary"><i class="bi bi-pie-chart-fill"></i> Storage Distribution</h6>
+                        <div class="card shadow-sm h-100">
+                            <div class="card-header text-white" style="background-color: #495057;">
+                                <h6 class="m-0 fw-bold">Storage Distribution</h6>
                             </div>
                             <div class="card-body">
                                 <div style="position: relative; height: 300px;">
@@ -198,9 +207,9 @@ $pageTitle = "Storage Dashboard";
                     </div>
                     
                     <div class="col-lg-6 mb-3">
-                        <div class="card shadow">
-                            <div class="card-header py-3">
-                                <h6 class="m-0 font-weight-bold text-primary"><i class="bi bi-bar-chart-fill"></i> Files by Category</h6>
+                        <div class="card shadow-sm h-100">
+                            <div class="card-header text-white" style="background-color: #495057;">
+                                <h6 class="m-0 fw-bold">Files by Category</h6>
                             </div>
                             <div class="card-body">
                                 <div style="position: relative; height: 300px;">
@@ -212,20 +221,20 @@ $pageTitle = "Storage Dashboard";
                 </div>
 
                 <!-- Storage Breakdown Table -->
-                <div class="card shadow mb-4">
-                    <div class="card-header py-3">
-                        <h6 class="m-0 font-weight-bold text-primary"><i class="bi bi-table"></i> Storage Breakdown</h6>
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header text-white" style="background-color: #495057;">
+                        <h6 class="m-0 fw-bold">Storage Breakdown</h6>
                     </div>
-                    <div class="card-body">
+                    <div class="card-body p-0">
                         <div class="table-responsive">
-                            <table class="table table-bordered table-hover">
-                                <thead class="table-light">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead style="background-color: #f8f9fa;">
                                     <tr>
-                                        <th>Category</th>
-                                        <th class="text-end">Students</th>
-                                        <th class="text-end">Files</th>
-                                        <th class="text-end">Storage Size</th>
-                                        <th class="text-end">% of Total</th>
+                                        <th class="fw-semibold px-4 py-3">Category</th>
+                                        <th class="text-end fw-semibold py-3">Students</th>
+                                        <th class="text-end fw-semibold py-3">Files</th>
+                                        <th class="text-end fw-semibold py-3">Storage Size</th>
+                                        <th class="text-end fw-semibold px-4 py-3">% of Total</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -233,12 +242,16 @@ $pageTitle = "Storage Dashboard";
                                         $percentage = $totalStorage > 0 ? ($stat['total_size'] / $totalStorage) * 100 : 0;
                                     ?>
                                     <tr>
-                                        <td>
-                                            <span class="badge bg-<?php 
-                                                echo $stat['category'] === 'active' ? 'success' : 
-                                                    ($stat['category'] === 'distributions' ? 'primary' :
-                                                    ($stat['category'] === 'archived' ? 'info' : 'secondary')); 
-                                            ?>">
+                                        <td class="px-4 py-3">
+                                            <span class="badge" style="background-color: <?php 
+                                                echo $stat['category'] === 'active' ? 'rgba(34, 197, 94, 0.15)' : 
+                                                    ($stat['category'] === 'distributions' ? 'rgba(59, 130, 246, 0.15)' :
+                                                    ($stat['category'] === 'archived' ? 'rgba(6, 182, 212, 0.15)' : 'rgba(107, 114, 128, 0.15)')); 
+                                            ?>; color: <?php 
+                                                echo $stat['category'] === 'active' ? '#15803d' : 
+                                                    ($stat['category'] === 'distributions' ? '#1e40af' :
+                                                    ($stat['category'] === 'archived' ? '#0e7490' : '#374151')); 
+                                            ?>; font-weight: 500; padding: 6px 12px;">
                                                 <?php 
                                                     if ($stat['category'] === 'distributions') {
                                                         echo 'Past Distributions';
@@ -248,28 +261,28 @@ $pageTitle = "Storage Dashboard";
                                                 ?>
                                             </span>
                                         </td>
-                                        <td class="text-end">
+                                        <td class="text-end py-3">
                                             <?php 
                                                 if ($stat['category'] === 'distributions') {
-                                                    echo number_format($stat['student_count']) . ' unique';
+                                                    echo '<span class="text-muted">' . number_format($stat['student_count']) . ' unique</span>';
                                                 } else {
                                                     echo number_format($stat['student_count']);
                                                 }
                                             ?>
                                         </td>
-                                        <td class="text-end"><?php echo number_format($stat['file_count']); ?></td>
-                                        <td class="text-end">
+                                        <td class="text-end py-3"><?php echo number_format($stat['file_count']); ?></td>
+                                        <td class="text-end py-3">
                                             <strong><?php echo number_format($stat['total_size'] / (1024*1024), 2); ?> MB</strong>
                                         </td>
-                                        <td class="text-end">
-                                            <?php echo number_format($percentage, 1); ?>%
+                                        <td class="text-end px-4 py-3">
+                                            <span class="badge bg-light text-dark border"><?php echo number_format($percentage, 1); ?>%</span>
                                         </td>
                                     </tr>
                                     <?php endforeach; ?>
                                     <?php if (empty($storageStats)): ?>
                                     <tr>
-                                        <td colspan="5" class="text-center text-muted py-4">
-                                            <i class="bi bi-inbox fs-1"></i><br>
+                                        <td colspan="5" class="text-center text-muted py-5">
+                                            <i class="bi bi-inbox fs-1 d-block mb-2 opacity-50"></i>
                                             No storage data available
                                         </td>
                                     </tr>
@@ -281,64 +294,67 @@ $pageTitle = "Storage Dashboard";
                 </div>
 
                 <!-- Recent Archive Operations -->
-                <div class="card shadow mb-4">
-                    <div class="card-header py-3 d-flex justify-content-between align-items-center">
-                        <h6 class="m-0 font-weight-bold text-primary"><i class="bi bi-clock-history"></i> Recent Archive Operations</h6>
-                        <span class="badge bg-secondary"><?php echo count($recentLogs); ?> records</span>
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header text-white d-flex justify-content-between align-items-center" style="background-color: #495057;">
+                        <h6 class="m-0 fw-bold">Recent Archive Operations</h6>
+                        <span class="badge" style="background-color: rgba(255,255,255,0.2); color: white;"><?php echo count($recentLogs); ?> records</span>
                     </div>
-                    <div class="card-body">
+                    <div class="card-body p-0">
                         <div class="table-responsive">
-                            <table class="table table-bordered table-hover">
-                                <thead class="table-light">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead style="background-color: #f8f9fa;">
                                     <tr>
-                                        <th>Timestamp</th>
-                                        <th>Operation</th>
-                                        <th>Student</th>
-                                        <th>Performed By</th>
-                                        <th>Status</th>
-                                        <th class="text-end">Size</th>
+                                        <th class="fw-semibold px-4 py-3">Timestamp</th>
+                                        <th class="fw-semibold py-3">Operation</th>
+                                        <th class="fw-semibold py-3">Student</th>
+                                        <th class="fw-semibold py-3">Performed By</th>
+                                        <th class="fw-semibold py-3">Status</th>
+                                        <th class="text-end fw-semibold px-4 py-3">Size</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <?php foreach ($recentLogs as $log): ?>
                                     <tr>
-                                        <td>
-                                            <small><?php echo date('M d, Y H:i', strtotime($log['performed_at'] ?? 'now')); ?></small>
+                                        <td class="px-4 py-3">
+                                            <small class="text-muted"><?php echo date('M d, Y H:i', strtotime($log['performed_at'] ?? 'now')); ?></small>
                                         </td>
-                                        <td>
-                                            <span class="badge bg-info">
+                                        <td class="py-3">
+                                            <span class="badge" style="background-color: rgba(6, 182, 212, 0.15); color: #0e7490; font-weight: 500;">
                                                 <?php echo strtoupper($log['operation'] ?? 'UNKNOWN'); ?>
                                             </span>
                                         </td>
-                                        <td>
+                                        <td class="py-3">
                                             <?php if (!empty($log['student_name'])): ?>
-                                                <small><?php echo htmlspecialchars($log['student_name']); ?></small><br>
+                                                <div class="fw-medium"><?php echo htmlspecialchars($log['student_name']); ?></div>
                                                 <small class="text-muted"><?php echo htmlspecialchars($log['lrn'] ?? ''); ?></small>
                                             <?php else: ?>
                                                 <small class="text-muted">—</small>
                                             <?php endif; ?>
                                         </td>
-                                        <td>
+                                        <td class="py-3">
                                             <small><?php echo htmlspecialchars($log['admin_name'] ?? 'System'); ?></small>
                                         </td>
-                                        <td>
-                                            <span class="badge bg-<?php 
+                                        <td class="py-3">
+                                            <span class="badge" style="background-color: <?php 
                                                 $status = strtoupper($log['operation_status'] ?? 'UNKNOWN');
-                                                echo $status === 'SUCCESS' ? 'success' : 
-                                                    ($status === 'FAILED' ? 'danger' : 'secondary');
-                                            ?>">
+                                                echo $status === 'SUCCESS' ? 'rgba(34, 197, 94, 0.15)' : 
+                                                    ($status === 'FAILED' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(107, 114, 128, 0.15)');
+                                            ?>; color: <?php 
+                                                echo $status === 'SUCCESS' ? '#15803d' : 
+                                                    ($status === 'FAILED' ? '#991b1b' : '#374151');
+                                            ?>; font-weight: 500;">
                                                 <?php echo $status; ?>
                                             </span>
                                         </td>
-                                        <td class="text-end">
-                                            <small><?php echo number_format(($log['total_size_before'] ?? 0) / (1024*1024), 2); ?> MB</small>
+                                        <td class="text-end px-4 py-3">
+                                            <small class="text-muted"><?php echo number_format(($log['total_size_before'] ?? 0) / (1024*1024), 2); ?> MB</small>
                                         </td>
                                     </tr>
                                     <?php endforeach; ?>
                                     <?php if (empty($recentLogs)): ?>
                                     <tr>
-                                        <td colspan="6" class="text-center text-muted py-4">
-                                            <i class="bi bi-inbox fs-1"></i><br>
+                                        <td colspan="6" class="text-center text-muted py-5">
+                                            <i class="bi bi-inbox fs-1 d-block mb-2 opacity-50"></i>
                                             No archive operations recorded
                                         </td>
                                     </tr>
