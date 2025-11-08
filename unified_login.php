@@ -762,7 +762,8 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
         }
         
         /* FIX 4: Footer always sticks to bottom but flows naturally */
-        .login-page-isolated #dynamic-footer {
+        .login-page-isolated #dynamic-footer,
+        .login-page-isolated .login-compact-footer {
             flex-shrink: 0;
             margin-top: auto;
         }
@@ -1017,6 +1018,91 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
             /* Prevent horizontal overflow at any zoom */
             .login-page-isolated * {
                 max-width: 100%;
+            }
+        }
+        
+        /* ============================================
+           COMPACT FOOTER FOR LOGIN PAGE
+           ============================================ */
+        
+        .login-compact-footer {
+            background: #f8f9fa;
+            border-top: 1px solid #e9ecef;
+            margin-top: auto;
+            flex-shrink: 0;
+            padding: 0;
+            width: 100%;
+        }
+        
+        .login-compact-footer small {
+            font-size: 0.8125rem;
+            line-height: 1.8;
+        }
+        
+        .login-compact-footer a {
+            transition: color 0.2s ease;
+        }
+        
+        .login-compact-footer a.hover-primary:hover {
+            color: var(--thm-primary) !important;
+        }
+        
+        /* Adjust login card max-height to account for compact footer */
+        .login-page-isolated .login-card {
+            max-height: calc(100vh - var(--navbar-height) - 70px); /* 70px = compact footer height + padding */
+        }
+        
+        /* Mobile adjustments for compact footer */
+        @media (max-width: 575.98px) {
+            .login-compact-footer small {
+                font-size: 0.75rem;
+            }
+            
+            .login-compact-footer .py-3 {
+                padding-top: 0.75rem !important;
+                padding-bottom: 0.75rem !important;
+            }
+            
+            .login-page-isolated .login-card {
+                max-height: calc(100vh - var(--navbar-height) - 80px);
+            }
+        }
+        
+        /* Very short viewports - make footer even more compact */
+        @media (max-height: 700px) {
+            .login-compact-footer .py-3 {
+                padding-top: 0.5rem !important;
+                padding-bottom: 0.5rem !important;
+            }
+            
+            .login-compact-footer small {
+                font-size: 0.75rem;
+            }
+            
+            .login-page-isolated .login-card {
+                max-height: calc(100vh - var(--navbar-height) - 50px);
+            }
+        }
+        
+        @media (max-height: 600px) {
+            .login-compact-footer .py-3 {
+                padding-top: 0.375rem !important;
+                padding-bottom: 0.375rem !important;
+            }
+            
+            .login-compact-footer small {
+                font-size: 0.6875rem;
+            }
+            
+            .login-page-isolated .login-card {
+                max-height: calc(100vh - var(--navbar-height) - 40px);
+            }
+        }
+        
+        /* Hide some footer elements on very small screens */
+        @media (max-width: 375px) {
+            .login-compact-footer br.d-sm-none {
+                display: block !important;
             }
         }
         
@@ -1661,8 +1747,28 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
         </div> <!-- Close login-main-wrapper -->
     </div> <!-- Close login-content-container -->
 
-    <!-- Footer - Dynamic CMS Controlled -->
-    <?php include __DIR__ . '/includes/website/footer.php'; ?>
+    <!-- Compact Footer for Login Page -->
+    <footer class="login-compact-footer">
+        <div class="container-fluid">
+            <div class="row py-3">
+                <div class="col-12 text-center">
+                    <small class="text-muted">
+                        © <?= date('Y') ?> City Government of General Trias • EducAid
+                        <span class="mx-2 d-none d-sm-inline">|</span>
+                        <br class="d-sm-none">
+                        <a href="website/landingpage.php" class="text-decoration-none text-muted hover-primary">Home</a>
+                        <span class="mx-2">|</span>
+                        <a href="website/about.php" class="text-decoration-none text-muted hover-primary">About</a>
+                        <span class="mx-2">|</span>
+                        <a href="website/contact.php" class="text-decoration-none text-muted hover-primary">Contact</a>
+                        <span class="mx-2 d-none d-md-inline">|</span>
+                        <br class="d-md-none">
+                        <span class="d-none d-md-inline text-muted">Powered by the Office of the Mayor</span>
+                    </small>
+                </div>
+            </div>
+        </div>
+    </footer>
 
     <script src="assets/js/bootstrap.bundle.min.js"></script>
     <script src="assets/js/login.js"></script>
