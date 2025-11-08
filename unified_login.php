@@ -1538,18 +1538,21 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
         
         /* reCAPTCHA Security Modal - Fix z-index and backdrop */
         #recaptchaModal {
-            z-index: 9999 !important;
+            z-index: 10500 !important;
         }
         
         #recaptchaModal .modal-dialog {
-            z-index: 10000 !important;
+            z-index: 10501 !important;
+            position: relative;
         }
         
         #recaptchaModal .modal-content {
             border-radius: 1rem;
             border: none;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
             background: #ffffff;
+            position: relative;
+            z-index: 10502;
         }
         
         #recaptchaModal .modal-header {
@@ -1567,10 +1570,12 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
         
         #recaptchaModal .modal-header .btn-close {
             filter: brightness(0) invert(1);
+            opacity: 1;
         }
         
         #recaptchaModal .modal-body {
             padding: 2rem 1.5rem;
+            background: #ffffff;
         }
         
         #recaptchaModal .modal-body p {
@@ -1579,10 +1584,23 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
             font-size: 0.9375rem;
         }
         
-        /* Ensure modal backdrop appears above login content */
+        /* Ensure modal backdrop appears above ALL login content with much darker overlay */
         .modal-backdrop {
-            z-index: 9998 !important;
-            background-color: rgba(0, 0, 0, 0.6) !important;
+            z-index: 10499 !important;
+            background-color: rgba(0, 0, 0, 0.85) !important;
+            opacity: 1 !important;
+        }
+        
+        .modal-backdrop.show {
+            opacity: 1 !important;
+        }
+        
+        /* Override any potential conflicts with login page elements */
+        .login-page-isolated.modal-open .login-content-container,
+        .login-page-isolated.modal-open .brand-section,
+        .login-page-isolated.modal-open .login-card {
+            position: relative;
+            z-index: 1 !important;
         }
         
         /* Fix for reCAPTCHA widget inside modal */
