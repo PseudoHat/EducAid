@@ -11,7 +11,8 @@
 
 class DocumentService {
     private $db;
-    private $baseDir = __DIR__ . '/../assets/uploads/';
+    private $baseDir;
+    private $pathConfig;
     
     // Document type mapping
     const DOCUMENT_TYPES = [
@@ -23,7 +24,14 @@ class DocumentService {
     ];
     
     public function __construct($dbConnection) {
+        require_once __DIR__ . '/../config/FilePathConfig.php';
+        
         $this->db = $dbConnection;
+        $this->pathConfig = FilePathConfig::getInstance();
+        $this->baseDir = $this->pathConfig->getUploadsDir();
+        
+        error_log("DocumentService: Environment=" . ($this->pathConfig->isRailway() ? 'Railway' : 'Localhost') . 
+                  ", BaseDir=" . $this->baseDir);
     }
     
     /**
@@ -33,28 +41,8 @@ class DocumentService {
      * @return string Relative web path
      */
     private function convertToWebPath($filePath) {
-        // Normalize path separators
-        $filePath = str_replace('\\', '/', $filePath);
-        $baseDir = str_replace('\\', '/', $this->baseDir);
-        
-        // If path starts with base directory, make it relative
-        if (strpos($filePath, $baseDir) === 0) {
-            $relativePath = substr($filePath, strlen($baseDir));
-            return 'assets/uploads/' . ltrim($relativePath, '/');
-        }
-        
-        // If it's already a relative path starting with assets/
-        if (strpos($filePath, 'assets/uploads/') === 0) {
-            return $filePath;
-        }
-        
-        // If it's a relative path with ../../
-        if (strpos($filePath, '../../assets/uploads/') === 0) {
-            return str_replace('../../', '', $filePath);
-        }
-        
-        // Fallback: return as-is
-        return $filePath;
+        // Use pathConfig for proper conversion
+        return $this->pathConfig->getRelativePath($filePath);
     }
     
     /**

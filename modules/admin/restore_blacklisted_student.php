@@ -13,6 +13,9 @@
  */
 
 include __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../../config/FilePathConfig.php';
+$pathConfig = FilePathConfig::getInstance();
+
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -70,7 +73,7 @@ try {
     pg_query($connection, "COMMIT");
     
     // 4. Restore files from ZIP archive
-    $zipFile = __DIR__ . '/../../assets/uploads/blacklisted_students/' . $student_id . '.zip';
+    $zipFile = $pathConfig->getArchivedStudentsPath() . DIRECTORY_SEPARATOR . $student_id . '.zip';
     $filesRestored = 0;
     $restoreErrors = [];
     
@@ -79,7 +82,7 @@ try {
         
         if ($zip->open($zipFile) === TRUE) {
             // Extract files
-            $basePath = __DIR__ . '/../../assets/uploads/student';
+            $basePath = $pathConfig->getStudentPath();
             
             for ($i = 0; $i < $zip->numFiles; $i++) {
                 $filename = $zip->getNameIndex($i);
@@ -99,13 +102,13 @@ try {
                     
                     if ($location === 'permanent') {
                         // Restore to assets/uploads/student/[filetype]/[student_id]/
-                        $targetDir = $basePath . '/' . $fileType . '/' . $student_id;
+                        $targetDir = $basePath . DIRECTORY_SEPARATOR . $fileType . DIRECTORY_SEPARATOR . $student_id;
                         
                         if (!is_dir($targetDir)) {
                             mkdir($targetDir, 0755, true);
                         }
                         
-                        $targetFile = $targetDir . '/' . $file;
+                        $targetFile = $targetDir . DIRECTORY_SEPARATOR . $file;
                         
                         // Extract the file
                         $fileContent = $zip->getFromIndex($i);

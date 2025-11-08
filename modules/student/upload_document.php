@@ -601,32 +601,48 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $can_upload) {
                 if ($doc_type_code === '00' && !isset($upload_result)) {
                     $errors = [];
                     
-                    // Check First Name - FIXED: use correct path student_name->first_name_found
+                    // CRITICAL: Check verification_passed flag from OCR service
+                    // If OCR service already rejected it, block immediately
+                    $verification_passed = $temp_data['extracted_data']['verification_passed'] ?? 
+                                          ($verification_status === 'passed');
+                    
+                    if (!$verification_passed) {
+                        $errors[] = "• ❌ VALIDATION FAILED: This document did not pass automatic verification.";
+                        error_log("UPLOAD BLOCKED: verification_passed = false for EAF");
+                    }
+                    
+                    // Check First Name - STRICT: Must match OCR service thresholds (60%)
                     if ($extracted_data && isset($extracted_data['student_name'])) {
                         $first_name_found = $extracted_data['student_name']['first_name_found'] ?? false;
                         $first_name_similarity = $extracted_data['student_name']['first_name_similarity'] ?? 0;
                         
-                        // Require at least 70% similarity for first name
-                        if (!$first_name_found || $first_name_similarity < 70) {
-                            $errors[] = "• First name not found or mismatch in document. Expected '{$student['first_name']}' (Similarity: {$first_name_similarity}%)";
+                        // STRICT: Require 60% similarity (matching EnrollmentFormOCRService)
+                        // first_name_found is already calculated with 60% threshold in OCR service
+                        if (!$first_name_found) {
+                            $errors[] = "• ❌ FIRST NAME MISMATCH: Expected '{$student['first_name']}' but found different name (Similarity: {$first_name_similarity}%)";
+                            error_log("UPLOAD BLOCKED: First name mismatch - Expected '{$student['first_name']}', Similarity: {$first_name_similarity}%");
                         }
                     } else {
                         // If no student_name data at all, it's a critical failure
-                        $errors[] = "• First name not found in document. Expected '{$student['first_name']}'";
+                        $errors[] = "• ❌ FIRST NAME NOT FOUND: Expected '{$student['first_name']}' but document has no readable name";
+                        error_log("UPLOAD BLOCKED: No student_name data in extracted_data");
                     }
                     
-                    // Check Last Name - FIXED: use correct path student_name->last_name_found
+                    // Check Last Name - STRICT: Must match OCR service thresholds (70%)
                     if ($extracted_data && isset($extracted_data['student_name'])) {
                         $last_name_found = $extracted_data['student_name']['last_name_found'] ?? false;
                         $last_name_similarity = $extracted_data['student_name']['last_name_similarity'] ?? 0;
                         
-                        // Require at least 75% similarity for last name (more strict)
-                        if (!$last_name_found || $last_name_similarity < 75) {
-                            $errors[] = "• Last name not found or mismatch in document. Expected '{$student['last_name']}' (Similarity: {$last_name_similarity}%)";
+                        // STRICT: Require 70% similarity (matching EnrollmentFormOCRService)
+                        // last_name_found is already calculated with 70% threshold in OCR service
+                        if (!$last_name_found) {
+                            $errors[] = "• ❌ LAST NAME MISMATCH: Expected '{$student['last_name']}' but found different name (Similarity: {$last_name_similarity}%)";
+                            error_log("UPLOAD BLOCKED: Last name mismatch - Expected '{$student['last_name']}', Similarity: {$last_name_similarity}%");
                         }
                     } else {
                         // If no student_name data at all, it's a critical failure
-                        $errors[] = "• Last name not found in document. Expected '{$student['last_name']}'";
+                        $errors[] = "• ❌ LAST NAME NOT FOUND: Expected '{$student['last_name']}' but document has no readable name";
+                        error_log("UPLOAD BLOCKED: No student_name data in extracted_data");
                     }
                     
                     // Check Course
@@ -1614,6 +1630,8 @@ $page_title = 'Upload Documents';
                                     <?php 
                                     $warnings = [];
                                     $confidence = $preview_data['ocr_confidence'] ?? 0;
+                                    $extracted_data = $preview_data['extracted_data'] ?? null;
+                                    $verification_status = $preview_data['verification_status'] ?? 'pending';
                                     
                                     // Check confidence threshold
                                     if ($confidence < 40) {
@@ -1622,8 +1640,114 @@ $page_title = 'Upload Documents';
                                         $warnings[] = "⚠️ <strong>Low Quality:</strong> OCR confidence is {$confidence}%. Consider re-uploading a clearer image for faster approval.";
                                     }
                                     
-                                    // Check name verification
-                                    if (isset($preview_data['extracted_data']['last_name'])) {
+                                    // CRITICAL: Check EAF validation results (from EnrollmentFormOCRService)
+                                    if ($type_code === '00' && $extracted_data && is_array($extracted_data)) {
+                                        // Check verification_passed flag
+                                        $verification_passed = $extracted_data['verification_passed'] ?? 
+                                                              ($verification_status === 'passed');
+                                        
+                                        if (!$verification_passed) {
+                                            // Show specific validation failures
+                                            if (isset($extracted_data['student_name'])) {
+                                                $first_name_found = $extracted_data['student_name']['first_name_found'] ?? false;
+                                                $last_name_found = $extracted_data['student_name']['last_name_found'] ?? false;
+                                                $first_name_similarity = $extracted_data['student_name']['first_name_similarity'] ?? 0;
+                                                $last_name_similarity = $extracted_data['student_name']['last_name_similarity'] ?? 0;
+                                                
+                                                if (!$first_name_found) {
+                                                    $warnings[] = "❌ <strong>FIRST NAME MISMATCH:</strong> Expected '{$student['first_name']}' but found different name (Match: " . round($first_name_similarity, 1) . "%)";
+                                                }
+                                                
+                                                if (!$last_name_found) {
+                                                    $warnings[] = "❌ <strong>LAST NAME MISMATCH:</strong> Expected '{$student['last_name']}' but found different name (Match: " . round($last_name_similarity, 1) . "%)";
+                                                }
+                                            }
+                                            
+                                            // Check document type validation
+                                            if (isset($extracted_data['document_type'])) {
+                                                $is_enrollment_form = $extracted_data['document_type']['is_enrollment_form'] ?? false;
+                                                if (!$is_enrollment_form) {
+                                                    $warnings[] = "❌ <strong>WRONG DOCUMENT TYPE:</strong> This does not appear to be an Enrollment Assistance Form";
+                                                }
+                                            }
+                                            
+                                            // General rejection message
+                                            if (empty($warnings)) {
+                                                $warnings[] = "❌ <strong>VALIDATION FAILED:</strong> This document does not match your registration information. Please upload the correct Enrollment Assistance Form.";
+                                            }
+                                        }
+                                    }
+                                    // Letter to Mayor (02) validation warnings
+                                    elseif ($type_code === '02') {
+                                        // Read verify.json to check for validation failures
+                                        $verifyJsonPath = $preview_data['path'] . '.verify.json';
+                                        if (file_exists($verifyJsonPath)) {
+                                            $verifyData = json_decode(file_get_contents($verifyJsonPath), true);
+                                            
+                                            // Check for cross-document confusion
+                                            if (isset($verifyData['wrong_document_type']) && $verifyData['wrong_document_type']) {
+                                                $warnings[] = "❌ <strong>WRONG DOCUMENT TYPE:</strong> This appears to be a \"" . 
+                                                             ($verifyData['detected_document_type'] ?? 'different document') . 
+                                                             "\", not a \"Letter to Mayor\". Please upload it in the correct document field.";
+                                            }
+                                            
+                                            // Check individual field validations
+                                            if (isset($verifyData['first_name']) && !$verifyData['first_name']) {
+                                                $warnings[] = "❌ <strong>NAME MISMATCH:</strong> Your first name '{$student['first_name']}' was not found in the letter";
+                                            }
+                                            
+                                            if (isset($verifyData['last_name']) && !$verifyData['last_name']) {
+                                                $warnings[] = "❌ <strong>NAME MISMATCH:</strong> Your last name '{$student['last_name']}' was not found in the letter";
+                                            }
+                                            
+                                            if (isset($verifyData['mayor_header']) && !$verifyData['mayor_header']) {
+                                                $warnings[] = "⚠️ <strong>Missing Mayor's Office Header:</strong> Document should be addressed to the Mayor";
+                                            }
+                                            
+                                            if (isset($verifyData['barangay']) && !$verifyData['barangay']) {
+                                                $warnings[] = "⚠️ <strong>Barangay Not Found:</strong> Expected '{$student['barangay_name']}'";
+                                            }
+                                        }
+                                    }
+                                    // Certificate of Indigency (03) validation warnings
+                                    elseif ($type_code === '03') {
+                                        // Read verify.json to check for validation failures
+                                        $verifyJsonPath = $preview_data['path'] . '.verify.json';
+                                        if (file_exists($verifyJsonPath)) {
+                                            $verifyData = json_decode(file_get_contents($verifyJsonPath), true);
+                                            
+                                            // Check for cross-document confusion
+                                            if (isset($verifyData['wrong_document_type']) && $verifyData['wrong_document_type']) {
+                                                $warnings[] = "❌ <strong>WRONG DOCUMENT TYPE:</strong> This appears to be a \"" . 
+                                                             ($verifyData['detected_document_type'] ?? 'different document') . 
+                                                             "\", not a \"Certificate of Indigency\". Please upload it in the correct document field.";
+                                            }
+                                            
+                                            // Check for missing critical keywords
+                                            if (isset($verifyData['missing_keywords']) && $verifyData['missing_keywords']) {
+                                                $warnings[] = "❌ <strong>MISSING KEYWORD:</strong> Document does not contain \"indigency\" or \"indigent\" - not a valid Certificate of Indigency";
+                                            }
+                                            
+                                            // Check individual field validations
+                                            if (isset($verifyData['certificate_title']) && !$verifyData['certificate_title']) {
+                                                $warnings[] = "❌ <strong>Missing Certificate Title:</strong> Document should have \"Certificate of Indigency\" title";
+                                            }
+                                            
+                                            if (isset($verifyData['first_name']) && !$verifyData['first_name']) {
+                                                $warnings[] = "❌ <strong>NAME MISMATCH:</strong> Your first name '{$student['first_name']}' was not found in the certificate";
+                                            }
+                                            
+                                            if (isset($verifyData['last_name']) && !$verifyData['last_name']) {
+                                                $warnings[] = "❌ <strong>NAME MISMATCH:</strong> Your last name '{$student['last_name']}' was not found in the certificate";
+                                            }
+                                            
+                                            if (isset($verifyData['barangay']) && !$verifyData['barangay']) {
+                                                $warnings[] = "⚠️ <strong>Barangay Not Found:</strong> Expected '{$student['barangay_name']}'";
+                                            }
+                                        }
+                                    }
+                                    // Legacy validation for non-EAF documents or old data structure
+                                    elseif (isset($preview_data['extracted_data']['last_name'])) {
                                         $student_last_name = strtolower(trim($student['last_name']));
                                         $ocr_last_name = strtolower(trim($preview_data['extracted_data']['last_name']['normalized'] ?? $preview_data['extracted_data']['last_name']['raw'] ?? ''));
                                         $similarity = 0;
@@ -1655,26 +1779,100 @@ $page_title = 'Upload Documents';
                                     <?php else: ?>
                                     <!-- Confirm & Submit Button (shown after OCR) -->
                                     <?php
-                                    // Check if document will pass validation (for non-ID documents)
+                                    // CRITICAL: Check if document PASSED OCR validation
                                     $will_pass_validation = true;
                                     $validation_message = '';
                                     
-                                    if ($type_code !== '04') {
+                                    if ($type_code !== '04') { // All documents except ID Picture
                                         $confidence = $preview_data['ocr_confidence'] ?? 0;
+                                        $verification_status = $preview_data['verification_status'] ?? 'pending';
+                                        $extracted_data = $preview_data['extracted_data'] ?? null;
                                         
+                                        // Check 1: Minimum confidence threshold
                                         if ($confidence < 40) {
                                             $will_pass_validation = false;
-                                            $validation_message = 'Document quality too low (minimum 40% required)';
-                                        } elseif (isset($preview_data['extracted_data']['last_name'])) {
-                                            $student_last_name = strtolower(trim($student['last_name']));
-                                            $ocr_last_name = strtolower(trim($preview_data['extracted_data']['last_name']['normalized'] ?? $preview_data['extracted_data']['last_name']['raw'] ?? ''));
-                                            $similarity = 0;
-                                            similar_text($student_last_name, $ocr_last_name, $similarity);
+                                            $validation_message = '❌ Document quality too low (minimum 40% required)';
+                                        }
+                                        
+                                        // Check 2: For EAF (00), check if OCR service validation passed
+                                        if ($type_code === '00') {
+                                            // Check verification_passed flag from EnrollmentFormOCRService
+                                            $verification_passed = false;
                                             
-                                            if ($similarity < 60) {
-                                                $will_pass_validation = false;
-                                                $validation_message = 'Name mismatch detected';
+                                            // Check if extracted_data has verification result
+                                            if ($extracted_data && is_array($extracted_data)) {
+                                                // EnrollmentFormOCRService returns verification_passed at root level
+                                                $verification_passed = $extracted_data['verification_passed'] ?? 
+                                                                      ($verification_status === 'passed');
                                             }
+                                            
+                                            if (!$verification_passed) {
+                                                $will_pass_validation = false;
+                                                $validation_message = '❌ Document validation failed - Name or details do not match your registration';
+                                                
+                                                // Get specific failure reasons from extracted_data
+                                                if ($extracted_data && isset($extracted_data['student_name'])) {
+                                                    $first_name_found = $extracted_data['student_name']['first_name_found'] ?? false;
+                                                    $last_name_found = $extracted_data['student_name']['last_name_found'] ?? false;
+                                                    
+                                                    if (!$first_name_found) {
+                                                        $validation_message .= " (First name mismatch)";
+                                                    }
+                                                    if (!$last_name_found) {
+                                                        $validation_message .= " (Last name mismatch)";
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        
+                                        // Check 2b: For Letter to Mayor (02), check validation
+                                        if ($type_code === '02') {
+                                            $verifyJsonPath = $preview_data['path'] . '.verify.json';
+                                            if (file_exists($verifyJsonPath)) {
+                                                $verifyData = json_decode(file_get_contents($verifyJsonPath), true);
+                                                $verification_passed = $verifyData['verification_passed'] ?? 
+                                                                      ($verification_status === 'passed');
+                                                
+                                                if (!$verification_passed) {
+                                                    $will_pass_validation = false;
+                                                    
+                                                    // Check for wrong document type
+                                                    if (isset($verifyData['wrong_document_type']) && $verifyData['wrong_document_type']) {
+                                                        $validation_message = '❌ Wrong document type - This is not a Letter to Mayor';
+                                                    } else {
+                                                        $validation_message = '❌ Document validation failed - Required information not found';
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        
+                                        // Check 2c: For Certificate of Indigency (03), check validation
+                                        if ($type_code === '03') {
+                                            $verifyJsonPath = $preview_data['path'] . '.verify.json';
+                                            if (file_exists($verifyJsonPath)) {
+                                                $verifyData = json_decode(file_get_contents($verifyJsonPath), true);
+                                                $verification_passed = $verifyData['verification_passed'] ?? 
+                                                                      ($verification_status === 'passed');
+                                                
+                                                if (!$verification_passed) {
+                                                    $will_pass_validation = false;
+                                                    
+                                                    // Check for wrong document type
+                                                    if (isset($verifyData['wrong_document_type']) && $verifyData['wrong_document_type']) {
+                                                        $validation_message = '❌ Wrong document type - This is not a Certificate of Indigency';
+                                                    } elseif (isset($verifyData['missing_keywords']) && $verifyData['missing_keywords']) {
+                                                        $validation_message = '❌ Missing "indigency" keyword - Not a valid certificate';
+                                                    } else {
+                                                        $validation_message = '❌ Document validation failed - Required information not found';
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        
+                                        // Check 3: Verification status should not be 'failed'
+                                        if ($verification_status === 'failed') {
+                                            $will_pass_validation = false;
+                                            $validation_message = '❌ Document verification failed';
                                         }
                                     }
                                     ?>
@@ -1768,6 +1966,13 @@ $page_title = 'Upload Documents';
         // Mark body as ready after scripts load
         document.body.classList.add('js-ready');
         
+        // Helper function to strip HTML tags from text (for alert messages)
+        function stripHtml(html) {
+            const tmp = document.createElement('DIV');
+            tmp.innerHTML = html;
+            return tmp.textContent || tmp.innerText || '';
+        }
+        
         // AJAX Upload Function (prevents page refresh)
         async function handleFileUpload(typeCode, file) {
             const formData = new FormData();
@@ -1798,7 +2003,7 @@ $page_title = 'Upload Documents';
                     // Reload the page to show the preview (remove any URL parameters)
                     window.location.href = 'upload_document.php';
                 } else {
-                    alert('Upload failed: ' + data.message);
+                    alert('Upload failed: ' + stripHtml(data.message));
                 }
             } catch (error) {
                 console.error('Upload error:', error);
@@ -1811,7 +2016,7 @@ $page_title = 'Upload Documents';
                         window.location.href = 'upload_document.php';
                     }, 500);
                 } else {
-                    alert('Upload failed: ' + (error.message || 'Please try again.'));
+                    alert('Upload failed: ' + stripHtml(error.message || 'Please try again.'));
                 }
             }
         }
@@ -1900,7 +2105,7 @@ $page_title = 'Upload Documents';
                     window.location.reload();
                 } else {
                     console.error('Processing failed:', data.message);
-                    alert('❌ Processing failed: ' + data.message);
+                    alert('❌ Processing failed: ' + stripHtml(data.message));
                     
                     // Clear processing lock and re-enable buttons
                     isProcessing = false;
@@ -1914,7 +2119,7 @@ $page_title = 'Upload Documents';
                 }
             } catch (error) {
                 console.error('Processing error:', error);
-                alert('❌ Processing failed: ' + (error.message || 'Please try again.'));
+                alert('❌ Processing failed: ' + stripHtml(error.message || 'Please try again.'));
                 
                 // Clear processing lock and re-enable buttons
                 isProcessing = false;

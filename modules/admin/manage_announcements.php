@@ -1,7 +1,10 @@
 <?php
 include __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../../config/FilePathConfig.php';
 require_once __DIR__ . '/../../includes/CSRFProtection.php';
 require_once __DIR__ . '/../../includes/student_notification_helper.php';
+$pathConfig = FilePathConfig::getInstance();
+
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -157,7 +160,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
       }
       
-      $uploadDir = __DIR__ . '/../../assets/uploads/announcements';
+      $uploadDir = $pathConfig->getAnnouncementsPath();
       
       // Check if directory exists and is writable
       if (!is_dir($uploadDir)) {

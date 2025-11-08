@@ -1,5 +1,8 @@
 <?php
 include __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../../config/FilePathConfig.php';
+$pathConfig = FilePathConfig::getInstance();
+
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -133,20 +136,21 @@ if ($result && pg_num_rows($result) > 0) {
         // Try to find the file in temp or student directories
         $search_dirs = [];
         if ($folder_name) {
+            global $pathConfig;
             if ($isRailway) {
                 // Railway volume paths
                 $railway_folder = $railway_folders[$document_type_code] ?? '';
                 $search_dirs = [
-                    '/mnt/assets/uploads/temp/' . $railway_folder . '/',
-                    '/mnt/assets/uploads/student/' . $railway_folder . '/',
-                    '/mnt/assets/uploads/student/' . $railway_folder . '/' . $student_id . '/'
+                    $pathConfig->getTempPath($railway_folder),
+                    $pathConfig->getStudentPath($railway_folder),
+                    $pathConfig->getStudentPath($railway_folder) . DIRECTORY_SEPARATOR . $student_id . DIRECTORY_SEPARATOR
                 ];
             } else {
                 // Local development paths
                 $search_dirs = [
-                    __DIR__ . '/../../assets/uploads/temp/' . $folder_name . '/',
-                    __DIR__ . '/../../assets/uploads/student/' . $folder_name . '/',
-                    __DIR__ . '/../../assets/uploads/student/' . $folder_name . '/' . $student_id . '/'
+                    $pathConfig->getTempPath($folder_name),
+                    $pathConfig->getStudentPath($folder_name),
+                    $pathConfig->getStudentPath($folder_name) . DIRECTORY_SEPARATOR . $student_id . DIRECTORY_SEPARATOR
                 ];
             }
         }
@@ -303,20 +307,21 @@ if ($result && pg_num_rows($result) > 0) {
     ];
     
     if ($folder_name) {
+        global $pathConfig;
         if ($isRailway) {
             // Railway volume paths
             $railway_folder = $railway_folders[$document_type_code] ?? '';
             $searchDirs = [
-                '/mnt/assets/uploads/temp/' . $railway_folder,
-                '/mnt/assets/uploads/student/' . $railway_folder,
-                '/mnt/assets/uploads/student/' . $railway_folder . '/' . $student_id
+                $pathConfig->getTempPath($railway_folder),
+                $pathConfig->getStudentPath($railway_folder),
+                $pathConfig->getStudentPath($railway_folder) . DIRECTORY_SEPARATOR . $student_id
             ];
         } else {
             // Local development paths
             $searchDirs = [
-                __DIR__ . '/../../assets/uploads/temp/' . $folder_name,
-                __DIR__ . '/../../assets/uploads/student/' . $folder_name,
-                __DIR__ . '/../../assets/uploads/student/' . $folder_name . '/' . $student_id
+                $pathConfig->getTempPath($folder_name),
+                $pathConfig->getStudentPath($folder_name),
+                $pathConfig->getStudentPath($folder_name) . DIRECTORY_SEPARATOR . $student_id
             ];
         }
     }

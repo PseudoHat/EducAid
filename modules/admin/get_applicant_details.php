@@ -9,6 +9,9 @@
  * Folders: indigency, grades, id_pictures, enrollment_forms, letter_mayor
  */
 
+require_once __DIR__ . '/../../config/FilePathConfig.php';
+$pathConfig = FilePathConfig::getInstance();
+
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -60,9 +63,10 @@ $doc_type_config = [
 
 $documents = [];
 $server_root = dirname(__DIR__, 2);
-// Use relative path from modules/admin/ directory
-// Paths stored in DB as "assets/uploads/..." need ../../ prefix for browser resolution
-$web_base = '../../assets/uploads/student/';
+// Use FilePathConfig for Railway/Localhost compatibility
+$student_base = $pathConfig->getStudentPath();
+// Web path needs to be relative for browser resolution
+$web_base = 'assets/uploads/student/';
 
 // Step 1: Check documents table for approved/permanent documents
 $docs_query = pg_query_params($connection, 
@@ -122,7 +126,7 @@ foreach ($doc_type_config as $code => $config) {
     }
     
     // Check permanent storage: student/{folder}/{studentID}/
-    $student_dir = $server_root . '/assets/uploads/student/' . $folder . '/' . $student_id . '/';
+    $student_dir = $student_base . DIRECTORY_SEPARATOR . $folder . DIRECTORY_SEPARATOR . $student_id . DIRECTORY_SEPARATOR;
     
     if (is_dir($student_dir)) {
         $files = glob($student_dir . '*');

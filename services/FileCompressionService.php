@@ -1,13 +1,18 @@
 <?php
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../config/FilePathConfig.php';
 
 class FileCompressionService {
     private $conn;
     private $fileArchiveSupportsDistribution = null;
+    private $pathConfig;
     
     public function __construct() {
         global $connection;
         $this->conn = $connection;
+        $this->pathConfig = FilePathConfig::getInstance();
+        
+        error_log("FileCompressionService: Environment=" . ($this->pathConfig->isRailway() ? 'Railway' : 'Localhost'));
     }
     
     public function compressDistribution($distributionId, $adminId) {
@@ -92,7 +97,7 @@ class FileCompressionService {
             }
             
             // Prepare to scan actual files from shared upload folders
-            $uploadsPath = __DIR__ . '/../assets/uploads';
+            $uploadsPath = $this->pathConfig->getUploadsPath();
             $studentFiles = [];
             
             // Initialize array for each student
@@ -106,20 +111,19 @@ class FileCompressionService {
             
             // Scan shared folders for files belonging to our students
             // Include ALL document types: enrollment, grades, ID, indigency, letter
-            // UPDATED: Now scans student-organized folders (student/{doc_type}/{student_id}/)
             $folders = [
-                'student/enrollment_forms' => 'enrollment_forms',
-                'student/grades' => 'grades',
-                'student/id_pictures' => 'id_pictures',
-                'student/indigency' => 'indigency',
-                'student/letter_mayor' => 'letter_mayor' // Fixed: folder name is letter_mayor not letter_to_mayor
+                'enrollment_forms' => 'enrollment_forms',
+                'grades' => 'grades',
+                'id_pictures' => 'id_pictures',
+                'indigency' => 'indigency',
+                'letter_to_mayor' => 'letter_to_mayor'
             ];
             
             $totalFilesFound = 0;
             $totalFilesMatched = 0;
             
-            foreach ($folders as $folderPath => $folderType) {
-                $fullPath = $uploadsPath . '/' . $folderPath;
+            foreach ($folders as $folderName => $folderType) {
+                $fullPath = $this->pathConfig->getStudentPath($folderName);
                 error_log("Scanning folder: $fullPath");
                 
                 if (is_dir($fullPath)) {
@@ -161,10 +165,10 @@ class FileCompressionService {
                         // OLD STRUCTURE: flat files in student/{doc_type}/
                         error_log("  Using legacy flat structure");
                         foreach ($items as $file) {
-                            if ($file !== '.' && $file !== '..' && is_file($fullPath . '/' . $file)) {
+                            if ($file !== '.' && $file !== '..' && is_file($fullPath . DIRECTORY_SEPARATOR . $file)) {
                                 // Skip associated files (.ocr.txt, .verify.json, .confidence.json, .tsv, .ocr.json)
                                 if (!preg_match('/\.(ocr\.(txt|json)|verify\.json|confidence\.json|tsv)$/i', $file)) {
-                                    $files[] = $fullPath . '/' . $file;
+                                    $files[] = $fullPath . DIRECTORY_SEPARATOR . $file;
                                 }
                             }
                         }
@@ -226,15 +230,15 @@ class FileCompressionService {
                 throw new Exception("No files found to compress");
             }
             
-            // Create distribution archive directory named after distribution ID
-            $archiveBaseDir = __DIR__ . '/../assets/uploads/distributions/';
+            // Create distribution archive directory using pathConfig
+            $archiveBaseDir = $this->pathConfig->getDistributionsPath();
             if (!file_exists($archiveBaseDir)) {
                 mkdir($archiveBaseDir, 0755, true);
             }
             
             // Create the main ZIP file named with distribution ID
             $zipFilename = $distributionId . '.zip';
-            $zipPath = $archiveBaseDir . $zipFilename;
+            $zipPath = $archiveBaseDir . DIRECTORY_SEPARATOR . $zipFilename;
             
             $zip = new ZipArchive();
             if ($zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== TRUE) {

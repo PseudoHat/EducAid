@@ -22,6 +22,7 @@ class UnifiedFileService {
     private $db;
     private $baseDir;
     private $basePath;
+    private $pathConfig;
     
     // Document type mapping
     const DOCUMENT_TYPES = [
@@ -42,9 +43,17 @@ class UnifiedFileService {
     ];
     
     public function __construct($dbConnection) {
+        require_once __DIR__ . '/../config/FilePathConfig.php';
+        
         $this->db = $dbConnection;
-        $this->baseDir = __DIR__ . '/../assets/uploads/';
-        $this->basePath = __DIR__ . '/../assets/uploads';
+        $this->pathConfig = FilePathConfig::getInstance();
+        
+        // Use centralized path configuration (supports both Railway and localhost)
+        $this->baseDir = $this->pathConfig->getUploadsDir();
+        $this->basePath = $this->pathConfig->getUploadsPath();
+        
+        error_log("UnifiedFileService: Environment=" . ($this->pathConfig->isRailway() ? 'Railway' : 'Localhost') . 
+                  ", BaseDir=" . $this->baseDir);
     }
     
     // ============================================================================
@@ -131,16 +140,34 @@ class UnifiedFileService {
                     
                     error_log("UnifiedFileService::moveToPermStorage - Moving to student folder: {$newPath}");
                 } else {
-                    // Fallback to simple replacement if pattern doesn't match
-                    $newPath = str_replace('/temp/', '/student/', $oldPath);
-                    $newPath = str_replace('temp/', 'student/', $newPath); // Handle both
-                    $targetDir = dirname($newPath);
+                    // Fallback: Extract document type folder and create student-organized structure
+                    // Pattern didn't match - likely a different path format
+                    error_log("UnifiedFileService::moveToPermStorage - Pattern didn't match, using fallback for: $oldPath");
                     
-                    // Extract filename info for associated files even in fallback
                     $originalFilename = basename($oldPath);
                     $baseName = pathinfo($originalFilename, PATHINFO_FILENAME);
+                    $extension = pathinfo($originalFilename, PATHINFO_EXTENSION);
+                    $newFilename = $baseName . '_' . $timestamp . '.' . $extension;
                     
-                    error_log("UnifiedFileService::moveToPermStorage - Using fallback path: {$newPath}");
+                    // Try to extract document type folder from path
+                    $docTypeFolder = null;
+                    if (preg_match('#/([^/]+)/[^/]+$#', $oldPath, $matches)) {
+                        $docTypeFolder = $matches[1];
+                    }
+                    
+                    if ($docTypeFolder) {
+                        // Build student-organized path: assets/uploads/student/{doc_type}/{student_id}/
+                        $baseRoot = dirname(dirname(__FILE__));
+                        $targetDir = $baseRoot . '/assets/uploads/student/' . $docTypeFolder . '/' . $studentId . '/';
+                        $newPath = $targetDir . $newFilename;
+                        error_log("UnifiedFileService::moveToPermStorage - Fallback with student folder: {$newPath}");
+                    } else {
+                        // Last resort: use simple replacement
+                        $newPath = str_replace('/temp/', '/student/', $oldPath);
+                        $newPath = str_replace('temp/', 'student/', $newPath);
+                        $targetDir = dirname($newPath);
+                        error_log("UnifiedFileService::moveToPermStorage - Fallback simple replacement: {$newPath}");
+                    }
                 }
                 
                 // Ensure target directory exists

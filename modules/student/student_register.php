@@ -12,6 +12,8 @@ if (isset($_POST['processIdPictureOcr']) || isset($_POST['processGradesOcr']) ||
 require_once __DIR__ . '/../../config/database.php';
 // Include reCAPTCHA v3 configuration (site key + secret key constants)
 require_once __DIR__ . '/../../config/recaptcha_config.php';
+// Include FilePathConfig for centralized path management
+require_once __DIR__ . '/../../config/FilePathConfig.php';
 
 // Make connection variable available in this scope
 global $connection;
@@ -304,10 +306,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processEnrollmentOcr'
         exit;
     }
 
-    // Use Railway volume path if available, fallback to local path
-    $uploadDir = file_exists('/mnt/assets/uploads/') 
-        ? '/mnt/assets/uploads/temp/EAF/' 
-        : __DIR__ . '/../../assets/uploads/temp/enrollment_forms/';
+    // Initialize FilePathConfig for path management
+    $pathConfig = FilePathConfig::getInstance();
+    $uploadDir = $pathConfig->getTempPath('enrollment_forms');
     if (!file_exists($uploadDir)) {
         mkdir($uploadDir, 0777, true);
     }
@@ -1546,10 +1547,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processIdPictureOcr']
         exit;
     }
 
-    // Use Railway volume path if available, fallback to local path
-    $uploadDir = file_exists('/mnt/assets/uploads/') 
-        ? '/mnt/assets/uploads/temp/ID/' 
-        : __DIR__ . '/../../assets/uploads/temp/id_pictures/';
+    // Initialize FilePathConfig for path management
+    $pathConfig = FilePathConfig::getInstance();
+    $uploadDir = $pathConfig->getTempPath('id_pictures');
     if (!file_exists($uploadDir)) { mkdir($uploadDir, 0777, true); }
 
     // DELETE OLD FILES: Remove previous upload and OCR results when new file is uploaded
@@ -1883,14 +1883,14 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processIdPictureOcr']
     // Validation Checks (6 checks total)
     $checks = [];
     
-    // 1. First Name Match (80% threshold)
+    // 1. First Name Match (STRICTER: 60% threshold, down from 80%)
     $firstNameSimilarity = calculateIDSimilarity($formData['first_name'], $ocrText);
     $checks['first_name_match'] = [
-        'passed' => $firstNameSimilarity >= 80,
+        'passed' => $firstNameSimilarity >= 60,
         'similarity' => $firstNameSimilarity,
-        'threshold' => 80,
+        'threshold' => 60,
         'expected' => $formData['first_name'],
-        'found_in_ocr' => $firstNameSimilarity >= 80
+        'found_in_ocr' => $firstNameSimilarity >= 60
     ];
 
     // 2. Middle Name Match (70% threshold, auto-pass if empty)
@@ -1911,14 +1911,14 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processIdPictureOcr']
         ];
     }
 
-    // 3. Last Name Match (80% threshold)
+    // 3. Last Name Match (STRICTER: 70% threshold, down from 80%)
     $lastNameSimilarity = calculateIDSimilarity($formData['last_name'], $ocrText);
     $checks['last_name_match'] = [
-        'passed' => $lastNameSimilarity >= 80,
+        'passed' => $lastNameSimilarity >= 70,
         'similarity' => $lastNameSimilarity,
-        'threshold' => 80,
+        'threshold' => 70,
         'expected' => $formData['last_name'],
-        'found_in_ocr' => $lastNameSimilarity >= 80
+        'found_in_ocr' => $lastNameSimilarity >= 70
     ];
 
     // 4. University Match (60% threshold, word-based)
@@ -2262,10 +2262,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processLetterOcr'])) 
         json_response(['status' => 'error', 'message' => 'No letter file uploaded or upload error.']);
     }
 
-    // Use Railway volume path if available, fallback to local path
-    $uploadDir = file_exists('/mnt/assets/uploads/') 
-        ? '/mnt/assets/uploads/temp/Letter/' 
-        : __DIR__ . '/../../assets/uploads/temp/letter_mayor/';
+    // Initialize FilePathConfig for path management
+    $pathConfig = FilePathConfig::getInstance();
+    $uploadDir = $pathConfig->getTempPath('letter_mayor');
     if (!file_exists($uploadDir)) {
         mkdir($uploadDir, 0777, true);
     }
@@ -2425,12 +2424,12 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processLetterOcr'])) 
         return $maxSimilarity;
     }
     
-    // Check first name with improved matching
+    // Check first name with improved matching (STRICTER: 60% threshold)
     if (!empty($formData['first_name'])) {
         $similarity = calculateSimilarity($formData['first_name'], $ocrTextNormalized);
         $verification['confidence_scores']['first_name'] = $similarity;
         
-        if ($similarity >= 80) {
+        if ($similarity >= 60) {
             $verification['first_name'] = true;
             // Find and store the matched text snippet
             $pattern = '/\b\w*' . preg_quote(substr($formData['first_name'], 0, 3), '/') . '\w*\b/i';
@@ -2440,12 +2439,12 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processLetterOcr'])) 
         }
     }
     
-    // Check last name with improved matching
+    // Check last name with improved matching (STRICTER: 70% threshold)
     if (!empty($formData['last_name'])) {
         $similarity = calculateSimilarity($formData['last_name'], $ocrTextNormalized);
         $verification['confidence_scores']['last_name'] = $similarity;
         
-        if ($similarity >= 80) {
+        if ($similarity >= 70) {
             $verification['last_name'] = true;
             // Find and store the matched text snippet
             $pattern = '/\b\w*' . preg_quote(substr($formData['last_name'], 0, 3), '/') . '\w*\b/i';
@@ -2612,6 +2611,26 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processLetterOcr'])) 
     
     // Track uploaded file
     $_SESSION['uploaded_files']['letter'] = basename($targetPath);
+    
+    // CROSS-DOCUMENT DETECTION: Check if user uploaded wrong document type
+    // This prevents uploading Certificate, Grades, or other documents as Letter to Mayor
+    $crossDocumentCheck = performCrossDocumentCheck($ocrText, '02'); // '02' = Letter to Mayor
+    
+    if ($crossDocumentCheck['wrong_document_detected']) {
+        $verification['cross_document_warning'] = [
+            'detected' => true,
+            'expected_type' => 'Letter to Mayor',
+            'detected_type' => $crossDocumentCheck['detected_type'],
+            'message' => $crossDocumentCheck['message'],
+            'confidence' => $crossDocumentCheck['confidence']
+        ];
+        
+        // Override overall_success if wrong document detected
+        $verification['overall_success'] = false;
+        $verification['summary']['recommendation'] = $crossDocumentCheck['message'];
+        
+        error_log("CROSS-DOCUMENT WARNING: User uploaded " . $crossDocumentCheck['detected_type'] . " instead of Letter to Mayor");
+    }
     
     // Note: Letter file is kept in temp directory for final registration step
     // It will be cleaned up during registration completion
@@ -2830,12 +2849,12 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processCertificateOcr
         $verification['found_text_snippets']['certificate_title'] = $foundTitleText;
     }
     
-    // Check first name with improved matching
+    // Check first name with improved matching (STRICTER: 60% threshold)
     if (!empty($formData['first_name'])) {
         $similarity = calculateCertificateSimilarity($formData['first_name'], $ocrTextNormalized);
         $verification['confidence_scores']['first_name'] = $similarity;
         
-        if ($similarity >= 80) {
+        if ($similarity >= 60) {
             $verification['first_name'] = true;
             // Find and store the matched text snippet
             $pattern = '/\b\w*' . preg_quote(substr($formData['first_name'], 0, 3), '/') . '\w*\b/i';
@@ -2845,12 +2864,12 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processCertificateOcr
         }
     }
     
-    // Check last name with improved matching
+    // Check last name with improved matching (STRICTER: 70% threshold)
     if (!empty($formData['last_name'])) {
         $similarity = calculateCertificateSimilarity($formData['last_name'], $ocrTextNormalized);
         $verification['confidence_scores']['last_name'] = $similarity;
         
-        if ($similarity >= 80) {
+        if ($similarity >= 70) {
             $verification['last_name'] = true;
             // Find and store the matched text snippet
             $pattern = '/\b\w*' . preg_quote(substr($formData['last_name'], 0, 3), '/') . '\w*\b/i';
@@ -2975,6 +2994,26 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processCertificateOcr
     
     // Track uploaded file
     $_SESSION['uploaded_files']['certificate'] = basename($targetPath);
+    
+    // CROSS-DOCUMENT DETECTION: Check if user uploaded wrong document type
+    // This prevents uploading Letter, Grades, or other documents as Certificate of Indigency
+    $crossDocumentCheck = performCrossDocumentCheck($ocrText, '03'); // '03' = Certificate of Indigency
+    
+    if ($crossDocumentCheck['wrong_document_detected']) {
+        $verification['cross_document_warning'] = [
+            'detected' => true,
+            'expected_type' => 'Certificate of Indigency',
+            'detected_type' => $crossDocumentCheck['detected_type'],
+            'message' => $crossDocumentCheck['message'],
+            'confidence' => $crossDocumentCheck['confidence']
+        ];
+        
+        // Override overall_success if wrong document detected
+        $verification['overall_success'] = false;
+        $verification['summary']['recommendation'] = $crossDocumentCheck['message'];
+        
+        error_log("CROSS-DOCUMENT WARNING: User uploaded " . $crossDocumentCheck['detected_type'] . " instead of Certificate of Indigency");
+    }
     
     // Note: Certificate file is kept in temp directory for final registration step
     // It will be cleaned up during registration completion
@@ -4413,6 +4452,98 @@ function validateAdminSchoolYear($ocrText, $adminSchoolYear) {
     return ['match' => false, 'confidence' => 0, 'found_text' => ''];
 }
 
+/**
+ * Cross-Document Detection: Check if uploaded document matches expected type
+ * Prevents users from uploading wrong documents (e.g., Certificate instead of Letter)
+ * 
+ * @param string $ocrText - Full OCR text from document
+ * @param string $expectedDocType - Expected document type code ('02'=Letter, '03'=Certificate, '01'=Grades)
+ * @return array - Detection results with warning if wrong document detected
+ */
+function performCrossDocumentCheck($ocrText, $expectedDocType) {
+    // Document type signatures (keywords that identify each document type)
+    $documentSignatures = [
+        '01' => ['subject', 'final grade', 'prelim', 'midterm', 'finals', 'general average', 'units', 'remarks'],
+        '02' => ['dear mayor', 'honorable mayor', 'mayor ferrer', 'request', 'assistance', 'respectfully', 'sincerely', 'gratitude', 'scholarship'],
+        '03' => ['certificate', 'indigency', 'certify', 'resident', 'barangay', 'katunayan', 'kahirapan']
+    ];
+    
+    $documentNames = [
+        '01' => 'Grades Document',
+        '02' => 'Letter to Mayor',
+        '03' => 'Certificate of Indigency'
+    ];
+    
+    // Normalize OCR text for keyword matching
+    $quickText = strtolower($ocrText);
+    
+    // Check against other document types
+    $detectedType = null;
+    $maxMatchCount = 0;
+    $detectedDocCode = null;
+    
+    foreach ($documentSignatures as $docCode => $keywords) {
+        // Skip checking against the expected document type
+        if ($docCode === $expectedDocType) {
+            continue;
+        }
+        
+        // Count keyword matches
+        $matchCount = 0;
+        foreach ($keywords as $keyword) {
+            if (stripos($quickText, $keyword) !== false) {
+                $matchCount++;
+            }
+        }
+        
+        // Special handling for Letter vs Grades detection (HIGH FALSE POSITIVE RISK)
+        // Letters often mention "grades", "GPA", "semester" when discussing academic performance
+        if (($expectedDocType === '02' && $docCode === '01')) {
+            // Check if document has letter-specific keywords
+            $hasLetterKeywords = stripos($quickText, 'dear mayor') !== false || 
+                                stripos($quickText, 'honorable') !== false ||
+                                stripos($quickText, 'respectfully') !== false ||
+                                stripos($quickText, 'sincerely') !== false ||
+                                stripos($quickText, 'scholarship') !== false;
+            
+            // If it has letter keywords, don't flag as grades
+            if ($hasLetterKeywords) {
+                $isStrongMatch = false;
+                error_log("CROSS-DOCUMENT: Letter has grade keywords but also has letter structure - PASS");
+            } else {
+                // Only flag if 6+ structural grade keywords
+                $isStrongMatch = ($matchCount >= 6);
+            }
+        } else {
+            // For other document type checks, use 3+ keyword threshold
+            $isStrongMatch = ($matchCount >= 3);
+        }
+        
+        if ($isStrongMatch && $matchCount > $maxMatchCount) {
+            $maxMatchCount = $matchCount;
+            $detectedType = $documentNames[$docCode];
+            $detectedDocCode = $docCode;
+        }
+    }
+    
+    // Return result
+    if ($detectedType !== null) {
+        return [
+            'wrong_document_detected' => true,
+            'detected_type' => $detectedType,
+            'expected_type' => $documentNames[$expectedDocType],
+            'confidence' => $maxMatchCount,
+            'message' => "This appears to be a {$detectedType}, not a {$documentNames[$expectedDocType]}. Please upload the correct document type."
+        ];
+    }
+    
+    return [
+        'wrong_document_detected' => false,
+        'detected_type' => null,
+        'message' => ''
+    ];
+}
+
 function cleanSubjectName($rawSubject) {
     // Remove subject codes and keep only the descriptive subject name
     $subject = $rawSubject;
@@ -4812,20 +4943,21 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['register'])) {
         $cleanFirstname = preg_replace('/[^a-zA-Z0-9]/', '', $firstname);
         $namePrefix = strtolower($cleanLastname . '_' . $cleanFirstname);
 
-        // === DEFINE UPLOAD DIRECTORIES WITH RAILWAY VOLUME SUPPORT ===
-        // Use Railway volume path if available, fallback to local path
-        $isRailway = file_exists('/mnt/assets/uploads/');
-        $tempIDPictureDir = $isRailway ? '/mnt/assets/uploads/temp/ID/' : __DIR__ . '/../../assets/uploads/temp/id_pictures/';
-        $tempEnrollmentDir = $isRailway ? '/mnt/assets/uploads/temp/EAF/' : __DIR__ . '/../../assets/uploads/temp/enrollment_forms/';
-        $tempLetterDir = $isRailway ? '/mnt/assets/uploads/temp/Letter/' : __DIR__ . '/../../assets/uploads/temp/letter_mayor/';
-        $tempIndigencyDir = $isRailway ? '/mnt/assets/uploads/temp/Indigency/' : __DIR__ . '/../../assets/uploads/temp/indigency/';
-        $tempGradesDir = $isRailway ? '/mnt/assets/uploads/temp/Grades/' : __DIR__ . '/../../assets/uploads/temp/grades/';
+        // === INITIALIZE PATH CONFIG FOR FILE HANDLING ===
+        $pathConfig = FilePathConfig::getInstance();
+        
+        // Get temp directories using FilePathConfig (handles Railway/localhost automatically)
+        $tempIDPictureDir = $pathConfig->getTempPath('id_pictures');
+        $tempEnrollmentDir = $pathConfig->getTempPath('enrollment_forms');
+        $tempLetterDir = $pathConfig->getTempPath('letter_mayor');
+        $tempIndigencyDir = $pathConfig->getTempPath('indigency');
+        $tempGradesDir = $pathConfig->getTempPath('grades');
 
         // === SAVE ID PICTURE USING UnifiedFileService ===
         $sessionPrefix = $_SESSION['file_prefix'] ?? 'session';
         
         // Look for session-based ID picture file
-        $idPicturePattern = $tempIDPictureDir . $sessionPrefix . '_idpic.*';
+        $idPicturePattern = $tempIDPictureDir . DIRECTORY_SEPARATOR . $sessionPrefix . '_idpic.*';
         $idTempFiles = glob($idPicturePattern);
         
         // Filter to get only actual image files (not .verify.json, .ocr.txt, etc.)
@@ -4835,12 +4967,14 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['register'])) {
         });
         
         error_log("Processing ID Picture for student: $student_id (Session: $sessionPrefix)");
+        error_log("ID Picture pattern: $idPicturePattern");
+        error_log("ID Picture files found: " . count($idTempFiles));
         
         if (!empty($idTempFiles)) {
             foreach ($idTempFiles as $idTempFile) {
                 $idExtension = pathinfo($idTempFile, PATHINFO_EXTENSION);
                 $idNewFilename = $student_id . '_id_' . time() . '.' . $idExtension;
-                $idTempPath = $tempIDPictureDir . $idNewFilename;
+                $idTempPath = $tempIDPictureDir . DIRECTORY_SEPARATOR . $idNewFilename;
                 
                 // Copy file with new student ID-based name
                 if (@copy($idTempFile, $idTempPath)) {
@@ -4909,7 +5043,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['register'])) {
         // tempEnrollmentDir already defined above with Railway volume support
         
         // Look for session-based enrollment form (LastName_FirstName_EAF pattern)
-        $eafPattern = $tempEnrollmentDir . '*_EAF.*';
+        $eafPattern = $tempEnrollmentDir . DIRECTORY_SEPARATOR . '*_EAF.*';
         $tempFiles = glob($eafPattern);
         
         // Filter to get only actual document files
@@ -4928,7 +5062,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['register'])) {
                 
                 $extension = pathinfo($tempFile, PATHINFO_EXTENSION);
                 $newFilename = $student_id . '_' . $namePrefix . '_eaf.' . $extension;
-                $tempEnrollmentPath = $tempEnrollmentDir . $newFilename;
+                $tempEnrollmentPath = $tempEnrollmentDir . DIRECTORY_SEPARATOR . $newFilename;
                 
                 error_log("EAF new path will be: $tempEnrollmentPath");
                 
@@ -5006,7 +5140,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['register'])) {
         // tempLetterDir already defined above with Railway volume support
         
         // Look for session-based letter file
-        $letterPattern = $tempLetterDir . $sessionPrefix . '_Letter to mayor.*';
+        $letterPattern = $tempLetterDir . DIRECTORY_SEPARATOR . $sessionPrefix . '_Letter to mayor.*';
         $letterTempFiles = glob($letterPattern);
         
         // Filter to get only actual document files
@@ -5016,12 +5150,14 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['register'])) {
         });
         
         error_log("Processing Letter to Mayor for student: $student_id (Session: $sessionPrefix)");
+        error_log("Letter pattern: $letterPattern");
+        error_log("Letter files found: " . count($letterTempFiles));
         
         if (!empty($letterTempFiles)) {
             foreach ($letterTempFiles as $letterTempFile) {
                 $letterExtension = pathinfo($letterTempFile, PATHINFO_EXTENSION);
                 $newLetterFilename = $student_id . '_' . $namePrefix . '_lettertomayor.' . $letterExtension;
-                $letterTempPath = $tempLetterDir . $newLetterFilename;
+                $letterTempPath = $tempLetterDir . DIRECTORY_SEPARATOR . $newLetterFilename;
 
                 if (copy($letterTempFile, $letterTempPath)) {
                     // Copy and UPDATE verification JSON with new paths
@@ -5086,7 +5222,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['register'])) {
         // tempIndigencyDir already defined above with Railway volume support
         
         // Look for session-based certificate file
-        $certificatePattern = $tempIndigencyDir . $sessionPrefix . '_Indigency.*';
+        $certificatePattern = $tempIndigencyDir . DIRECTORY_SEPARATOR . $sessionPrefix . '_Indigency.*';
         $certificateTempFiles = glob($certificatePattern);
         
         // Filter to get only actual document files
@@ -5096,12 +5232,14 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['register'])) {
         });
         
         error_log("Processing Certificate of Indigency for student: $student_id (Session: $sessionPrefix)");
+        error_log("Certificate pattern: $certificatePattern");
+        error_log("Certificate files found: " . count($certificateTempFiles));
         
         if (!empty($certificateTempFiles)) {
             foreach ($certificateTempFiles as $certificateTempFile) {
                 $certificateExtension = pathinfo($certificateTempFile, PATHINFO_EXTENSION);
                 $newCertificateFilename = $student_id . '_' . $namePrefix . '_indigency.' . $certificateExtension;
-                $certificateTempPath = $tempIndigencyDir . $newCertificateFilename;
+                $certificateTempPath = $tempIndigencyDir . DIRECTORY_SEPARATOR . $newCertificateFilename;
 
                 if (copy($certificateTempFile, $certificateTempPath)) {
                     // Copy and UPDATE verification JSON with new paths
@@ -5166,7 +5304,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['register'])) {
         // tempGradesDir already defined above with Railway volume support
         
         // Look for session-based grades file
-        $gradesPattern = $tempGradesDir . $sessionPrefix . '_Grades.*';
+        $gradesPattern = $tempGradesDir . DIRECTORY_SEPARATOR . $sessionPrefix . '_Grades.*';
         $gradesTempFiles = glob($gradesPattern);
         
         // Filter to get only actual document files
@@ -5176,12 +5314,14 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['register'])) {
         });
         
         error_log("Processing Grades for student: $student_id (Session: $sessionPrefix)");
+        error_log("Grades pattern: $gradesPattern");
+        error_log("Grades files found: " . count($gradesTempFiles));
         
         if (!empty($gradesTempFiles)) {
             foreach ($gradesTempFiles as $gradesTempFile) {
                 $gradesExtension = pathinfo($gradesTempFile, PATHINFO_EXTENSION);
                 $newGradesFilename = $student_id . '_' . $namePrefix . '_grades.' . $gradesExtension;
-                $gradesTempPath = $tempGradesDir . $newGradesFilename;
+                $gradesTempPath = $tempGradesDir . DIRECTORY_SEPARATOR . $newGradesFilename;
 
                 if (copy($gradesTempFile, $gradesTempPath)) {
                     // Copy and UPDATE verification JSON with new paths

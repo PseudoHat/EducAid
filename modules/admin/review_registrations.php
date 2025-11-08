@@ -4,6 +4,7 @@ require_once __DIR__ . '/../../includes/CSRFProtection.php';
 require_once __DIR__ . '/../../services/UnifiedFileService.php';
 require_once __DIR__ . '/../../services/DocumentService.php';
 require_once __DIR__ . '/../../includes/student_notification_helper.php';
+require_once __DIR__ . '/../../config/FilePathConfig.php';
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -177,14 +178,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             }
                         }
                         
-                        // 3. Clean up any remaining files in organized temp directories
-                        $tempDirs = [
-                            __DIR__ . '/../../assets/uploads/temp/enrollment_forms/',
-                            __DIR__ . '/../../assets/uploads/temp/letter_mayor/',
-                            __DIR__ . '/../../assets/uploads/temp/indigency/'
-                        ];
+                        // 3. Clean up any remaining files in organized temp directories using FilePathConfig
+                        $pathConfig = FilePathConfig::getInstance();
+                        $tempFolders = ['enrollment_forms', 'letter_mayor', 'indigency', 'id_pictures', 'grades'];
                         
-                        foreach ($tempDirs as $dir) {
+                        foreach ($tempFolders as $folderName) {
+                            $dir = $pathConfig->getTempPath($folderName);
                             if (is_dir($dir)) {
                                 $files = glob($dir . $student_id . '_*');
                                 foreach ($files as $file) {
@@ -438,16 +437,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                 }
                 
-                // Clean up any remaining files in temp directories using glob patterns
-                $tempDirs = [
-                    __DIR__ . '/../../assets/uploads/temp/id_pictures/',
-                    __DIR__ . '/../../assets/uploads/temp/enrollment_forms/',
-                    __DIR__ . '/../../assets/uploads/temp/letter_mayor/',
-                    __DIR__ . '/../../assets/uploads/temp/indigency/',
-                    __DIR__ . '/../../assets/uploads/temp/grades/'
-                ];
+                // Clean up any remaining files in temp directories using FilePathConfig
+                $pathConfig = FilePathConfig::getInstance();
+                $tempFolders = ['id_pictures', 'enrollment_forms', 'letter_mayor', 'indigency', 'grades'];
                 
-                foreach ($tempDirs as $dir) {
+                foreach ($tempFolders as $folderName) {
+                    $dir = $pathConfig->getTempPath($folderName);
                     if (is_dir($dir)) {
                         // Get all files matching student_id pattern (including associated files)
                         $files = glob($dir . $student_id . '_*');
@@ -460,18 +455,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                 }
                 
-                // NEW: Clean up student-organized permanent directories
-                $permanentDirs = [
-                    __DIR__ . '/../../assets/uploads/student/id_pictures/' . $student_id . '/',
-                    __DIR__ . '/../../assets/uploads/student/enrollment_forms/' . $student_id . '/',
-                    __DIR__ . '/../../assets/uploads/student/letter_to_mayor/' . $student_id . '/',
-                    __DIR__ . '/../../assets/uploads/student/indigency/' . $student_id . '/',
-                    __DIR__ . '/../../assets/uploads/student/grades/' . $student_id . '/'
-                ];
+                // NEW: Clean up student-organized permanent directories using FilePathConfig
+                $permanentFolders = ['id_pictures', 'enrollment_forms', 'letter_to_mayor', 'indigency', 'grades'];
                 
-                foreach ($permanentDirs as $dir) {
+                foreach ($permanentFolders as $folderName) {
+                    $dir = $pathConfig->getStudentPath($folderName) . DIRECTORY_SEPARATOR . $student_id . DIRECTORY_SEPARATOR;
                     if (is_dir($dir)) {
-                        // Delete all files in the student's folder
                         $files = glob($dir . '*');
                         foreach ($files as $file) {
                             if (is_file($file)) {
@@ -479,7 +468,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 $files_deleted++;
                             }
                         }
-                        // Remove the empty directory
+                        // Remove directory if empty
                         @rmdir($dir);
                     }
                 }

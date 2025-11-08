@@ -5,16 +5,21 @@
  */
 
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../config/FilePathConfig.php';
 require_once __DIR__ . '/FileCompressionService.php';
 
 class DistributionArchiveService {
     private $conn;
     private $compressionService;
+    private $pathConfig;
     
     public function __construct($connection = null) {
         global $connection;
         $this->conn = $connection ?? $connection;
         $this->compressionService = new FileCompressionService();
+        $this->pathConfig = FilePathConfig::getInstance();
+        
+        error_log("DistributionArchiveService: Environment=" . ($this->pathConfig->isRailway() ? 'Railway' : 'Localhost'));
     }
     
     /**
@@ -214,7 +219,7 @@ class DistributionArchiveService {
         if (empty($studentIds)) return [];
         
         $manifest = [];
-        $uploadsPath = __DIR__ . '/../assets/uploads/student';
+        $uploadsPath = $this->pathConfig->getStudentPath(); // Use pathConfig instead of hardcoded path
         $folders = [
             'enrollment_forms' => '00',
             'grades' => '01',
@@ -224,7 +229,7 @@ class DistributionArchiveService {
         ];
         
         foreach ($folders as $folder => $typeCode) {
-            $folderPath = $uploadsPath . '/' . $folder;
+            $folderPath = $this->pathConfig->getStudentPath($folder); // Use pathConfig with folder name
             if (!is_dir($folderPath)) continue;
             
             $files = glob($folderPath . '/*.*');
@@ -261,13 +266,13 @@ class DistributionArchiveService {
      * Compress distribution files into ZIP archive
      */
     private function compressDistributionFiles($distributionId, $fileManifest) {
-        $archivesPath = __DIR__ . '/../assets/uploads/distributions';
+        $archivesPath = $this->pathConfig->getDistributionsPath(); // Use pathConfig instead of hardcoded path
         if (!is_dir($archivesPath)) {
             mkdir($archivesPath, 0755, true);
         }
         
         $zipFilename = $distributionId . '.zip';
-        $zipPath = $archivesPath . '/' . $zipFilename;
+        $zipPath = $archivesPath . DIRECTORY_SEPARATOR . $zipFilename; // Use DIRECTORY_SEPARATOR
         
         $zip = new ZipArchive();
         if ($zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {

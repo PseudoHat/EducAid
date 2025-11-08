@@ -176,6 +176,14 @@ body {
   text-align: center;
 }
 
+/* QR Generated column - narrow and centered */
+.table th.qr-col,
+.table td.qr-col {
+  width: 120px;
+  text-align: center;
+  white-space: nowrap;
+}
+
 /* Mobile Responsive Card Table */
 @media (max-width: 767.98px) {
   .table-responsive {

@@ -8,6 +8,7 @@ if (!isset($_SESSION['admin_username'])) {
     exit;
 }
 include __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../../config/FilePathConfig.php';
 require_once __DIR__ . '/../../includes/student_notification_helper.php';
 
 // Get workflow permissions to control approval actions
@@ -16,6 +17,9 @@ $workflow_status = getWorkflowStatus($connection);
 
 require_once __DIR__ . '/../../phpmailer/vendor/autoload.php';
 require_once __DIR__ . '/../../includes/util/student_id.php';
+
+// Initialize FilePathConfig for Railway/Localhost compatibility
+$pathConfig = FilePathConfig::getInstance();
 
 // Resolve current admin's municipality context
 $adminMunicipalityId = null;
@@ -758,8 +762,9 @@ function _normalize_token($s) {
 // Searches permanent storage: student/{doc_type}/{student_id}/ and legacy flat structure
 // For modal display, use get_applicant_details.php endpoint instead
 function find_student_documents($first_name, $last_name, $student_id = null) {
-    $server_base = dirname(__DIR__, 2) . '/assets/uploads/student/'; // absolute server path
-    $web_base    = '../../assets/uploads/student/';                   // web path from this PHP file
+    global $pathConfig; // Use global FilePathConfig instance
+    $server_base = $pathConfig->getStudentPath(); // absolute server path with trailing separator
+    $web_base    = 'assets/uploads/student/';     // web path (relative from document root)
 
     $first = _normalize_token($first_name);
     $last  = _normalize_token($last_name);
@@ -777,7 +782,7 @@ function find_student_documents($first_name, $last_name, $student_id = null) {
         
         // NEW STRUCTURE: Search student/{doc_type}/{student_id}/ folders first if student_id is provided
         if ($student_id) {
-            $studentDir = $server_base . $folder . '/' . $student_id . '/';
+            $studentDir = $server_base . DIRECTORY_SEPARATOR . $folder . DIRECTORY_SEPARATOR . $student_id . DIRECTORY_SEPARATOR;
             if (is_dir($studentDir)) {
                 foreach (glob($studentDir . '*.*') as $file) {
                     // Skip associated files
@@ -791,7 +796,7 @@ function find_student_documents($first_name, $last_name, $student_id = null) {
         }
         
         // OLD STRUCTURE: Search flat student/{doc_type}/ folder
-        $dir = $server_base . $folder . '/';
+        $dir = $server_base . DIRECTORY_SEPARATOR . $folder . DIRECTORY_SEPARATOR;
         if (is_dir($dir)) {
             // Scan all files and pick the newest that contains both name tokens
             foreach (glob($dir . '*.*') as $file) {
@@ -1369,8 +1374,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         error_log("Reject documents triggered for student: " . $student_id);
         
         try {
-            // Delete all document files from filesystem
-            $uploadsPath = dirname(__DIR__, 2) . '/assets/uploads/student';
+            // Delete all document files from filesystem using FilePathConfig
+            $uploadsPath = $pathConfig->getStudentPath();
             $documentTypes = ['enrollment_forms', 'grades', 'id_pictures', 'indigency', 'letter_mayor'];
             $deletedCount = 0;
             
@@ -1551,10 +1556,10 @@ if (isset($_GET['refresh_modal']) && isset($_GET['student_id'])) {
         $db_documents['grades'] = $db_documents['academic_grades'];
     }
     
-    // Then, search for documents in student directory using student_id pattern
+    // Then, search for documents in student directory using student_id pattern with FilePathConfig
     $found_documents = [];
-    $server_base = dirname(__DIR__, 2) . '/assets/uploads/student/';
-    $web_base = '../../assets/uploads/student/';
+    $server_base = $pathConfig->getStudentPath(); // Use FilePathConfig for base path
+    $web_base = 'assets/uploads/student/'; // Web path relative from document root
     
     $document_folders = [
         'id_pictures' => 'id_picture',
@@ -1568,7 +1573,7 @@ if (isset($_GET['refresh_modal']) && isset($_GET['student_id'])) {
         $matches = [];
         
         // NEW STRUCTURE: Check student/{doc_type}/{student_id}/ folder first
-        $student_subdir = $server_base . $folder . '/' . $student_id . '/';
+        $student_subdir = $server_base . DIRECTORY_SEPARATOR . $folder . DIRECTORY_SEPARATOR . $student_id . DIRECTORY_SEPARATOR;
         if (is_dir($student_subdir)) {
             foreach (glob($student_subdir . '*') as $file) {
                 // Skip associated files
@@ -1583,7 +1588,7 @@ if (isset($_GET['refresh_modal']) && isset($_GET['student_id'])) {
         }
         
         // OLD STRUCTURE: Check flat student/{doc_type}/ folder
-        $dir = $server_base . $folder . '/';
+        $dir = $server_base . DIRECTORY_SEPARATOR . $folder . DIRECTORY_SEPARATOR;
         if (is_dir($dir)) {
             // Look for files starting with student_id OR containing student's name
             $pattern = $dir . $student_id . '_*';
@@ -1632,9 +1637,9 @@ if (isset($_GET['refresh_modal']) && isset($_GET['student_id'])) {
         }
     }
     
-    // Also search temp folders for documents not yet moved to permanent storage
-    $temp_base = dirname(__DIR__, 2) . '/assets/uploads/temp/';
-    $temp_web_base = '../../assets/uploads/temp/';
+    // Also search temp folders for documents not yet moved to permanent storage using FilePathConfig
+    $temp_base = $pathConfig->getTempPath(); // Use FilePathConfig for temp path
+    $temp_web_base = 'assets/uploads/temp/'; // Web path relative from document root
     
     foreach ($document_folders as $folder => $type) {
         // Skip if already found in student directory
@@ -1642,7 +1647,7 @@ if (isset($_GET['refresh_modal']) && isset($_GET['student_id'])) {
             continue;
         }
         
-        $temp_dir = $temp_base . $folder . '/';
+        $temp_dir = $temp_base . DIRECTORY_SEPARATOR . $folder . DIRECTORY_SEPARATOR;
         if (is_dir($temp_dir)) {
             // Search by student_id or name
             $all_files = glob($temp_dir . '*');

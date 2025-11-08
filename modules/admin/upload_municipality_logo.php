@@ -7,8 +7,11 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../../config/FilePathConfig.php';
 require_once __DIR__ . '/../../includes/permissions.php';
 require_once __DIR__ . '/../../includes/CSRFProtection.php';
+
+$pathConfig = FilePathConfig::getInstance();
 
 // Security checks
 if (!isset($_SESSION['admin_id'])) {
@@ -106,7 +109,7 @@ if (!$imageInfo && $mimeType !== 'image/svg+xml') {
 }
 
 // Create upload directory if it doesn't exist
-$uploadDir = __DIR__ . '/../../assets/uploads/municipality_logos';
+$uploadDir = $pathConfig->getMunicipalLogosPath();
 if (!is_dir($uploadDir)) {
     if (!mkdir($uploadDir, 0755, true)) {
         echo json_encode(['success' => false, 'message' => 'Failed to create upload directory']);
