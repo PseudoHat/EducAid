@@ -72,15 +72,12 @@ if ($navbar_is_super_admin && isset($connection)) {
     // First try to get from session
     $muni_id = isset($_SESSION['active_municipality_id']) ? (int)$_SESSION['active_municipality_id'] : null;
     
-    // If no session, get the admin's first assigned municipality
+    // If no session, get the admin's municipality
     if (!$muni_id && isset($_SESSION['admin_id'])) {
         $admin_id = (int)$_SESSION['admin_id'];
         $assign_result = pg_query_params(
             $connection,
-            "SELECT municipality_id FROM admin_municipality_assignments 
-             WHERE admin_id = $1 
-             ORDER BY municipality_id ASC 
-             LIMIT 1",
+            "SELECT municipality_id FROM admins WHERE admin_id = $1",
             [$admin_id]
         );
         
