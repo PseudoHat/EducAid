@@ -551,7 +551,17 @@ if (isset($_GET['api'])) {
         }
         .copied-badge.show { opacity: 1; }
 
-        /* Household grouping styles - IMPROVED */
+        /* Filter section styling */
+        .filter-section {
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+
+        /* Household grouping styles - CLEAN */
         .surname-group {
             border-left: 4px solid #0d6efd;
             background: #f8f9fa;
@@ -561,33 +571,20 @@ if (isset($_GET['api'])) {
             color: white;
             font-weight: 600;
             border: none;
-            position: sticky;
-            top: 0;
-            z-index: 10;
         }
         .surname-group-header td {
-            padding: 1rem !important;
-            font-size: 1rem;
-        }
-        .surname-group-header .badge {
-            font-size: 0.875rem;
-            padding: 0.35rem 0.65rem;
+            padding: 0.75rem !important;
         }
         .primary-recipient {
-            background: linear-gradient(90deg, #d1e7dd 0%, #ffffff 100%) !important;
+            background: #d1e7dd !important;
             border-left: 4px solid #198754;
-            font-weight: 500;
-        }
-        .primary-recipient td {
-            border-top: 2px solid #198754;
-            border-bottom: 2px solid #198754;
         }
         .unresolved-household {
-            background: linear-gradient(90deg, #fff3cd 0%, #ffffff 100%) !important;
+            background: #fff3cd !important;
             border-left: 4px solid #ffc107;
         }
         .resolved-household {
-            background: linear-gradient(90deg, #d1ecf1 0%, #ffffff 100%) !important;
+            background: #d1ecf1 !important;
             border-left: 4px solid #0dcaf0;
         }
         
@@ -601,212 +598,116 @@ if (isset($_GET['api'])) {
             padding: 0.25rem 0.5rem;
             font-size: 0.75rem;
             line-height: 1.2;
-            border-radius: 0.25rem;
         }
 
-        /* Status badges - IMPROVED */
+        /* Status badges */
         .badge-household-verified {
-            background: linear-gradient(135deg, #198754 0%, #20c997 100%);
-            box-shadow: 0 2px 4px rgba(25, 135, 84, 0.3);
+            background: #198754;
         }
         .badge-household-unverified {
-            background: linear-gradient(135deg, #ffc107 0%, #ffca2c 100%);
+            background: #ffc107;
             color: #000;
-            box-shadow: 0 2px 4px rgba(255, 193, 7, 0.3);
         }
         .badge-primary {
-            background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
-            box-shadow: 0 2px 4px rgba(13, 110, 253, 0.3);
+            background: #0d6efd;
         }
         
-        /* Enhanced cards */
-        .card {
-            border: none;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-            border-radius: 0.75rem;
-        }
-        
-        /* Table improvements */
-        #resultsTable {
-            border-radius: 0.5rem;
+        /* Table styling - Match review_registrations */
+        .table-responsive {
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            border-radius: 8px;
             overflow: hidden;
         }
-        #resultsTable thead {
-            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
-        }
         #resultsTable thead th {
+            background: #495057;
+            color: white;
             border: none;
             font-weight: 600;
-            letter-spacing: 0.5px;
-            padding: 1rem 0.75rem;
-        }
-        #resultsTable tbody tr {
-            transition: all 0.2s ease;
         }
         #resultsTable tbody tr:hover:not(.surname-group-header) {
-            transform: translateX(4px);
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            background-color: #f8f9fa;
         }
         
-        /* Page header improvements */
-        .page-header {
+        /* Quick actions section */
+        .quick-actions {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            padding: 2rem;
-            border-radius: 1rem;
-            margin-bottom: 2rem;
-            box-shadow: 0 4px 16px rgba(102, 126, 234, 0.3);
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
-        .page-header h1 {
-            font-size: 2rem;
-            font-weight: 700;
-            margin-bottom: 0.5rem;
-        }
-        .page-header p {
-            opacity: 0.95;
-            font-size: 1.05rem;
-            margin: 0;
-        }
-        
-        /* Filter card improvements */
-        .filter-card {
-            background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
-            border: 2px solid #e9ecef;
-        }
-        .filter-card .card-body {
-            padding: 1.5rem;
-        }
-        
-        /* Button improvements */
-        .btn {
-            border-radius: 0.5rem;
-            font-weight: 500;
-            transition: all 0.2s ease;
-        }
-        .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
-        }
-        .btn-primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border: none;
-        }
-        .btn-success {
-            background: linear-gradient(135deg, #198754 0%, #20c997 100%);
-            border: none;
-        }
-        .btn-danger {
-            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
-            border: none;
-        }
-        .btn-outline-secondary:hover {
-            background: #6c757d;
-            border-color: #6c757d;
+        .quick-actions h5 {
             color: white;
+            margin-bottom: 5px;
         }
-        
-        /* Icon improvements */
-        .bi {
-            vertical-align: -0.125em;
+        .quick-actions small {
+            color: rgba(255, 255, 255, 0.8);
         }
     </style>
 </head>
-<body class="p-3">
-    <?php include_once __DIR__ . '/../../includes/admin/admin_header.php'; ?>
+<body>
     <?php include_once __DIR__ . '/../../includes/admin/admin_topbar.php'; ?>
-    <?php include_once __DIR__ . '/../../includes/admin/admin_sidebar.php'; ?>
+    <div id="wrapper" class="admin-wrapper">
+        <?php include_once __DIR__ . '/../../includes/admin/admin_sidebar.php'; ?>
+        <?php include_once __DIR__ . '/../../includes/admin/admin_header.php'; ?>
+        
+        <section class="home-section" id="mainContent">
 
-    <style>
-        .admin-main {
-            margin-top: 48px;
-            margin-left: 260px;
-            padding: 1rem;
-        }
-        @media (max-width: 991.98px) {
-            .admin-main { margin-left: 0; }
-        }
-    </style>
-
-    <div class="admin-main">
-        <div class="container-fluid">
-            <!-- Enhanced Page Header -->
-            <div class="page-header">
-                <div class="d-flex justify-content-between align-items-center">
+        <section class="home-section" id="mainContent">
+            <div class="container-fluid py-4 px-4">
+                <!-- Page Header - Match review_registrations style -->
+                <div class="d-flex justify-content-between align-items-center mb-4">
                     <div>
-                        <h1>
-                            <i class="bi bi-people-fill me-3"></i>Household Duplicates Management
-                        </h1>
-                        <p>
-                            <i class="bi bi-info-circle me-2"></i>
-                            Identify and resolve household duplicate registrations to ensure accurate distribution
-                        </p>
+                        <h1 class="fw-bold mb-1">Household Duplicates Management</h1>
+                        <p class="text-muted mb-0">Identify and resolve household duplicate registrations to ensure accurate distribution.</p>
                     </div>
                     <div class="text-end">
-                        <div class="badge bg-light text-dark fs-6 px-3 py-2">
-                            <i class="bi bi-clock-history me-2"></i>
-                            <span id="lastUpdated">Loading...</span>
-                        </div>
+                        <span class="badge bg-warning fs-6" id="totalBadge">Loading...</span>
                     </div>
                 </div>
-            </div>
 
-            <!-- Instructions Alert -->
-            <div class="alert alert-info alert-dismissible fade show" role="alert" style="border-left: 4px solid #0dcaf0; border-radius: 0.75rem;">
-                <h5 class="alert-heading">
-                    <i class="bi bi-lightbulb me-2"></i>How to Resolve Household Duplicates
-                </h5>
-                <ol class="mb-0">
-                    <li><strong>Review:</strong> Students with the same surname who may be siblings/family members</li>
-                    <li><strong>Mark Primary:</strong> Select one student as the primary recipient (usually the oldest or first to register)</li>
-                    <li><strong>Archive Duplicates:</strong> Archive the remaining family members to prevent duplicate distributions</li>
-                    <li><strong>Verification:</strong> Once resolved, the group will be marked as "Verified" ✓</li>
-                </ol>
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>
-
-            <!-- Filters -->
-            <div class="card filter-card mb-4">
-                <div class="card-header bg-transparent border-0">
-                    <h5 class="mb-0">
-                        <i class="bi bi-funnel me-2"></i>Filter Options
-                    </h5>
+                <!-- Instructions Alert -->
+                <div class="alert alert-info alert-dismissible fade show" role="alert">
+                    <h6 class="alert-heading">
+                        <i class="bi bi-lightbulb me-2"></i>How to Resolve Household Duplicates
+                    </h6>
+                    <ol class="mb-0 small">
+                        <li><strong>Review:</strong> Students with the same surname who may be siblings/family members</li>
+                        <li><strong>Mark Primary:</strong> Select one student as the primary recipient (usually the oldest or first to register)</li>
+                        <li><strong>Archive Duplicates:</strong> Archive the remaining family members to prevent duplicate distributions</li>
+                        <li><strong>Verification:</strong> Once resolved, the group will be marked as "Verified" ✓</li>
+                    </ol>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                 </div>
-                <div class="card-body">
-                    <form id="filterForm" class="row g-3 align-items-end">
+
+                <!-- Filters Section -->
+                <div class="filter-section">
+                    <form id="filterForm" class="row g-3">
                         <div class="col-md-3">
-                            <label class="form-label fw-semibold">
-                                <i class="bi bi-search me-1"></i>Surname
-                            </label>
+                            <label class="form-label">Surname</label>
                             <input name="surname" id="surname" class="form-control" placeholder="Search by surname...">
                         </div>
                         <div class="col-md-2">
-                            <label class="form-label fw-semibold">
-                                <i class="bi bi-building me-1"></i>School
-                            </label>
+                            <label class="form-label">School</label>
                             <select id="school" name="school" class="form-select">
                                 <option value="">All Schools</option>
                             </select>
                         </div>
                         <div class="col-md-2">
-                            <label class="form-label fw-semibold">
-                                <i class="bi bi-geo-alt me-1"></i>Municipality
-                            </label>
+                            <label class="form-label">Municipality</label>
                             <select id="municipality" name="municipality" class="form-select">
                                 <option value="">All Municipalities</option>
                             </select>
                         </div>
                         <div class="col-md-2">
-                            <label class="form-label fw-semibold">
-                                <i class="bi bi-map me-1"></i>Barangay
-                            </label>
+                            <label class="form-label">Barangay</label>
                             <select id="barangay" name="barangay" class="form-select">
                                 <option value="">All Barangays</option>
                             </select>
                         </div>
                         <div class="col-md-3">
-                            <label class="form-label fw-semibold">
-                                <i class="bi bi-house-check me-1"></i>Household Status
-                            </label>
+                            <label class="form-label">Household Status</label>
                             <select id="household_status" name="household_status" class="form-select">
                                 <option value="">All Statuses</option>
                                 <option value="unresolved" selected>Unresolved Only</option>
@@ -814,65 +715,61 @@ if (isset($_GET['api'])) {
                             </select>
                         </div>
                         <div class="col-md-2">
-                            <label class="form-label fw-semibold">
-                                <i class="bi bi-person-badge me-1"></i>Status
-                            </label>
+                            <label class="form-label">Student Status</label>
                             <select id="status" name="status" class="form-select">
-                                <option value="">All Statuses</option>
+                                <option value="">All</option>
                                 <option value="applicant">Applicant</option>
                                 <option value="pending">Pending</option>
                             </select>
                         </div>
                         <div class="col-md-2">
-                            <label class="form-label fw-semibold">
-                                <i class="bi bi-calendar-event me-1"></i>Date From
-                            </label>
+                            <label class="form-label">Date From</label>
                             <input type="date" id="date_from" name="date_from" class="form-control">
                         </div>
                         <div class="col-md-2">
-                            <label class="form-label fw-semibold">
-                                <i class="bi bi-calendar-check me-1"></i>Date To
-                            </label>
+                            <label class="form-label">Date To</label>
                             <input type="date" id="date_to" name="date_to" class="form-control">
                         </div>
-                        <div class="col-md-2 d-grid">
-                            <button id="applyBtn" class="btn btn-primary">
-                                <i class="bi bi-funnel-fill me-2"></i>Apply Filters
-                            </button>
-                        </div>
-                        <div class="col-md-2 d-grid">
-                            <button id="exportCsvBtn" class="btn btn-outline-secondary">
-                                <i class="bi bi-download me-2"></i>Export CSV
-                            </button>
+                        <div class="col-md-2">
+                            <label class="form-label">&nbsp;</label>
+                            <div class="d-flex gap-2">
+                                <button id="applyBtn" type="button" class="btn btn-primary">Filter</button>
+                                <button id="exportCsvBtn" type="button" class="btn btn-outline-secondary" title="Export to CSV">
+                                    <i class="bi bi-download"></i>
+                                </button>
+                            </div>
                         </div>
                     </form>
                 </div>
-            </div>
 
-            <!-- Summary and Per Page -->
-            <div class="card mb-3" style="border-radius: 0.75rem;">
-                <div class="card-body">
-                    <div class="row align-items-center">
-                        <div class="col-md-6">
-                            <div id="summary" class="d-flex gap-2 flex-wrap"></div>
+                <!-- Quick Stats Section -->
+                <div class="quick-actions">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <div>
+                            <h5 class="mb-1"><i class="bi bi-bar-chart me-2"></i>Household Statistics</h5>
+                            <small id="quickStatsText">Review and resolve duplicate household registrations</small>
                         </div>
-                        <div class="col-md-6 text-end">
-                            <label class="me-2 fw-semibold">
-                                <i class="bi bi-list-ul me-1"></i>Rows per page:
-                            </label>
-                            <select id="per_page" class="form-select form-select-sm d-inline-block" style="width: auto;">
-                                <option>20</option>
-                                <option>50</option>
-                                <option>100</option>
-                            </select>
-                        </div>
+                        <div id="summary" class="d-flex gap-2 flex-wrap"></div>
                     </div>
                 </div>
-            </div>
 
-            <!-- Results Table -->
-            <div class="card" style="border-radius: 0.75rem; overflow: hidden;">
-                <div class="table-container table-responsive">
+                <!-- Per Page Selection -->
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div class="text-muted" id="paginationInfo">
+                        Showing results
+                    </div>
+                    <div>
+                        <label class="me-2">Rows per page:</label>
+                        <select id="per_page" class="form-select form-select-sm d-inline-block" style="width: auto;">
+                            <option>20</option>
+                            <option>50</option>
+                            <option>100</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Results Table -->
+                <div class="table-responsive">
                 <table class="table table-striped table-hover table-fixed" id="resultsTable">
                     <thead class="table-dark">
                         <tr>
@@ -903,7 +800,8 @@ if (isset($_GET['api'])) {
                     <ul class="pagination" id="pagination"></ul>
                 </nav>
             </div>
-        </div>
+            </div>
+        </section>
     </div>
 
     <!-- Confirm Archive Modal -->
@@ -1018,7 +916,6 @@ if (isset($_GET['api'])) {
             } catch (err) {
                 console.error('Invalid JSON response:', text);
                 document.getElementById('summary').innerHTML = '<span class="badge bg-danger">Server error (check console)</span>';
-                updateLastUpdated();
                 return;
             }
             currentData = data;
@@ -1040,22 +937,36 @@ if (isset($_GET['api'])) {
             
             const resolvedCount = groupCount - unresolvedCount;
             
+            // Update top badge
+            document.getElementById('totalBadge').textContent = `${unresolvedCount} Unresolved`;
+            
+            // Update summary badges
             document.getElementById('summary').innerHTML = `
-                <span class="badge bg-primary fs-6 px-3 py-2">
-                    <i class="bi bi-people-fill me-2"></i>${total} Students
+                <span class="badge bg-primary px-3 py-2">
+                    ${total} Students
                 </span>
-                <span class="badge bg-info text-dark fs-6 px-3 py-2">
-                    <i class="bi bi-collection me-2"></i>${groupCount} Groups
+                <span class="badge bg-info text-dark px-3 py-2">
+                    ${groupCount} Groups
                 </span>
-                <span class="badge bg-warning text-dark fs-6 px-3 py-2">
-                    <i class="bi bi-exclamation-triangle me-2"></i>${unresolvedCount} Unresolved
+                <span class="badge bg-warning text-dark px-3 py-2">
+                    ${unresolvedCount} Unresolved
                 </span>
-                <span class="badge bg-success fs-6 px-3 py-2">
-                    <i class="bi bi-check-circle me-2"></i>${resolvedCount} Resolved
+                <span class="badge bg-success px-3 py-2">
+                    ${resolvedCount} Resolved
                 </span>
             `;
             
-            updateLastUpdated();
+            // Update quick stats text
+            document.getElementById('quickStatsText').textContent = 
+                `${unresolvedCount} household groups require review • ${resolvedCount} already resolved`;
+            
+            // Update pagination info
+            const page = data.page || 1;
+            const perPage = data.per_page || 20;
+            const start = total > 0 ? ((page - 1) * perPage) + 1 : 0;
+            const end = Math.min(page * perPage, total);
+            document.getElementById('paginationInfo').textContent = 
+                `Showing ${start}-${end} of ${total} students in ${groupCount} groups`;
 
             // Render grouped by surname
             for (const [surname, students] of Object.entries(surnameGroups)) {
@@ -1566,21 +1477,6 @@ if (isset($_GET['api'])) {
                 .replace(/"/g,'&quot;')
                 .replace(/'/g,'&#039;'); 
         }
-        
-        // Update last updated timestamp
-        function updateLastUpdated() {
-            const now = new Date();
-            const timeStr = now.toLocaleTimeString('en-US', { 
-                hour: '2-digit', 
-                minute: '2-digit',
-                second: '2-digit'
-            });
-            const dateStr = now.toLocaleDateString('en-US', {
-                month: 'short',
-                day: 'numeric'
-            });
-            document.getElementById('lastUpdated').textContent = `${dateStr} at ${timeStr}`;
-        }
 
         // Event listeners
         document.getElementById('applyBtn').addEventListener('click', function(e){ 
@@ -1605,7 +1501,6 @@ if (isset($_GET['api'])) {
         });
 
         // Initialize
-        updateLastUpdated();
         loadSelects().then(()=>fetchData(1));
     </script>
 </body>
