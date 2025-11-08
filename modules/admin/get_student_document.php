@@ -6,6 +6,12 @@ if (session_status() === PHP_SESSION_NONE) {
 
 // Function to convert absolute server paths to web-accessible relative paths
 function convertToWebPath($inputPath) {
+    // Handle Railway volume paths
+    if (strpos($inputPath, '/mnt/assets/uploads/') === 0) {
+        // Convert Railway volume path to web path
+        return str_replace('/mnt/', '', $inputPath);
+    }
+    
     $root = realpath(__DIR__ . '/../../');
     $rootNorm = str_replace('\\', '/', $root);
     $p = str_replace('\\', '/', $inputPath);
@@ -108,19 +114,41 @@ if ($result && pg_num_rows($result) > 0) {
     
     $folder_name = $code_to_folder[$document_type_code] ?? '';
     
+    // Support both Railway volume and local paths
+    $isRailway = file_exists('/mnt/assets/uploads/');
+    
     // Check if the file exists at the stored path
     if (!file_exists($file_path)) {
         error_log("File does not exist at stored path: " . $file_path);
         
+        // Map to Railway volume paths
+        $railway_folders = [
+            '04' => 'ID',
+            '00' => 'EAF',
+            '02' => 'Letter',
+            '03' => 'Indigency',
+            '01' => 'Grades'
+        ];
+        
         // Try to find the file in temp or student directories
-        // UPDATED: Now checks both flat and student-organized structures
         $search_dirs = [];
         if ($folder_name) {
-            $search_dirs = [
-                __DIR__ . '/../../assets/uploads/temp/' . $folder_name . '/',
-                __DIR__ . '/../../assets/uploads/student/' . $folder_name . '/',
-                __DIR__ . '/../../assets/uploads/student/' . $folder_name . '/' . $student_id . '/' // NEW: student folder
-            ];
+            if ($isRailway) {
+                // Railway volume paths
+                $railway_folder = $railway_folders[$document_type_code] ?? '';
+                $search_dirs = [
+                    '/mnt/assets/uploads/temp/' . $railway_folder . '/',
+                    '/mnt/assets/uploads/student/' . $railway_folder . '/',
+                    '/mnt/assets/uploads/student/' . $railway_folder . '/' . $student_id . '/'
+                ];
+            } else {
+                // Local development paths
+                $search_dirs = [
+                    __DIR__ . '/../../assets/uploads/temp/' . $folder_name . '/',
+                    __DIR__ . '/../../assets/uploads/student/' . $folder_name . '/',
+                    __DIR__ . '/../../assets/uploads/student/' . $folder_name . '/' . $student_id . '/'
+                ];
+            }
         }
         
         $found_file = null;
@@ -262,12 +290,35 @@ if ($result && pg_num_rows($result) > 0) {
     $folder_name = $code_to_folder[$document_type_code] ?? '';
     $searchDirs = [];
     
+    // Support both Railway volume and local paths
+    $isRailway = file_exists('/mnt/assets/uploads/');
+    
+    // Map to Railway volume paths
+    $railway_folders = [
+        '04' => 'ID',
+        '00' => 'EAF',
+        '02' => 'Letter',
+        '03' => 'Indigency',
+        '01' => 'Grades'
+    ];
+    
     if ($folder_name) {
-        $searchDirs = [
-            __DIR__ . '/../../assets/uploads/temp/' . $folder_name,
-            __DIR__ . '/../../assets/uploads/student/' . $folder_name,
-            __DIR__ . '/../../assets/uploads/student/' . $folder_name . '/' . $student_id // NEW: student folder
-        ];
+        if ($isRailway) {
+            // Railway volume paths
+            $railway_folder = $railway_folders[$document_type_code] ?? '';
+            $searchDirs = [
+                '/mnt/assets/uploads/temp/' . $railway_folder,
+                '/mnt/assets/uploads/student/' . $railway_folder,
+                '/mnt/assets/uploads/student/' . $railway_folder . '/' . $student_id
+            ];
+        } else {
+            // Local development paths
+            $searchDirs = [
+                __DIR__ . '/../../assets/uploads/temp/' . $folder_name,
+                __DIR__ . '/../../assets/uploads/student/' . $folder_name,
+                __DIR__ . '/../../assets/uploads/student/' . $folder_name . '/' . $student_id
+            ];
+        }
     }
     
     $foundFS = null;

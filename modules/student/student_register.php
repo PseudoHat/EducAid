@@ -105,12 +105,20 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['cleanup_session_files
     
     try {
         $cleanupCount = 0;
-        $tempDirs = [
-            '../../assets/uploads/temp/enrollment_forms/',
-            '../../assets/uploads/temp/id_pictures/',
-            '../../assets/uploads/temp/letter_mayor/',
-            '../../assets/uploads/temp/indigency/',
-            '../../assets/uploads/temp/grades/'
+        // Support both Railway volume and local paths
+        $isRailway = file_exists('/mnt/assets/uploads/');
+        $tempDirs = $isRailway ? [
+            '/mnt/assets/uploads/temp/EAF/',
+            '/mnt/assets/uploads/temp/ID/',
+            '/mnt/assets/uploads/temp/Letter/',
+            '/mnt/assets/uploads/temp/Indigency/',
+            '/mnt/assets/uploads/temp/Grades/'
+        ] : [
+            __DIR__ . '/../../assets/uploads/temp/enrollment_forms/',
+            __DIR__ . '/../../assets/uploads/temp/id_pictures/',
+            __DIR__ . '/../../assets/uploads/temp/letter_mayor/',
+            __DIR__ . '/../../assets/uploads/temp/indigency/',
+            __DIR__ . '/../../assets/uploads/temp/grades/'
         ];
         
         // Get current session info
@@ -296,7 +304,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processEnrollmentOcr'
         exit;
     }
 
-    $uploadDir = '../../assets/uploads/temp/enrollment_forms/';
+    // Use Railway volume path if available, fallback to local path
+    $uploadDir = file_exists('/mnt/assets/uploads/') 
+        ? '/mnt/assets/uploads/temp/EAF/' 
+        : __DIR__ . '/../../assets/uploads/temp/enrollment_forms/';
     if (!file_exists($uploadDir)) {
         mkdir($uploadDir, 0777, true);
     }
@@ -1535,7 +1546,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processIdPictureOcr']
         exit;
     }
 
-    $uploadDir = '../../assets/uploads/temp/id_pictures/';
+    // Use Railway volume path if available, fallback to local path
+    $uploadDir = file_exists('/mnt/assets/uploads/') 
+        ? '/mnt/assets/uploads/temp/ID/' 
+        : __DIR__ . '/../../assets/uploads/temp/id_pictures/';
     if (!file_exists($uploadDir)) { mkdir($uploadDir, 0777, true); }
 
     // DELETE OLD FILES: Remove previous upload and OCR results when new file is uploaded
@@ -2234,12 +2248,24 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processLetterOcr'])) 
     @error_reporting(0);
     
     $captcha = verify_recaptcha_v3($_POST['g-recaptcha-response'] ?? '', 'process_letter_ocr');
-    if (!$captcha['ok']) { json_response(['status'=>'error','message'=>'Security verification failed (captcha).']); }
+    if (!$captcha['ok']) { 
+        // Provide more detailed error message
+        $reason = $captcha['reason'] ?? 'unknown';
+        $score = $captcha['score'] ?? 0;
+        json_response([
+            'status'=>'error',
+            'message'=>'Security verification failed (captcha).',
+            'debug' => 'Reason: ' . $reason . ', Score: ' . $score
+        ]); 
+    }
     if (!isset($_FILES['letter_to_mayor']) || $_FILES['letter_to_mayor']['error'] !== UPLOAD_ERR_OK) {
         json_response(['status' => 'error', 'message' => 'No letter file uploaded or upload error.']);
     }
 
-    $uploadDir = '../../assets/uploads/temp/letter_mayor/';
+    // Use Railway volume path if available, fallback to local path
+    $uploadDir = file_exists('/mnt/assets/uploads/') 
+        ? '/mnt/assets/uploads/temp/Letter/' 
+        : __DIR__ . '/../../assets/uploads/temp/letter_mayor/';
     if (!file_exists($uploadDir)) {
         mkdir($uploadDir, 0777, true);
     }
@@ -2605,7 +2631,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processCertificateOcr
         json_response(['status' => 'error', 'message' => 'No certificate file uploaded or upload error.']);
     }
 
-    $uploadDir = '../../assets/uploads/temp/indigency/';
+    // Use Railway volume path if available, fallback to local path
+    $uploadDir = file_exists('/mnt/assets/uploads/') 
+        ? '/mnt/assets/uploads/temp/Indigency/' 
+        : __DIR__ . '/../../assets/uploads/temp/indigency/';
     if (!file_exists($uploadDir)) {
         mkdir($uploadDir, 0777, true);
     }
@@ -2969,7 +2998,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processGradesOcr'])) 
             json_response(['status' => 'error', 'message' => 'No grades document uploaded or upload error.']);
         }
 
-        $uploadDir = '../../assets/uploads/temp/grades/';
+        // Use Railway volume path if available, fallback to local path
+        $uploadDir = file_exists('/mnt/assets/uploads/') 
+            ? '/mnt/assets/uploads/temp/Grades/' 
+            : __DIR__ . '/../../assets/uploads/temp/grades/';
         if (!file_exists($uploadDir)) {
             mkdir($uploadDir, 0777, true);
         }
@@ -4780,9 +4812,17 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['register'])) {
         $cleanFirstname = preg_replace('/[^a-zA-Z0-9]/', '', $firstname);
         $namePrefix = strtolower($cleanLastname . '_' . $cleanFirstname);
 
+        // === DEFINE UPLOAD DIRECTORIES WITH RAILWAY VOLUME SUPPORT ===
+        // Use Railway volume path if available, fallback to local path
+        $isRailway = file_exists('/mnt/assets/uploads/');
+        $tempIDPictureDir = $isRailway ? '/mnt/assets/uploads/temp/ID/' : __DIR__ . '/../../assets/uploads/temp/id_pictures/';
+        $tempEnrollmentDir = $isRailway ? '/mnt/assets/uploads/temp/EAF/' : __DIR__ . '/../../assets/uploads/temp/enrollment_forms/';
+        $tempLetterDir = $isRailway ? '/mnt/assets/uploads/temp/Letter/' : __DIR__ . '/../../assets/uploads/temp/letter_mayor/';
+        $tempIndigencyDir = $isRailway ? '/mnt/assets/uploads/temp/Indigency/' : __DIR__ . '/../../assets/uploads/temp/indigency/';
+        $tempGradesDir = $isRailway ? '/mnt/assets/uploads/temp/Grades/' : __DIR__ . '/../../assets/uploads/temp/grades/';
+
         // === SAVE ID PICTURE USING UnifiedFileService ===
         $sessionPrefix = $_SESSION['file_prefix'] ?? 'session';
-        $tempIDPictureDir = '../../assets/uploads/temp/id_pictures/';
         
         // Look for session-based ID picture file
         $idPicturePattern = $tempIDPictureDir . $sessionPrefix . '_idpic.*';
@@ -4866,7 +4906,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['register'])) {
         }
 
         // === SAVE ENROLLMENT FORM (EAF) USING UnifiedFileService ===
-        $tempEnrollmentDir = '../../assets/uploads/temp/enrollment_forms/';
+        // tempEnrollmentDir already defined above with Railway volume support
         
         // Look for session-based enrollment form (LastName_FirstName_EAF pattern)
         $eafPattern = $tempEnrollmentDir . '*_EAF.*';
@@ -4963,7 +5003,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['register'])) {
         }
 
         // === SAVE LETTER TO MAYOR USING UnifiedFileService ===
-        $tempLetterDir = '../../assets/uploads/temp/letter_mayor/';
+        // tempLetterDir already defined above with Railway volume support
         
         // Look for session-based letter file
         $letterPattern = $tempLetterDir . $sessionPrefix . '_Letter to mayor.*';
@@ -5043,7 +5083,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['register'])) {
         }
 
         // === SAVE CERTIFICATE OF INDIGENCY USING UnifiedFileService ===
-        $tempIndigencyDir = '../../assets/uploads/temp/indigency/';
+        // tempIndigencyDir already defined above with Railway volume support
         
         // Look for session-based certificate file
         $certificatePattern = $tempIndigencyDir . $sessionPrefix . '_Indigency.*';
@@ -5123,7 +5163,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['register'])) {
         }
 
         // === SAVE GRADES USING UnifiedFileService ===
-        $tempGradesDir = '../../assets/uploads/temp/grades/';
+        // tempGradesDir already defined above with Railway volume support
         
         // Look for session-based grades file
         $gradesPattern = $tempGradesDir . $sessionPrefix . '_Grades.*';
@@ -8505,6 +8545,13 @@ console.log('✅ Enhanced navigation with validation ready');
             } else {
                 // Enhanced error display for PDFs and suggestions
                 let errorMessage = data.message;
+                
+                // Add debug info if available
+                if (data.debug) {
+                    console.error('Letter verification error:', data.debug);
+                    errorMessage += '\n\nTechnical details: ' + data.debug;
+                }
+                
                 if (data.suggestions && data.suggestions.length > 0) {
                     errorMessage += '\n\nSuggestions:\n' + data.suggestions.join('\n');
                 }

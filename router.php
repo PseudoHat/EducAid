@@ -7,6 +7,9 @@
 // Load security headers first (before any output)
 require_once __DIR__ . '/config/security_headers.php';
 
+// Auto-initialize Railway volume symlink if needed
+require_once __DIR__ . '/includes/railway_volume_init.php';
+
 // Start session if not already started (required for timeout middleware)
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
