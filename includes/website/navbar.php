@@ -306,6 +306,65 @@ nav.navbar.fixed-header .navbar-collapse {
     width: auto !important;
   }
 }
+
+/* Hamburger to X animation */
+.navbar-toggler {
+  border: none;
+  padding: 0.5rem;
+  position: relative;
+  width: 40px;
+  height: 40px;
+  transition: all 0.3s ease;
+}
+
+.navbar-toggler:focus {
+  box-shadow: none;
+  outline: none;
+}
+
+.navbar-toggler-icon {
+  display: block;
+  position: relative;
+  width: 24px;
+  height: 2px;
+  background-color: currentColor;
+  transition: all 0.3s ease;
+  margin: auto;
+}
+
+.navbar-toggler-icon::before,
+.navbar-toggler-icon::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background-color: currentColor;
+  transition: all 0.3s ease;
+}
+
+.navbar-toggler-icon::before {
+  top: -8px;
+}
+
+.navbar-toggler-icon::after {
+  bottom: -8px;
+}
+
+/* Active state (X) */
+.navbar-toggler.active .navbar-toggler-icon {
+  background-color: transparent;
+}
+
+.navbar-toggler.active .navbar-toggler-icon::before {
+  top: 0;
+  transform: rotate(45deg);
+}
+
+.navbar-toggler.active .navbar-toggler-icon::after {
+  bottom: 0;
+  transform: rotate(-45deg);
+}
 </style>
 
 <?php if ($navbar_edit_mode && $navbar_is_super_admin): ?>
@@ -536,5 +595,31 @@ nav.navbar.fixed-header .navbar-collapse {
 
   window.addEventListener('load', updateOffsets);
   window.addEventListener('resize', updateOffsets);
+})();
+
+// Hamburger menu animation - Toggle between hamburger and X
+(function() {
+  'use strict';
+  
+  document.addEventListener('DOMContentLoaded', () => {
+    const navbarToggler = document.querySelector('.navbar-toggler');
+    const navbarCollapse = document.getElementById('nav');
+    
+    if (navbarToggler && navbarCollapse) {
+      // Listen for Bootstrap collapse events
+      navbarCollapse.addEventListener('show.bs.collapse', () => {
+        navbarToggler.classList.add('active');
+      });
+      
+      navbarCollapse.addEventListener('hide.bs.collapse', () => {
+        navbarToggler.classList.remove('active');
+      });
+      
+      // Also handle initial state if menu is already open
+      if (navbarCollapse.classList.contains('show')) {
+        navbarToggler.classList.add('active');
+      }
+    }
+  });
 })();
 </script>
