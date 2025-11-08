@@ -1048,126 +1048,118 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
         }
         
         /* ============================================
-           COMPACT LOGIN CARD CONTENT
+           COMPACT LOGIN CARD CONTENT - BALANCED
            ============================================ */
         
-        /* Reduce login header spacing - EVEN MORE COMPACT */
+        /* Balanced login header spacing */
         .login-page-isolated .login-header {
-            margin-bottom: 0.75rem !important; /* Further reduced from 1rem */
+            margin-bottom: 1rem !important;
         }
         
         .login-page-isolated .login-title {
-            font-size: 1.375rem !important; /* Further reduced from 1.5rem */
-            margin-bottom: 0.25rem !important; /* Further reduced */
-            line-height: 1.2 !important;
+            font-size: 1.5rem !important;
+            margin-bottom: 0.375rem !important;
+            line-height: 1.3 !important;
+            font-weight: 700;
         }
         
         .login-page-isolated .login-subtitle {
-            font-size: 0.8125rem !important; /* Further reduced */
+            font-size: 0.875rem !important;
             margin-bottom: 0 !important;
-            line-height: 1.4 !important;
+            line-height: 1.5 !important;
+            color: #64748b;
         }
         
-        /* Reduce form group spacing - TIGHTER */
+        /* Balanced form group spacing */
         .login-page-isolated .form-group {
-            margin-bottom: 0.625rem !important; /* Further reduced from 0.875rem */
+            margin-bottom: 0.875rem !important;
         }
         
         .login-page-isolated .form-label {
-            font-size: 0.6875rem !important; /* Further reduced */
-            margin-bottom: 0.25rem !important; /* Further reduced */
+            font-size: 0.75rem !important;
+            margin-bottom: 0.375rem !important;
             font-weight: 600 !important;
             text-transform: uppercase;
+            letter-spacing: 0.025em;
+            color: #475569;
         }
         
-        /* Reduce form control padding - MORE COMPACT */
+        /* Balanced form control padding */
         .login-page-isolated .form-control {
-            padding: 0.5rem 0.75rem !important; /* Further reduced */
-            font-size: 0.875rem !important; /* Further reduced */
-            line-height: 1.4 !important;
+            padding: 0.625rem 0.875rem !important;
+            font-size: 0.9375rem !important;
+            line-height: 1.5 !important;
+            border-radius: 8px;
         }
         
-        /* Compact buttons - SMALLER */
+        /* Balanced buttons */
         .login-page-isolated .btn-lg {
-            padding: 0.625rem 1.25rem !important; /* Further reduced */
-            font-size: 0.9375rem !important; /* Further reduced */
+            padding: 0.75rem 1.5rem !important;
+            font-size: 1rem !important;
+            font-weight: 600;
+            border-radius: 8px;
         }
         
-        /* Reduce margins and paddings - AGGRESSIVE */
+        /* Balanced margins and paddings */
         .login-page-isolated .mb-3 {
-            margin-bottom: 0.5rem !important; /* Further reduced */
+            margin-bottom: 0.75rem !important;
         }
         
         .login-page-isolated .mb-4 {
-            margin-bottom: 0.75rem !important; /* Further reduced */
+            margin-bottom: 1rem !important;
         }
         
         .login-page-isolated .mt-3 {
-            margin-top: 0.5rem !important; /* Further reduced */
+            margin-top: 0.75rem !important;
         }
         
         .login-page-isolated .mt-4 {
-            margin-top: 0.75rem !important; /* Further reduced */
+            margin-top: 1rem !important;
         }
         
-        /* Compact alerts - SMALLER */
+        /* Balanced alerts */
         .login-page-isolated .alert {
-            padding: 0.5rem 0.75rem !important; /* Further reduced */
-            margin-bottom: 0.5rem !important; /* Further reduced */
-            font-size: 0.8125rem !important; /* Further reduced */
+            padding: 0.75rem 1rem !important;
+            margin-bottom: 0.75rem !important;
+            font-size: 0.875rem !important;
+            border-radius: 8px;
         }
         
-        /* Reduce step indicators spacing */
+        /* Balanced step indicators spacing */
         .login-page-isolated .step-indicators {
-            margin-bottom: 0.5rem !important; /* Further reduced */
+            margin-bottom: 0.875rem !important;
         }
         
-        /* Compact text helpers */
+        /* Balanced text helpers */
         .login-page-isolated small,
         .login-page-isolated .small {
-            font-size: 0.75rem !important; /* Further reduced */
-            line-height: 1.4 !important;
+            font-size: 0.8125rem !important;
+            line-height: 1.5 !important;
         }
         
-        /* Reduce OTP input size */
+        /* Balanced OTP input size */
         .login-page-isolated .otp-input {
-            font-size: 1.125rem !important; /* Further reduced */
-            letter-spacing: 0.35em !important; /* Reduced */
-            padding: 0.625rem !important; /* Further reduced */
+            font-size: 1.25rem !important;
+            letter-spacing: 0.4em !important;
+            padding: 0.75rem !important;
         }
         
-        /* Compact forgot password link */
-        .login-page-isolated .text-center.mt-3 {
-            margin-top: 0.5rem !important; /* Further reduced */
-        }
-        
-        /* Reduce card padding AGGRESSIVELY */
+        /* Balanced card padding */
         .login-page-isolated .login-card {
-            padding: 1.25rem 1rem !important; /* Further reduced from 1.5rem 1.25rem */
+            padding: 1.75rem 1.5rem !important;
         }
         
-        /* Tighter spacing between password field and reCAPTCHA text */
-        .login-page-isolated .form-group + .form-group {
-            margin-top: 0.5rem !important;
-        }
-        
-        /* Reduce spacing around buttons */
-        .login-page-isolated .d-grid {
-            margin-top: 0.5rem !important;
-        }
-        
-        /* Make "Create Account" section more compact */
-        .login-page-isolated .text-center:has(.btn-outline-success) {
+        /* Balanced spacing between sections */
+        .login-page-isolated .text-center.mt-3 {
             margin-top: 0.75rem !important;
-            padding-top: 0.5rem !important;
         }
         
         /* Adjust login card max-height to account for compact footer */
         .login-page-isolated .login-card {
-            max-height: calc(100vh - var(--navbar-height) - 70px); /* 70px = compact footer height + padding */
+            max-height: calc(100vh - var(--navbar-height) - 70px);
         }
         
-        /* Mobile adjustments for compact footer */
+        /* Mobile adjustments - BALANCED */
         @media (max-width: 575.98px) {
             .login-compact-footer small {
                 font-size: 0.75rem;
@@ -1180,83 +1172,58 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
             
             .login-page-isolated .login-card {
                 max-height: calc(100vh - var(--navbar-height) - 80px);
-                padding: 1rem 0.875rem !important; /* Further reduced */
+                padding: 1.5rem 1.25rem !important;
             }
             
             .login-page-isolated .login-title {
-                font-size: 1.25rem !important; /* Further reduced */
+                font-size: 1.375rem !important;
             }
             
             .login-page-isolated .login-subtitle {
-                font-size: 0.75rem !important; /* Further reduced */
+                font-size: 0.8125rem !important;
             }
             
             .login-page-isolated .form-control {
-                padding: 0.4375rem 0.625rem !important; /* Further reduced */
-                font-size: 0.8125rem !important; /* Further reduced */
+                padding: 0.5625rem 0.75rem !important;
+                font-size: 0.875rem !important;
             }
             
             .login-page-isolated .btn-lg {
-                padding: 0.5rem 1rem !important; /* Further reduced */
-                font-size: 0.875rem !important; /* Further reduced */
+                padding: 0.625rem 1.25rem !important;
+                font-size: 0.9375rem !important;
             }
             
             .login-page-isolated .form-group {
-                margin-bottom: 0.5rem !important; /* Further reduced */
+                margin-bottom: 0.75rem !important;
             }
         }
         
-        /* Very short viewports - make footer even more compact */
+        /* Very short viewports - BALANCED */
         @media (max-height: 700px) {
             .login-compact-footer .py-3 {
                 padding-top: 0.5rem !important;
                 padding-bottom: 0.5rem !important;
             }
             
-            .login-compact-footer small {
-                font-size: 0.75rem;
-            }
-            
             .login-page-isolated .login-card {
                 max-height: calc(100vh - var(--navbar-height) - 50px);
-                padding: 1rem 0.875rem !important; /* Further reduced */
+                padding: 1.375rem 1.25rem !important;
             }
             
             .login-page-isolated .login-header {
-                margin-bottom: 0.5rem !important; /* Further reduced */
+                margin-bottom: 0.875rem !important;
             }
             
             .login-page-isolated .login-title {
-                font-size: 1.25rem !important; /* Further reduced */
-                margin-bottom: 0.1875rem !important;
-            }
-            
-            .login-page-isolated .login-subtitle {
-                font-size: 0.75rem !important; /* Further reduced */
+                font-size: 1.375rem !important;
             }
             
             .login-page-isolated .form-group {
-                margin-bottom: 0.5rem !important; /* Further reduced */
+                margin-bottom: 0.75rem !important;
             }
             
             .login-page-isolated .form-label {
-                font-size: 0.625rem !important; /* Further reduced */
-                margin-bottom: 0.1875rem !important;
-            }
-            
-            .login-page-isolated .form-control {
-                padding: 0.4375rem 0.625rem !important; /* Further reduced */
-                font-size: 0.8125rem !important;
-            }
-            
-            .login-page-isolated .btn-lg {
-                padding: 0.5rem 1rem !important; /* Further reduced */
-                font-size: 0.875rem !important;
-            }
-            
-            .login-page-isolated .mb-3,
-            .login-page-isolated .mb-4 {
-                margin-bottom: 0.5rem !important;
+                font-size: 0.6875rem !important;
             }
         }
         
@@ -1266,58 +1233,35 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
                 padding-bottom: 0.375rem !important;
             }
             
-            .login-compact-footer small {
-                font-size: 0.6875rem;
-            }
-            
             .login-page-isolated .login-card {
                 max-height: calc(100vh - var(--navbar-height) - 40px);
-                padding: 0.75rem 0.75rem !important; /* Further reduced */
+                padding: 1.125rem 1rem !important;
             }
             
             .login-page-isolated .login-header {
-                margin-bottom: 0.375rem !important; /* Further reduced */
+                margin-bottom: 0.75rem !important;
             }
             
             .login-page-isolated .login-title {
-                font-size: 1.125rem !important; /* Further reduced */
-                margin-bottom: 0.125rem !important;
+                font-size: 1.25rem !important;
             }
             
             .login-page-isolated .login-subtitle {
-                font-size: 0.6875rem !important; /* Further reduced */
+                font-size: 0.75rem !important;
             }
             
             .login-page-isolated .form-group {
-                margin-bottom: 0.375rem !important; /* Further reduced */
-            }
-            
-            .login-page-isolated .form-label {
-                font-size: 0.5625rem !important; /* Further reduced */
-                margin-bottom: 0.125rem !important;
+                margin-bottom: 0.625rem !important;
             }
             
             .login-page-isolated .form-control {
-                padding: 0.375rem 0.5rem !important; /* Further reduced */
-                font-size: 0.75rem !important; /* Further reduced */
+                padding: 0.5rem 0.625rem !important;
+                font-size: 0.8125rem !important;
             }
             
             .login-page-isolated .btn-lg {
-                padding: 0.4375rem 0.875rem !important; /* Further reduced */
-                font-size: 0.8125rem !important; /* Further reduced */
-            }
-            
-            .login-page-isolated small,
-            .login-page-isolated .small {
-                font-size: 0.6875rem !important;
-            }
-            
-            .login-page-isolated .mb-3,
-            .login-page-isolated .mb-4,
-            .login-page-isolated .mt-3,
-            .login-page-isolated .mt-4 {
-                margin-bottom: 0.375rem !important;
-                margin-top: 0.375rem !important;
+                padding: 0.5625rem 1.125rem !important;
+                font-size: 0.875rem !important;
             }
         }
         
