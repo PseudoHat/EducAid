@@ -627,37 +627,44 @@ if ($current_year_check && pg_num_rows($current_year_check) > 0) {
 <html lang="en">
 <?php $page_title='Distribution Control Center'; include __DIR__ . '/../../includes/admin/admin_head.php'; ?>
 <style>
-  /* Modern Distribution Control Styling */
-  .control-header {
-    background: linear-gradient(145deg, #f5f7fa 0%, #eef1f4 100%);
-    border: 1px solid #e3e7ec;
-    border-radius: 16px;
-    padding: 2rem 1.75rem;
-    margin-bottom: 2rem;
-    position: relative;
-    overflow: hidden;
+  /* Clean Distribution Control Styling - Matching review_registrations.php */
+  .filter-section {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
   }
   
-  .control-header::before {
-    content: '';
-    position: absolute;
-    width: 300px;
-    height: 300px;
-    background: radial-gradient(circle at center, rgba(102, 126, 234, 0.08), transparent 70%);
-    top: -100px;
-    right: -100px;
-    border-radius: 50%;
+  .quick-actions {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 20px;
+    border-radius: 12px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
   }
   
-  .status-badge-large {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.75rem 1.5rem;
-    border-radius: 50px;
+  .quick-actions h5 {
+    color: white;
+    margin-bottom: 5px;
+  }
+  
+  .quick-actions small {
+    color: rgba(255, 255, 255, 0.8);
+  }
+  
+  .quick-actions .btn-light {
+    background: white;
+    color: #667eea;
     font-weight: 600;
-    font-size: 1rem;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    border: none;
+  }
+  
+  .quick-actions .btn-light:hover {
+    background: #f8f9fa;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
   }
   
   .metric-card {
@@ -902,54 +909,60 @@ if ($current_year_check && pg_num_rows($current_year_check) > 0) {
                 </div>
             <?php endif; ?>
             
-            <!-- Header -->
-            <div class="control-header">
-                <div class="d-flex justify-content-between align-items-start position-relative" style="z-index: 2;">
-                    <div>
-                        <h1 class="mb-2" style="font-size: 2rem; font-weight: 700; color: #2c3e50;">
-                            <i class="bi bi-diagram-3-fill text-primary me-2"></i>
-                            Distribution Control Center
-                        </h1>
-                        <p class="text-muted mb-0" style="font-size: 1rem;">
-                            Manage the complete distribution lifecycle
-                            <?php if ($current_academic_year && $current_semester): ?>
-                                <br><span class="badge bg-info mt-2">
-                                    <i class="bi bi-calendar3 me-1"></i>
-                                    <?= htmlspecialchars($current_semester) ?> <?= htmlspecialchars($current_academic_year) ?>
+            <!-- Header - Clean style -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h1 class="fw-bold mb-2">Distribution Control Center</h1>
+                    <p class="text-muted mb-2">Manage the complete distribution lifecycle</p>
+                    <?php if ($current_academic_year && $current_semester): ?>
+                        <div class="d-flex gap-2 mt-2">
+                            <span class="badge" style="background: #e8f4f8; color: #0c5460; font-size: 0.95rem; padding: 8px 14px; border: 1px solid #bee5eb;">
+                                <i class="bi bi-calendar3 me-1"></i>
+                                <?= htmlspecialchars($current_semester) ?> <?= htmlspecialchars($current_academic_year) ?>
+                            </span>
+                            <?php if ($documents_deadline): ?>
+                                <span class="badge" style="background: #fff3cd; color: #856404; font-size: 0.95rem; padding: 8px 14px; border: 1px solid #ffeeba;">
+                                    <i class="bi bi-clock-history me-1"></i>
+                                    Deadline: <?= date('M j, Y', strtotime($documents_deadline)) ?>
                                 </span>
-                                <?php if ($documents_deadline): ?>
-                                    <span class="badge bg-warning text-dark mt-2 ms-1">
-                                        <i class="bi bi-clock-history me-1"></i>
-                                        Deadline: <?= date('M j, Y', strtotime($documents_deadline)) ?>
-                                    </span>
-                                <?php endif; ?>
                             <?php endif; ?>
-                        </p>
-                    </div>
-                    <div>
-                        <?php
-                        $statusIcons = [
-                            'inactive' => 'circle',
-                            'preparing' => 'gear-fill',
-                            'active' => 'play-circle-fill',
-                            'finalizing' => 'hourglass-split',
-                            'finalized' => 'check-circle-fill'
-                        ];
-                        $statusColors = [
-                            'inactive' => 'secondary',
-                            'preparing' => 'warning',
-                            'active' => 'success',
-                            'finalizing' => 'info',
-                            'finalized' => 'primary'
-                        ];
-                        $statusColor = $statusColors[$workflow_status['distribution_status']] ?? 'secondary';
-                        $statusIcon = $statusIcons[$workflow_status['distribution_status']] ?? 'circle';
-                        ?>
-                        <span class="status-badge-large bg-<?= $statusColor ?> text-white">
-                            <i class="bi bi-<?= $statusIcon ?>"></i>
-                            <?= ucfirst($workflow_status['distribution_status']) ?>
-                        </span>
-                    </div>
+                        </div>
+                    <?php endif; ?>
+                </div>
+                <div class="d-flex flex-column align-items-end gap-2">
+                    <?php
+                    $statusIcons = [
+                        'inactive' => 'circle',
+                        'preparing' => 'gear-fill',
+                        'active' => 'play-circle-fill',
+                        'finalizing' => 'hourglass-split',
+                        'finalized' => 'check-circle-fill'
+                    ];
+                    $statusColors = [
+                        'inactive' => 'secondary',
+                        'preparing' => 'warning',
+                        'active' => 'success',
+                        'finalizing' => 'info',
+                        'finalized' => 'primary'
+                    ];
+                    $statusColor = $statusColors[$workflow_status['distribution_status']] ?? 'secondary';
+                    $statusIcon = $statusIcons[$workflow_status['distribution_status']] ?? 'circle';
+                    ?>
+                    <span class="badge bg-<?= $statusColor ?> fs-6">
+                        <i class="bi bi-<?= $statusIcon ?> me-1"></i>
+                        <?= ucfirst($workflow_status['distribution_status']) ?>
+                    </span>
+                    
+                    <?php if ($workflow_status['distribution_status'] === 'active'): ?>
+                        <div class="d-flex gap-2">
+                            <a href="manage_slots.php" class="btn btn-outline-primary btn-sm">
+                                <i class="bi bi-sliders me-1"></i>Manage Slots
+                            </a>
+                            <a href="manage_schedules.php" class="btn btn-outline-primary btn-sm">
+                                <i class="bi bi-calendar me-1"></i>Scheduling
+                            </a>
+                        </div>
+                    <?php endif; ?>
                 </div>
             </div>
                             
@@ -992,6 +1005,23 @@ if ($current_year_check && pg_num_rows($current_year_check) > 0) {
                     </div>
                 </div>
             </div>
+            
+            <!-- Distribution Active Alert - Quick Actions style -->
+            <?php if ($workflow_status['distribution_status'] === 'active'): ?>
+                <div class="quick-actions mb-4">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <div>
+                            <h5 class="mb-1"><i class="bi bi-info-circle-fill me-2"></i>Distribution Active</h5>
+                            <small>When you're ready to end this distribution cycle, go to the End Distribution page to finalize and archive all data.</small>
+                        </div>
+                        <div>
+                            <a href="end_distribution.php" class="btn btn-light">
+                                <i class="bi bi-box-arrow-right me-1"></i>End Distribution
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            <?php endif; ?>
             
             <!-- Action Cards -->
                             <div class="row g-3">
@@ -1037,45 +1067,6 @@ if ($current_year_check && pg_num_rows($current_year_check) > 0) {
                                         </div>
                                     </div>
                                 <?php endif; ?>
-                                
-                                <?php if ($workflow_status['distribution_status'] === 'active'): ?>
-                                    <div class="col-md-6">
-                                        <div class="card border-info">
-                                            <div class="card-body">
-                                                <h5 class="card-title text-info">
-                                                    <i class="bi bi-gear me-2"></i>System Management
-                                                </h5>
-                                                <p class="card-text">Manage registration slots and scheduling through dedicated pages.</p>
-                                                <div class="d-flex gap-2">
-                                                    <a href="manage_slots.php" class="btn btn-outline-info btn-sm">
-                                                        <i class="bi bi-sliders me-1"></i>Manage Slots
-                                                    </a>
-                                                    <a href="manage_schedules.php" class="btn btn-outline-info btn-sm">
-                                                        <i class="bi bi-calendar me-1"></i>Scheduling
-                                                    </a>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                <?php endif; ?>
-                                
-                                <?php if ($workflow_status['distribution_status'] === 'active'): ?>
-                                    <div class="col-md-12">
-                                        <div class="alert alert-info d-flex align-items-center">
-                                            <i class="bi bi-info-circle-fill me-3" style="font-size: 1.5rem;"></i>
-                                            <div class="flex-grow-1">
-                                                <h6 class="mb-1">Distribution Active</h6>
-                                                <p class="mb-0">
-                                                    When you're ready to end this distribution cycle, go to the 
-                                                    <a href="end_distribution.php" class="alert-link fw-bold">
-                                                        <i class="bi bi-box-arrow-right me-1"></i>End Distribution
-                                                    </a> 
-                                                    page to finalize and archive all data.
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                <?php endif; ?>
                             </div>
                             
                             <!-- Distribution History -->
@@ -1110,57 +1101,75 @@ if ($current_year_check && pg_num_rows($current_year_check) > 0) {
                         <?php endif; ?>
                         
                         <!-- System Information -->
-                        <div class="card border-0 shadow-sm mt-4" style="border-radius: 12px; overflow: hidden;">
-                            <div class="card-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 1.25rem;">
-                                <h5 class="mb-0 text-white fw-bold">
-                                    <i class="fas fa-info-circle me-2"></i>
-                                    System Information
-                                </h5>
-                            </div>
-                            <div class="card-body" style="background: #f8f9fa; padding: 1.75rem;">
-                                <div class="row g-4">
-                                    <!-- Configuration Status Column -->
-                                    <div class="col-md-6">
-                                        <small class="text-muted">Configuration Status:</small>
-                                        <ul class="list-unstyled small">
-                                            <li><strong>Distribution Status:</strong> <?= htmlspecialchars($distribution_status) ?></li>
-                                            <li><strong>Uploads Enabled:</strong> <?= htmlspecialchars($uploads_enabled ? 'Yes' : 'No') ?></li>
-                                            <li><strong>Academic Year:</strong> <?= htmlspecialchars($current_academic_year ?: 'Not Set') ?></li>
-                                            <li><strong>Semester:</strong> <?= htmlspecialchars($current_semester ?: 'Not Set') ?></li>
-                                            <li><strong>Documents Deadline:</strong> 
+                        <div class="row g-3 mt-4">
+                            <!-- Configuration Status -->
+                            <div class="col-md-6">
+                                <div class="card h-100 border-0 shadow-sm" style="border-radius: 12px;">
+                                    <div class="card-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 1rem;">
+                                        <h5 class="mb-0 text-white fw-bold" style="font-size: 1.1rem;">
+                                            <i class="bi bi-info-circle me-2"></i>System Information
+                                        </h5>
+                                    </div>
+                                    <div class="card-body" style="background: white; padding: 1.5rem;">
+                                        <div class="mb-3">
+                                            <small class="text-muted text-uppercase" style="font-size: 0.75rem; font-weight: 600;">Configuration Status:</small>
+                                        </div>
+                                        <div class="info-list">
+                                            <div class="info-row mb-3">
+                                                <strong style="color: #495057;">Distribution Status:</strong> 
+                                                <span class="text-capitalize"><?= htmlspecialchars($distribution_status) ?></span>
+                                            </div>
+                                            <div class="info-row mb-3">
+                                                <strong style="color: #495057;">Uploads Enabled:</strong> 
+                                                <span><?= htmlspecialchars($uploads_enabled ? 'Yes' : 'No') ?></span>
+                                            </div>
+                                            <div class="info-row mb-3">
+                                                <strong style="color: #495057;">Academic Year:</strong> 
+                                                <span><?= htmlspecialchars($current_academic_year ?: 'Not Set') ?></span>
+                                            </div>
+                                            <div class="info-row mb-3">
+                                                <strong style="color: #495057;">Semester:</strong> 
+                                                <span><?= htmlspecialchars($current_semester ?: 'Not Set') ?></span>
+                                            </div>
+                                            <div class="info-row">
+                                                <strong style="color: #495057;">Documents Deadline:</strong> 
                                                 <?php if ($documents_deadline): ?>
-                                                    <span class="text-warning fw-bold"><?= date('F j, Y', strtotime($documents_deadline)) ?></span>
+                                                    <span style="color: #f39c12; font-weight: 600;"><?= date('F j, Y', strtotime($documents_deadline)) ?></span>
                                                 <?php else: ?>
                                                     <span class="text-muted">Not Set</span>
                                                 <?php endif; ?>
-                                            </li>
-                                        </ul>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <div class="info-section" style="background: white; padding: 1.5rem; border-radius: 10px; height: 100%; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
-                                            <h6 class="fw-bold text-success mb-3" style="font-size: 0.95rem; text-transform: uppercase; letter-spacing: 0.5px;">
-                                                <i class="fas fa-users me-2"></i>Student Statistics
-                                            </h6>
-                                            <div class="info-grid">
-                                                <div class="info-item d-flex justify-content-between align-items-center mb-3 pb-3" style="border-bottom: 1px solid #e9ecef;">
-                                                    <span class="text-muted" style="font-size: 0.9rem;">Total Students:</span>
-                                                    <span class="badge bg-primary" style="font-size: 1rem; padding: 0.4rem 0.8rem; min-width: 50px;">
-                                                        <?= number_format($student_counts['total_students']) ?>
-                                                    </span>
-                                                </div>
-                                                <div class="info-item d-flex justify-content-between align-items-center mb-3 pb-3" style="border-bottom: 1px solid #e9ecef;">
-                                                    <span class="text-muted" style="font-size: 0.9rem;">Verified Students:</span>
-                                                    <span class="badge bg-success" style="font-size: 1rem; padding: 0.4rem 0.8rem; min-width: 50px;">
-                                                        <?= number_format($student_counts['verified_students']) ?>
-                                                    </span>
-                                                </div>
-                                                <div class="info-item d-flex justify-content-between align-items-center">
-                                                    <span class="text-muted" style="font-size: 0.9rem;">Pending Verification:</span>
-                                                    <span class="badge bg-warning text-dark" style="font-size: 1rem; padding: 0.4rem 0.8rem; min-width: 50px;">
-                                                        <?= number_format($student_counts['pending_verification']) ?>
-                                                    </span>
-                                                </div>
                                             </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Student Statistics -->
+                            <div class="col-md-6">
+                                <div class="card h-100 border-0 shadow-sm" style="border-radius: 12px;">
+                                    <div class="card-header" style="background: white; padding: 1.5rem; border-bottom: 2px solid #e9ecef;">
+                                        <h6 class="fw-bold mb-0" style="color: #28a745; font-size: 1rem; text-transform: uppercase; letter-spacing: 0.5px;">
+                                            <i class="bi bi-people-fill me-2"></i>Student Statistics
+                                        </h6>
+                                    </div>
+                                    <div class="card-body" style="background: white; padding: 1.5rem;">
+                                        <div class="d-flex justify-content-between align-items-center mb-3 pb-3" style="border-bottom: 1px solid #f0f0f0;">
+                                            <span style="color: #6c757d; font-size: 0.95rem;">Total Students:</span>
+                                            <span class="badge" style="background: #007bff; color: white; font-size: 1.1rem; padding: 0.5rem 1rem; border-radius: 8px; min-width: 60px; text-align: center;">
+                                                <?= number_format($student_counts['total_students']) ?>
+                                            </span>
+                                        </div>
+                                        <div class="d-flex justify-content-between align-items-center mb-3 pb-3" style="border-bottom: 1px solid #f0f0f0;">
+                                            <span style="color: #6c757d; font-size: 0.95rem;">Verified Students:</span>
+                                            <span class="badge" style="background: #28a745; color: white; font-size: 1.1rem; padding: 0.5rem 1rem; border-radius: 8px; min-width: 60px; text-align: center;">
+                                                <?= number_format($student_counts['verified_students']) ?>
+                                            </span>
+                                        </div>
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <span style="color: #6c757d; font-size: 0.95rem;">Pending Verification:</span>
+                                            <span class="badge" style="background: #ffc107; color: #212529; font-size: 1.1rem; padding: 0.5rem 1rem; border-radius: 8px; min-width: 60px; text-align: center;">
+                                                <?= number_format($student_counts['pending_verification']) ?>
+                                            </span>
                                         </div>
                                     </div>
                                 </div>
