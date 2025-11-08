@@ -1604,3 +1604,87 @@ footer { margin-top: 0 !important; }
 .step.active * {
     display: inherit !important;
 }
+
+/* ============================================
+   GLOBAL FOOTER FIX - Prevents gaps and internal scrollbars
+   ============================================ */
+
+/* Ensure HTML takes full viewport height */
+html {
+    height: 100%;
+}
+
+/* Body as flexbox container - foundation for sticky footer */
+body:not(.login-page-isolated) {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    margin: 0;
+}
+
+/* Main content area grows to push footer down */
+body:not(.login-page-isolated) > main,
+body:not(.login-page-isolated) > .main-content-wrapper {
+    flex: 1 0 auto;
+}
+
+/* Footer sticks to bottom but flows naturally when content is long */
+body:not(.login-page-isolated) > footer,
+body:not(.login-page-isolated) > #dynamic-footer {
+    flex-shrink: 0;
+    margin-top: auto;
+}
+
+/* Remove fixed heights that cause overflow issues */
+.container,
+.container-fluid {
+    height: auto !important;
+    min-height: 0 !important;
+}
+
+/* Prevent internal scrollbars - allow natural page scrolling */
+.row {
+    overflow: visible !important;
+}
+
+/* Footer containers should never have constrained heights */
+footer .container,
+footer .container-fluid,
+#dynamic-footer .container,
+#dynamic-footer .container-fluid {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+}
+
+/* Ensure login page isolation works correctly */
+.login-page-isolated {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+/* Responsive adjustments - maintain layout at all zoom levels */
+@media (min-width: 320px) and (max-width: 2560px) {
+    body {
+        overflow-x: hidden; /* Prevent horizontal scroll */
+    }
+    
+    /* Ensure content doesn't create unwanted gaps */
+    main, .main-content-wrapper {
+        width: 100%;
+        max-width: 100vw;
+    }
+}
+
+/* Print styles - footer should appear naturally */
+@media print {
+    body {
+        display: block !important;
+    }
+    
+    footer {
+        margin-top: 2rem;
+        page-break-inside: avoid;
+    }
+}
