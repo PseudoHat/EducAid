@@ -723,28 +723,28 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
     <style>
         /* Navbar enabled with isolation fixes applied */
         :root {
-            --topbar-height: 0px;
-            --navbar-height: 0px;
+            --topbar-height: 40px; /* Standard topbar height */
+            --navbar-height: 76px; /* Standard navbar height */
             --thm-primary: #0051f8;
             --thm-green: #18a54a;
         }
         
         /* FIX 1: Unique body class to isolate from navbar */
         body.login-page-isolated {
-            padding-top: var(--navbar-height);
-            overflow-x: hidden;
+            padding-top: calc(var(--navbar-height) + var(--topbar-height)); /* Push content below navbar */
+            overflow: hidden; /* Prevent page scroll */
             font-family: "Manrope", sans-serif;
-            min-height: 100vh; /* Ensure body fills viewport */
+            height: 100vh; /* Exact viewport height */
             display: flex;
             flex-direction: column;
         }
         
         /* FIX 2: Unique page wrapper to prevent container-fluid conflicts */
         .login-page-isolated .login-main-wrapper {
-            flex: 1 0 auto; /* Grow to fill space, push footer down */
+            flex: 1 1 auto; /* Grow to fill space, push footer down */
             max-width: 100vw;
-            overflow-x: hidden;
-            overflow-y: visible; /* Allow content to flow naturally */
+            height: calc(100vh - var(--navbar-height) - var(--topbar-height)); /* Exact height */
+            overflow: hidden; /* No scrollbars */
             display: flex;
             flex-direction: column;
         }
@@ -823,23 +823,21 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
         
         /* Adjust brand section height to account for navbar and topbar */
         .brand-section {
-            padding-top: 3rem;
-            padding-bottom: 3rem;
+            padding: 2rem 2rem; /* Reduced padding */
             display: flex;
             align-items: center;
             justify-content: center;
-            flex: 1; /* Allow to grow */
-            min-height: 0; /* Remove height constraints */
+            height: 100%; /* Fill parent height */
+            overflow: hidden; /* No internal scroll */
         }
         
         /* Ensure login form section adjusts properly */
         .col-lg-6:not(.brand-section) {
             display: flex;
             align-items: center;
-            padding-top: 2rem;
-            padding-bottom: 2rem;
-            flex: 1; /* Allow to grow */
-            min-height: 0; /* Remove height constraints */
+            padding: 2rem 1.5rem; /* Reduced padding */
+            height: 100%; /* Fill parent height */
+            overflow: hidden; /* No internal scroll */
         }
         
         /* Mobile adjustments */
@@ -894,7 +892,9 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
             z-index: 2;
             width: 100%;
             max-width: 520px;
-            padding: 3rem 2.5rem;
+            padding: 2rem 2rem; /* Reduced padding */
+            max-height: 100%; /* Don't exceed section height */
+            overflow-y: auto; /* Scroll if content is too tall */
         }
         
         /* Hero Badge */
@@ -1062,8 +1062,8 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
             justify-content: center;
             width: 100%;
             max-width: 100%;
-            padding-top: 1.5rem !important;
-            padding-bottom: 1.5rem !important;
+            height: 100%; /* Fill section height */
+            padding: 0 !important; /* Remove padding */
         }
         
         .login-card {
@@ -1073,8 +1073,9 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
             box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
             width: 100%;
             max-width: 100%;
-            margin: 1rem auto;
-            /* Removed max-height and overflow-y for natural flow */
+            max-height: 95%; /* Don't exceed container */
+            overflow-y: auto; /* Scroll if content is too tall */
+            margin: 0 auto;
         }
         
         /* Compress spacing inside login card */
@@ -1149,22 +1150,21 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
             padding: 0;
             width: 100%;
             max-width: 100%;
-            height: auto;
-            min-height: 0;
+            height: 100%; /* Fill main wrapper exactly */
         }
         
         .login-main-wrapper .row {
             margin: 0;
             width: 100%;
+            height: 100%; /* Fill container exactly */
             flex-wrap: nowrap; /* Prevent columns from stacking on zoom */
         }
         
-        /* At higher zoom levels, allow content to breathe */
+        /* At higher zoom levels, prevent overflow */
         @media (min-width: 992px) {
             .brand-section,
             .form-section {
-                overflow-y: visible; /* No scrollbars in sections */
-                overflow-x: hidden;
+                overflow: hidden; /* No scrollbars in sections */
             }
         }
         
