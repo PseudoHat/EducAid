@@ -709,7 +709,7 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=0.8, maximum-scale=2.0, user-scalable=yes">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EducAid - Login</title>
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Poppins:wght@400;600&display=swap" rel="stylesheet">
     <link href="assets/css/bootstrap-icons.css" rel="stylesheet">
@@ -721,11 +721,6 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
     <script src="https://www.google.com/recaptcha/api.js" async defer></script>
     
     <style>
-        /* Default zoom level for desktop */
-        html {
-            zoom: 80%;
-        }
-        
         /* Navbar enabled with isolation fixes applied */
         :root {
             --topbar-height: 0px;
@@ -734,32 +729,42 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
             --thm-green: #18a54a;
         }
         
-        /* FIX 1: Unique body class to isolate from navbar */
+        /* FIX 1: Modern Flexbox Layout - Body as flex container */
         body.login-page-isolated {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
             padding-top: var(--navbar-height);
             overflow-x: hidden;
-            overflow-y: auto; /* Allow page-level scroll */
             font-family: "Manrope", sans-serif;
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
+            margin: 0;
         }
         
-        /* FIX 2: Unique page wrapper to prevent container-fluid conflicts */
-        .login-page-isolated .login-main-wrapper {
-            flex: 1 0 auto;
-            max-width: 100vw;
-            overflow: hidden; /* Hide any internal scrollbars */
-            display: flex;
-            flex-direction: column;
-        }
-        
-        /* FIX 3: Separate content container that won't affect navbar */
+        /* FIX 2: Content container takes remaining space (pushes footer down) */
         .login-page-isolated .login-content-container {
+            flex: 1 0 auto;
+            display: flex;
+            flex-direction: column;
             width: 100%;
             max-width: none;
             margin: 0;
             padding: 0;
+        }
+        
+        /* FIX 3: Main wrapper grows to fill available space, no fixed heights */
+        .login-page-isolated .login-main-wrapper {
+            flex: 1 0 auto;
+            width: 100%;
+            max-width: 100vw;
+            overflow-x: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        /* FIX 4: Footer always sticks to bottom but flows naturally */
+        .login-page-isolated #dynamic-footer {
+            flex-shrink: 0;
+            margin-top: auto;
         }
         
         /* FIX 4: CSS isolation for navbar to prevent page CSS bleed */
@@ -826,38 +831,33 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
             z-index: 1050;
         }
         
-        /* Adjust brand section height to account for navbar and topbar */
+        /* Adjust brand section - Remove fixed heights, allow natural flow */
         .brand-section {
-            padding-top: 4rem;
-            padding-bottom: 4rem;
+            padding-top: 2rem;
+            padding-bottom: 2rem;
             display: flex;
             align-items: center;
             justify-content: center;
-            flex: 1;
-            min-height: calc(100vh - var(--navbar-height) - var(--topbar-height));
-            overflow: hidden; /* No scrollbar in brand section */
         }
         
-        /* Ensure login form section adjusts properly */
+        /* Ensure login form section adjusts properly - No fixed heights */
         .col-lg-6:not(.brand-section) {
             display: flex;
             align-items: center;
-            padding-top: 3rem;
-            padding-bottom: 3rem;
-            flex: 1;
-            min-height: calc(100vh - var(--navbar-height) - var(--topbar-height));
-            overflow: hidden; /* No scrollbar in form section */
+            padding-top: 2rem;
+            padding-bottom: 2rem;
+        }
+        
+        /* Remove overflow from containers to prevent internal scrollbars */
+        .login-page-isolated .container-fluid,
+        .login-page-isolated .row {
+            overflow: visible;
         }
         
         /* Mobile adjustments */
         @media (max-width: 991.98px) {
-            .login-page-isolated .login-main-wrapper {
-                min-height: auto;
-            }
-            
             .brand-section,
             .col-lg-6:not(.brand-section) {
-                min-height: auto;
                 padding-top: 1.5rem;
                 padding-bottom: 1.5rem;
             }
@@ -885,8 +885,7 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
         /* Ensure footer is never affected by parent flex containers */
         body > footer,
         body > #dynamic-footer {
-            flex: 0 0 auto !important; /* Footer takes only needed space */
-            margin-top: auto; /* Push footer to bottom */
+            flex: 0 0 auto !important;
         }
         
         /* ==== MODERN BRAND SECTION STYLES ==== */
@@ -1054,158 +1053,6 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
                 min-height: 100vh;
             }
         }
-        
-        /* ==== LOGIN FORM SECTION FIXES ==== */
-        .form-section {
-            display: flex;
-            flex-direction: column;
-            overflow: hidden; /* No scrollbar */
-        }
-        
-        .form-section .container {
-            flex: 1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 100%;
-            max-width: 100%;
-            padding-top: 2rem !important;
-            padding-bottom: 2rem !important;
-            padding-left: 2rem !important;
-            padding-right: 2rem !important;
-        }
-        
-        .login-card {
-            background: rgba(255, 255, 255, 0.98);
-            border-radius: 20px;
-            padding: 2.5rem 3rem;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
-            width: 100%;
-            max-width: 650px; /* Increased from 520px */
-            margin: 0 auto;
-        }
-        
-        /* Compress spacing inside login card */
-        .login-card .login-header {
-            margin-bottom: 1.25rem;
-        }
-        
-        .login-card .login-title {
-            margin-bottom: 0.25rem;
-            font-size: 1.5rem; /* Smaller title */
-            line-height: 1.2;
-        }
-        
-        .login-card .login-subtitle {
-            margin-bottom: 0;
-            font-size: 0.875rem; /* Smaller subtitle */
-            line-height: 1.4;
-        }
-        
-        /* Reduce all form spacing aggressively */
-        .login-card .form-label {
-            margin-bottom: 0.35rem !important;
-            font-size: 0.875rem;
-        }
-        
-        .login-card .form-control {
-            padding: 0.6rem 0.75rem !important; /* Smaller inputs */
-            font-size: 0.9rem;
-        }
-        
-        .login-card .form-group,
-        .login-card .mb-3,
-        .login-card .mb-4 {
-            margin-bottom: 0.75rem !important; /* Very tight spacing */
-        }
-        
-        .login-card .btn {
-            padding: 0.65rem 1.25rem; /* Smaller buttons */
-            font-size: 0.95rem;
-        }
-        
-        .login-card .btn-lg {
-            padding: 0.75rem 1.5rem !important;
-        }
-        
-        /* Reduce text and link spacing */
-        .login-card p,
-        .login-card .text-center {
-            margin-bottom: 0.5rem !important;
-            font-size: 0.875rem;
-        }
-        
-        .login-card a {
-            font-size: 0.875rem;
-        }
-        
-        /* Step indicators - make more compact */
-        .login-card .step-indicators {
-            margin-bottom: 1rem !important;
-            padding: 0.5rem 0 !important;
-        }
-        
-        /* Ensure row takes full width and centers properly */
-        .form-section .row {
-            width: 100%;
-            margin: 0;
-        }
-        
-        /* ==== ZOOM RESPONSIVENESS FIXES ==== */
-        /* Make container-fluid and row adapt to zoom */
-        .login-main-wrapper .container-fluid {
-            padding: 0;
-            width: 100%;
-            max-width: 100%;
-            height: 100%;
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-        }
-        
-        .login-main-wrapper .row {
-            margin: 0;
-            width: 100%;
-            flex: 1;
-            flex-wrap: nowrap;
-            min-height: calc(100vh - var(--navbar-height) - var(--topbar-height));
-        }
-        
-        /* Remove scrollbars between sections */
-        @media (min-width: 992px) {
-            .brand-section,
-            .form-section {
-                overflow: hidden !important; /* No scrollbars */
-                height: 100%;
-            }
-            
-            /* Disable zoom on mobile to prevent layout issues */
-            html {
-                zoom: 80%;
-            }
-        }
-        
-        /* Mobile: reset zoom */
-        @media (max-width: 991.98px) {
-            html {
-                zoom: 100%;
-            }
-        }
-        
-        /* Ensure both columns adapt to zoom without overflow */
-        @media (min-width: 992px) and (max-width: 1399px) {
-            .login-card {
-                padding: 1.25rem 1.75rem; /* Slightly smaller on medium screens */
-            }
-        }
-        
-        /* Very large screens / high zoom */
-        @media (min-width: 1400px) {
-            .brand-content {
-                max-width: 600px; /* Allow more space */
-            }
-        }
-
     </style>
     
     <?php if ($IS_LOGIN_EDIT_MODE): ?>
@@ -1369,7 +1216,7 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
     <div class="login-content-container">
         <div class="login-main-wrapper">
             <div class="container-fluid p-0">
-                <div class="row g-0">
+                <div class="row g-0 h-100">
             <!-- Brand Section - Hidden on mobile, visible on tablet+ -->
             <div class="col-lg-6 d-none d-lg-flex brand-section">
                 <div class="brand-content">
@@ -1458,8 +1305,8 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
 
             <!-- Form Section -->
             <div class="col-12 col-lg-6 form-section">
-                <div class="container py-4 py-lg-0">
-                    <div class="row justify-content-center align-items-center">
+                <div class="container h-100 py-4 py-lg-0">
+                    <div class="row justify-content-center align-items-center h-100">
                         <div class="col-12 col-sm-11 col-md-9 col-lg-11 col-xl-9 col-xxl-8">
                             <div class="login-card">
                                 <div class="login-header">
