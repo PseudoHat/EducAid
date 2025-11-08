@@ -439,8 +439,17 @@ if ($res) {
   <?php include __DIR__ . '/../../includes/admin/admin_sidebar.php'; ?>
   <?php include __DIR__ . '/../../includes/admin/admin_header.php'; ?>
   <section class="home-section" id="mainContent">
-    <div class="container-fluid p-4">
-      <h2 class="fw-bold mb-4 text-primary"><i class="bi bi-calendar-week"></i> Manage Signup Slots</h2>
+    <div class="container-fluid py-4 px-4">
+      <!-- Page Header - Clean style -->
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+          <h1 class="fw-bold mb-1">Manage Signup Slots</h1>
+          <p class="text-muted mb-0">Create and manage registration slots for student sign-ups</p>
+        </div>
+        <div class="text-end">
+          <span class="badge bg-primary fs-6"><?= $totalSlots ?> Total Slots</span>
+        </div>
+      </div>
 
       <?php
       // Display status/error messages
@@ -508,8 +517,8 @@ if ($res) {
       ?>
 
       <!-- Program Capacity Overview -->
-      <div class="card border-info mb-4">
-        <div class="card-header bg-info text-white">
+      <div class="card mb-4">
+        <div class="card-header">
           <h5 class="mb-0"><i class="bi bi-speedometer2 me-2"></i>Program Capacity Overview</h5>
         </div>
         <div class="card-body">
@@ -517,7 +526,7 @@ if ($res) {
             <div class="col-md-3">
               <div class="text-center">
                 <h6 class="text-muted mb-1">Current Students</h6>
-                <h4 class="text-primary mb-0" id="currentStudentsCount"><?= number_format($currentTotalStudents) ?></h4>
+                <h4 class="mb-0" style="color: #495057;" id="currentStudentsCount"><?= number_format($currentTotalStudents) ?></h4>
               </div>
             </div>
             <div class="col-md-3">
@@ -659,18 +668,21 @@ if ($res) {
                         $distribution_status !== 'finalized';
       ?>
       
-      <form id="releaseSlotsForm" method="POST" class="card p-4 shadow-sm mb-4" <?php echo !$canCreateSlots ? 'style="opacity: 0.6; pointer-events: none;"' : ''; ?>>
+      <form id="releaseSlotsForm" method="POST" class="card shadow-sm mb-4" <?php echo !$canCreateSlots ? 'style="opacity: 0.6; pointer-events: none;"' : ''; ?>>
         <!-- Hidden fields for academic period -->
         <input type="hidden" name="semester" value="<?= htmlspecialchars($distribution_semester) ?>">
         <input type="hidden" name="academic_year" value="<?= htmlspecialchars($distribution_academic_year) ?>">
         
-        <h5 class="fw-semibold mb-3 text-secondary">
-          <i class="bi bi-plus-circle"></i> Release New Slot
-          <?php if (!$canCreateSlots): ?>
-            <span class="badge bg-warning ms-2">Blocked</span>
-          <?php endif; ?>
-        </h5>
+        <div class="card-header">
+          <h5 class="mb-0">
+            <i class="bi bi-plus-circle me-2"></i>Release New Slot
+            <?php if (!$canCreateSlots): ?>
+              <span class="badge bg-warning ms-2">Blocked</span>
+            <?php endif; ?>
+          </h5>
+        </div>
         
+        <div class="card-body">
         <!-- Smart Recommendations -->
         <?php if ($maxCapacity !== null): ?>
         <div class="alert alert-info" id="slotRecommendation">
@@ -741,13 +753,14 @@ if ($res) {
         <button type="button" id="showPasswordModalBtn" class="btn btn-primary mt-3">
           <i class="bi bi-upload"></i> Release
         </button>
+        </div>
       </form>
 
       <!-- Current Slot -->
       <?php if ($slotInfo): ?>
         <div class="card shadow-sm mb-4">
-          <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-            <span><i class="bi bi-clock-history"></i> Current Slot</span>
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-clock-history me-2"></i>Current Slot</span>
             <span class="badge badge-pill badge-blue"><?= $slotInfo['semester'] ?> | AY <?= $slotInfo['academic_year'] ?></span>
           </div>
           <div id="currentSlotBody" class="collapse show card-body">
@@ -855,8 +868,23 @@ if ($res) {
         </div>
       <?php endif; ?>
 
-      <!-- Past Releases -->
-      <h4 class="mt-4 text-primary"><i class="bi bi-archive"></i> Past Releases</h4>
+      <!-- Past Releases - Bold Archive Section -->
+      <div class="card shadow mt-5 mb-4" style="border: 2px solid #6c757d; border-radius: 12px;">
+        <div class="card-header" style="background: linear-gradient(135deg, #495057 0%, #6c757d 100%); border-radius: 10px 10px 0 0; padding: 1.25rem;">
+          <div class="d-flex justify-content-between align-items-center">
+            <div>
+              <h4 class="mb-1" style="font-weight: 700;"><i class="bi bi-archive-fill me-2"></i>Past Releases</h4>
+              <small style="color: rgba(255, 255, 255, 0.8); font-size: 0.9rem;">
+                <i class="bi bi-clock-history me-1"></i>Historical slot records
+              </small>
+            </div>
+            <span class="badge" style="background: #ffc107; color: #212529; font-size: 1rem; padding: 0.5rem 1rem; font-weight: 600;">
+              <?= count($pastReleases) ?> Archived
+            </span>
+          </div>
+        </div>
+        <div class="card-body" style="background: #f8f9fa; padding: 1.5rem;">
+      
       <?php if (!empty($pastReleases)): ?>
         <div class="accordion" id="pastSlotsAccordion">
           <?php foreach ($pastReleases as $i => $h): ?>
@@ -878,17 +906,17 @@ if ($res) {
                 }
             }
             ?>
-            <div class="accordion-item">
+            <div class="accordion-item mb-2">
               <h2 class="accordion-header" id="heading<?= $i ?>">
                 <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
                         data-bs-target="#collapse<?= $i ?>" aria-expanded="false" aria-controls="collapse<?= $i ?>">
                   <div class="d-flex justify-content-between align-items-center w-100 me-3">
                     <span>
-                      <i class="bi bi-calendar-event"></i>
+                      <i class="bi bi-calendar-event me-2"></i>
                       <?= htmlspecialchars($h['semester']) ?> <?= htmlspecialchars($h['academic_year']) ?> —
                       <?= date('M j, Y', strtotime($h['created_at'])) ?>
                     </span>
-                    <span class="badge bg-secondary">
+                    <span class="badge" style="background: #6c757d; color: white; font-size: 0.85rem; padding: 0.4rem 0.8rem;">
                       <?= $participants_count ?> / <?= $h['slot_count'] ?> slots used
                     </span>
                   </div>
@@ -898,24 +926,24 @@ if ($res) {
                 <div class="accordion-body">
                   <div class="row mb-3">
                     <div class="col-md-6">
-                      <p class="mb-1"><strong><i class="bi bi-calendar3"></i> Semester:</strong> <?= htmlspecialchars($h['semester']) ?></p>
-                      <p class="mb-1"><strong><i class="bi bi-bookmark"></i> Academic Year:</strong> <?= htmlspecialchars($h['academic_year']) ?></p>
+                      <p class="mb-2"><strong><i class="bi bi-calendar3 me-2"></i>Semester:</strong> <?= htmlspecialchars($h['semester']) ?></p>
+                      <p class="mb-2"><strong><i class="bi bi-bookmark me-2"></i>Academic Year:</strong> <?= htmlspecialchars($h['academic_year']) ?></p>
                     </div>
                     <div class="col-md-6">
-                      <p class="mb-1"><strong><i class="bi bi-people"></i> Capacity:</strong> <?= $h['slot_count'] ?> slots</p>
-                      <p class="mb-1"><strong><i class="bi bi-check-circle"></i> Registered:</strong> <?= $participants_count ?> students</p>
+                      <p class="mb-2"><strong><i class="bi bi-people me-2"></i>Capacity:</strong> <?= $h['slot_count'] ?> slots</p>
+                      <p class="mb-2"><strong><i class="bi bi-check-circle me-2"></i>Registered:</strong> <?= $participants_count ?> students</p>
                     </div>
                   </div>
                   
                   <?php if ($participants_count > 0): ?>
-                    <div class="card bg-light">
+                    <div class="card shadow-sm">
                       <div class="card-header">
-                        <strong><i class="bi bi-person-lines-fill"></i> Slot Participants</strong>
+                        <strong><i class="bi bi-person-lines-fill me-2"></i>Slot Participants</strong>
                       </div>
                       <div class="card-body p-0">
                         <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
                           <table class="table table-sm table-hover mb-0">
-                            <thead class="table-light sticky-top">
+                            <thead style="position: sticky; top: 0; background: #495057; color: white; z-index: 1;">
                               <tr>
                                 <th style="width: 5%">#</th>
                                 <th style="width: 45%">Name</th>
@@ -950,7 +978,7 @@ if ($res) {
                     </div>
                   <?php else: ?>
                     <div class="alert alert-info mb-0">
-                      <i class="bi bi-info-circle"></i> No students registered for this slot.
+                      <i class="bi bi-info-circle me-2"></i>No students registered for this slot.
                     </div>
                   <?php endif; ?>
                   
@@ -959,10 +987,10 @@ if ($res) {
                   <form method="POST" onsubmit="return confirm('Are you sure you want to delete this slot? This will remove the slot record but will NOT delete the students who registered.')">
                     <input type="hidden" name="delete_slot_id" value="<?= $h['slot_id'] ?>">
                     <button type="submit" class="btn btn-sm btn-danger">
-                      <i class="bi bi-trash"></i> Delete Slot Record
+                      <i class="bi bi-trash me-1"></i>Delete Slot Record
                     </button>
                     <small class="text-muted ms-2">
-                      <i class="bi bi-info-circle"></i> Students will remain in the system
+                      <i class="bi bi-info-circle me-1"></i>Students will remain in the system
                     </small>
                   </form>
                 </div>
@@ -971,8 +999,10 @@ if ($res) {
           <?php endforeach; ?>
         </div>
       <?php else: ?>
-        <div class="alert alert-info"><i class="bi bi-info-circle-fill"></i> No past releases found.</div>
+        <div class="alert alert-info"><i class="bi bi-info-circle-fill me-2"></i>No past releases found.</div>
       <?php endif; ?>
+        </div>
+      </div>
     </div>
   </section>
 </div>
