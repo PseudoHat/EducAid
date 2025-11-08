@@ -5,7 +5,7 @@ include __DIR__ . '/../../services/OTPService.php';
 require_once __DIR__ . '/../../includes/CSRFProtection.php';
 
 // Load secure session configuration (must be before session_start)
-require_once __DIR__ . '../../config/session_config.php';
+require_once __DIR__ . '/../../config/session_config.php';
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
