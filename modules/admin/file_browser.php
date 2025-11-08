@@ -4,7 +4,11 @@
  * Allows admins to view and manage files in the Railway volume or local uploads directory
  */
 
-session_start();
+// Start session only if not already started
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
 require_once __DIR__ . '/../../config/database.php';
 
 // Admin authentication check
@@ -88,6 +92,73 @@ if ($currentPath) {
 if ($fullPath === false || strpos($fullPath, $baseRealPath) !== 0) {
     $_SESSION['error'] = 'Invalid path or directory does not exist.';
     header('Location: file_browser.php');
+    exit;
+}
+
+// Handle folder creation
+if (isset($_POST['create_folder']) && isset($_POST['folder_name'])) {
+    $folderName = trim($_POST['folder_name']);
+    
+    // Validate folder name
+    if (empty($folderName)) {
+        $_SESSION['error'] = 'Folder name cannot be empty.';
+    } elseif (preg_match('/[^a-zA-Z0-9_\-]/', $folderName)) {
+        $_SESSION['error'] = 'Folder name can only contain letters, numbers, underscores, and hyphens.';
+    } else {
+        $newFolderPath = $fullPath . DIRECTORY_SEPARATOR . $folderName;
+        
+        // Check if folder already exists
+        if (file_exists($newFolderPath)) {
+            $_SESSION['error'] = 'A folder with this name already exists.';
+        } else {
+            // Create folder with proper permissions
+            if (mkdir($newFolderPath, 0755, true)) {
+                $_SESSION['success'] = 'Folder "' . htmlspecialchars($folderName) . '" created successfully.';
+            } else {
+                $_SESSION['error'] = 'Failed to create folder. Please check permissions.';
+            }
+        }
+    }
+    
+    // Redirect to refresh the page
+    header('Location: file_browser.php?path=' . urlencode($currentPath));
+    exit;
+}
+
+// Handle folder deletion
+if (isset($_POST['delete_folder']) && isset($_POST['folder_path'])) {
+    $folderToDelete = trim($_POST['folder_path']);
+    
+    // Normalize the path
+    $folderToDelete = str_replace('\\', '/', $folderToDelete);
+    
+    // Build full system path
+    $folderSystemPath = $baseDir . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $folderToDelete);
+    $folderRealPath = realpath($folderSystemPath);
+    
+    // Security check: ensure the folder is within the base directory
+    if ($folderRealPath === false || strpos($folderRealPath, $baseRealPath) !== 0) {
+        $_SESSION['error'] = 'Invalid folder path.';
+    } elseif (!is_dir($folderRealPath)) {
+        $_SESSION['error'] = 'Folder does not exist.';
+    } else {
+        // Check if folder is empty
+        $files = array_diff(scandir($folderRealPath), ['.', '..']);
+        
+        if (count($files) > 0) {
+            $_SESSION['error'] = 'Cannot delete folder: It contains ' . count($files) . ' item(s). Please remove all contents first.';
+        } else {
+            // Delete the empty folder
+            if (rmdir($folderRealPath)) {
+                $_SESSION['success'] = 'Folder deleted successfully.';
+            } else {
+                $_SESSION['error'] = 'Failed to delete folder. Check permissions.';
+            }
+        }
+    }
+    
+    // Redirect to refresh the page
+    header('Location: file_browser.php?path=' . urlencode($currentPath));
     exit;
 }
 
@@ -666,6 +737,13 @@ $pageTitle = 'Railway Volume Browser';
                     </div>
                 </div>
                 
+                <!-- Action Bar -->
+                <div class="mb-3 d-flex gap-2 flex-wrap">
+                    <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#createFolderModal">
+                        <i class="bi bi-folder-plus me-2"></i>Create Folder
+                    </button>
+                </div>
+                
                 <!-- File List Header (Desktop Only) -->
                 <div class="file-list-header d-none d-md-block">
                     <div class="row align-items-center">
@@ -764,11 +842,19 @@ $pageTitle = 'Railway Volume Browser';
                                             <i class="bi bi-download"></i>
                                         </a>
                                     <?php else: ?>
-                                        <a href="?path=<?php echo urlencode($item['path']); ?>" 
-                                           class="btn btn-sm btn-outline-secondary btn-action"
-                                           title="Open folder">
-                                            <i class="bi bi-folder-symlink"></i>
-                                        </a>
+                                        <div class="d-flex gap-1 justify-content-center">
+                                            <a href="?path=<?php echo urlencode($item['path']); ?>" 
+                                               class="btn btn-sm btn-outline-secondary btn-action"
+                                               title="Open folder">
+                                                <i class="bi bi-folder-symlink"></i>
+                                            </a>
+                                            <button type="button"
+                                                    class="btn btn-sm btn-outline-danger btn-action"
+                                                    onclick="confirmDeleteFolder('<?php echo htmlspecialchars($item['name'], ENT_QUOTES); ?>', '<?php echo htmlspecialchars($item['path'], ENT_QUOTES); ?>')"
+                                                    title="Delete folder">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </div>
                                     <?php endif; ?>
                                 </div>
                             </div>
@@ -791,11 +877,19 @@ $pageTitle = 'Railway Volume Browser';
                                                 </small>
                                             </div>
                                         </div>
-                                        <a href="?path=<?php echo urlencode($item['path']); ?>" 
-                                           class="btn btn-sm btn-outline-secondary btn-action"
-                                           title="Open">
-                                            <i class="bi bi-folder-symlink"></i>
-                                        </a>
+                                        <div class="d-flex gap-1">
+                                            <a href="?path=<?php echo urlencode($item['path']); ?>" 
+                                               class="btn btn-sm btn-outline-secondary btn-action"
+                                               title="Open">
+                                                <i class="bi bi-folder-symlink"></i>
+                                            </a>
+                                            <button type="button"
+                                                    class="btn btn-sm btn-outline-danger btn-action"
+                                                    onclick="confirmDeleteFolder('<?php echo htmlspecialchars($item['name'], ENT_QUOTES); ?>', '<?php echo htmlspecialchars($item['path'], ENT_QUOTES); ?>')"
+                                                    title="Delete">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </div>
                                     <?php else: ?>
                                         <?php
                                         $ext = strtolower(pathinfo($item['name'], PATHINFO_EXTENSION));
@@ -852,8 +946,127 @@ $pageTitle = 'Railway Volume Browser';
         </div>
     </div>
     
+    <!-- Create Folder Modal -->
+    <div class="modal fade" id="createFolderModal" tabindex="-1" aria-labelledby="createFolderModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form method="POST" action="">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="createFolderModalLabel">
+                            <i class="bi bi-folder-plus me-2"></i>Create New Folder
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label for="folder_name" class="form-label">Folder Name</label>
+                            <input type="text" 
+                                   class="form-control" 
+                                   id="folder_name" 
+                                   name="folder_name" 
+                                   placeholder="Enter folder name"
+                                   pattern="[a-zA-Z0-9_\-]+"
+                                   title="Only letters, numbers, underscores, and hyphens allowed"
+                                   required>
+                            <div class="form-text">
+                                Only letters, numbers, underscores (_), and hyphens (-) are allowed.
+                            </div>
+                        </div>
+                        <div class="alert alert-info mb-0">
+                            <i class="bi bi-info-circle me-2"></i>
+                            <strong>Current location:</strong>
+                            <code><?php echo $isRailway ? '/mnt/assets/uploads' : '/assets/uploads'; ?><?php echo $currentPath ? '/' . htmlspecialchars($currentPath) : ''; ?></code>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" name="create_folder" class="btn btn-primary">
+                            <i class="bi bi-folder-plus me-2"></i>Create Folder
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Delete Folder Modal -->
+    <div class="modal fade" id="deleteFolderModal" tabindex="-1" aria-labelledby="deleteFolderModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form method="POST" action="" id="deleteFolderForm">
+                    <div class="modal-header bg-danger text-white">
+                        <h5 class="modal-title" id="deleteFolderModalLabel">
+                            <i class="bi bi-trash me-2"></i>Delete Folder
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="alert alert-warning">
+                            <i class="bi bi-exclamation-triangle me-2"></i>
+                            <strong>Warning:</strong> This action cannot be undone!
+                        </div>
+                        <p class="mb-3">Are you sure you want to delete the folder <strong id="folderNameDisplay"></strong>?</p>
+                        <div class="alert alert-danger mb-0" id="folderNotEmptyWarning" style="display: none;">
+                            <i class="bi bi-x-circle me-2"></i>
+                            <strong>Cannot Delete:</strong> This folder contains files or subfolders. Please remove all contents before deleting.
+                        </div>
+                        <input type="hidden" name="folder_path" id="folder_path_input">
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" name="delete_folder" class="btn btn-danger" id="confirmDeleteBtn">
+                            <i class="bi bi-trash me-2"></i>Delete Folder
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
     <!-- Bootstrap Bundle with Popper -->
     <script src="../../assets/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+    // Function to check if folder is empty and show confirmation modal
+    function confirmDeleteFolder(folderName, folderPath) {
+        const modal = new bootstrap.Modal(document.getElementById('deleteFolderModal'));
+        const folderNameDisplay = document.getElementById('folderNameDisplay');
+        const folderPathInput = document.getElementById('folder_path_input');
+        const warningDiv = document.getElementById('folderNotEmptyWarning');
+        const confirmBtn = document.getElementById('confirmDeleteBtn');
+        
+        // Set folder name and path
+        folderNameDisplay.textContent = folderName;
+        folderPathInput.value = folderPath;
+        
+        // Check if folder has contents by making an AJAX call
+        fetch('?path=' + encodeURIComponent(folderPath))
+            .then(response => response.text())
+            .then(html => {
+                // Simple check: if the HTML contains "No files or folders found", it's empty
+                const isEmpty = html.includes('No files or folders found');
+                
+                if (!isEmpty) {
+                    // Show warning and disable delete button
+                    warningDiv.style.display = 'block';
+                    confirmBtn.disabled = true;
+                } else {
+                    // Hide warning and enable delete button
+                    warningDiv.style.display = 'none';
+                    confirmBtn.disabled = false;
+                }
+            })
+            .catch(error => {
+                console.error('Error checking folder contents:', error);
+                // On error, show warning to be safe
+                warningDiv.style.display = 'block';
+                confirmBtn.disabled = true;
+            });
+        
+        // Show the modal
+        modal.show();
+    }
+    </script>
     
     <!-- Admin Sidebar Script (matches other admin pages) -->
     <script src="../../assets/js/admin/sidebar.js"></script>
