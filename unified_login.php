@@ -741,6 +741,8 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
             min-height: calc(100vh - var(--navbar-height));
             max-width: 100vw;
             overflow-x: hidden;
+            display: flex;
+            flex-direction: column;
         }
         
         /* FIX 3: Separate content container that won't affect navbar */
@@ -823,6 +825,7 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
             display: flex;
             align-items: center;
             justify-content: center;
+            flex: 1; /* Allow to grow */
         }
         
         /* Ensure login form section adjusts properly */
@@ -832,6 +835,7 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
             align-items: center;
             padding-top: 2rem;
             padding-bottom: 2rem;
+            flex: 1; /* Allow to grow */
         }
         
         /* Mobile adjustments */
@@ -1038,6 +1042,35 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
                 min-height: 100vh;
             }
         }
+        
+        /* ==== LOGIN FORM SECTION FIXES ==== */
+        .form-section {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .form-section .container {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+        }
+        
+        .login-card {
+            background: rgba(255, 255, 255, 0.98);
+            border-radius: 16px;
+            padding: 2.5rem;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 100%;
+        }
+        
+        /* Ensure row takes full width and centers properly */
+        .form-section .row {
+            width: 100%;
+            margin: 0;
+        }
     </style>
     
     <?php if ($IS_LOGIN_EDIT_MODE): ?>
@@ -1201,7 +1234,7 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
     <div class="login-content-container">
         <div class="login-main-wrapper">
             <div class="container-fluid p-0">
-                <div class="row g-0 h-100">
+                <div class="row g-0">
             <!-- Brand Section - Hidden on mobile, visible on tablet+ -->
             <div class="col-lg-6 d-none d-lg-flex brand-section">
                 <div class="brand-content">
@@ -1290,8 +1323,8 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
 
             <!-- Form Section -->
             <div class="col-12 col-lg-6 form-section">
-                <div class="container h-100 py-4 py-lg-0">
-                    <div class="row justify-content-center align-items-center h-100">
+                <div class="container py-4 py-lg-0">
+                    <div class="row justify-content-center align-items-center">
                         <div class="col-12 col-sm-11 col-md-9 col-lg-11 col-xl-9 col-xxl-8">
                             <div class="login-card">
                                 <div class="login-header">
