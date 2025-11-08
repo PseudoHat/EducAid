@@ -644,6 +644,13 @@ if (isset($_GET['api'])) {
         .quick-actions small {
             color: rgba(255, 255, 255, 0.8);
         }
+        
+        /* Responsive adjustments */
+        @media (max-width: 991.98px) {
+            .container-fluid {
+                margin-left: 0 !important;
+            }
+        }
     </style>
 </head>
 <body>
@@ -652,8 +659,6 @@ if (isset($_GET['api'])) {
         <?php include_once __DIR__ . '/../../includes/admin/admin_sidebar.php'; ?>
         <?php include_once __DIR__ . '/../../includes/admin/admin_header.php'; ?>
         
-        <section class="home-section" id="mainContent">
-
         <section class="home-section" id="mainContent">
             <div class="container-fluid py-4 px-4">
                 <!-- Page Header - Match review_registrations style -->
