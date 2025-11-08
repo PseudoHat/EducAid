@@ -1,6 +1,6 @@
 <?php
-// Include reCAPTCHA configuration
-require_once '../config/recaptcha_v2_config.php';
+// Include reCAPTCHA configuration (use absolute path)
+require_once __DIR__ . '/../config/recaptcha_v2_config.php';
 
 // Start session FIRST before any output
 if (session_status() === PHP_SESSION_NONE) {

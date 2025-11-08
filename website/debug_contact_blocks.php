@@ -2,8 +2,8 @@
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
-require_once '../config/database.php';
-require_once '../includes/permissions.php';
+require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../includes/permissions.php';
 
 // Only allow super admin
 if (!isset($_SESSION['admin_id'])) {

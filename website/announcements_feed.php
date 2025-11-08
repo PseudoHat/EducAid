@@ -1,7 +1,7 @@
 <?php
 // Simple JSON feed for latest announcements (used by landing page skeleton loader)
 header('Content-Type: application/json; charset=utf-8');
-require_once '../config/database.php';
+require_once __DIR__ . '/../config/database.php';
 
 $limit = isset($_GET['limit']) && ctype_digit($_GET['limit']) ? (int)$_GET['limit'] : 3;
 if ($limit < 1) { $limit = 3; }
