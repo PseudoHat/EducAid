@@ -1977,8 +1977,9 @@ if ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '' === 'XMLHttpRequest' || (isset($_GET
 <div id="wrapper" class="admin-wrapper">
     <?php include __DIR__ . '/../../includes/admin/admin_sidebar.php'; ?>
     <?php include __DIR__ . '/../../includes/admin/admin_header.php'; ?>
+    
     <section class="home-section" id="mainContent">
-    <div class="container-fluid py-4 px-4">
+        <div class="container-fluid py-4 px-4">
             <?php if (!empty($_SESSION['error_message']) || !empty($_SESSION['error'])): ?>
             <div class="alert alert-danger alert-dismissible fade show" role="alert">
                 <i class="bi bi-exclamation-triangle me-2"></i>
@@ -1997,47 +1998,53 @@ if ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '' === 'XMLHttpRequest' || (isset($_GET
             <?php unset($_SESSION['success_message'], $_SESSION['success']); ?>
             <?php endif; ?>
 
-            <div class="section-header mb-3 d-flex justify-content-between align-items-center">
-                <h2 class="fw-bold text-primary mb-0">
-                    <i class="bi bi-person-vcard" ></i>
-                    Manage Applicants
-                </h2>
-                <div class="d-flex align-items-center gap-2">
+            <!-- Page Header - Clean style -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h1 class="fw-bold mb-1">Manage Applicants</h1>
+                    <p class="text-muted mb-0">Review and manage student applicants in the system.</p>
+                </div>
+                <div class="text-end d-flex gap-2 align-items-center">
                     <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#migrationModal">
                         <i class="bi bi-upload me-1"></i> Migrate from CSV
                     </button>
-                    <span class="badge bg-info fs-6"><?php echo $totalApplicants; ?> Total Applicants</span>
+                    <span class="badge bg-info fs-6"><?php echo $totalApplicants; ?> Applicants</span>
                 </div>
             </div>
-      <!-- Filter Container -->
-      <div class="filter-container card shadow-sm mb-4 p-3">
-        <form class="row g-3" id="filterForm" method="GET">
-          <div class="col-sm-4">
-            <label class="form-label fw-bold" style="color:#1182FF;">Sort by Surname</label>
-            <select name="sort" class="form-select">
-              <option value="asc" <?= $sort === 'asc' ? 'selected' : '' ?>>A to Z</option>
-              <option value="desc" <?= $sort === 'desc' ? 'selected' : '' ?>>Z to A</option>
-            </select>
-          </div>
-          <div class="col-sm-4">
-            <label class="form-label fw-bold" style="color:#1182FF;">Search by Surname</label>
-            <input type="text" name="search_surname" class="form-control" value="<?= htmlspecialchars($search) ?>" placeholder="Enter surname...">
-          </div>
-          <div class="col-sm-4 d-flex align-items-end gap-2">
-            <button type="submit" class="btn btn-primary w-100"><i class="bi bi-search me-1"></i> Apply Filters</button>
-            <button type="button" class="btn btn-secondary w-100" id="clearFiltersBtn">Clear</button>
-          </div>
-        </form>
-      </div>
-      <!-- Applicants Table -->
-      <div class="table-responsive" id="tableWrapper">
-        <?= render_table($applicants, $connection) ?>
-      </div>
-      <div id="pagination">
-        <?php render_pagination($page, $totalPages); ?>
-      </div>
-    </div>
-  </section>
+
+            <!-- Filter Section - Clean style -->
+            <div class="filter-section">
+                <form class="row g-3" id="filterForm" method="GET">
+                    <div class="col-md-4">
+                        <label class="form-label">Sort by Surname</label>
+                        <select name="sort" class="form-select">
+                            <option value="asc" <?= $sort === 'asc' ? 'selected' : '' ?>>A to Z</option>
+                            <option value="desc" <?= $sort === 'desc' ? 'selected' : '' ?>>Z to A</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Search by Surname</label>
+                        <input type="text" name="search_surname" class="form-control" value="<?= htmlspecialchars($search) ?>" placeholder="Enter surname...">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">&nbsp;</label>
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary"><i class="bi bi-search me-1"></i> Filter</button>
+                            <button type="button" class="btn btn-outline-secondary" id="clearFiltersBtn">Clear</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Applicants Table -->
+            <div class="table-responsive" id="tableWrapper">
+                <?= render_table($applicants, $connection) ?>
+            </div>
+            <div id="pagination">
+                <?php render_pagination($page, $totalPages); ?>
+            </div>
+        </div>
+    </section>
 </div>
 
 <!-- Include Blacklist Modal -->

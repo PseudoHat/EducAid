@@ -5,6 +5,16 @@ body {
   color: #222;
 }
 
+/* Filter section styling - Clean style */
+.filter-section {
+  background: white;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.1);
+}
+
 .section-header {
   display: flex;
   align-items: center;
@@ -40,8 +50,8 @@ h2.fw-bold {
 }
 
 .form-label {
-  font-weight: 600;
-  color: #1182FF;
+  font-weight: 400;
+  color: #212529;
   margin-bottom: 5px;
 }
 
@@ -59,7 +69,7 @@ h2.fw-bold {
   border-radius: 0.45rem;
   font-weight: 600;
   font-size: 1rem;
-  padding: 10px 0;
+  padding: 10px 20px;
   transition: background 0.18s;
 }
 .btn-primary:hover,
@@ -70,6 +80,7 @@ h2.fw-bold {
   overflow: hidden;
   margin-top: 10px;
   background: #fff;
+  box-shadow: 0 0 10px rgba(0,0,0,0.1);
 }
 
 .table {
@@ -84,13 +95,13 @@ h2.fw-bold {
   border: none;
 }
 .table thead th {
-  background: #eaf3ff;
-  color: #1182FF;
-  font-weight: 700;
+  background: #495057;
+  color: white;
+  font-weight: 600;
   font-size: 1.06rem;
 }
 .table-hover tbody tr:hover {
-  background: #f1f6ff;
+  background: #f8f9fa;
   transition: background 0.15s;
 }
 
