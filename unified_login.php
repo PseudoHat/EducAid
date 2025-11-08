@@ -734,13 +734,17 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
             padding-top: var(--navbar-height);
             overflow-x: hidden;
             font-family: "Manrope", sans-serif;
+            min-height: 100vh; /* Ensure body fills viewport */
+            display: flex;
+            flex-direction: column;
         }
         
         /* FIX 2: Unique page wrapper to prevent container-fluid conflicts */
         .login-page-isolated .login-main-wrapper {
-            min-height: calc(100vh - var(--navbar-height));
+            flex: 1 0 auto; /* Grow to fill space, push footer down */
             max-width: 100vw;
             overflow-x: hidden;
+            overflow-y: visible; /* Allow content to flow naturally */
             display: flex;
             flex-direction: column;
         }
@@ -819,23 +823,23 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
         
         /* Adjust brand section height to account for navbar and topbar */
         .brand-section {
-            min-height: calc(100vh - var(--navbar-height) - var(--topbar-height));
-            padding-top: 2rem;
-            padding-bottom: 2rem;
+            padding-top: 3rem;
+            padding-bottom: 3rem;
             display: flex;
             align-items: center;
             justify-content: center;
             flex: 1; /* Allow to grow */
+            min-height: 0; /* Remove height constraints */
         }
         
         /* Ensure login form section adjusts properly */
         .col-lg-6:not(.brand-section) {
-            min-height: calc(100vh - var(--navbar-height) - var(--topbar-height));
             display: flex;
             align-items: center;
             padding-top: 2rem;
             padding-bottom: 2rem;
             flex: 1; /* Allow to grow */
+            min-height: 0; /* Remove height constraints */
         }
         
         /* Mobile adjustments */
@@ -874,7 +878,8 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
         /* Ensure footer is never affected by parent flex containers */
         body > footer,
         body > #dynamic-footer {
-            flex: 0 0 auto !important;
+            flex: 0 0 auto !important; /* Footer takes only needed space */
+            margin-top: auto; /* Push footer to bottom */
         }
         
         /* ==== MODERN BRAND SECTION STYLES ==== */
@@ -1057,20 +1062,19 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
             justify-content: center;
             width: 100%;
             max-width: 100%;
-            padding-top: 1rem !important;
-            padding-bottom: 1rem !important;
+            padding-top: 1.5rem !important;
+            padding-bottom: 1.5rem !important;
         }
         
         .login-card {
             background: rgba(255, 255, 255, 0.98);
             border-radius: 16px;
-            padding: 1.5rem 2rem; /* Much tighter padding */
+            padding: 1.5rem 2rem;
             box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
             width: 100%;
             max-width: 100%;
-            margin: auto;
-            max-height: 85vh; /* Prevent card from being too tall */
-            overflow-y: auto; /* Add scroll inside card only if absolutely needed */
+            margin: 1rem auto;
+            /* Removed max-height and overflow-y for natural flow */
         }
         
         /* Compress spacing inside login card */
@@ -1137,6 +1141,45 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
         .form-section .row {
             width: 100%;
             margin: 0;
+        }
+        
+        /* ==== ZOOM RESPONSIVENESS FIXES ==== */
+        /* Make container-fluid and row adapt to zoom */
+        .login-main-wrapper .container-fluid {
+            padding: 0;
+            width: 100%;
+            max-width: 100%;
+            height: auto;
+            min-height: 0;
+        }
+        
+        .login-main-wrapper .row {
+            margin: 0;
+            width: 100%;
+            flex-wrap: nowrap; /* Prevent columns from stacking on zoom */
+        }
+        
+        /* At higher zoom levels, allow content to breathe */
+        @media (min-width: 992px) {
+            .brand-section,
+            .form-section {
+                overflow-y: visible; /* No scrollbars in sections */
+                overflow-x: hidden;
+            }
+        }
+        
+        /* Ensure both columns adapt to zoom without overflow */
+        @media (min-width: 992px) and (max-width: 1399px) {
+            .login-card {
+                padding: 1.25rem 1.75rem; /* Slightly smaller on medium screens */
+            }
+        }
+        
+        /* Very large screens / high zoom */
+        @media (min-width: 1400px) {
+            .brand-content {
+                max-width: 600px; /* Allow more space */
+            }
         }
 
     </style>
