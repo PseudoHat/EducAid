@@ -840,6 +840,35 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
             justify-content: center;
         }
         
+        /* Form section - Optimize for login card sizing */
+        .login-page-isolated .form-section {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem 1rem;
+        }
+        
+        /* Container inside form section - Remove fixed heights */
+        .login-page-isolated .form-section .container {
+            height: auto !important;
+            max-height: none !important;
+            width: 100%;
+            padding-top: 0;
+            padding-bottom: 0;
+        }
+        
+        /* Row inside container - Auto height, centered */
+        .login-page-isolated .form-section .row {
+            height: auto !important;
+            min-height: 0 !important;
+            margin: 0;
+        }
+        
+        /* Column wrapper - Natural sizing */
+        .login-page-isolated .form-section [class*="col-"] {
+            height: auto !important;
+        }
+        
         /* Ensure login form section adjusts properly - No fixed heights */
         .col-lg-6:not(.brand-section) {
             display: flex;
@@ -854,12 +883,51 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
             overflow: visible;
         }
         
+        /* Login card responsive optimizations */
+        .login-page-isolated .login-card {
+            max-width: 100%;
+            width: 100%;
+            margin: 0 auto;
+            overflow: visible;
+        }
+        
+        /* Ensure buttons and form elements don't overflow */
+        .login-page-isolated .login-card .btn,
+        .login-page-isolated .login-card .form-control {
+            max-width: 100%;
+            word-wrap: break-word;
+        }
+        
         /* Mobile adjustments */
         @media (max-width: 991.98px) {
             .brand-section,
             .col-lg-6:not(.brand-section) {
                 padding-top: 1.5rem;
                 padding-bottom: 1.5rem;
+            }
+            
+            .login-page-isolated .form-section {
+                padding: 1.5rem 0.75rem;
+            }
+        }
+        
+        /* Extra small devices */
+        @media (max-width: 575.98px) {
+            .login-page-isolated .form-section {
+                padding: 1rem 0.5rem;
+            }
+            
+            .login-page-isolated .form-section .container {
+                padding-left: 0.5rem;
+                padding-right: 0.5rem;
+            }
+        }
+        
+        /* Ensure proper viewport scaling at all zoom levels */
+        @media (min-width: 320px) and (max-width: 2560px) {
+            .login-page-isolated .form-section {
+                max-width: 100vw;
+                overflow-x: hidden;
             }
         }
         
