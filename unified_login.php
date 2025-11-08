@@ -823,13 +823,13 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
             font-weight: 500;
         }
         
-        /* Topbar integration */
+        /* Topbar integration - Lower z-index so modals can appear above */
         .login-page-isolated .landing-topbar {
             position: fixed;
             top: 0;
             left: 0;
             right: 0;
-            z-index: 1050;
+            z-index: 1040;
         }
         
         /* Adjust brand section - Remove fixed heights, allow natural flow */
@@ -1536,23 +1536,37 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
             box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
         }
         
-        /* reCAPTCHA Security Modal - Fix z-index and backdrop */
+        /* reCAPTCHA Security Modal - Properly layer above all content */
+        /* Force Bootstrap modal variables to use higher z-index */
+        .modal {
+            --bs-modal-zindex: 10500 !important;
+        }
+        
+        .modal-backdrop {
+            --bs-backdrop-zindex: 10499 !important;
+            --bs-backdrop-opacity: 0.85 !important;
+        }
+        
         #recaptchaModal {
             z-index: 10500 !important;
         }
         
+        #recaptchaModal.show {
+            display: block !important;
+        }
+        
         #recaptchaModal .modal-dialog {
-            z-index: 10501 !important;
             position: relative;
             max-width: 450px !important;
-            margin: 1.75rem auto;
+            margin: 1.75rem auto !important;
+            z-index: 10501 !important;
         }
         
         #recaptchaModal .modal-content {
             border-radius: 1rem;
             border: none;
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-            background: #ffffff;
+            background: #ffffff !important;
             position: relative;
             z-index: 10502;
             width: 100%;
@@ -1590,18 +1604,32 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
         /* Ensure modal backdrop appears above ALL login content with much darker overlay */
         .modal-backdrop {
             z-index: 10499 !important;
-            background-color: rgba(0, 0, 0, 0.85) !important;
-            opacity: 1 !important;
+            background-color: #000 !important;
+        }
+        
+        .modal-backdrop.fade {
+            opacity: 0 !important;
         }
         
         .modal-backdrop.show {
-            opacity: 1 !important;
+            opacity: 0.85 !important;
+        }
+        
+        /* Force backdrop to cover entire viewport */
+        body.modal-open > .modal-backdrop {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            z-index: 10499 !important;
         }
         
         /* Override any potential conflicts with login page elements */
-        .login-page-isolated.modal-open .login-content-container,
-        .login-page-isolated.modal-open .brand-section,
-        .login-page-isolated.modal-open .login-card {
+        body.modal-open .login-page-isolated .login-content-container,
+        body.modal-open .login-page-isolated .brand-section,
+        body.modal-open .login-page-isolated .login-card,
+        body.modal-open .login-page-isolated .landing-topbar {
             position: relative;
             z-index: 1 !important;
         }
