@@ -551,49 +551,168 @@ if (isset($_GET['api'])) {
         }
         .copied-badge.show { opacity: 1; }
 
-        /* Household grouping styles */
+        /* Household grouping styles - IMPROVED */
         .surname-group {
             border-left: 4px solid #0d6efd;
             background: #f8f9fa;
         }
         .surname-group-header {
-            background: linear-gradient(90deg, #e7f3ff, #f8f9fa);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
             font-weight: 600;
-            border-bottom: 2px solid #0d6efd;
+            border: none;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        .surname-group-header td {
+            padding: 1rem !important;
+            font-size: 1rem;
+        }
+        .surname-group-header .badge {
+            font-size: 0.875rem;
+            padding: 0.35rem 0.65rem;
         }
         .primary-recipient {
-            background: #d1e7dd !important;
+            background: linear-gradient(90deg, #d1e7dd 0%, #ffffff 100%) !important;
             border-left: 4px solid #198754;
+            font-weight: 500;
+        }
+        .primary-recipient td {
+            border-top: 2px solid #198754;
+            border-bottom: 2px solid #198754;
         }
         .unresolved-household {
-            background: #fff3cd !important;
+            background: linear-gradient(90deg, #fff3cd 0%, #ffffff 100%) !important;
             border-left: 4px solid #ffc107;
+        }
+        .resolved-household {
+            background: linear-gradient(90deg, #d1ecf1 0%, #ffffff 100%) !important;
+            border-left: 4px solid #0dcaf0;
         }
         
         .action-buttons {
             display: flex;
-            gap: 0.5rem;
+            gap: 0.35rem;
             flex-wrap: wrap;
+            align-items: center;
         }
         .btn-xs {
             padding: 0.25rem 0.5rem;
             font-size: 0.75rem;
+            line-height: 1.2;
+            border-radius: 0.25rem;
         }
 
-        /* Status badges */
+        /* Status badges - IMPROVED */
         .badge-household-verified {
-            background: #198754;
+            background: linear-gradient(135deg, #198754 0%, #20c997 100%);
+            box-shadow: 0 2px 4px rgba(25, 135, 84, 0.3);
         }
         .badge-household-unverified {
-            background: #ffc107;
+            background: linear-gradient(135deg, #ffc107 0%, #ffca2c 100%);
             color: #000;
+            box-shadow: 0 2px 4px rgba(255, 193, 7, 0.3);
         }
         .badge-primary {
-            background: #0d6efd;
+            background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
+            box-shadow: 0 2px 4px rgba(13, 110, 253, 0.3);
+        }
+        
+        /* Enhanced cards */
+        .card {
+            border: none;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            border-radius: 0.75rem;
+        }
+        
+        /* Table improvements */
+        #resultsTable {
+            border-radius: 0.5rem;
+            overflow: hidden;
+        }
+        #resultsTable thead {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+        }
+        #resultsTable thead th {
+            border: none;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            padding: 1rem 0.75rem;
+        }
+        #resultsTable tbody tr {
+            transition: all 0.2s ease;
+        }
+        #resultsTable tbody tr:hover:not(.surname-group-header) {
+            transform: translateX(4px);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* Page header improvements */
+        .page-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem;
+            border-radius: 1rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 16px rgba(102, 126, 234, 0.3);
+        }
+        .page-header h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+        .page-header p {
+            opacity: 0.95;
+            font-size: 1.05rem;
+            margin: 0;
+        }
+        
+        /* Filter card improvements */
+        .filter-card {
+            background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+            border: 2px solid #e9ecef;
+        }
+        .filter-card .card-body {
+            padding: 1.5rem;
+        }
+        
+        /* Button improvements */
+        .btn {
+            border-radius: 0.5rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+        }
+        .btn-success {
+            background: linear-gradient(135deg, #198754 0%, #20c997 100%);
+            border: none;
+        }
+        .btn-danger {
+            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+            border: none;
+        }
+        .btn-outline-secondary:hover {
+            background: #6c757d;
+            border-color: #6c757d;
+            color: white;
+        }
+        
+        /* Icon improvements */
+        .bi {
+            vertical-align: -0.125em;
         }
     </style>
 </head>
 <body class="p-3">
+    <?php include_once __DIR__ . '/../../includes/admin/admin_header.php'; ?>
     <?php include_once __DIR__ . '/../../includes/admin/admin_topbar.php'; ?>
     <?php include_once __DIR__ . '/../../includes/admin/admin_sidebar.php'; ?>
 
@@ -610,94 +729,150 @@ if (isset($_GET['api'])) {
 
     <div class="admin-main">
         <div class="container-fluid">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h1 class="h3 mb-0">
-                    <i class="bi bi-people-fill me-2"></i>Household Duplicates Management
-                </h1>
-                <div class="text-muted">
-                    <small>Identify and resolve household duplicate registrations</small>
+            <!-- Enhanced Page Header -->
+            <div class="page-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h1>
+                            <i class="bi bi-people-fill me-3"></i>Household Duplicates Management
+                        </h1>
+                        <p>
+                            <i class="bi bi-info-circle me-2"></i>
+                            Identify and resolve household duplicate registrations to ensure accurate distribution
+                        </p>
+                    </div>
+                    <div class="text-end">
+                        <div class="badge bg-light text-dark fs-6 px-3 py-2">
+                            <i class="bi bi-clock-history me-2"></i>
+                            <span id="lastUpdated">Loading...</span>
+                        </div>
+                    </div>
                 </div>
             </div>
 
             <!-- Instructions Alert -->
-            <div class="alert alert-info alert-dismissible fade show" role="alert">
-                <h5 class="alert-heading"><i class="bi bi-info-circle me-2"></i>How to Resolve Household Duplicates</h5>
+            <div class="alert alert-info alert-dismissible fade show" role="alert" style="border-left: 4px solid #0dcaf0; border-radius: 0.75rem;">
+                <h5 class="alert-heading">
+                    <i class="bi bi-lightbulb me-2"></i>How to Resolve Household Duplicates
+                </h5>
                 <ol class="mb-0">
-                    <li><strong>Review</strong> students with the same surname who may be siblings/family members</li>
+                    <li><strong>Review:</strong> Students with the same surname who may be siblings/family members</li>
                     <li><strong>Mark Primary:</strong> Select one student as the primary recipient (usually the oldest or first to register)</li>
                     <li><strong>Archive Duplicates:</strong> Archive the remaining family members to prevent duplicate distributions</li>
-                    <li><strong>Verification:</strong> Once resolved, the group will be marked as "Verified"</li>
+                    <li><strong>Verification:</strong> Once resolved, the group will be marked as "Verified" ✓</li>
                 </ol>
                 <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
             </div>
 
             <!-- Filters -->
-            <div class="card mb-3">
+            <div class="card filter-card mb-4">
+                <div class="card-header bg-transparent border-0">
+                    <h5 class="mb-0">
+                        <i class="bi bi-funnel me-2"></i>Filter Options
+                    </h5>
+                </div>
                 <div class="card-body">
-                    <form id="filterForm" class="row g-2 align-items-end">
-                        <div class="col-sm-3">
-                            <label class="form-label">Surname</label>
-                            <input name="surname" id="surname" class="form-control" placeholder="Search surname">
+                    <form id="filterForm" class="row g-3 align-items-end">
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold">
+                                <i class="bi bi-search me-1"></i>Surname
+                            </label>
+                            <input name="surname" id="surname" class="form-control" placeholder="Search by surname...">
                         </div>
-                        <div class="col-sm-2">
-                            <label class="form-label">School</label>
-                            <select id="school" name="school" class="form-select"><option value="">All</option></select>
+                        <div class="col-md-2">
+                            <label class="form-label fw-semibold">
+                                <i class="bi bi-building me-1"></i>School
+                            </label>
+                            <select id="school" name="school" class="form-select">
+                                <option value="">All Schools</option>
+                            </select>
                         </div>
-                        <div class="col-sm-2">
-                            <label class="form-label">Municipality</label>
-                            <select id="municipality" name="municipality" class="form-select"><option value="">All</option></select>
+                        <div class="col-md-2">
+                            <label class="form-label fw-semibold">
+                                <i class="bi bi-geo-alt me-1"></i>Municipality
+                            </label>
+                            <select id="municipality" name="municipality" class="form-select">
+                                <option value="">All Municipalities</option>
+                            </select>
                         </div>
-                        <div class="col-sm-2">
-                            <label class="form-label">Barangay</label>
-                            <select id="barangay" name="barangay" class="form-select"><option value="">All</option></select>
+                        <div class="col-md-2">
+                            <label class="form-label fw-semibold">
+                                <i class="bi bi-map me-1"></i>Barangay
+                            </label>
+                            <select id="barangay" name="barangay" class="form-select">
+                                <option value="">All Barangays</option>
+                            </select>
                         </div>
-                        <div class="col-sm-2">
-                            <label class="form-label">Household Status</label>
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold">
+                                <i class="bi bi-house-check me-1"></i>Household Status
+                            </label>
                             <select id="household_status" name="household_status" class="form-select">
-                                <option value="">All</option>
-                                <option value="unresolved">Unresolved Only</option>
+                                <option value="">All Statuses</option>
+                                <option value="unresolved" selected>Unresolved Only</option>
                                 <option value="resolved">Resolved Only</option>
                             </select>
                         </div>
-                        <div class="col-sm-2">
-                            <label class="form-label">Status</label>
+                        <div class="col-md-2">
+                            <label class="form-label fw-semibold">
+                                <i class="bi bi-person-badge me-1"></i>Status
+                            </label>
                             <select id="status" name="status" class="form-select">
-                                <option value="">All</option>
+                                <option value="">All Statuses</option>
                                 <option value="applicant">Applicant</option>
                                 <option value="pending">Pending</option>
                             </select>
                         </div>
-                        <div class="col-sm-2">
-                            <label class="form-label">Date From</label>
+                        <div class="col-md-2">
+                            <label class="form-label fw-semibold">
+                                <i class="bi bi-calendar-event me-1"></i>Date From
+                            </label>
                             <input type="date" id="date_from" name="date_from" class="form-control">
                         </div>
-                        <div class="col-sm-2">
-                            <label class="form-label">Date To</label>
+                        <div class="col-md-2">
+                            <label class="form-label fw-semibold">
+                                <i class="bi bi-calendar-check me-1"></i>Date To
+                            </label>
                             <input type="date" id="date_to" name="date_to" class="form-control">
                         </div>
-                        <div class="col-sm-2 d-grid">
-                            <button id="applyBtn" class="btn btn-primary">Apply Filters</button>
+                        <div class="col-md-2 d-grid">
+                            <button id="applyBtn" class="btn btn-primary">
+                                <i class="bi bi-funnel-fill me-2"></i>Apply Filters
+                            </button>
                         </div>
-                        <div class="col-sm-2 d-grid">
-                            <button id="exportCsvBtn" class="btn btn-outline-secondary">Export CSV</button>
+                        <div class="col-md-2 d-grid">
+                            <button id="exportCsvBtn" class="btn btn-outline-secondary">
+                                <i class="bi bi-download me-2"></i>Export CSV
+                            </button>
                         </div>
                     </form>
                 </div>
             </div>
 
             <!-- Summary and Per Page -->
-            <div class="mb-2 d-flex justify-content-between align-items-center">
-                <div id="summary" class="fw-bold"></div>
-                <div>
-                    <label class="me-2">Per page</label>
-                    <select id="per_page" class="form-select form-select-sm" style="width:6rem; display:inline-block">
-                        <option>20</option><option>50</option><option>100</option>
-                    </select>
+            <div class="card mb-3" style="border-radius: 0.75rem;">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col-md-6">
+                            <div id="summary" class="d-flex gap-2 flex-wrap"></div>
+                        </div>
+                        <div class="col-md-6 text-end">
+                            <label class="me-2 fw-semibold">
+                                <i class="bi bi-list-ul me-1"></i>Rows per page:
+                            </label>
+                            <select id="per_page" class="form-select form-select-sm d-inline-block" style="width: auto;">
+                                <option>20</option>
+                                <option>50</option>
+                                <option>100</option>
+                            </select>
+                        </div>
+                    </div>
                 </div>
             </div>
 
             <!-- Results Table -->
-            <div class="table-container table-responsive">
+            <div class="card" style="border-radius: 0.75rem; overflow: hidden;">
+                <div class="table-container table-responsive">
                 <table class="table table-striped table-hover table-fixed" id="resultsTable">
                     <thead class="table-dark">
                         <tr>
@@ -719,12 +894,15 @@ if (isset($_GET['api'])) {
                     </thead>
                     <tbody></tbody>
                 </table>
+                </div>
             </div>
 
             <!-- Pagination -->
-            <nav>
-                <ul class="pagination" id="pagination"></ul>
-            </nav>
+            <div class="d-flex justify-content-center mt-4">
+                <nav>
+                    <ul class="pagination" id="pagination"></ul>
+                </nav>
+            </div>
         </div>
     </div>
 
@@ -839,7 +1017,8 @@ if (isset($_GET['api'])) {
                 data = JSON.parse(text);
             } catch (err) {
                 console.error('Invalid JSON response:', text);
-                document.getElementById('summary').textContent = 'Server error (check console)';
+                document.getElementById('summary').innerHTML = '<span class="badge bg-danger">Server error (check console)</span>';
+                updateLastUpdated();
                 return;
             }
             currentData = data;
@@ -854,10 +1033,29 @@ if (isset($_GET['api'])) {
             const surnameGroups = groupBySurname(data.rows || []);
             const groupCount = Object.keys(surnameGroups).length;
             
+            // Count unresolved groups
+            const unresolvedCount = Object.values(surnameGroups).filter(students => 
+                !students.every(s => (s.household_verified ?? 'f') === 't')
+            ).length;
+            
+            const resolvedCount = groupCount - unresolvedCount;
+            
             document.getElementById('summary').innerHTML = `
-                <span class="badge bg-primary">${total} Students</span>
-                <span class="badge bg-info text-dark">${groupCount} Surname Groups</span>
+                <span class="badge bg-primary fs-6 px-3 py-2">
+                    <i class="bi bi-people-fill me-2"></i>${total} Students
+                </span>
+                <span class="badge bg-info text-dark fs-6 px-3 py-2">
+                    <i class="bi bi-collection me-2"></i>${groupCount} Groups
+                </span>
+                <span class="badge bg-warning text-dark fs-6 px-3 py-2">
+                    <i class="bi bi-exclamation-triangle me-2"></i>${unresolvedCount} Unresolved
+                </span>
+                <span class="badge bg-success fs-6 px-3 py-2">
+                    <i class="bi bi-check-circle me-2"></i>${resolvedCount} Resolved
+                </span>
             `;
+            
+            updateLastUpdated();
 
             // Render grouped by surname
             for (const [surname, students] of Object.entries(surnameGroups)) {
@@ -1368,6 +1566,21 @@ if (isset($_GET['api'])) {
                 .replace(/"/g,'&quot;')
                 .replace(/'/g,'&#039;'); 
         }
+        
+        // Update last updated timestamp
+        function updateLastUpdated() {
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString('en-US', { 
+                hour: '2-digit', 
+                minute: '2-digit',
+                second: '2-digit'
+            });
+            const dateStr = now.toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric'
+            });
+            document.getElementById('lastUpdated').textContent = `${dateStr} at ${timeStr}`;
+        }
 
         // Event listeners
         document.getElementById('applyBtn').addEventListener('click', function(e){ 
@@ -1392,6 +1605,7 @@ if (isset($_GET['api'])) {
         });
 
         // Initialize
+        updateLastUpdated();
         loadSelects().then(()=>fetchData(1));
     </script>
 </body>
