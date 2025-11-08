@@ -11,7 +11,7 @@ if (!isset($_SESSION['admin_username'])) {
 }
 
 include __DIR__ . '/../../config/database.php';
-require_once '../../services/AuditLogger.php';
+require_once __DIR__ . '/../../services/AuditLogger.php';
 
 // Get admin info
 $adminId = $_SESSION['admin_id'] ?? null;
