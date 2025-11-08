@@ -93,6 +93,7 @@ $distributionFiles = [
     'end_distribution.php',
     'distribution_archives.php',
     'storage_dashboard.php',
+    'file_browser.php',
 ];
 $isDistributionActive = in_array($current, $distributionFiles, true);
 
@@ -291,6 +292,11 @@ $isSysControlsActive = in_array($current, $sysControlsFiles, true);
           <li>
             <a class="submenu-link <?= is_active('storage_dashboard.php', $current) ? 'active' : '' ?>" href="storage_dashboard.php">
               <i class="bi bi-hdd me-2"></i> Storage Dashboard
+            </a>
+          </li>
+          <li>
+            <a class="submenu-link <?= is_active('file_browser.php', $current) ? 'active' : '' ?>" href="file_browser.php">
+              <i class="bi bi-folder2-open me-2"></i> File Browser
             </a>
           </li>
         </ul>
