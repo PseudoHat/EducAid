@@ -1544,6 +1544,8 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
         #recaptchaModal .modal-dialog {
             z-index: 10501 !important;
             position: relative;
+            max-width: 450px !important;
+            margin: 1.75rem auto;
         }
         
         #recaptchaModal .modal-content {
@@ -1553,6 +1555,7 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
             background: #ffffff;
             position: relative;
             z-index: 10502;
+            width: 100%;
         }
         
         #recaptchaModal .modal-header {
