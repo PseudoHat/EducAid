@@ -6,7 +6,7 @@
  * whose files are stored in permanent storage:
  * assets/uploads/student/{filetype}/{studentID}/
  * 
- * Folders: indigency, grades, id_pictures, enrollment_forms, letter_mayor
+ * Folders: indigency, grades, id_pictures, enrollment_forms, letter_to_mayor
  */
 
 require_once __DIR__ . '/../../config/FilePathConfig.php';
@@ -56,7 +56,7 @@ $student_type = ($student['needs_document_upload'] === 't' || $student['needs_do
 $doc_type_config = [
     '04' => ['folder' => 'id_pictures', 'label' => 'ID Picture', 'key' => 'id_picture'],
     '00' => ['folder' => 'enrollment_forms', 'label' => 'EAF', 'key' => 'eaf'],
-    '02' => ['folder' => 'letter_mayor', 'label' => 'Letter to Mayor', 'key' => 'letter_to_mayor'],
+    '02' => ['folder' => 'letter_to_mayor', 'label' => 'Letter to Mayor', 'key' => 'letter_to_mayor'],
     '03' => ['folder' => 'indigency', 'label' => 'Certificate of Indigency', 'key' => 'certificate_of_indigency'],
     '01' => ['folder' => 'grades', 'label' => 'Academic Grades', 'key' => 'grades']
 ];

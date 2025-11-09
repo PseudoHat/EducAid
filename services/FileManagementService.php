@@ -16,7 +16,7 @@ class FileManagementService {
         'grades' => 'grades',
         'id_pictures' => 'id_pictures',
         'indigency' => 'indigency',
-        'letter_mayor' => 'letter_to_mayor' // Note: temp uses letter_mayor, permanent uses letter_to_mayor
+        'letter_to_mayor' => 'letter_to_mayor' // Standardized: letter_to_mayor for both temp and permanent
     ];
     
     public function __construct($connection = null) {
@@ -233,7 +233,7 @@ class FileManagementService {
             ['temp' => 'grades', 'permanent' => 'grades'],
             ['temp' => 'id_pictures', 'permanent' => 'id_pictures'],
             ['temp' => 'indigency', 'permanent' => 'indigency'],
-            ['temp' => 'letter_mayor', 'permanent' => 'letter_to_mayor']
+            ['temp' => 'letter_to_mayor', 'permanent' => 'letter_to_mayor']
         ];
         
         // First, check temp folders (for rejected applicants who never got approved)
@@ -351,7 +351,7 @@ class FileManagementService {
         $deletedSize = 0;
         
         $tempPath = $this->basePath . '/temp';
-        $folders = ['enrollment_forms', 'grades', 'id_pictures', 'indigency', 'letter_mayor'];
+        $folders = ['enrollment_forms', 'grades', 'id_pictures', 'indigency', 'letter_to_mayor'];
         
         foreach ($folders as $folder) {
             $folderPath = $tempPath . '/' . $folder;

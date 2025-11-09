@@ -18,7 +18,7 @@ class DocumentService {
     const DOCUMENT_TYPES = [
         'eaf' => ['code' => '00', 'name' => 'eaf', 'folder' => 'enrollment_forms'],
         'academic_grades' => ['code' => '01', 'name' => 'academic_grades', 'folder' => 'grades'],
-        'letter_to_mayor' => ['code' => '02', 'name' => 'letter_to_mayor', 'folder' => 'letter_mayor'],
+        'letter_to_mayor' => ['code' => '02', 'name' => 'letter_to_mayor', 'folder' => 'letter_to_mayor'],
         'certificate_of_indigency' => ['code' => '03', 'name' => 'certificate_of_indigency', 'folder' => 'indigency'],
         'id_picture' => ['code' => '04', 'name' => 'id_picture', 'folder' => 'id_pictures']
     ];

@@ -46,10 +46,10 @@ function convertToWebPath($inputPath) {
     $parent = basename(dirname($p));
     $candidateDirs = [
         'assets/uploads/temp/enrollment_forms',
-        'assets/uploads/temp/letter_mayor',
+        'assets/uploads/temp/letter_to_mayor',
         'assets/uploads/temp/indigency',
         'assets/uploads/student/enrollment_forms',
-        'assets/uploads/student/letter_mayor',
+        'assets/uploads/student/letter_to_mayor',
         'assets/uploads/student/indigency'
     ];
     foreach ($candidateDirs as $dir) {
@@ -110,7 +110,7 @@ if ($result && pg_num_rows($result) > 0) {
     $code_to_folder = [
         '04' => 'id_pictures',
         '00' => 'enrollment_forms',
-        '02' => 'letter_mayor',
+        '02' => 'letter_to_mayor',
         '03' => 'indigency',
         '01' => 'grades'
     ];
@@ -286,7 +286,7 @@ if ($result && pg_num_rows($result) > 0) {
     $code_to_folder = [
         '04' => 'id_pictures',
         '00' => 'enrollment_forms',
-        '02' => 'letter_mayor',
+        '02' => 'letter_to_mayor',
         '03' => 'indigency',
         '01' => 'grades'
     ];

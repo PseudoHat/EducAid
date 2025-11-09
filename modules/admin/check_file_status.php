@@ -26,7 +26,7 @@ if (pg_num_rows($result) == 0) {
         // Check temp directories
         $temp_dirs = [
             'temp/enrollment_forms' => __DIR__ . '/../../assets/uploads/temp/enrollment_forms/',
-            'temp/letter_mayor' => __DIR__ . '/../../assets/uploads/temp/letter_mayor/',
+            'temp/letter_to_mayor' => __DIR__ . '/../../assets/uploads/temp/letter_to_mayor/',
             'temp/indigency' => __DIR__ . '/../../assets/uploads/temp/indigency/',
         ];
         

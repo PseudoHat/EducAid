@@ -28,14 +28,14 @@ class FilePathConfig {
             'grades',            // Same on both
             'id_pictures',       // Localhost: id_pictures, Railway: ID
             'indigency',         // Same on both (case may differ)
-            'letter_mayor'       // Localhost: letter_mayor, Railway: Letter
+            'letter_to_mayor'    // Localhost: letter_to_mayor, Railway: Letter (standardized)
         ],
         'student' => [
             'enrollment_forms',  // Localhost: enrollment_forms, Railway: EAF
             'grades',            // Same on both
             'id_pictures',       // Localhost: id_pictures, Railway: ID
             'indigency',         // Same on both (case may differ)
-            'letter_to_mayor'    // Localhost: letter_to_mayor, Railway: Letter
+            'letter_to_mayor'    // Localhost: letter_to_mayor, Railway: Letter (standardized)
         ],
         'archived_students' => [],
         'distributions' => [],
@@ -51,8 +51,7 @@ class FilePathConfig {
         'grades' => 'Grades',
         'id_pictures' => 'ID',
         'indigency' => 'Indigency',
-        'letter_mayor' => 'Letter',
-        'letter_to_mayor' => 'Letter'
+        'letter_to_mayor' => 'Letter'  // Standardized: letter_to_mayor (not letter_mayor)
     ];
     
     /**
@@ -63,7 +62,7 @@ class FilePathConfig {
         'grades' => 'grades',
         'id' => 'id_pictures',
         'indigency' => 'indigency',
-        'letter' => 'letter_mayor'
+        'letter' => 'letter_to_mayor'  // Standardized: letter_to_mayor (not letter_mayor)
     ];
     
     private function __construct() {

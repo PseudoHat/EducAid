@@ -125,7 +125,7 @@ if (isset($_POST['create_folder']) && isset($_POST['folder_name'])) {
     exit;
 }
 
-// Handle folder deletion
+// Handle folder deletion (single)
 if (isset($_POST['delete_folder']) && isset($_POST['folder_path'])) {
     $folderToDelete = trim($_POST['folder_path']);
     
@@ -155,6 +155,91 @@ if (isset($_POST['delete_folder']) && isset($_POST['folder_path'])) {
                 $_SESSION['error'] = 'Failed to delete folder. Check permissions.';
             }
         }
+    }
+    
+    // Redirect to refresh the page
+    header('Location: file_browser.php?path=' . urlencode($currentPath));
+    exit;
+}
+
+// Handle bulk deletion (folders and files)
+if (isset($_POST['bulk_delete']) && isset($_POST['selected_items'])) {
+    $selectedItems = $_POST['selected_items'];
+    
+    if (!is_array($selectedItems) || empty($selectedItems)) {
+        $_SESSION['error'] = 'No items selected for deletion.';
+        header('Location: file_browser.php?path=' . urlencode($currentPath));
+        exit;
+    }
+    
+    $deletedCount = 0;
+    $failedCount = 0;
+    $errors = [];
+    
+    foreach ($selectedItems as $itemPath) {
+        // Normalize the path
+        $itemPath = str_replace('\\', '/', trim($itemPath));
+        
+        // Build full system path
+        $itemSystemPath = $baseDir . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $itemPath);
+        $itemRealPath = realpath($itemSystemPath);
+        
+        // Security check
+        if ($itemRealPath === false || strpos($itemRealPath, $baseRealPath) !== 0) {
+            $errors[] = basename($itemPath) . ': Invalid path';
+            $failedCount++;
+            continue;
+        }
+        
+        // Check if it's a directory
+        if (is_dir($itemRealPath)) {
+            // Check if folder is empty
+            $contents = array_diff(scandir($itemRealPath), ['.', '..']);
+            
+            if (count($contents) > 0) {
+                $errors[] = basename($itemPath) . ': Folder not empty (' . count($contents) . ' items)';
+                $failedCount++;
+            } else {
+                // Delete empty folder
+                if (rmdir($itemRealPath)) {
+                    $deletedCount++;
+                } else {
+                    $errors[] = basename($itemPath) . ': Failed to delete folder';
+                    $failedCount++;
+                }
+            }
+        } elseif (is_file($itemRealPath)) {
+            // Delete file
+            if (unlink($itemRealPath)) {
+                $deletedCount++;
+            } else {
+                $errors[] = basename($itemPath) . ': Failed to delete file';
+                $failedCount++;
+            }
+        } else {
+            $errors[] = basename($itemPath) . ': Not a file or folder';
+            $failedCount++;
+        }
+    }
+    
+    // Build success/error message
+    $messages = [];
+    if ($deletedCount > 0) {
+        $messages[] = "Successfully deleted $deletedCount item(s)";
+    }
+    if ($failedCount > 0) {
+        $messages[] = "Failed to delete $failedCount item(s)";
+        if (!empty($errors)) {
+            $messages[] = "Errors: " . implode('; ', array_slice($errors, 0, 3)) . ($failedCount > 3 ? '...' : '');
+        }
+    }
+    
+    if ($deletedCount > 0 && $failedCount === 0) {
+        $_SESSION['success'] = implode('. ', $messages);
+    } elseif ($deletedCount > 0 && $failedCount > 0) {
+        $_SESSION['warning'] = implode('. ', $messages);
+    } else {
+        $_SESSION['error'] = implode('. ', $messages);
     }
     
     // Redirect to refresh the page
@@ -679,6 +764,17 @@ $pageTitle = 'Railway Volume Browser';
                 </div>
             <?php endif; ?>
             
+            <?php if (isset($_SESSION['warning'])): ?>
+                <div class="alert alert-warning alert-dismissible fade show" role="alert">
+                    <i class="bi bi-exclamation-circle me-2"></i>
+                    <?php 
+                    echo htmlspecialchars($_SESSION['warning']); 
+                    unset($_SESSION['warning']);
+                    ?>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            <?php endif; ?>
+            
             <div class="file-browser-container">
                 
                 <!-- Breadcrumb Navigation -->
@@ -738,16 +834,30 @@ $pageTitle = 'Railway Volume Browser';
                 </div>
                 
                 <!-- Action Bar -->
-                <div class="mb-3 d-flex gap-2 flex-wrap">
-                    <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#createFolderModal">
-                        <i class="bi bi-folder-plus me-2"></i>Create Folder
-                    </button>
+                <div class="mb-3 d-flex justify-content-between align-items-center gap-2 flex-wrap">
+                    <div class="d-flex gap-2 flex-wrap">
+                        <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#createFolderModal">
+                            <i class="bi bi-folder-plus me-2"></i>Create Folder
+                        </button>
+                    </div>
+                    <div class="d-flex gap-2 align-items-center" id="bulkActionsBar" style="display: none !important;">
+                        <span class="badge bg-info" id="selectedCountBadge">0 selected</span>
+                        <button type="button" class="btn btn-danger btn-sm" onclick="confirmBulkDelete()">
+                            <i class="bi bi-trash me-2"></i>Delete Selected
+                        </button>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="clearSelection()">
+                            <i class="bi bi-x-circle me-2"></i>Clear
+                        </button>
+                    </div>
                 </div>
                 
                 <!-- File List Header (Desktop Only) -->
                 <div class="file-list-header d-none d-md-block">
                     <div class="row align-items-center">
-                        <div class="col-md-5">Name</div>
+                        <div class="col-md-auto" style="width: 40px;">
+                            <input type="checkbox" class="form-check-input" id="selectAllCheckbox" onchange="toggleSelectAll(this)">
+                        </div>
+                        <div class="col-md">Name</div>
                         <div class="col-md-2 text-center">Type</div>
                         <div class="col-md-2 text-end">Size</div>
                         <div class="col-md-2 text-center">Modified</div>
@@ -768,7 +878,15 @@ $pageTitle = 'Railway Volume Browser';
                         <div class="file-item">
                             <!-- Desktop Layout -->
                             <div class="row align-items-center d-none d-md-flex">
-                                <div class="col-md-5">
+                                <div class="col-md-auto" style="width: 40px;">
+                                    <input type="checkbox" 
+                                           class="form-check-input item-checkbox" 
+                                           value="<?php echo htmlspecialchars($item['path']); ?>"
+                                           data-name="<?php echo htmlspecialchars($item['name']); ?>"
+                                           data-type="<?php echo $item['type']; ?>"
+                                           onchange="updateSelectionCount()">
+                                </div>
+                                <div class="col-md">
                                     <div class="d-flex align-items-center">
                                         <?php if ($item['type'] === 'dir'): ?>
                                             <i class="bi bi-folder-fill text-warning file-icon"></i>
@@ -862,6 +980,12 @@ $pageTitle = 'Railway Volume Browser';
                             <!-- Mobile Layout -->
                             <div class="d-md-none">
                                 <div class="d-flex align-items-start gap-2">
+                                    <input type="checkbox" 
+                                           class="form-check-input item-checkbox mt-1" 
+                                           value="<?php echo htmlspecialchars($item['path']); ?>"
+                                           data-name="<?php echo htmlspecialchars($item['name']); ?>"
+                                           data-type="<?php echo $item['type']; ?>"
+                                           onchange="updateSelectionCount()">
                                     <?php if ($item['type'] === 'dir'): ?>
                                         <i class="bi bi-folder-fill text-warning file-icon"></i>
                                         <div class="flex-grow-1 min-w-0">
@@ -1023,10 +1147,124 @@ $pageTitle = 'Railway Volume Browser';
         </div>
     </div>
     
+    <!-- Bulk Delete Confirmation Modal -->
+    <div class="modal fade" id="bulkDeleteModal" tabindex="-1" aria-labelledby="bulkDeleteModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form method="POST" action="" id="bulkDeleteForm">
+                    <div class="modal-header bg-danger text-white">
+                        <h5 class="modal-title" id="bulkDeleteModalLabel">
+                            <i class="bi bi-trash me-2"></i>Delete Multiple Items
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="alert alert-danger">
+                            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                            <strong>Warning:</strong> This action cannot be undone!
+                        </div>
+                        <p class="mb-2">You are about to delete <strong id="bulkDeleteCount">0</strong> item(s):</p>
+                        <div class="alert alert-secondary mb-3" style="max-height: 200px; overflow-y: auto;">
+                            <ul class="mb-0 ps-3" id="bulkDeleteList"></ul>
+                        </div>
+                        <div class="alert alert-info mb-0">
+                            <i class="bi bi-info-circle me-2"></i>
+                            <strong>Note:</strong> Folders must be empty to be deleted. Non-empty folders will be skipped.
+                        </div>
+                        <div id="bulkDeleteItemsContainer"></div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" name="bulk_delete" class="btn btn-danger" id="confirmBulkDeleteBtn">
+                            <i class="bi bi-trash me-2"></i>Delete Selected Items
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
     <!-- Bootstrap Bundle with Popper -->
     <script src="../../assets/js/bootstrap.bundle.min.js"></script>
     
     <script>
+    // Selection Management
+    function updateSelectionCount() {
+        const checkboxes = document.querySelectorAll('.item-checkbox:checked');
+        const count = checkboxes.length;
+        const bulkActionsBar = document.getElementById('bulkActionsBar');
+        const selectedCountBadge = document.getElementById('selectedCountBadge');
+        
+        if (count > 0) {
+            bulkActionsBar.style.display = 'flex';
+            selectedCountBadge.textContent = count + ' selected';
+        } else {
+            bulkActionsBar.style.display = 'none';
+            document.getElementById('selectAllCheckbox').checked = false;
+        }
+    }
+    
+    function toggleSelectAll(checkbox) {
+        const itemCheckboxes = document.querySelectorAll('.item-checkbox');
+        itemCheckboxes.forEach(cb => {
+            cb.checked = checkbox.checked;
+        });
+        updateSelectionCount();
+    }
+    
+    function clearSelection() {
+        const checkboxes = document.querySelectorAll('.item-checkbox');
+        checkboxes.forEach(cb => {
+            cb.checked = false;
+        });
+        document.getElementById('selectAllCheckbox').checked = false;
+        updateSelectionCount();
+    }
+    
+    function confirmBulkDelete() {
+        const checkboxes = document.querySelectorAll('.item-checkbox:checked');
+        
+        if (checkboxes.length === 0) {
+            alert('Please select items to delete.');
+            return;
+        }
+        
+        const modal = new bootstrap.Modal(document.getElementById('bulkDeleteModal'));
+        const bulkDeleteCount = document.getElementById('bulkDeleteCount');
+        const bulkDeleteList = document.getElementById('bulkDeleteList');
+        const bulkDeleteItemsContainer = document.getElementById('bulkDeleteItemsContainer');
+        
+        // Clear previous content
+        bulkDeleteList.innerHTML = '';
+        bulkDeleteItemsContainer.innerHTML = '';
+        
+        // Set count
+        bulkDeleteCount.textContent = checkboxes.length;
+        
+        // Build list and hidden inputs
+        checkboxes.forEach((checkbox, index) => {
+            const itemName = checkbox.getAttribute('data-name');
+            const itemPath = checkbox.value;
+            const itemType = checkbox.getAttribute('data-type');
+            
+            // Add to visible list
+            const li = document.createElement('li');
+            const icon = itemType === 'dir' ? 'bi-folder-fill text-warning' : 'bi-file-earmark text-secondary';
+            li.innerHTML = `<i class="bi ${icon} me-1"></i>${itemName}`;
+            bulkDeleteList.appendChild(li);
+            
+            // Add hidden input for form submission
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'selected_items[]';
+            input.value = itemPath;
+            bulkDeleteItemsContainer.appendChild(input);
+        });
+        
+        // Show modal
+        modal.show();
+    }
+    
     // Function to check if folder is empty and show confirmation modal
     function confirmDeleteFolder(folderName, folderPath) {
         const modal = new bootstrap.Modal(document.getElementById('deleteFolderModal'));

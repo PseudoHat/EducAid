@@ -28,7 +28,7 @@ class UnifiedFileService {
     const DOCUMENT_TYPES = [
         'eaf' => ['code' => '00', 'name' => 'eaf', 'folder' => 'enrollment_forms'],
         'academic_grades' => ['code' => '01', 'name' => 'academic_grades', 'folder' => 'grades'],
-        'letter_to_mayor' => ['code' => '02', 'name' => 'letter_to_mayor', 'folder' => 'letter_mayor'],
+        'letter_to_mayor' => ['code' => '02', 'name' => 'letter_to_mayor', 'folder' => 'letter_to_mayor'],
         'certificate_of_indigency' => ['code' => '03', 'name' => 'certificate_of_indigency', 'folder' => 'indigency'],
         'id_picture' => ['code' => '04', 'name' => 'id_picture', 'folder' => 'id_pictures']
     ];
@@ -39,7 +39,7 @@ class UnifiedFileService {
         'grades' => 'grades',
         'id_pictures' => 'id_pictures',
         'indigency' => 'indigency',
-        'letter_mayor' => 'letter_mayor'
+        'letter_to_mayor' => 'letter_to_mayor'
     ];
     
     public function __construct($dbConnection) {
@@ -474,7 +474,7 @@ class UnifiedFileService {
                 ['temp' => 'grades', 'permanent' => 'grades'],
                 ['temp' => 'id_pictures', 'permanent' => 'id_pictures'],
                 ['temp' => 'indigency', 'permanent' => 'indigency'],
-                ['temp' => 'letter_mayor', 'permanent' => 'letter_mayor']
+                ['temp' => 'letter_to_mayor', 'permanent' => 'letter_to_mayor']
             ];
             
             //Check temp folders first (for students blacklisted during registration)
@@ -954,7 +954,7 @@ class UnifiedFileService {
                 continue;
             }
             
-            $folderName = $parts[0]; // enrollment_forms, grades, letter_mayor, indigency, id_picture
+            $folderName = $parts[0]; // enrollment_forms, grades, letter_to_mayor, indigency, id_pictures
             $file = $parts[1];
             
             // Create permanent storage directory: /assets/uploads/student/{folderName}/{studentId}/
@@ -1030,7 +1030,7 @@ class UnifiedFileService {
         $deletedSize = 0;
         
         $tempPath = $this->basePath . '/temp';
-        $folders = ['enrollment_forms', 'grades', 'id_pictures', 'indigency', 'letter_mayor'];
+        $folders = ['enrollment_forms', 'grades', 'id_pictures', 'indigency', 'letter_to_mayor'];
         
         foreach ($folders as $folder) {
             $folderPath = $tempPath . '/' . $folder;

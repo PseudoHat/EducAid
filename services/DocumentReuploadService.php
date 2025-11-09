@@ -18,7 +18,7 @@ class DocumentReuploadService {
         '04' => ['name' => 'id_picture', 'folder' => 'id_pictures'],
         '00' => ['name' => 'eaf', 'folder' => 'enrollment_forms'],
         '01' => ['name' => 'academic_grades', 'folder' => 'grades'],
-        '02' => ['name' => 'letter_to_mayor', 'folder' => 'letter_mayor'],
+        '02' => ['name' => 'letter_to_mayor', 'folder' => 'letter_to_mayor'],
         '03' => ['name' => 'certificate_of_indigency', 'folder' => 'indigency']
     ];
 

@@ -104,7 +104,7 @@ if (empty($documents) && $student['status'] === 'under_registration') {
     $tempFolders = [
         '04' => __DIR__ . '/../../assets/uploads/temp/id_pictures/',
         '00' => __DIR__ . '/../../assets/uploads/temp/enrollment_forms/',
-        '02' => __DIR__ . '/../../assets/uploads/temp/letter_mayor/',
+        '02' => __DIR__ . '/../../assets/uploads/temp/letter_to_mayor/',
         '03' => __DIR__ . '/../../assets/uploads/temp/indigency/',
         '01' => __DIR__ . '/../../assets/uploads/temp/grades/'
     ];

@@ -21,7 +21,7 @@ $pathConfig = FilePathConfig::getInstance();
 function deleteAllStudentUploads() {
     global $pathConfig;
     $uploadsPath = $pathConfig->getStudentPath();
-    $documentTypes = ['enrollment_forms', 'grades', 'id_pictures', 'indigency', 'letter_mayor']; // Fixed: letter_mayor not letter_to_mayor
+    $documentTypes = ['enrollment_forms', 'grades', 'id_pictures', 'indigency', 'letter_to_mayor']; // Standardized: letter_to_mayor
     
     $totalDeleted = 0;
     $associatedDeleted = 0;
@@ -559,7 +559,7 @@ if (in_array($distribution_status, ['preparing', 'active']) && $has_completed_sn
     // Count total files in student folders (handles both new nested and old flat structure)
     $file_count = 0;
     $total_size = 0;
-    $document_types = ['enrollment_forms', 'grades', 'id_pictures', 'indigency', 'letter_mayor'];
+    $document_types = ['enrollment_forms', 'grades', 'id_pictures', 'indigency', 'letter_to_mayor'];
     
     foreach ($document_types as $type) {
         $folder = $pathConfig->getStudentPath() . DIRECTORY_SEPARATOR . $type;

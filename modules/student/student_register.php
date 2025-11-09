@@ -118,7 +118,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['cleanup_session_files
         ] : [
             __DIR__ . '/../../assets/uploads/temp/enrollment_forms/',
             __DIR__ . '/../../assets/uploads/temp/id_pictures/',
-            __DIR__ . '/../../assets/uploads/temp/letter_mayor/',
+            __DIR__ . '/../../assets/uploads/temp/letter_to_mayor/',
             __DIR__ . '/../../assets/uploads/temp/indigency/',
             __DIR__ . '/../../assets/uploads/temp/grades/'
         ];
@@ -2264,7 +2264,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processLetterOcr'])) 
 
     // Initialize FilePathConfig for path management
     $pathConfig = FilePathConfig::getInstance();
-    $uploadDir = $pathConfig->getTempPath('letter_mayor');
+    $uploadDir = $pathConfig->getTempPath('letter_to_mayor');
     if (!file_exists($uploadDir)) {
         mkdir($uploadDir, 0777, true);
     }
@@ -4949,7 +4949,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['register'])) {
         // Get temp directories using FilePathConfig (handles Railway/localhost automatically)
         $tempIDPictureDir = $pathConfig->getTempPath('id_pictures');
         $tempEnrollmentDir = $pathConfig->getTempPath('enrollment_forms');
-        $tempLetterDir = $pathConfig->getTempPath('letter_mayor');
+        $tempLetterDir = $pathConfig->getTempPath('letter_to_mayor');
         $tempIndigencyDir = $pathConfig->getTempPath('indigency');
         $tempGradesDir = $pathConfig->getTempPath('grades');
 
