@@ -320,6 +320,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['unpublish_schedule'])
         }
     }
     
+    // CONSTRAINT 3: Check if distribution has been completed but not yet compressed/archived
+    // This prevents unpublishing after "Complete Distribution" is clicked but before "End Distribution" compresses files
+    $uncompressed_snapshot_check = pg_query($connection, 
+        "SELECT snapshot_id, academic_year, semester, finalized_at 
+         FROM distribution_snapshots 
+         WHERE finalized_at IS NOT NULL 
+         AND (files_compressed = FALSE OR files_compressed IS NULL)
+         ORDER BY finalized_at DESC 
+         LIMIT 1"
+    );
+    
+    if ($uncompressed_snapshot_check && pg_num_rows($uncompressed_snapshot_check) > 0) {
+        $snapshot_data = pg_fetch_assoc($uncompressed_snapshot_check);
+        $formatted_date = date('F j, Y g:i A', strtotime($snapshot_data['finalized_at']));
+        echo "<script>alert('Cannot unpublish schedule: Distribution was completed on " . $formatted_date . " for " . $snapshot_data['academic_year'] . " " . $snapshot_data['semester'] . " but files have not been compressed yet. Please go to End Distribution to compress and archive the distribution files first.'); window.location.href='manage_schedules.php';</script>";
+        exit;
+    }
+    
     // If all constraints pass, allow unpublishing
     $settings['schedule_published'] = false;
     file_put_contents($settingsPath, json_encode($settings, JSON_PRETTY_PRINT));
@@ -341,6 +359,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['clear_schedule_data']
     $token = $_POST['csrf_token'] ?? '';
     if (!CSRFProtection::validateToken('manage_schedules', $token)) {
         echo "<script>alert('Security validation failed. Please refresh and try again.'); window.location.href='manage_schedules.php';</script>";
+        exit;
+    }
+    
+    // CRITICAL: Check if distribution has been completed but not yet compressed
+    // Prevent clearing schedule data if there are uncompressed distribution snapshots
+    $uncompressed_check = pg_query($connection, 
+        "SELECT snapshot_id, academic_year, semester, finalized_at 
+         FROM distribution_snapshots 
+         WHERE finalized_at IS NOT NULL 
+         AND (files_compressed = FALSE OR files_compressed IS NULL)
+         ORDER BY finalized_at DESC 
+         LIMIT 1"
+    );
+    
+    if ($uncompressed_check && pg_num_rows($uncompressed_check) > 0) {
+        $snapshot = pg_fetch_assoc($uncompressed_check);
+        $formatted_date = date('F j, Y g:i A', strtotime($snapshot['finalized_at']));
+        echo "<script>alert('Cannot clear schedule data: Distribution was completed on " . $formatted_date . " but files have not been compressed yet. Please go to End Distribution to compress and archive the distribution files first, then you can clear the schedule data.'); window.location.href='manage_schedules.php';</script>";
+        exit;
+    }
+    
+    // Check if any student has been scanned (additional safety check)
+    $scanned_check = pg_query($connection, "SELECT COUNT(*) as count FROM students WHERE status = 'given'");
+    $scanned_count = 0;
+    if ($scanned_check) {
+        $scanned_data = pg_fetch_assoc($scanned_check);
+        $scanned_count = intval($scanned_data['count']);
+    }
+    
+    if ($scanned_count > 0) {
+        echo "<script>alert('Cannot clear schedule data: " . $scanned_count . " student(s) have received their aid. You must complete and compress the distribution first before clearing schedule data.'); window.location.href='manage_schedules.php';</script>";
         exit;
     }
     
@@ -489,35 +538,54 @@ if ($usedDatesResult) {
             $unpublish_reason = '';
             
             if ($schedulePublished) {
-                // Check if any student has been scanned
-                $scanned_check = pg_query($connection, "SELECT COUNT(*) as count FROM students WHERE status = 'given'");
-                $scanned_count = 0;
-                if ($scanned_check) {
-                    $scanned_data = pg_fetch_assoc($scanned_check);
-                    $scanned_count = intval($scanned_data['count']);
+                // Check if distribution has been completed but not yet compressed
+                $uncompressed_snapshot_check = pg_query($connection, 
+                    "SELECT snapshot_id, academic_year, semester, finalized_at 
+                     FROM distribution_snapshots 
+                     WHERE finalized_at IS NOT NULL 
+                     AND (files_compressed = FALSE OR files_compressed IS NULL)
+                     ORDER BY finalized_at DESC 
+                     LIMIT 1"
+                );
+                
+                if ($uncompressed_snapshot_check && pg_num_rows($uncompressed_snapshot_check) > 0) {
+                    $can_unpublish = false;
+                    $snapshot_data = pg_fetch_assoc($uncompressed_snapshot_check);
+                    $formatted_date = date('F j, Y g:i A', strtotime($snapshot_data['finalized_at']));
+                    $unpublish_reason = 'Distribution was completed on ' . $formatted_date . ' for ' . $snapshot_data['academic_year'] . ' ' . $snapshot_data['semester'] . ' but files have not been compressed yet. Please go to <a href="end_distribution.php" class="alert-link">End Distribution</a> to compress and archive first.';
                 }
                 
-                if ($scanned_count > 0) {
-                    $can_unpublish = false;
-                    $unpublish_reason = $scanned_count . ' student(s) have already received their aid. Schedule must remain published for record-keeping.';
-                } else {
-                    // Check if we're within 24 hours of distribution start
-                    $earliest_date_query = pg_query($connection, "SELECT MIN(distribution_date) as earliest_date FROM schedules");
-                    if ($earliest_date_query) {
-                        $date_row = pg_fetch_assoc($earliest_date_query);
-                        $earliest_date = $date_row['earliest_date'];
-                        
-                        if ($earliest_date) {
-                            $start_timestamp = strtotime($earliest_date);
-                            $current_timestamp = time();
-                            $time_diff = $start_timestamp - $current_timestamp;
-                            $hours_until_start = $time_diff / 3600;
+                // Check if any student has been scanned (only if not already blocked by snapshot check)
+                if ($can_unpublish) {
+                    $scanned_check = pg_query($connection, "SELECT COUNT(*) as count FROM students WHERE status = 'given'");
+                    $scanned_count = 0;
+                    if ($scanned_check) {
+                        $scanned_data = pg_fetch_assoc($scanned_check);
+                        $scanned_count = intval($scanned_data['count']);
+                    }
+                    
+                    if ($scanned_count > 0) {
+                        $can_unpublish = false;
+                        $unpublish_reason = $scanned_count . ' student(s) have already received their aid. Schedule must remain published for record-keeping.';
+                    } else {
+                        // Check if we're within 24 hours of distribution start
+                        $earliest_date_query = pg_query($connection, "SELECT MIN(distribution_date) as earliest_date FROM schedules");
+                        if ($earliest_date_query) {
+                            $date_row = pg_fetch_assoc($earliest_date_query);
+                            $earliest_date = $date_row['earliest_date'];
                             
-                            if ($hours_until_start < 24 && $hours_until_start >= 0) {
-                                $can_unpublish = false;
-                                $formatted_date = date('F j, Y', $start_timestamp);
-                                $hours_remaining = round($hours_until_start, 1);
-                                $unpublish_reason = 'Distribution starts on ' . $formatted_date . ' (in ' . $hours_remaining . ' hours). Cannot unpublish within 24 hours of start.';
+                            if ($earliest_date) {
+                                $start_timestamp = strtotime($earliest_date);
+                                $current_timestamp = time();
+                                $time_diff = $start_timestamp - $current_timestamp;
+                                $hours_until_start = $time_diff / 3600;
+                                
+                                if ($hours_until_start < 24 && $hours_until_start >= 0) {
+                                    $can_unpublish = false;
+                                    $formatted_date = date('F j, Y', $start_timestamp);
+                                    $hours_remaining = round($hours_until_start, 1);
+                                    $unpublish_reason = 'Distribution starts on ' . $formatted_date . ' (in ' . $hours_remaining . ' hours). Cannot unpublish within 24 hours of start.';
+                                }
                             }
                         }
                     }
@@ -526,7 +594,7 @@ if ($usedDatesResult) {
                 // Show warning if unpublishing is blocked
                 if (!$can_unpublish) {
                     echo '<div class="alert alert-warning alert-dismissible fade show" role="alert">';
-                    echo '<i class="bi bi-lock-fill"></i> <strong>Schedule Locked:</strong> ' . htmlspecialchars($unpublish_reason);
+                    echo '<i class="bi bi-lock-fill"></i> <strong>Schedule Locked:</strong> ' . $unpublish_reason;
                     echo '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
                     echo '</div>';
                 }

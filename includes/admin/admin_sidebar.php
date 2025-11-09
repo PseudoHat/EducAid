@@ -398,7 +398,10 @@ $isSysControlsActive = in_array($current, $sysControlsFiles, true);
       <?= menu_link('audit_logs.php', 'bi bi-shield-lock-fill', 'Audit Trail', is_active('audit_logs.php', $current)); ?>
     <?php endif; ?>
 
-  
+    <!-- Reports & Analytics (super_admin only) -->
+    <?php if ($admin_role === 'super_admin'): ?>
+      <?= menu_link('reports.php', 'bi bi-file-earmark-bar-graph-fill', 'Reports & Analytics', is_active('reports.php', $current)); ?>
+    <?php endif; ?>
 
     <!-- Filler flex spacer -->
     <li class="mt-auto p-0 m-0"></li>

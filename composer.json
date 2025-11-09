@@ -5,7 +5,11 @@
   "require": {
     "php": ">=8.0",
     "ext-pgsql": "*",
-    "ext-pdo_pgsql": "*"
+    "ext-pdo_pgsql": "*",
+    "ext-gd": "*",
+    "ext-zip": "*",
+    "tecnickcom/tcpdf": "^6.7",
+    "phpoffice/phpspreadsheet": "^1.29"
   },
   "autoload": {
     "psr-4": {
