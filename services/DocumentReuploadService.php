@@ -2280,12 +2280,14 @@ class DocumentReuploadService {
                     $uploadedDocs[] = $row['document_type_code'];
                 }
                 
-                // If all documents are uploaded, clear the rejection status
+                // If all documents are uploaded, notify student but KEEP them in reupload mode
+                // Admin must approve the reuploaded documents before clearing the reupload flag
                 if (count($uploadedDocs) >= count($documentsToReupload)) {
+                    // Don't clear needs_document_upload yet - wait for admin approval
+                    // Only clear documents_to_reupload list since all are now uploaded
                     pg_query_params($this->db,
                         "UPDATE students 
-                         SET documents_to_reupload = NULL,
-                             needs_document_upload = FALSE
+                         SET documents_to_reupload = NULL
                          WHERE student_id = $1",
                         [$studentId]
                     );
@@ -2295,6 +2297,8 @@ class DocumentReuploadService {
                          VALUES ($1, $2, FALSE, NOW())",
                         [$studentId, 'All required documents have been re-uploaded successfully. An admin will review them shortly.']
                     );
+                    
+                    error_log("DocumentReuploadService: All documents uploaded for $studentId - Waiting for admin approval");
                 }
             }
         } catch (Exception $e) {

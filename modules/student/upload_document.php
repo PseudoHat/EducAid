@@ -27,6 +27,7 @@ $student_query = pg_query_params($connection,
     "SELECT s.*, 
             COALESCE(s.needs_document_upload, FALSE) as needs_upload,
             s.documents_to_reupload,
+            s.document_rejection_reasons,
             b.name as barangay_name,
             u.name as university_name,
             yl.name as year_level_name
@@ -78,6 +79,22 @@ if ($needs_upload) {
     // If no specific documents listed, allow all uploads
     if (empty($documents_to_reupload)) {
         $documents_to_reupload = ['00', '01', '02', '03', '04']; // All document types
+    }
+}
+
+// Parse rejection reasons (if any)
+$rejection_reasons_map = [];
+if (!empty($student['document_rejection_reasons'])) {
+    $rejection_data = json_decode($student['document_rejection_reasons'], true);
+    if (is_array($rejection_data)) {
+        foreach ($rejection_data as $rejection) {
+            if (isset($rejection['code']) && isset($rejection['reason'])) {
+                $rejection_reasons_map[$rejection['code']] = [
+                    'name' => $rejection['name'] ?? '',
+                    'reason' => $rejection['reason']
+                ];
+            }
+        }
     }
 }
 
@@ -1475,6 +1492,22 @@ $page_title = 'Upload Documents';
                                 </div>
                             </div>
                         </div>
+                        
+                        <?php if (isset($rejection_reasons_map[$type_code])): ?>
+                        <!-- Rejection Reason Alert -->
+                        <div class="alert alert-danger mb-3 mt-3" role="alert">
+                            <div class="d-flex align-items-start">
+                                <i class="bi bi-exclamation-triangle-fill me-2 fs-5"></i>
+                                <div class="flex-grow-1">
+                                    <strong>Document Rejected</strong>
+                                    <p class="mb-0 mt-1">
+                                        <strong>Reason:</strong> <?= htmlspecialchars($rejection_reasons_map[$type_code]['reason']) ?>
+                                    </p>
+                                    <small class="text-muted">Please re-upload this document with the corrections.</small>
+                                </div>
+                            </div>
+                        </div>
+                        <?php endif; ?>
                         
                         <?php if ($has_document): ?>
                         <!-- Show existing document -->
