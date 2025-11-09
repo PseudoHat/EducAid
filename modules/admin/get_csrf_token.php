@@ -36,8 +36,25 @@ if (!in_array($action, $validActions)) {
     exit;
 }
 
-// Generate a fresh token for the specified action
-$token = CSRFProtection::generateToken($action);
+// Reuse the latest existing token for this action when available to avoid unnecessary rotation
+$token = null;
+if (isset($_SESSION['csrf_tokens'][$action])) {
+    $stored = $_SESSION['csrf_tokens'][$action];
+    if (is_array($stored) && !empty($stored)) {
+        // Return the most recent token without generating a new one
+        $token = end($stored);
+    } elseif (is_string($stored) && $stored !== '') {
+        $token = $stored;
+    }
+}
+
+if (!$token) {
+    // No existing token found; generate a new one
+    $token = CSRFProtection::generateToken($action);
+}
+
+// Debug logging (safe: only prefix)
+error_log(sprintf('CSRF: get_csrf_token return for %s -> %s...', $action, substr($token, 0, 16)));
 
 // Return the token
 header('Content-Type: application/json');

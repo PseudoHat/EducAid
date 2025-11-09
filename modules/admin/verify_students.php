@@ -10,6 +10,19 @@ if (!isset($_SESSION['admin_username'])) {
     exit;
 }
 
+// Lightweight API for sidebar: return active students count as JSON
+if (isset($_GET['api']) && $_GET['api'] === 'badge_count') {
+    header('Content-Type: application/json');
+    $countRes = @pg_query($connection, "SELECT COUNT(*) FROM students WHERE status = 'active' AND (is_archived IS NULL OR is_archived = FALSE)");
+    $count = 0;
+    if ($countRes) {
+        $count = (int) pg_fetch_result($countRes, 0, 0);
+        pg_free_result($countRes);
+    }
+    echo json_encode(['count' => $count]);
+    exit;
+}
+
 // Check workflow permissions - must have active distribution
 $workflow_status = getWorkflowStatus($connection);
 if (!$workflow_status['can_verify_students']) {

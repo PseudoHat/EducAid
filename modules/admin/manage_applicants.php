@@ -242,10 +242,15 @@ $migration_result = $_SESSION['migration_result'] ?? null;
 $csrfMigrationToken = CSRFProtection::generateToken('csv_migration');
 
 // Generate CSRF tokens for applicant approval flows
+// Note: reject_documents token is NOT generated here—it's fetched via AJAX when the modal opens
+// to avoid rotation issues from the page auto-refresh mechanism.
 $csrfApproveApplicantToken = CSRFProtection::generateToken('approve_applicant');
 $csrfOverrideApplicantToken = CSRFProtection::generateToken('override_applicant');
 $csrfArchiveStudentToken = CSRFProtection::generateToken('archive_student');
-$csrfRejectDocumentsToken = CSRFProtection::generateToken('reject_documents');
+// For reject_documents, set empty placeholder - the actual token will be fetched via AJAX when modal opens
+$csrfRejectDocumentsToken = ''; // Will be populated by AJAX fetch
+// Reject applicant token (if needed in future)
+$csrfRejectApplicantToken = CSRFProtection::generateToken('reject_applicant');
 
 // Clear migration sessions on GET request to prevent resubmission warnings
 if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['clear_migration'])) {
@@ -1167,6 +1172,9 @@ function render_pagination($page, $totalPages) {
 
 // Handle verify/reject/archive actions before AJAX or page render
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    error_log("=== POST REQUEST to manage_applicants.php ===");
+    error_log("POST keys: " . implode(', ', array_keys($_POST)));
+    
     $applicantCsrfAction = null;
     if (!empty($_POST['mark_verified']) && isset($_POST['student_id'])) {
         $applicantCsrfAction = 'approve_applicant';
@@ -1182,11 +1190,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($applicantCsrfAction !== null) {
         $token = $_POST['csrf_token'] ?? '';
-        if (!CSRFProtection::validateToken($applicantCsrfAction, $token)) {
-            $_SESSION['error'] = 'Security validation failed. Please refresh the page and try again.';
+
+        // Extra diagnostics
+        $storedTokens = $_SESSION['csrf_tokens'][$applicantCsrfAction] ?? [];
+        error_log("CSRF Validation - Action: $applicantCsrfAction");
+        error_log("CSRF Validation - Token received (first 20): " . ($token ? substr($token, 0, 20) : 'MISSING') . "...");
+        error_log("CSRF Validation - Stored token count: " . (is_array($storedTokens) ? count($storedTokens) : (empty($storedTokens)?0:1)));
+        
+        // Log all stored token prefixes for comparison
+        if (is_array($storedTokens) && !empty($storedTokens)) {
+            $prefixes = array_map(function($t) { return substr($t, 0, 16); }, $storedTokens);
+            error_log("CSRF Validation - Stored tokens (first 16): " . implode(', ', $prefixes));
+        }
+        
+        error_log("CSRF Validation - POST keys: " . implode(', ', array_keys($_POST)));
+
+        // For reject_documents and reject_applicant allow re-use (do not consume on first attempt)
+        $consume = !in_array($applicantCsrfAction, ['reject_documents','reject_applicant'], true);
+        $valid = CSRFProtection::validateToken($applicantCsrfAction, $token, $consume);
+        if (!$valid) {
+            error_log("CSRF Validation FAILED for action: $applicantCsrfAction | Stored tokens: " . json_encode($storedTokens));
+            // Regenerate a fresh token to avoid forcing full page refresh
+            if ($applicantCsrfAction === 'reject_documents') {
+                $newToken = CSRFProtection::generateToken('reject_documents');
+                $_SESSION['pending_csrf_refresh'] = $newToken; // flag for front-end (optional)
+                error_log("CSRF Validation - Issued replacement token for reject_documents: " . substr($newToken,0,16));
+            } elseif ($applicantCsrfAction === 'reject_applicant') {
+                $newToken = CSRFProtection::generateToken('reject_applicant');
+                $_SESSION['pending_csrf_refresh_reject_applicant'] = $newToken;
+                error_log("CSRF Validation - Issued replacement token for reject_applicant: " . substr($newToken,0,16));
+            }
+            $_SESSION['error'] = 'Security validation failed. Please retry the action.';
             header('Location: ' . $_SERVER['PHP_SELF']);
             exit;
         }
+
+        error_log("CSRF Validation PASSED for action: $applicantCsrfAction (consume=" . ($consume?'true':'false') . ")");
     }
 
     // Verify student
@@ -1214,13 +1253,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             [$sid]
         );
         
-        // Move files from temp to permanent storage AND update documents table
-        require_once __DIR__ . '/../../services/UnifiedFileService.php';
-        $fileService = new UnifiedFileService($connection);
-        $fileMoveResult = $fileService->moveToPermStorage($sid, $_SESSION['admin_id']);
+        // Check if student has temp documents that need to be moved
+        // (Skip if files were already moved during registration approval or are re-uploads)
+        $tempDocsCheck = pg_query_params($connection,
+            "SELECT COUNT(*) FROM documents WHERE student_id = $1 AND status = 'temp'",
+            [$sid]
+        );
+        $hasTempDocs = pg_fetch_result($tempDocsCheck, 0, 0) > 0;
         
-        if (!$fileMoveResult['success']) {
-            error_log("UnifiedFileService: Error moving files for student $sid: " . implode(', ', $fileMoveResult['errors'] ?? []));
+        if ($hasTempDocs) {
+            // Move files from temp to permanent storage AND update documents table
+            require_once __DIR__ . '/../../services/UnifiedFileService.php';
+            $fileService = new UnifiedFileService($connection);
+            $fileMoveResult = $fileService->moveToPermStorage($sid, $_SESSION['admin_id']);
+            
+            if (!$fileMoveResult['success']) {
+                error_log("UnifiedFileService: Error moving files for student $sid: " . implode(', ', $fileMoveResult['errors'] ?? []));
+            } else {
+                error_log("UnifiedFileService: Successfully moved temp files to permanent for student $sid");
+            }
+        } else {
+            error_log("UnifiedFileService: Skipping file move for student $sid - no temp documents found (files likely already permanent)");
         }
         
         // Add admin notification
@@ -1394,6 +1447,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     // Reject Documents - Selective rejection with reasons
     if (!empty($_POST['reject_documents']) && isset($_POST['student_id'])) {
+        error_log("=== REJECT DOCUMENTS HANDLER START ===");
+        error_log("POST keys: " . implode(', ', array_keys($_POST)));
+        error_log("CSRF token from POST: " . substr(($_POST['csrf_token'] ?? 'MISSING'), 0, 20) . "...");
+        
         $student_id = trim($_POST['student_id']);
         error_log("Reject documents triggered for student: " . $student_id);
         
@@ -4875,7 +4932,7 @@ function showValidationModal() {
 }
 
 // Reject Documents Modal Functions
-function showRejectDocumentsModal(studentId, studentName) {
+async function showRejectDocumentsModal(studentId, studentName) {
     // If the fullscreen Document Viewer is open, close it first so this modal isn't hidden behind it
     try {
         const dv = document.getElementById('docViewerBackdrop');
@@ -4895,28 +4952,40 @@ function showRejectDocumentsModal(studentId, studentName) {
         if (vBackdrop) vBackdrop.classList.remove('show');
     } catch (e) { /* no-op */ }
 
-    // Fetch a fresh CSRF token from the server before showing the modal
-    fetch('get_csrf_token.php?action=reject_documents')
-        .then(response => response.json())
-        .then(data => {
-            if (data.success && data.token) {
-                // Update the CSRF token in the form
-                const tokenInput = document.querySelector('#rejectDocumentsForm input[name="csrf_token"]');
-                if (tokenInput) {
-                    tokenInput.value = data.token;
-                }
-            }
-        })
-        .catch(error => {
-            console.error('Failed to fetch CSRF token:', error);
-        });
-
     // Set values in modal
     document.getElementById('rejectStudentId').value = studentId;
     document.getElementById('rejectStudentName').textContent = studentName;
     
-    // Reset form
+    // Reset form FIRST (before token refresh, as reset will clear the token input)
     document.getElementById('rejectDocumentsForm').reset();
+    
+    // Refresh CSRF token AFTER reset to ensure token is always fresh and not cleared by reset()
+    try {
+        console.log('[RejectDocuments] Fetching fresh CSRF token...');
+        const response = await fetch('get_csrf_token.php?action=reject_documents');
+        if (response.ok) {
+            const data = await response.json();
+            console.log('[RejectDocuments] Token response:', data);
+            if (data && data.success && data.token) {
+                const tokenInput = document.querySelector('#rejectDocumentsForm input[name="csrf_token"]');
+                if (tokenInput) {
+                    const oldToken = tokenInput.value;
+                    tokenInput.value = data.token;
+                    console.log('[RejectDocuments] CSRF token updated');
+                    console.log('[RejectDocuments] Old token (first 16):', oldToken.substring(0, 16));
+                    console.log('[RejectDocuments] New token (first 16):', data.token.substring(0, 16));
+                } else {
+                    console.error('[RejectDocuments] Token input field not found!');
+                }
+            } else {
+                console.error('[RejectDocuments] Invalid token response:', data);
+            }
+        } else {
+            console.warn('[RejectDocuments] CSRF refresh failed: HTTP', response.status);
+        }
+    } catch(e) {
+        console.error('[RejectDocuments] CSRF refresh exception:', e);
+    }
     
     // Hide all reason containers and uncheck all checkboxes
     const reasonContainers = document.querySelectorAll('.reject-reason-container');
@@ -4927,6 +4996,10 @@ function showRejectDocumentsModal(studentId, studentName) {
     const checkboxes = document.querySelectorAll('input[name="reject_doc_types[]"]');
     checkboxes.forEach(checkbox => {
         checkbox.checked = false;
+        // Re-enable by default; availability will adjust below
+        checkbox.disabled = false;
+        const label = document.querySelector('label[for="' + checkbox.id + '"]');
+        if (label) label.removeAttribute('title');
     });
     
     // Disable submit button
@@ -4941,6 +5014,73 @@ function showRejectDocumentsModal(studentId, studentName) {
     
     // Use small timeout to ensure other overlays are fully hidden before showing this modal
     setTimeout(() => modal.show(), 30);
+
+    // After showing, fetch current doc statuses and disable unavailable or already-rejected types
+    await updateRejectDocumentsAvailability(studentId);
+}
+
+// Map reject modal codes to document keys returned by get_applicant_details.php
+const _rejectDocCodeToKey = {
+    '04': 'id_picture',
+    '00': 'eaf',
+    '01': 'grades',
+    '02': 'letter_to_mayor',
+    '03': 'certificate_of_indigency'
+};
+
+// Adjust availability for rejection:
+//  - Disable documents that are already approved OR already rejected (cannot re-reject / no action needed)
+//  - Enable documents that are missing (allow admin to flag them with a reason: "Not uploaded" etc.)
+//  - Enable documents that exist but are still in temp/unverified state
+async function updateRejectDocumentsAvailability(studentId) {
+    try {
+        const url = 'get_applicant_details.php?student_id=' + encodeURIComponent(studentId) + '&_=' + Date.now();
+        const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+        if (!res.ok) return; // fallback: leave all enabled
+        const data = await res.json();
+        if (!data || !data.success || !data.documents) return;
+
+        Object.entries(_rejectDocCodeToKey).forEach(([code, key]) => {
+            const cb = document.querySelector('input[name="reject_doc_types[]"][value="' + code + '"]');
+            if (!cb) return;
+            const label = document.querySelector('label[for="' + cb.id + '"]');
+            const reasonContainer = document.getElementById('reason_container_' + code);
+            const doc = data.documents[key];
+
+            // Check if document is missing (endpoint sets missing:true when not found)
+            const isMissing = !doc || doc.missing === true;
+            
+            // Extract status with fallback field names
+            const status = (doc && (doc.status || doc.document_status || doc.state || doc.verdict)) ? String(doc.status || doc.document_status || doc.state || doc.verdict).toLowerCase() : null;
+            const isRejected = status === 'rejected';
+
+            // Rule: Only allow selecting documents that EXIST (not missing) and are not already rejected
+            if (isMissing) {
+                cb.disabled = true;
+                if (reasonContainer) reasonContainer.style.display = 'none';
+                if (label) label.title = 'Disabled: not uploaded';
+                return;
+            }
+            if (isRejected) {
+                cb.disabled = true;
+                if (reasonContainer) reasonContainer.style.display = 'none';
+                if (label) label.title = 'Disabled: already rejected';
+                return;
+            }
+
+            // Has a file and not rejected: allow selection regardless of approved/pending status
+            cb.disabled = false;
+            if (label) label.title = 'Uploaded: you can request re-upload';
+        });
+
+        // Re-evaluate submit button enabled state after applying disables
+        const enabledChecked = Array.from(document.querySelectorAll('input[name="reject_doc_types[]"]')).some(cb => cb.checked && !cb.disabled);
+        const submitBtn = document.getElementById('confirmRejectBtn');
+        if (submitBtn) submitBtn.disabled = !enabledChecked;
+    } catch (e) {
+        // Silent fail; modal still usable with all options enabled
+        console.warn('updateRejectDocumentsAvailability failed', e);
+    }
 }
 
 // Handle checkbox changes to show/hide reason inputs
@@ -4965,20 +5105,28 @@ document.addEventListener('DOMContentLoaded', function() {
                 reasonInput.value = '';
             }
             
-            // Enable/disable submit button based on whether any checkbox is checked
-            const anyChecked = Array.from(checkboxes).some(cb => cb.checked);
+            // Enable/disable submit button based on whether any non-disabled checkbox is checked
+            const anyChecked = Array.from(checkboxes).some(cb => cb.checked && !cb.disabled);
             submitBtn.disabled = !anyChecked;
         });
     });
     
     // Validate form before submission
     document.getElementById('rejectDocumentsForm').addEventListener('submit', function(e) {
-        const checkedBoxes = Array.from(checkboxes).filter(cb => cb.checked);
+        const checkedBoxes = Array.from(checkboxes).filter(cb => cb.checked && !cb.disabled);
         
         if (checkedBoxes.length === 0) {
             e.preventDefault();
             alert('Please select at least one document to reject.');
             return false;
+        }
+        
+        // Log token being submitted for debugging
+        const tokenInput = document.querySelector('#rejectDocumentsForm input[name="csrf_token"]');
+        if (tokenInput) {
+            console.log('[RejectDocuments] Submitting with token (first 16):', tokenInput.value.substring(0, 16));
+        } else {
+            console.error('[RejectDocuments] No token input found at submission!');
         }
         
         // Check that all checked documents have reasons

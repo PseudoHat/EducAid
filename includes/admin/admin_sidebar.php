@@ -240,7 +240,7 @@ $isSysControlsActive = in_array($current, $sysControlsFiles, true);
             <?php if ($canVerifyStudents): ?>
               <a class="submenu-link <?= is_active('verify_students.php', $current) ? 'active' : '' ?>" href="verify_students.php">
                 <i class="bi bi-person-check me-2"></i> Verify Students
-                <span class="badge bg-info ms-2">Ready</span>
+                <span id="verify-students-badge" class="badge bg-transparent ms-2" role="status" aria-live="polite"></span>
               </a>
             <?php else: ?>
               <a class="submenu-link text-muted" href="#"
@@ -573,6 +573,74 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   } catch (err) {
     console.debug('manage applicants badge init error', err);
+  }
+});
+</script>
+
+<!-- Live badge for Verify Students (client-side polling) -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  try {
+    const sidebar = document.getElementById('sidebar');
+    if (!sidebar) return;
+    
+    // Find badge element by ID (already rendered in HTML)
+    const badgeEl = document.getElementById('verify-students-badge');
+    if (!badgeEl) return;
+
+    // Polling function to update count
+    const apiUrl = 'verify_students.php?api=badge_count';
+    async function updateBadge() {
+      try {
+        const res = await fetch(apiUrl, {cache: 'no-store'});
+        if (!res.ok) return;
+        const data = await res.json();
+        const count = parseInt(data.count || 0, 10) || 0;
+        if (count > 0) {
+          badgeEl.textContent = count;
+          badgeEl.classList.remove('bg-transparent', 'bg-secondary');
+          badgeEl.classList.add(count > 9 ? 'bg-danger' : 'bg-success');
+          badgeEl.setAttribute('aria-label', count + ' active students to verify');
+        } else {
+          badgeEl.textContent = '';
+          badgeEl.classList.remove('bg-danger', 'bg-success');
+          badgeEl.classList.add('bg-transparent');
+          badgeEl.setAttribute('aria-label', '');
+        }
+      } catch (e) {
+        // silent
+      }
+    }
+
+    // initial update shortly after load and then every 90s
+    let badgePollInterval;
+    
+    function startBadgePolling() {
+      if (badgePollInterval) clearInterval(badgePollInterval);
+      badgePollInterval = setInterval(() => {
+        // Only poll if page is visible
+        if (!document.hidden) {
+          updateBadge();
+        }
+      }, 90000);
+    }
+    
+    setTimeout(() => {
+      updateBadge();
+      startBadgePolling();
+    }, 700); // Slightly delayed to avoid race with other badges
+    
+    // Pause polling when page is hidden
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) {
+        updateBadge();
+        startBadgePolling();
+      } else if (badgePollInterval) {
+        clearInterval(badgePollInterval);
+      }
+    });
+  } catch (err) {
+    console.debug('verify students badge init error', err);
   }
 });
 </script>
