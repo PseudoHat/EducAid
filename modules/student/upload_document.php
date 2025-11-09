@@ -908,55 +908,66 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $can_upload) {
         );
         
         if ($delete_query) {
-            // Delete the actual file and associated OCR files if they exist
+            // Delete ALL files for this student and document type from permanent storage
+            // Use FilePathConfig to get the correct permanent directory structure
+            require_once __DIR__ . '/../../config/FilePathConfig.php';
+            $pathConfig = FilePathConfig::getInstance();
+            
+            // Get document folder mapping
+            $docFolderMap = [
+                '04' => 'id_pictures',
+                '00' => 'enrollment_forms',
+                '01' => 'grades',
+                '02' => 'letter_to_mayor',
+                '03' => 'indigency'
+            ];
+            
+            if (isset($docFolderMap[$doc_type_code])) {
+                $docFolder = $docFolderMap[$doc_type_code];
+                
+                // Build student-specific directory path: assets/uploads/student/{doc_type}/{student_id}/
+                $studentDir = $pathConfig->getStudentPath($docFolder) . DIRECTORY_SEPARATOR . $student_id;
+                
+                if (is_dir($studentDir)) {
+                    error_log("Re-upload: Deleting ALL files from directory - $studentDir");
+                    
+                    // Delete ALL files in the student's directory for this document type
+                    $allFiles = glob($studentDir . DIRECTORY_SEPARATOR . '*');
+                    $deletedCount = 0;
+                    foreach ($allFiles as $file) {
+                        if (is_file($file)) {
+                            if (@unlink($file)) {
+                                $deletedCount++;
+                                error_log("Re-upload: Deleted - " . basename($file));
+                            } else {
+                                error_log("Re-upload: Failed to delete - " . basename($file));
+                            }
+                        }
+                    }
+                    
+                    error_log("Re-upload: Deleted $deletedCount file(s) for student $student_id, doc type $doc_type_code");
+                    
+                    // Remove the now-empty student directory
+                    if (count(glob($studentDir . DIRECTORY_SEPARATOR . '*')) === 0) {
+                        @rmdir($studentDir);
+                        error_log("Re-upload: Removed empty student directory - $studentDir");
+                    }
+                } else {
+                    error_log("Re-upload: Student directory not found - $studentDir");
+                }
+            }
+            
+            // Also delete from old file path (if stored in database) - for backwards compatibility
             if ($file_to_delete) {
                 $server_root = dirname(__DIR__, 2);
-                
-                // Convert web path to server path
                 $file_path = $file_to_delete;
                 if (strpos($file_path, '../../') === 0) {
                     $file_path = $server_root . '/' . substr($file_path, 6);
                 }
                 
-                // Get the directory containing the file
-                $file_dir = dirname($file_path);
-                $file_basename = basename($file_path);
-                
-                error_log("Re-upload: Deleting files from directory - $file_dir");
-                
-                // Delete main file
                 if (file_exists($file_path)) {
                     @unlink($file_path);
-                    error_log("Re-upload: Deleted main file - $file_path");
-                }
-                
-                // Delete associated OCR files (same directory, same basename + extensions)
-                $ocr_extensions = ['.ocr.txt', '.tsv', '.verify.json', '.ocr.json'];
-                foreach ($ocr_extensions as $ext) {
-                    $ocr_file = $file_path . $ext;
-                    if (file_exists($ocr_file)) {
-                        @unlink($ocr_file);
-                        error_log("Re-upload: Deleted OCR file - $ocr_file");
-                    }
-                }
-                
-                // Check if files are in a student-specific subdirectory (e.g., /student/{doc_type}/{student_id}/)
-                // If the directory only contains this student's files, delete the entire directory
-                if (is_dir($file_dir) && basename($file_dir) == $student_id) {
-                    // This is a student-specific directory, delete all files in it
-                    $files_in_dir = glob($file_dir . '/*');
-                    foreach ($files_in_dir as $file) {
-                        if (is_file($file)) {
-                            @unlink($file);
-                            error_log("Re-upload: Deleted file from student directory - $file");
-                        }
-                    }
-                    
-                    // Try to remove the now-empty directory
-                    if (count(glob($file_dir . '/*')) === 0) {
-                        @rmdir($file_dir);
-                        error_log("Re-upload: Removed empty student directory - $file_dir");
-                    }
+                    error_log("Re-upload: Deleted old database path file - $file_path");
                 }
             }
             

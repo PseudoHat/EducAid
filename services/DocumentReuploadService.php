@@ -149,6 +149,19 @@ class DocumentReuploadService {
                 error_log("DocumentReuploadService: Created student folder: $permanentFolder");
             }
             
+            // DELETE ALL EXISTING FILES for this student and document type to prevent duplicates
+            // This ensures clean re-upload without accumulating old versions
+            $existingFiles = glob($permanentFolder . $studentId . '_' . $docInfo['name'] . '_*');
+            if (!empty($existingFiles)) {
+                foreach ($existingFiles as $oldFile) {
+                    if (is_file($oldFile)) {
+                        @unlink($oldFile);
+                        error_log("DocumentReuploadService: Deleted old file during reupload: " . basename($oldFile));
+                    }
+                }
+                error_log("DocumentReuploadService: Cleaned up " . count($existingFiles) . " old files before new upload");
+            }
+            
             // Generate unique filename with timestamp to prevent overwrites
             $originalFilename = basename($tempPath);
             $extension = pathinfo($originalFilename, PATHINFO_EXTENSION);
@@ -252,6 +265,19 @@ class DocumentReuploadService {
                 $ocrData['verification_details'] = $verifyJson;
                 
                 error_log("confirmUpload: Read verification data - Confidence: {$ocrData['ocr_confidence']}%, Status: {$ocrData['verification_status']}");
+            }
+            
+            // DELETE existing database record for this document type to prevent duplicates
+            // This ensures only ONE record per student per document type
+            $deleteResult = pg_query_params($this->db,
+                "DELETE FROM documents WHERE student_id = $1 AND document_type_code = $2",
+                [$studentId, $docTypeCode]
+            );
+            if ($deleteResult) {
+                $deletedRows = pg_affected_rows($deleteResult);
+                if ($deletedRows > 0) {
+                    error_log("DocumentReuploadService: Deleted $deletedRows existing database record(s) for $studentId - $docTypeCode");
+                }
             }
             
             // Use DocumentService to save to database
