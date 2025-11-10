@@ -1802,6 +1802,17 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
                                 <?php unset($_SESSION['logout_message']); ?>
                                 <?php endif; ?>
 
+                                <!-- Archived Account Message -->
+                                <?php if (isset($_GET['archived']) && $_GET['archived'] == '1'): ?>
+                                <div class="alert alert-warning alert-dismissible fade show" role="alert">
+                                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                                    <strong>Account Archived</strong><br>
+                                    Your account has been archived because you did not advance to the next year level. 
+                                    Please contact the admin office for verification and account reactivation.
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                                </div>
+                                <?php endif; ?>
+
                                 <!-- Step 1: Simplified Credentials (Email + Password Only) -->
                                 <div id="step1" class="step active">
                                     <form id="loginForm">

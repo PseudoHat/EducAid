@@ -82,36 +82,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     
                     if ($result && pg_affected_rows($result) > 0) {
                         // Update or create course mapping
-                        $courseQuery = "SELECT course, university_id FROM students WHERE student_id = $1";
-                        $courseResult = pg_query_params($connection, $courseQuery, [$student_id]);
-                        $courseData = pg_fetch_assoc($courseResult);
-                        
-                        if ($courseData && !empty($courseData['course'])) {
-                            $checkMappingQuery = "SELECT mapping_id, occurrence_count 
-                                                 FROM courses_mapping 
-                                                 WHERE raw_course_name = $1 AND university_id = $2";
-                            $mappingResult = pg_query_params($connection, $checkMappingQuery, [
-                                $courseData['course'],
-                                $courseData['university_id']
-                            ]);
-                            
-                            if ($mappingResult && pg_num_rows($mappingResult) > 0) {
-                                $mapping = pg_fetch_assoc($mappingResult);
-                                pg_query_params($connection, 
-                                    "UPDATE courses_mapping 
-                                     SET occurrence_count = occurrence_count + 1, last_seen = NOW()
-                                     WHERE mapping_id = $1", 
-                                    [$mapping['mapping_id']]);
-                            } else {
-                                pg_query_params($connection, 
-                                    "INSERT INTO courses_mapping 
-                                     (raw_course_name, normalized_course, university_id, program_duration,
-                                      occurrence_count, is_verified, created_by, created_at, last_seen)
-                                     VALUES ($1, $2, $3, 4, 1, FALSE, $4, NOW(), NOW())", 
-                                    [$courseData['course'], $courseData['course'], 
-                                     $courseData['university_id'], $_SESSION['admin_id'] ?? null]);
-                            }
-                        }
+                        // Course mapping logic removed - no longer needed
+                        // Students will declare their year level at enrollment
                         
                         // Use UnifiedFileService to move all documents from temp to permanent storage
                         $moveResult = $fileService->moveToPermStorage($student_id, $_SESSION['admin_id'] ?? null);
@@ -194,13 +166,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             }
                         }
                         
-                        // Delete related records first (due to foreign key constraints)
-                        pg_query_params($connection, "DELETE FROM qr_logs WHERE student_id = $1", [$student_id]);
-                        pg_query_params($connection, "DELETE FROM distributions WHERE student_id = $1", [$student_id]);
-                        pg_query_params($connection, "DELETE FROM enrollment_forms WHERE student_id = $1", [$student_id]);
-                        pg_query_params($connection, "DELETE FROM documents WHERE student_id = $1", [$student_id]);
+                        // Delete database records
+                        // Note: 'under_registration' students only have records in students and documents tables
+                        @pg_query_params($connection, "DELETE FROM documents WHERE student_id = $1", [$student_id]);
                         
-                        // Finally delete the student record
+                        // Delete the student record
                         $deleteResult = pg_query_params($connection, "DELETE FROM students WHERE student_id = $1", [$student_id]);
                         
                         if ($deleteResult) {
@@ -295,42 +265,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 
                 // Update or create course mapping after approval
-                $courseQuery = "SELECT course, course_verified, university_id FROM students WHERE student_id = $1";
-                $courseResult = pg_query_params($connection, $courseQuery, [$student_id]);
-                $courseData = pg_fetch_assoc($courseResult);
-                
-                if ($courseData && !empty($courseData['course'])) {
-                    // Check if course mapping exists
-                    $checkMappingQuery = "SELECT mapping_id, is_verified, occurrence_count 
-                                         FROM courses_mapping 
-                                         WHERE raw_course_name = $1 AND university_id = $2";
-                    $mappingResult = pg_query_params($connection, $checkMappingQuery, [
-                        $courseData['course'],
-                        $courseData['university_id']
-                    ]);
-                    
-                    if ($mappingResult && pg_num_rows($mappingResult) > 0) {
-                        // Update existing mapping - increment occurrence count
-                        $mapping = pg_fetch_assoc($mappingResult);
-                        $updateMappingQuery = "UPDATE courses_mapping 
-                                              SET occurrence_count = occurrence_count + 1,
-                                                  last_seen = NOW()
-                                              WHERE mapping_id = $1";
-                        pg_query_params($connection, $updateMappingQuery, [$mapping['mapping_id']]);
-                    } else {
-                        // Create new unverified course mapping (default to 4-year program)
-                        $insertMappingQuery = "INSERT INTO courses_mapping 
-                                              (raw_course_name, normalized_course, university_id, 
-                                               program_duration, occurrence_count, is_verified, created_by, created_at, last_seen)
-                                              VALUES ($1, $2, $3, 4, 1, FALSE, $4, NOW(), NOW())";
-                        pg_query_params($connection, $insertMappingQuery, [
-                            $courseData['course'],
-                            $courseData['course'], // Use raw name as normalized until verified
-                            $courseData['university_id'],
-                            $_SESSION['admin_id'] ?? null
-                        ]);
-                    }
-                }
+                // Course mapping logic removed - no longer needed
+                // Students will declare their year level at enrollment
                 
                 error_log("Step 3: About to call moveToPermStorage for student: $student_id");
                 
@@ -473,13 +409,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                 }
                 
-                // Delete database records (respecting foreign key constraints)
-                pg_query_params($connection, "DELETE FROM qr_logs WHERE student_id = $1", [$student_id]);
-                pg_query_params($connection, "DELETE FROM distributions WHERE student_id = $1", [$student_id]);
-                pg_query_params($connection, "DELETE FROM documents WHERE student_id = $1", [$student_id]);
-                pg_query_params($connection, "DELETE FROM grade_uploads WHERE student_id = $1", [$student_id]);
+                // Delete database records
+                // Note: Students with status 'under_registration' should ONLY have records in:
+                // - students table (main record)
+                // - documents table (uploaded verification documents)
+                // They won't have records in distributions, qr_logs, grade_uploads, etc. since they haven't been approved yet
                 
-                // Finally delete the student record - this frees up the slot completely
+                // Delete uploaded documents
+                @pg_query_params($connection, "DELETE FROM documents WHERE student_id = $1", [$student_id]);
+                
+                // Delete the student record - this automatically frees up the slot
                 $deleteResult = pg_query_params($connection, "DELETE FROM students WHERE student_id = $1", [$student_id]);
                 
                 if ($deleteResult) {
@@ -650,21 +589,16 @@ $countResult = pg_query_params($connection, $countQuery, $params);
 $totalRecords = intval(pg_fetch_result($countResult, 0, 0));
 $totalPages = ceil($totalRecords / $limit);
 
-// Fetch pending registrations with pagination including confidence scores and course mapping info
-$query = "SELECT DISTINCT ON (s.student_id) s.*, b.name as barangay_name, u.name as university_name, yl.name as year_level_name,
+// Fetch pending registrations with pagination including confidence scores
+$query = "SELECT s.*, b.name as barangay_name, u.name as university_name, yl.name as year_level_name,
                  COALESCE(s.confidence_score, calculate_confidence_score(s.student_id)) as confidence_score,
-                 get_confidence_level(COALESCE(s.confidence_score, calculate_confidence_score(s.student_id))) as confidence_level,
-                 cm.is_verified as course_is_verified,
-                 cm.mapping_id as course_mapping_id,
-                 cm.normalized_course as course_normalized_name
+                 get_confidence_level(COALESCE(s.confidence_score, calculate_confidence_score(s.student_id))) as confidence_level
           FROM students s
           LEFT JOIN barangays b ON s.barangay_id = b.barangay_id
           LEFT JOIN universities u ON s.university_id = u.university_id
           LEFT JOIN year_levels yl ON s.year_level_id = yl.year_level_id
-          LEFT JOIN courses_mapping cm ON s.course = cm.raw_course_name 
-                                        AND (cm.university_id = s.university_id OR cm.university_id IS NULL)
           WHERE $whereClause
-          ORDER BY s.student_id, cm.university_id NULLS LAST
+          ORDER BY s.student_id
           LIMIT $limit OFFSET $offset";
 
 $result = pg_query_params($connection, $query, $params);
@@ -1109,19 +1043,6 @@ $yearLevels = pg_fetch_all(pg_query($connection, "SELECT year_level_id, name FRO
                                             <?php if (!empty($registration['course'])): ?>
                                                 <div class="small">
                                                     <?php echo htmlspecialchars($registration['course']); ?>
-                                                    <?php if ($registration['course_is_verified'] === 't'): ?>
-                                                        <span class="badge bg-success" title="Course verified in database">
-                                                            <i class="bi bi-check-circle"></i>
-                                                        </span>
-                                                    <?php elseif ($registration['course_mapping_id']): ?>
-                                                        <span class="badge bg-warning text-dark" title="Course exists but not verified">
-                                                            <i class="bi bi-exclamation-circle"></i> Unverified
-                                                        </span>
-                                                    <?php else: ?>
-                                                        <span class="badge bg-danger" title="New course - needs mapping">
-                                                            <i class="bi bi-plus-circle"></i> New
-                                                        </span>
-                                                    <?php endif; ?>
                                                 </div>
                                             <?php else: ?>
                                                 <span class="text-muted small">Not specified</span>

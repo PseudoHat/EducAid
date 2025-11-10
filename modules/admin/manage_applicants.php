@@ -995,6 +995,8 @@ function render_table($applicants, $connection) {
                 <th>Name</th>
                 <th>Contact</th>
                 <th>Email</th>
+                <th>Year Level</th>
+                <th>Graduating</th>
                 <th>Type</th>
                 <th>Documents</th>
                 <th>Action</th>
@@ -1002,7 +1004,7 @@ function render_table($applicants, $connection) {
         </thead>
         <tbody id="applicantsTableBody">
         <?php if (pg_num_rows($applicants) === 0): ?>
-            <tr><td colspan="6" class="text-center no-applicants">No applicants found.</td></tr>
+            <tr><td colspan="8" class="text-center no-applicants">No applicants found.</td></tr>
         <?php else: ?>
             <?php while ($applicant = pg_fetch_assoc($applicants)) {
                 $student_id = $applicant['student_id'];
@@ -1028,6 +1030,30 @@ function render_table($applicants, $connection) {
                     </td>
                     <td data-label="Email">
                         <?= htmlspecialchars($applicant['email']) ?>
+                    </td>
+                    <td data-label="Year Level">
+                        <?php if (!empty($applicant['current_year_level'])): ?>
+                            <span class="badge bg-primary">
+                                <?= htmlspecialchars($applicant['current_year_level']) ?>
+                            </span>
+                        <?php else: ?>
+                            <span class="text-muted small">Not Set</span>
+                        <?php endif; ?>
+                    </td>
+                    <td data-label="Graduating">
+                        <?php if (isset($applicant['is_graduating'])): ?>
+                            <?php if ($applicant['is_graduating'] === 't' || $applicant['is_graduating'] === true): ?>
+                                <span class="badge bg-success">
+                                    <i class="bi bi-mortarboard-fill"></i> Yes
+                                </span>
+                            <?php else: ?>
+                                <span class="badge bg-secondary">
+                                    <i class="bi bi-arrow-repeat"></i> No
+                                </span>
+                            <?php endif; ?>
+                        <?php else: ?>
+                            <span class="text-muted small">Not Set</span>
+                        <?php endif; ?>
                     </td>
                     <td data-label="Type">
                         <span class="badge <?= $type_color ?> text-white" title="<?= $needs_upload ? 'Existing student required to re-upload documents' : 'New applicant from registration system' ?>">

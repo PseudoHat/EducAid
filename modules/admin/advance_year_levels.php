@@ -740,10 +740,7 @@ include __DIR__ . '/../../includes/admin/admin_head.php';
             document.getElementById('count_grad_4').textContent = breakdown.graduating_4th_year;
             document.getElementById('count_grad_5').textContent = breakdown.graduating_5th_year;
             
-            if (breakdown.no_course_mapping > 0) {
-                document.getElementById('noCourseCount').style.display = 'block';
-                document.getElementById('count_no_course').textContent = breakdown.no_course_mapping;
-            }
+            // Course mapping check removed - no longer applicable
             
             // Show warnings if any
             if (data.warnings.length > 0) {
@@ -771,9 +768,7 @@ include __DIR__ . '/../../includes/admin/admin_head.php';
             html += buildStudentSection('Advancing: 3rd → 4th Year', advancing['3rd_to_4th'], false);
             html += buildStudentSection('Advancing: 4th → 5th Year (5-year programs)', advancing['4th_to_5th'], false);
             
-            if (advancing.no_course_mapping.length > 0) {
-                html += buildStudentSection('⚠️ No Course Mapping (Manual Review Needed)', advancing.no_course_mapping, false);
-            }
+            // Course mapping check removed - no longer applicable
             
             html += '</div>';
             

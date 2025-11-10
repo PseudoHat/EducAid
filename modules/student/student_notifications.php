@@ -4,6 +4,9 @@ session_start();
 if (!isset($_SESSION['student_username'])) { header("Location: ../../unified_login.php"); exit; }
 $student_id = $_SESSION['student_id'];
 
+// Require year level update before accessing this page
+include __DIR__ . '/../../includes/require_year_level_update.php';
+
 // Pagination setup
 $page = isset($_GET['page']) && is_numeric($_GET['page']) && $_GET['page'] > 0 ? (int) $_GET['page'] : 1;
 $limit = 20;

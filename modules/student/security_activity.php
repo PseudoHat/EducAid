@@ -11,6 +11,9 @@ $student_id = $_SESSION['student_id'];
 // Track session activity
 include __DIR__ . '/../../includes/student_session_tracker.php';
 
+// Require year level update before accessing this page
+include __DIR__ . '/../../includes/require_year_level_update.php';
+
 // Include SessionManager
 require_once __DIR__ . '/../../includes/SessionManager.php';
 $sessionManager = new SessionManager($connection);

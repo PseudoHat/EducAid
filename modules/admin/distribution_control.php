@@ -103,8 +103,8 @@ if ($period_result) {
 
 // Handle POST actions
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
-    // Validate CSRF token
-    if (!isset($_POST['csrf_token']) || !CSRFProtection::validateToken('distribution_control', $_POST['csrf_token'])) {
+    // Validate CSRF token - don't consume it to allow retries if modal is shown
+    if (!isset($_POST['csrf_token']) || !CSRFProtection::validateToken('distribution_control', $_POST['csrf_token'], false)) {
         $success = false;
         $message = 'Invalid security token. Please refresh the page and try again.';
     } else {
@@ -122,6 +122,122 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             if (empty($academic_year) || empty($semester)) {
                 $message = 'Academic year and semester are required to start distribution.';
                 break;
+            }
+            
+            // Check if graduating students were reviewed (if applicable)
+            $graduates_reviewed = isset($_POST['graduates_reviewed']) && $_POST['graduates_reviewed'] === '1';
+            $archive_graduates = isset($_POST['archive_graduates']) && $_POST['archive_graduates'] === '1';
+            
+            // Detect if this is a NEW academic year (not just new semester)
+            $previous_academic_year = $current_academic_year;
+            $is_new_academic_year = !empty($previous_academic_year) && $previous_academic_year !== $academic_year;
+            
+            // Check for graduating students even when restarting the same year
+            // to catch any graduates who weren't archived yet
+            $should_check_graduates = ($is_new_academic_year || empty($previous_academic_year)) && !$graduates_reviewed;
+            
+            // If starting distribution, check for graduating students from previous years
+            if ($should_check_graduates) {
+                // Query graduating students from previous academic year OR EARLIER
+                // This catches students who graduated 1-2 years ago but are still in the system
+                $graduates_query = pg_query_params($connection,
+                    "SELECT student_id, first_name, last_name, current_year_level, status_academic_year, email
+                     FROM students
+                     WHERE is_graduating = TRUE
+                       AND status_academic_year < $1
+                       AND status IN ('active', 'applicant')
+                       AND (is_archived = FALSE OR is_archived IS NULL)
+                     ORDER BY status_academic_year DESC, current_year_level, last_name",
+                    [$academic_year]
+                );
+                
+                if ($graduates_query && pg_num_rows($graduates_query) > 0) {
+                    $graduates = [];
+                    while ($grad = pg_fetch_assoc($graduates_query)) {
+                        $graduates[] = $grad;
+                    }
+                    
+                    // Store graduates in session for review modal
+                    $_SESSION['pending_graduates'] = $graduates;
+                    $_SESSION['new_distribution_data'] = [
+                        'academic_year' => $academic_year,
+                        'semester' => $semester,
+                        'documents_deadline' => $documents_deadline
+                    ];
+                    
+                    // Check if this is an AJAX request (from JavaScript)
+                    if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') {
+                        // Return JSON response for AJAX
+                        header('Content-Type: application/json');
+                        echo json_encode([
+                            'requires_review' => true,
+                            'graduate_count' => count($graduates),
+                            'previous_year' => $previous_academic_year,
+                            'new_year' => $academic_year
+                        ]);
+                        exit;
+                    } else {
+                        // For non-AJAX, set flag to show modal via JavaScript
+                        $_SESSION['show_graduate_modal'] = [
+                            'requires_review' => true,
+                            'graduate_count' => count($graduates),
+                            'previous_year' => $previous_academic_year,
+                            'new_year' => $academic_year
+                        ];
+                        
+                        // Redirect to self to show modal
+                        header("Location: " . $_SERVER['PHP_SELF']);
+                        exit;
+                    }
+                }
+            }
+            
+            // If graduates were reviewed and admin chose to archive them
+            if ($archive_graduates && isset($_SESSION['pending_graduates'])) {
+                $graduates = $_SESSION['pending_graduates'];
+                $archived_count = 0;
+                $admin_id = $_SESSION['admin_id'] ?? null;
+                
+                foreach ($graduates as $graduate) {
+                    $archive_query = "UPDATE students 
+                                     SET is_archived = TRUE,
+                                         archived_at = NOW(),
+                                         archived_by = $1,
+                                         archive_reason = $2,
+                                         status = 'archived'
+                                     WHERE student_id = $3";
+                    
+                    $archive_reason = "Graduated - Completed {$graduate['current_year_level']} in A.Y. {$graduate['status_academic_year']}";
+                    
+                    $archive_result = pg_query_params($connection, $archive_query, [
+                        $admin_id,
+                        $archive_reason,
+                        $graduate['student_id']
+                    ]);
+                    
+                    if ($archive_result) {
+                        $archived_count++;
+                        
+                        // Log in student_status_history
+                        $history_query = "INSERT INTO student_status_history 
+                                         (student_id, year_level, is_graduating, academic_year, updated_at, update_source, notes)
+                                         VALUES ($1, $2, $3, $4, NOW(), 'admin_graduate_archive', $5)";
+                        
+                        pg_query_params($connection, $history_query, [
+                            $graduate['student_id'],
+                            $graduate['current_year_level'],
+                            'true',
+                            $graduate['status_academic_year'],
+                            "Archived as graduated student when starting new distribution for A.Y. {$academic_year}"
+                        ]);
+                    }
+                }
+                
+                // Clear session data
+                unset($_SESSION['pending_graduates']);
+                unset($_SESSION['new_distribution_data']);
+                
+                error_log("Archived {$archived_count} graduating students before starting distribution for {$academic_year}");
             }
             
             // CONSTRAINT 1: Check if a finalized distribution already exists for this academic year/semester
@@ -1227,8 +1343,370 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }, 30000);
     }
+    
+    // Setup graduate review modal button handlers
+    setupGraduateModalButtons();
 });
+
+// Setup modal button event handlers
+function setupGraduateModalButtons() {
+    // Handle skip graduates button
+    const skipBtn = document.getElementById('skipGraduatesBtn');
+    if (skipBtn) {
+        skipBtn.addEventListener('click', function() {
+            console.log('Skip button clicked');
+            const form = document.getElementById('startDistributionForm');
+            if (!form) {
+                console.error('Form not found!');
+                return;
+            }
+            
+            // Replace the CSRF token with the fresh one from modal
+            if (window.graduateArchiveCsrfToken) {
+                const csrfInput = form.querySelector('input[name="csrf_token"]');
+                if (csrfInput) {
+                    console.log('Replacing CSRF token with fresh modal token');
+                    csrfInput.value = window.graduateArchiveCsrfToken;
+                }
+            }
+            
+            // Add hidden field to indicate graduates were reviewed but not archived
+            const reviewedInput = document.createElement('input');
+            reviewedInput.type = 'hidden';
+            reviewedInput.name = 'graduates_reviewed';
+            reviewedInput.value = '1';
+            form.appendChild(reviewedInput);
+            
+            // Close modal and submit form
+            const modalElement = document.getElementById('graduateReviewModal');
+            if (modalElement) {
+                const modalInstance = bootstrap.Modal.getInstance(modalElement);
+                if (modalInstance) {
+                    modalInstance.hide();
+                }
+            }
+            form.submit();
+        });
+    }
+    
+    // Handle archive graduates button
+    const archiveBtn = document.getElementById('archiveGraduatesBtn');
+    if (archiveBtn) {
+        archiveBtn.addEventListener('click', function() {
+            console.log('Archive button clicked');
+            const form = document.getElementById('startDistributionForm');
+            if (!form) {
+                console.error('Form not found!');
+                return;
+            }
+            
+            // Replace the CSRF token with the fresh one from modal
+            if (window.graduateArchiveCsrfToken) {
+                const csrfInput = form.querySelector('input[name="csrf_token"]');
+                if (csrfInput) {
+                    console.log('Replacing CSRF token with fresh modal token');
+                    csrfInput.value = window.graduateArchiveCsrfToken;
+                }
+            }
+            
+            // Add hidden fields to indicate graduates should be archived
+            const reviewedInput = document.createElement('input');
+            reviewedInput.type = 'hidden';
+            reviewedInput.name = 'graduates_reviewed';
+            reviewedInput.value = '1';
+            form.appendChild(reviewedInput);
+            
+            const archiveInput = document.createElement('input');
+            archiveInput.type = 'hidden';
+            archiveInput.name = 'archive_graduates';
+            archiveInput.value = '1';
+            form.appendChild(archiveInput);
+            
+            // Close modal and submit form
+            const modalElement = document.getElementById('graduateReviewModal');
+            if (modalElement) {
+                const modalInstance = bootstrap.Modal.getInstance(modalElement);
+                if (modalInstance) {
+                    modalInstance.hide();
+                }
+            }
+            form.submit();
+        });
+    }
+    
+    // Handle view graduates button - opens in new tab
+    const viewBtn = document.getElementById('viewGraduatesBtn');
+    if (viewBtn) {
+        viewBtn.addEventListener('click', function() {
+            console.log('View button clicked');
+            window.open('view_graduating_students.php', '_blank');
+        });
+    } else {
+        console.error('View graduates button not found in DOM');
+    }
+    
+    // Handle collapse toggle for graduates list
+    const graduatesList = document.getElementById('graduatesList');
+    if (graduatesList) {
+        graduatesList.addEventListener('show.bs.collapse', function() {
+            console.log('Loading graduates list...');
+            // Rotate icon
+            document.getElementById('graduatesListIcon').classList.replace('bi-chevron-down', 'bi-chevron-up');
+            // Load graduates via AJAX
+            loadGraduatesList();
+        });
+        
+        graduatesList.addEventListener('hide.bs.collapse', function() {
+            // Rotate icon back
+            document.getElementById('graduatesListIcon').classList.replace('bi-chevron-up', 'bi-chevron-down');
+        });
+    }
+}
+
+// Load graduates list via AJAX
+async function loadGraduatesList() {
+    const content = document.getElementById('graduatesContent');
+    if (!content) return;
+    
+    try {
+        const response = await fetch('get_graduating_students_list.php');
+        if (!response.ok) throw new Error('Failed to fetch graduates');
+        
+        const graduates = await response.json();
+        
+        if (graduates.length === 0) {
+            content.innerHTML = `
+                <div class="alert alert-warning mb-0">
+                    <i class="bi bi-info-circle me-2"></i>
+                    No graduating students found.
+                </div>
+            `;
+            return;
+        }
+        
+        // Build graduates list HTML
+        let html = '<div class="list-group">';
+        
+        graduates.forEach((student, index) => {
+            const yearBadgeColor = student.current_year_level === '5th Year' ? 'danger' : 
+                                   student.current_year_level === '4th Year' ? 'warning' : 'info';
+            const statusBadge = student.status === 'active' ? 
+                '<span class="badge bg-success">Active</span>' : 
+                '<span class="badge bg-primary">Applicant</span>';
+            
+            html += `
+                <div class="list-group-item">
+                    <div class="d-flex w-100 justify-content-between align-items-start">
+                        <div class="flex-grow-1">
+                            <h6 class="mb-1">
+                                <i class="bi bi-person-circle me-1"></i>
+                                ${student.first_name} ${student.last_name}
+                            </h6>
+                            <p class="mb-1 small text-muted">
+                                <i class="bi bi-card-text me-1"></i> ID: <strong>${student.student_id}</strong>
+                            </p>
+                            <p class="mb-1 small">
+                                <i class="bi bi-envelope me-1"></i> ${student.email || 'No email'}
+                            </p>
+                        </div>
+                        <div class="text-end">
+                            <span class="badge bg-${yearBadgeColor} mb-1">${student.current_year_level}</span><br>
+                            ${statusBadge}<br>
+                            <small class="text-muted">A.Y. ${student.status_academic_year}</small>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+        
+        html += '</div>';
+        content.innerHTML = html;
+        
+    } catch (error) {
+        console.error('Error loading graduates:', error);
+        content.innerHTML = `
+            <div class="alert alert-danger mb-0">
+                <i class="bi bi-exclamation-triangle me-2"></i>
+                Failed to load graduating students. Please try again.
+            </div>
+        `;
+    }
+}
+
+document.getElementById('startDistributionForm')?.addEventListener('submit', async function(e) {
+    const academicYear = document.getElementById('academic_year').value;
+    const semester = document.getElementById('semester').value;
+    const deadline = document.getElementById('documents_deadline').value;
+    
+    // Only check if not already reviewed
+    if (!this.querySelector('input[name="graduates_reviewed"]')) {
+        e.preventDefault();
+        
+        const formData = new FormData(this);
+        
+        try {
+            const response = await fetch(window.location.href, {
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: formData
+            });
+            
+            const data = await response.json();
+            
+            if (data.requires_review) {
+                // Show modal with graduating students
+                showGraduateReviewModal(data);
+                return;
+            }
+            
+            // If no graduate review needed, reload page to see result
+            window.location.reload();
+            
+        } catch (error) {
+            console.error('Error checking graduates:', error);
+            // On error, proceed with normal submission
+            this.submit();
+        }
+    }
+});
+
+// Check if we need to show modal from session (after redirect)
+<?php if (isset($_SESSION['show_graduate_modal'])): ?>
+    <?php $modal_data = $_SESSION['show_graduate_modal']; ?>
+    document.addEventListener('DOMContentLoaded', function() {
+        showGraduateReviewModal(<?= json_encode($modal_data) ?>);
+    });
+    <?php unset($_SESSION['show_graduate_modal']); ?>
+<?php endif; ?>
+
+// Fetch fresh CSRF token for graduate archive modal specifically
+async function refreshGraduateArchiveCsrfToken() {
+    try {
+        console.log('Fetching fresh CSRF token for graduate archive action...');
+        const response = await fetch('get_csrf_token.php?action=distribution_control');
+        if (response.ok) {
+            const data = await response.json();
+            if (data.success && data.token) {
+                // Store the fresh token for modal actions
+                window.graduateArchiveCsrfToken = data.token;
+                console.log('Graduate archive CSRF token refreshed successfully');
+                return true;
+            }
+        }
+        console.error('Failed to fetch CSRF token:', response.status);
+        return false;
+    } catch (error) {
+        console.error('Error fetching CSRF token:', error);
+        return false;
+    }
+}
+
+function showGraduateReviewModal(data) {
+    const modal = new bootstrap.Modal(document.getElementById('graduateReviewModal'));
+    
+    // Update modal content
+    document.getElementById('graduateCount').textContent = data.graduate_count;
+    document.getElementById('previousYear').textContent = data.previous_year;
+    document.getElementById('newYear').textContent = data.new_year;
+    
+    // Refresh CSRF token when modal opens to prevent rotation issues
+    // This token will be used when "Archive All" button is clicked
+    refreshGraduateArchiveCsrfToken().then(success => {
+        if (!success) {
+            console.error('Warning: CSRF token refresh failed. Archive action may fail.');
+        }
+    });
+    
+    // Re-setup button handlers after modal is shown
+    setupGraduateModalButtons();
+    
+    modal.show();
+}
+
 </script>
+
+<!-- Graduating Students Review Modal -->
+<div class="modal fade" id="graduateReviewModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title">
+                    <i class="bi bi-mortarboard-fill me-2"></i>
+                    Review Graduating Students
+                </h5>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info mb-4">
+                    <i class="bi bi-info-circle-fill me-2"></i>
+                    <strong>New Academic Year Detected!</strong><br>
+                    You are starting a distribution for <strong id="newYear">A.Y. 2025-2026</strong>, 
+                    but there are <strong id="graduateCount">0</strong> student(s) who marked themselves as 
+                    graduating in <strong id="previousYear">A.Y. 2024-2025</strong>.
+                </div>
+                
+                <h6 class="mb-3"><i class="bi bi-question-circle me-2"></i>What would you like to do?</h6>
+                
+                <div class="d-grid gap-3">
+                    <button type="button" class="btn btn-outline-primary d-flex align-items-center justify-content-between" 
+                            data-bs-toggle="collapse" data-bs-target="#graduatesList" aria-expanded="false">
+                        <div>
+                            <i class="bi bi-eye me-2"></i>
+                            <strong>View List of Graduating Students</strong>
+                            <p class="mb-0 small text-muted">Review student details before deciding</p>
+                        </div>
+                        <i class="bi bi-chevron-down" id="graduatesListIcon"></i>
+                    </button>
+                    
+                    <!-- Collapsible Graduates List -->
+                    <div class="collapse" id="graduatesList">
+                        <div class="card card-body" style="max-height: 400px; overflow-y: auto;">
+                            <div id="graduatesContent">
+                                <div class="text-center py-3">
+                                    <div class="spinner-border text-primary" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                    <p class="mt-2 mb-0 text-muted">Loading graduating students...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <button type="button" class="btn btn-success d-flex align-items-center justify-content-between" id="archiveGraduatesBtn">
+                        <div>
+                            <i class="bi bi-archive-fill me-2"></i>
+                            <strong>Archive All Graduating Students</strong>
+                            <p class="mb-0 small text-muted">Recommended: Automatically archive all graduates from previous year</p>
+                        </div>
+                        <i class="bi bi-check-circle"></i>
+                    </button>
+                    
+                    <button type="button" class="btn btn-outline-secondary d-flex align-items-center justify-content-between" id="skipGraduatesBtn">
+                        <div>
+                            <i class="bi bi-skip-forward me-2"></i>
+                            <strong>Skip for Now</strong>
+                            <p class="mb-0 small text-muted">Continue without archiving (you can do this manually later)</p>
+                        </div>
+                    </button>
+                </div>
+                
+                <div class="alert alert-light mt-4 mb-0">
+                    <small>
+                        <strong>Note:</strong> Archiving graduating students will:
+                        <ul class="mb-0 mt-2">
+                            <li>Move them to the archived students list</li>
+                            <li>Prevent them from appearing in future distributions</li>
+                            <li>Preserve their records for historical purposes</li>
+                            <li>Mark their accounts as "Graduated"</li>
+                        </ul>
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 </body>
 </html>
 

@@ -103,32 +103,7 @@ try {
                 }
             }
             
-            // Update or create course mapping
-            if (!empty($student['course'])) {
-                $checkMappingQuery = "SELECT mapping_id, occurrence_count 
-                                     FROM courses_mapping 
-                                     WHERE raw_course_name = $1 AND university_id = $2";
-                $mappingResult = pg_query_params($connection, $checkMappingQuery, [
-                    $student['course'],
-                    $student['university_id']
-                ]);
-                
-                if ($mappingResult && pg_num_rows($mappingResult) > 0) {
-                    $mapping = pg_fetch_assoc($mappingResult);
-                    pg_query_params($connection, 
-                        "UPDATE courses_mapping 
-                         SET occurrence_count = occurrence_count + 1, last_seen = NOW()
-                         WHERE mapping_id = $1", 
-                        [$mapping['mapping_id']]);
-                } else {
-                    pg_query_params($connection, 
-                        "INSERT INTO courses_mapping 
-                         (raw_course_name, normalized_course, university_id, program_duration,
-                          occurrence_count, is_verified, created_by, created_at, last_seen)
-                         VALUES ($1, $2, $3, 4, 1, FALSE, $4, NOW(), NOW())", 
-                        [$student['course'], $student['course'], $student['university_id'], null]);
-                }
-            }
+            // Course mapping logic removed - no longer needed
             
             // Use UnifiedFileService to move files from temp to permanent storage
             $moveResult = $fileService->moveToPermStorage($student['student_id'], $_SESSION['admin_id'] ?? null);

@@ -9,6 +9,9 @@ if (!isset($_SESSION['student_username'])) {
 }
 $student_id = $_SESSION['student_id'];
 
+// Require year level update before accessing this page
+include __DIR__ . '/../../includes/require_year_level_update.php';
+
 // PHPMailer setup
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;

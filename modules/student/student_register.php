@@ -295,7 +295,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processEnrollmentOcr'
     
     // Load the new TSV-based OCR services
     require_once(__DIR__ . '/../../services/EnrollmentFormOCRService.php');
-    require_once(__DIR__ . '/../../services/CourseMappingService.php');
     
     if (!isset($_FILES['enrollment_form']) || $_FILES['enrollment_form']['error'] !== UPLOAD_ERR_OK) {
         $errorMsg = 'No file uploaded or upload error.';
@@ -425,34 +424,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processEnrollmentOcr'
         $overallConfidence = $ocrResult['overall_confidence'];
         $tsvQuality = $ocrResult['tsv_quality'];
 
-        // Process extracted course if found
+        // Course extraction removed - students will input their course manually
+        // No automatic course population to avoid conflicts with student input
         $courseData = null;
         $normalizedCourse = null;
-        
-        if ($extracted['course']['found']) {
-            $courseMappingService = new CourseMappingService($connection);
-            $courseMatch = $courseMappingService->findMatchingCourse($extracted['course']['normalized']);
-            
-            if ($courseMatch) {
-                $courseData = [
-                    'raw_course' => $extracted['course']['raw'],
-                    'normalized_course' => $courseMatch['normalized_course'],
-                    'course_category' => $courseMatch['course_category'],
-                    'program_duration' => $courseMatch['program_duration_years'],
-                    'match_confidence' => $courseMatch['confidence'],
-                    'match_type' => $courseMatch['match_type']
-                ];
-                $normalizedCourse = $courseMatch['normalized_course'];
-            } else {
-                // Course found but not in database
-                $courseData = [
-                    'raw_course' => $extracted['course']['raw'],
-                    'normalized_course' => $extracted['course']['normalized'],
-                    'needs_admin_review' => true,
-                    'message' => 'Course name detected but needs admin verification'
-                ];
-            }
-        }
 
         // Build verification response
         $verification = [
@@ -477,8 +452,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processEnrollmentOcr'
                 'last_name' => $extracted['student_name']['last_name_similarity'] ?? 0,
                 'year_level' => $extracted['year_level']['confidence'],
                 'university' => $extracted['university']['confidence'],
-                'document_keywords' => $extracted['document_type']['confidence'],
-                'course' => $extracted['course']['confidence']
+                'document_keywords' => $extracted['document_type']['confidence']
+                // Course confidence removed - students input course manually
             ],
             
             // Found text snippets
@@ -486,13 +461,13 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processEnrollmentOcr'
                 'year_level' => $extracted['year_level']['raw'] ?? 'Not found',
                 'university' => $universityName,
                 'document_type' => $extracted['document_type']['is_enrollment_form'] ? 'Enrollment Form' : 'Unknown',
-                'course' => $extracted['course']['raw'] ?? 'Not found',
+                // Course removed - students input course manually
                 'academic_year' => $extracted['academic_year']['raw'] ?? 'Not found',
                 'student_id' => $extracted['student_id']['raw'] ?? 'Not found'
             ],
             
-            // Course information
-            'course_data' => $courseData,
+            // Course information removed - students input manually
+            // 'course_data' => $courseData,
             
             // TSV quality metrics
             'tsv_quality' => $tsvQuality,
@@ -524,8 +499,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processEnrollmentOcr'
         $confidenceData = [
             'overall_confidence' => $overallConfidence,
             'detailed_scores' => $verification['confidence_scores'],
-            'course_data' => $courseData,
-            'normalized_course' => $normalizedCourse,
+            // Course data removed - students input course manually
             'extracted_academic_year' => $extracted['academic_year']['raw'] ?? null,
             'extracted_student_id' => $extracted['student_id']['raw'] ?? null,
             'timestamp' => time()
@@ -4735,6 +4709,27 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['register'])) {
     $password = trim($_POST['password'] ?? '');
     $hashed = password_hash($password, PASSWORD_DEFAULT);
 
+    // Get year level name for new current_year_level column
+    $yearLevelName = '';
+    if ($year_level > 0) {
+        $yearResult = pg_query_params($connection, "SELECT name FROM year_levels WHERE year_level_id = $1", [$year_level]);
+        if ($yearRow = pg_fetch_assoc($yearResult)) {
+            $yearLevelName = $yearRow['name'];
+        }
+    }
+
+    // Use academic year from the slot the student registered under
+    // This ensures the student's status is tracked to the correct enrollment period
+    $currentAcademicYear = $slotAcademicYear ?? '';
+    
+    // If slot doesn't have academic year (shouldn't happen), fall back to current academic year
+    if (empty($currentAcademicYear)) {
+        $academicYearResult = pg_query($connection, "SELECT year_code FROM academic_years WHERE is_current = TRUE LIMIT 1");
+        if ($academicYearRow = pg_fetch_assoc($academicYearResult)) {
+            $currentAcademicYear = $academicYearRow['year_code'];
+        }
+    }
+
     // Validate required fields
     $requiredFields = [$firstname, $lastname, $email, $mobile, $bdate, $sex, $barangay, $university, $year_level, $password];
     if (in_array('', $requiredFields, true)) {
@@ -4863,10 +4858,12 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['register'])) {
         }
     }
 
-    // Get current active slot ID for tracking
-    $activeSlotQuery = pg_query_params($connection, "SELECT slot_id FROM signup_slots WHERE is_active = TRUE AND municipality_id = $1 ORDER BY created_at DESC LIMIT 1", [$municipality_id]);
+    // Get current active slot with academic year and semester for tracking
+    $activeSlotQuery = pg_query_params($connection, "SELECT slot_id, academic_year, semester FROM signup_slots WHERE is_active = TRUE AND municipality_id = $1 ORDER BY created_at DESC LIMIT 1", [$municipality_id]);
     $activeSlot = pg_fetch_assoc($activeSlotQuery);
     $slot_id = $activeSlot ? $activeSlot['slot_id'] : null;
+    $slotAcademicYear = $activeSlot ? $activeSlot['academic_year'] : null;
+    $slotSemester = $activeSlot ? $activeSlot['semester'] : null;
 
     // Get school student ID from form
     $school_student_id = trim($_POST['school_student_id'] ?? '');
@@ -4894,12 +4891,15 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['register'])) {
         student_id, municipality_id, first_name, middle_name, last_name, extension_name, 
         email, mobile, password, sex, status, payroll_no, application_date, bdate, 
         barangay_id, university_id, year_level_id, slot_id, school_student_id, course, course_verified,
-        household_verified, household_primary, household_group_id, archival_type
+        household_verified, household_primary, household_group_id, archival_type,
+        current_year_level, is_graduating, last_status_update, status_academic_year,
+        first_registered_academic_year, current_academic_year
     )
     VALUES (
         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 
         'under_registration', 0, NOW(), $11, $12, $13, $14, $15, $16, $17, $18,
-        FALSE, FALSE, NULL, NULL
+        FALSE, FALSE, NULL, NULL,
+        $19, FALSE, NOW(), $20, $21, $22
     ) RETURNING student_id";
 
     $result = pg_query_params($connection, $insertQuery, [
@@ -4919,8 +4919,12 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['register'])) {
         $year_level,
         $slot_id,
         $school_student_id,  // School/University-issued ID number
-        $course,             // Course/Program from OCR
-        $course_verified ? 'true' : 'false'  // Convert boolean to PostgreSQL boolean string
+        $course,             // Course/Program (manually entered by student)
+        $course_verified ? 'true' : 'false',  // Convert boolean to PostgreSQL boolean string
+        $yearLevelName,      // New: current_year_level (e.g., "2nd Year College")
+        $currentAcademicYear, // New: status_academic_year (from slot, e.g., "2025-2026")
+        $currentAcademicYear, // New: first_registered_academic_year (initial enrollment year)
+        $currentAcademicYear  // New: current_academic_year (tracks which year they're currently in)
     ]);
 
 
@@ -5826,19 +5830,14 @@ if (!$isAjaxRequest) {
                     <div class="mb-3">
                         <label class="form-label">
                             Course/Program 
-                            <span class="text-muted">(Auto-detected from Enrollment Form)</span>
                             <span class="text-danger">*</span>
                         </label>
                         <input type="text" class="form-control" name="course" id="courseField" 
-                               placeholder="Process enrollment form above to detect course" required>
+                               placeholder="Enter your course/program (e.g., BS Information Technology)" required>
                         <input type="hidden" name="course_verified" id="courseVerified" value="0">
                         <small class="form-text text-muted">
-                            <i class="bi bi-info-circle me-1"></i>Your course will be automatically detected from the enrollment form OCR. If not detected, you can enter it manually.
+                            <i class="bi bi-info-circle me-1"></i>Please enter your course or program as shown in your enrollment form.
                         </small>
-                        <div id="courseDetectionInfo" class="alert alert-info mt-2" style="display: none;">
-                            <i class="bi bi-check-circle me-2"></i>
-                            <strong>Course Detected:</strong> <span id="courseDetectionText"></span>
-                        </div>
                     </div>
                     
                     <button type="button" class="btn btn-secondary w-100 mb-2" onclick="prevStep()">Back</button>
@@ -7519,10 +7518,10 @@ function handleOcrResults(data) {
         // Update verification checkmarks
         updateVerificationChecks(data.verification);
         
-        // Handle course data if present
-        if (data.verification && data.verification.course_data) {
-            populateCourseField(data.verification.course_data);
-        }
+        // Course auto-population removed - students input course manually
+        // if (data.verification && data.verification.course_data) {
+        //     populateCourseField(data.verification.course_data);
+        // }
         
         // Enable next button if verification passed
         if (data.verification && data.verification.overall_success) {
