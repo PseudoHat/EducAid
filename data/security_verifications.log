@@ -44,3 +44,4 @@
 {"ts":"2025-11-04T01:41:09+01:00","ip":"::1","ua":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36","action":"process_letter_ocr","result":"ok","score":0.9,"reason":null,"session":"rglf3jdgrejcvhne"}
 {"ts":"2025-11-04T01:41:18+01:00","ip":"::1","ua":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36","action":"process_certificate_ocr","result":"ok","score":0.9,"reason":null,"session":"rglf3jdgrejcvhne"}
 {"ts":"2025-11-04T01:41:25+01:00","ip":"::1","ua":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36","action":"process_grades_ocr","result":"ok","score":0.9,"reason":null,"session":"rglf3jdgrejcvhne"}
+2025-11-10 19:25:03 - IP: ::1 - UA: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36

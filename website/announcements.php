@@ -41,29 +41,44 @@ require_once __DIR__ . '/../includes/website/announcements_content_helper.php';
 // Optional deep-link id
 $requested_id = isset($_GET['id']) && ctype_digit($_GET['id']) ? (int)$_GET['id'] : null;
 
-// Fetch announcements ordered with active first then newest (full list for now)
-$rows = [];
-$res = @pg_query($connection, "SELECT announcement_id, title, remarks, posted_at, is_active, event_date, event_time, location, image_path FROM announcements ORDER BY is_active DESC, posted_at DESC");
-if ($res) { while ($r = pg_fetch_assoc($res)) { $rows[] = $r; } pg_free_result($res); }
+// Fetch announcements - only get featured/active one and count for display
+$featured = null; $deep_linked = false; $total_count = 0;
 
-$featured = null; $past = []; $deep_linked = false;
-if ($rows) {
-  if ($requested_id !== null) {
-    foreach ($rows as $r) { if ((int)$r['announcement_id'] === $requested_id) { $featured = $r; $deep_linked = true; break; } }
+// Get total count
+$count_res = @pg_query($connection, "SELECT COUNT(*) as total FROM announcements");
+if ($count_res) { 
+  $count_row = pg_fetch_assoc($count_res); 
+  $total_count = (int)$count_row['total']; 
+  pg_free_result($count_res); 
+}
+
+$rows = [];
+$rows = [];
+
+// If deep-linking to specific announcement
+if ($requested_id !== null) {
+  $res = @pg_query_params($connection, "SELECT announcement_id, title, remarks, posted_at, is_active, event_date, event_time, location, image_path FROM announcements WHERE announcement_id=$1", [$requested_id]);
+  if ($res) { 
+    $featured = pg_fetch_assoc($res);
+    $deep_linked = true;
+    pg_free_result($res); 
   }
-  if (!$featured) {
-    // fall back to active then newest
-    foreach ($rows as $r) { if ($r['is_active'] === 't' || $r['is_active'] === true) { $featured = $r; break; } }
-    if (!$featured) { $featured = $rows[0]; }
+}
+
+// If no deep-link or not found, get the active/latest announcement
+if (!$featured) {
+  // Get active announcement or latest one
+  $res = @pg_query($connection, "SELECT announcement_id, title, remarks, posted_at, is_active, event_date, event_time, location, image_path FROM announcements ORDER BY is_active DESC, posted_at DESC LIMIT 1");
+  if ($res) {
+    $featured = pg_fetch_assoc($res);
+    pg_free_result($res);
   }
-  foreach ($rows as $r) { if ($r['announcement_id'] != $featured['announcement_id']) { $past[] = $r; } }
-} else {
-  // Sample fallback
+}
+
+// Fallback to sample if no announcements exist
+if (!$featured) {
   $featured = [ 'announcement_id'=>0,'title'=>'Orientation for New Applicants (Sample)','remarks'=>"This is a sample announcement. Admins can post real announcements from the admin portal. Provide guidance, instructions, schedules, or distribution details here.\n\nYou can include reminders about necessary documents, assembly times, and conduct expectations.",'posted_at'=>date('Y-m-d H:i:s'),'is_active'=>'t','event_date'=>date('Y-m-d', strtotime('+5 days')),'event_time'=>'09:00:00','location'=>'City Multipurpose Hall','image_path'=>null ];
-  $past = [
-    ['announcement_id'=>-1,'title'=>'System Maintenance Completed (Sample)','remarks'=>'The system maintenance window has concluded successfully. You may now continue using the portal normally.','posted_at'=>date('Y-m-d H:i:s', strtotime('-2 days')),'is_active'=>'f','event_date'=>null,'event_time'=>null,'location'=>null,'image_path'=>null],
-    ['announcement_id'=>-2,'title'=>'Distribution Day Reminders (Sample)','remarks'=>'Bring your valid school ID, QR code, and arrive 15 minutes early for orderly processing.','posted_at'=>date('Y-m-d H:i:s', strtotime('-10 days')),'is_active'=>'f','event_date'=>date('Y-m-d', strtotime('-9 days')),'event_time'=>'07:30:00','location'=>'Plaza Grounds','image_path'=>null]
-  ];
+  $total_count = 3; // Sample data count
 }
 
 function format_event($row){ $parts=[]; if(!empty($row['event_date'])){ $d=DateTime::createFromFormat('Y-m-d',$row['event_date']); if($d) $parts[]=$d->format('M d, Y'); } if(!empty($row['event_time'])){ $t=DateTime::createFromFormat('H:i:s',$row['event_time']); if($t) $parts[]=$t->format('g:i A'); } return implode(' • ', $parts); }
@@ -180,6 +195,7 @@ $custom_nav_links = [
         $short = mb_strlen($full) > 600 ? mb_substr($full,0,600).'…' : $full; $needToggle = $short !== $full; ?>
   <article class="featured-card fade-in<?php echo $deep_linked ? ' deep-linked' : ''; ?>">
         <button type="button" id="copyLinkBtn" class="copy-link-btn" data-announcement-id="<?php echo (int)$featured['announcement_id']; ?>" aria-label="Copy direct link" title="Copy direct link"><i class="bi bi-link-45deg"></i></button>
+
         <img class="featured-img" src="<?php echo esc($img); ?>" alt="Featured announcement image" style="cursor: pointer;" onclick="showImageModal('<?php echo esc($img); ?>', '<?php echo esc($featured['title']); ?>')">
         <div class="p-4 p-lg-5">
           <div class="featured-meta">
@@ -215,7 +231,7 @@ $custom_nav_links = [
   <h2 class="h5 fw-bold mb-1"<?php echo ann_block_style('past-title'); ?> data-lp-key="past-title" contenteditable="<?php echo $IS_EDIT_MODE ? 'true' : 'false'; ?>"><?php echo ann_block('past-title', '<i class="bi bi-archive me-2 text-primary"></i>Past Announcements'); ?></h2>
   <p class="small text-body-secondary mb-0"<?php echo ann_block_style('past-subtitle'); ?> data-lp-key="past-subtitle" contenteditable="<?php echo $IS_EDIT_MODE ? 'true' : 'false'; ?>"><?php echo ann_block('past-subtitle', 'Historical updates &amp; previous schedules'); ?></p>
       </div>
-      <div class="small text-body-secondary">Total: <?php echo count($past); ?></div>
+      <div class="small text-body-secondary">Total: <?php echo max(0, $total_count - 1); ?></div>
     </div>
         <div id="pastGrid" class="past-grid fade-in-stagger"></div>
         <div id="pastEmpty" class="text-center py-5 d-none">
