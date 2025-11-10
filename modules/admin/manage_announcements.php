@@ -72,7 +72,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       }
     }
     
-    header('Location: ' . $_SERVER['PHP_SELF'] . '?toggled=1');
+    // Add timestamp to prevent caching
+    header('Location: ' . $_SERVER['PHP_SELF'] . '?toggled=1&t=' . time());
     exit;
   }
 
@@ -259,12 +260,55 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     header('Location: ' . $_SERVER['PHP_SELF'] . '?posted=1');
     exit;
   }
+
+  // Handle edit announcement
+  if (isset($_POST['edit_announcement'])) {
+    if (!CSRFProtection::validateToken('post_announcement', $token)) {
+      header('Location: ' . $_SERVER['PHP_SELF'] . '?error=csrf');
+      exit;
+    }
+
+    $announcement_id = (int)$_POST['announcement_id'];
+    $title = trim($_POST['title']);
+    $remarks = trim($_POST['remarks']);
+    $event_date = !empty($_POST['event_date']) ? $_POST['event_date'] : null;
+    $event_time = !empty($_POST['event_time']) ? $_POST['event_time'] : null;
+    $location = !empty($_POST['location']) ? trim($_POST['location']) : null;
+
+    // Server-side validation
+    if (empty($title) || strlen($title) > 255) {
+      header('Location: ' . $_SERVER['PHP_SELF'] . '?error=invalid_title');
+      exit;
+    }
+    if (empty($remarks) || strlen($remarks) > 5000) {
+      header('Location: ' . $_SERVER['PHP_SELF'] . '?error=invalid_remarks');
+      exit;
+    }
+
+    // Update announcement
+    $query = "UPDATE announcements SET title=$1, remarks=$2, event_date=$3, event_time=$4, location=$5, updated_at=now() WHERE announcement_id=$6";
+    $result = pg_query_params($connection, $query, [$title, $remarks, $event_date, $event_time, $location, $announcement_id]);
+    
+    if (!$result) {
+      error_log("Announcement update failed: " . pg_last_error($connection));
+      header('Location: ' . $_SERVER['PHP_SELF'] . '?error=db_update');
+      exit;
+    }
+
+    header('Location: ' . $_SERVER['PHP_SELF'] . '?updated=1');
+    exit;
+  }
 }
 
-// Check for success flag
+// Check for success flags
 $posted = isset($_GET['posted']);
+$updated = isset($_GET['updated']);
 ?>
 <?php $page_title='Manage Announcements'; $extra_css=['../../assets/css/admin/manage_announcements.css']; include __DIR__ . '/../../includes/admin/admin_head.php'; ?>
+
+<!-- TinyMCE Rich Text Editor -->
+<script src="https://cdn.tiny.cloud/1/no-api-key/tinymce/6/tinymce.min.js" referrerpolicy="origin"></script>
+
 <style>
   .card:hover { transform:none!important; transition:none!important; }
   .card h5 { font-size:1.25rem; font-weight:600; color:#333; }
@@ -332,7 +376,7 @@ $posted = isset($_GET['posted']);
           </div>
           <div class="mb-3">
             <label class="form-label">Remarks / Description</label>
-            <textarea name="remarks" class="form-control form-control-lg" rows="6" placeholder="Provide details, agenda, instructions, deadlines..." required></textarea>
+            <textarea name="remarks" id="remarksEditor" class="form-control form-control-lg" rows="6" placeholder="Provide details, agenda, instructions, deadlines..." required></textarea>
           </div>
           <div class="mb-3">
             <div class="form-section-title">Image (Optional)</div>
@@ -349,6 +393,13 @@ $posted = isset($_GET['posted']);
         <?php if ($posted): ?>
           <div class="alert alert-success alert-dismissible fade show mt-3" role="alert">
             <i class="bi bi-check-circle me-2"></i>Announcement posted successfully!
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+        <?php endif; ?>
+        
+        <?php if ($updated): ?>
+          <div class="alert alert-success alert-dismissible fade show mt-3" role="alert">
+            <i class="bi bi-check-circle me-2"></i>Announcement updated successfully!
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
           </div>
         <?php endif; ?>
@@ -526,11 +577,14 @@ function renderPage() {
       <td>${a.posted_at}</td>
       <td>${badge}</td>
       <td>
+        <button type="button" class="btn btn-sm btn-outline-primary me-1 mb-1" onclick="editAnnouncement(${a.announcement_id})">
+          <i class="bi bi-pencil"></i> Edit
+        </button>
         <form method="POST" class="d-inline">
           <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfTokenToggle) ?>">
           <input type="hidden" name="announcement_id" value="${a.announcement_id}">
           <input type="hidden" name="toggle_active" value="${toggleValue}">
-          <button type="submit" class="btn btn-sm btn-outline-${btnClass}">${btnLabel}</button>
+          <button type="submit" class="btn btn-sm btn-outline-${btnClass} mb-1">${btnLabel}</button>
         </form>
       </td>`;
     tbody.appendChild(tr);
@@ -592,6 +646,99 @@ if(dropZone && imgInput && inlinePreview){
   ['dragleave','drop'].forEach(ev => dropZone.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); dropZone.classList.remove('dragover'); }));
   dropZone.addEventListener('drop', e => { const file = e.dataTransfer.files && e.dataTransfer.files[0]; if(file){ imgInput.files = e.dataTransfer.files; imgInput.dispatchEvent(new Event('change')); }});
 }
+
+// Edit announcement function
+function editAnnouncement(id) {
+  const announcement = announcements.find(a => a.announcement_id === id);
+  if (!announcement) return;
+  
+  // Populate form fields
+  document.getElementById('title').value = announcement.title;
+  document.getElementById('eventDate').value = announcement.event_date || '';
+  document.getElementById('eventTime').value = announcement.event_time || '';
+  document.getElementById('location').value = announcement.location || '';
+  
+  // Update TinyMCE content
+  tinymce.get('remarksEditor').setContent(announcement.remarks);
+  
+  // Change form to edit mode
+  const form = document.querySelector('form[method="POST"]');
+  const submitBtn = form.querySelector('button[type="submit"]');
+  submitBtn.innerHTML = '<i class="bi bi-check-circle me-1"></i> Update Announcement';
+  
+  // Add hidden field for announcement_id and change action
+  let editIdInput = form.querySelector('input[name="announcement_id"]');
+  if (!editIdInput) {
+    editIdInput = document.createElement('input');
+    editIdInput.type = 'hidden';
+    editIdInput.name = 'announcement_id';
+    form.appendChild(editIdInput);
+  }
+  editIdInput.value = id;
+  
+  // Change submit button name to edit_announcement
+  submitBtn.name = 'edit_announcement';
+  
+  // Add cancel button if not exists
+  let cancelBtn = form.querySelector('.cancel-edit-btn');
+  if (!cancelBtn) {
+    cancelBtn = document.createElement('button');
+    cancelBtn.type = 'button';
+    cancelBtn.className = 'btn btn-secondary cancel-edit-btn ms-2';
+    cancelBtn.innerHTML = '<i class="bi bi-x-circle me-1"></i> Cancel';
+    cancelBtn.onclick = resetForm;
+    submitBtn.parentNode.appendChild(cancelBtn);
+  }
+  
+  // Scroll to form
+  form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function resetForm() {
+  const form = document.querySelector('form[method="POST"]');
+  form.reset();
+  tinymce.get('remarksEditor').setContent('');
+  
+  const submitBtn = form.querySelector('button[type="submit"]');
+  submitBtn.innerHTML = '<i class="bi bi-send me-1"></i> Post Announcement';
+  submitBtn.name = 'post_announcement';
+  
+  const editIdInput = form.querySelector('input[name="announcement_id"]');
+  if (editIdInput) editIdInput.remove();
+  
+  const cancelBtn = form.querySelector('.cancel-edit-btn');
+  if (cancelBtn) cancelBtn.remove();
+  
+  // Clear image preview
+  const imgInput = document.getElementById('imageInput');
+  const inlinePreview = document.getElementById('inlineImagePreview');
+  const placeholder = document.getElementById('imageDropZone').querySelector('.placeholder');
+  if (imgInput) imgInput.value = '';
+  if (inlinePreview) { inlinePreview.innerHTML = ''; inlinePreview.hidden = true; }
+  if (placeholder) placeholder.hidden = false;
+}
+
+// Initialize TinyMCE Rich Text Editor
+tinymce.init({
+  selector: '#remarksEditor',
+  height: 300,
+  menubar: false,
+  plugins: [
+    'lists', 'link', 'charmap', 'preview', 'searchreplace',
+    'wordcount', 'fullscreen'
+  ],
+  toolbar: 'undo redo | formatselect | bold italic underline | bullist numlist | link | removeformat | preview fullscreen',
+  content_style: 'body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; font-size: 14px; }',
+  branding: false,
+  promotion: false,
+  block_formats: 'Paragraph=p; Heading 1=h1; Heading 2=h2; Heading 3=h3',
+  setup: function(editor) {
+    // Ensure form validation works with TinyMCE
+    editor.on('change', function() {
+      editor.save(); // Save content back to textarea
+    });
+  }
+});
 </script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="../../assets/js/admin/sidebar.js"></script>

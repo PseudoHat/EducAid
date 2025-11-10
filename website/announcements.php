@@ -180,7 +180,7 @@ $custom_nav_links = [
         $short = mb_strlen($full) > 600 ? mb_substr($full,0,600).'…' : $full; $needToggle = $short !== $full; ?>
   <article class="featured-card fade-in<?php echo $deep_linked ? ' deep-linked' : ''; ?>">
         <button type="button" id="copyLinkBtn" class="copy-link-btn" data-announcement-id="<?php echo (int)$featured['announcement_id']; ?>" aria-label="Copy direct link" title="Copy direct link"><i class="bi bi-link-45deg"></i></button>
-        <img class="featured-img" src="<?php echo esc($img); ?>" alt="Featured announcement image">
+        <img class="featured-img" src="<?php echo esc($img); ?>" alt="Featured announcement image" style="cursor: pointer;" onclick="showImageModal('<?php echo esc($img); ?>', '<?php echo esc($featured['title']); ?>')">
         <div class="p-4 p-lg-5">
           <div class="featured-meta">
             <span><i class="bi bi-clock-history me-1"></i><?php echo date('M d, Y', strtotime($featured['posted_at'])); ?></span>
@@ -382,7 +382,7 @@ $custom_nav_links = [
       link.className = 'ann-card-link';
       link.innerHTML = `
         <article class="ann-card fade-in">
-          <img src="${img}" alt="Announcement image" />
+          <img src="${img}" alt="Announcement image" style="cursor: pointer;" onclick="event.preventDefault(); event.stopPropagation(); showImageModal('${img}', '${escapeHtml(a.title||'')}');" />
           <div class="ann-card-body">
             <div class="ann-date">${new Date(a.posted_at).toLocaleDateString('en-US',{month:'short', day:'2-digit', year:'numeric'})}${a.is_active==='t'? ' <span class=\'badge bg-success ms-1\'>Active</span>':''}</div>
             <h6 class="ann-title">${escapeHtml(a.title||'')}</h6>
@@ -449,6 +449,30 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 </script>
 <?php endif; ?>
+
+<!-- Image Modal -->
+<div class="modal fade" id="imageModal" tabindex="-1" aria-labelledby="imageModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="imageModalLabel">Announcement Image</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body text-center">
+        <img id="modalImage" src="" alt="Full size announcement image" style="max-width: 100%; height: auto;">
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function showImageModal(imageSrc, title) {
+  const modal = new bootstrap.Modal(document.getElementById('imageModal'));
+  document.getElementById('modalImage').src = imageSrc;
+  document.getElementById('imageModalLabel').textContent = title || 'Announcement Image';
+  modal.show();
+}
+</script>
 
 </body>
 </html>

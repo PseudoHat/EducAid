@@ -102,14 +102,19 @@ $sysControlsFiles = [
     'blacklist_archive.php',
     'archived_students.php',
     'admin_management.php',
-    'municipality_content.php',
     'system_data.php',
     'settings.php',
+];
+$isSysControlsActive = in_array($current, $sysControlsFiles, true);
+
+/** Submenu membership for "Website CMS" (super_admin) */
+$cmsFiles = [
     'topbar_settings.php',
     'sidebar_settings.php',
     'footer_settings.php',
+    'municipality_content.php',
 ];
-$isSysControlsActive = in_array($current, $sysControlsFiles, true);
+$isCMSActive = in_array($current, $cmsFiles, true);
 ?>
 
 <!-- admin_sidebar.php -->
@@ -346,11 +351,6 @@ $isSysControlsActive = in_array($current, $sysControlsFiles, true);
             </a>
           </li>
           <li>
-            <a class="submenu-link <?= is_active('municipality_content.php', $current) ? 'active' : '' ?>" href="municipality_content.php">
-              <i class="bi bi-geo-alt me-2"></i> Municipalities
-            </a>
-          </li>
-          <li>
             <a class="submenu-link <?= is_active('system_data.php', $current) ? 'active' : '' ?>" href="system_data.php">
               <i class="bi bi-database me-2"></i> System Data
             </a>
@@ -360,6 +360,20 @@ $isSysControlsActive = in_array($current, $sysControlsFiles, true);
               <i class="bi bi-gear me-2"></i> Settings
             </a>
           </li>
+        </ul>
+      </li>
+    <?php endif; ?>
+
+    <!-- Website CMS (super_admin only) -->
+    <?php if ($admin_role === 'super_admin'): ?>
+      <li class="nav-item dropdown">
+        <a href="#submenu-cms" data-bs-toggle="collapse" class="dropdown-toggle">
+          <i class="bi bi-palette icon"></i>
+          <span class="links_name">Website CMS</span>
+          <i class="bi bi-chevron-down ms-auto small"></i>
+        </a>
+
+        <ul class="collapse list-unstyled ms-3 <?= $isCMSActive ? 'show' : '' ?>" id="submenu-cms">
           <li>
             <a class="submenu-link <?= is_active('topbar_settings.php', $current) ? 'active' : '' ?>" href="topbar_settings.php">
               <i class="bi bi-layout-text-window-reverse me-2"></i> Topbar Settings
@@ -373,6 +387,11 @@ $isSysControlsActive = in_array($current, $sysControlsFiles, true);
           <li>
             <a class="submenu-link <?= is_active('footer_settings.php', $current) ? 'active' : '' ?>" href="footer_settings.php">
               <i class="bi bi-layout-text-sidebar-reverse me-2"></i> Footer Settings
+            </a>
+          </li>
+          <li>
+            <a class="submenu-link <?= is_active('municipality_content.php', $current) ? 'active' : '' ?>" href="municipality_content.php">
+              <i class="bi bi-building me-2"></i> Municipality Branding
             </a>
           </li>
         </ul>
