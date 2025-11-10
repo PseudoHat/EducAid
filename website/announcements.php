@@ -41,44 +41,29 @@ require_once __DIR__ . '/../includes/website/announcements_content_helper.php';
 // Optional deep-link id
 $requested_id = isset($_GET['id']) && ctype_digit($_GET['id']) ? (int)$_GET['id'] : null;
 
-// Fetch announcements - only get featured/active one and count for display
-$featured = null; $deep_linked = false; $total_count = 0;
-
-// Get total count
-$count_res = @pg_query($connection, "SELECT COUNT(*) as total FROM announcements");
-if ($count_res) { 
-  $count_row = pg_fetch_assoc($count_res); 
-  $total_count = (int)$count_row['total']; 
-  pg_free_result($count_res); 
-}
-
+// Fetch announcements ordered with active first then newest (full list for now)
 $rows = [];
-$rows = [];
+$res = @pg_query($connection, "SELECT announcement_id, title, remarks, posted_at, is_active, event_date, event_time, location, image_path FROM announcements ORDER BY is_active DESC, posted_at DESC");
+if ($res) { while ($r = pg_fetch_assoc($res)) { $rows[] = $r; } pg_free_result($res); }
 
-// If deep-linking to specific announcement
-if ($requested_id !== null) {
-  $res = @pg_query_params($connection, "SELECT announcement_id, title, remarks, posted_at, is_active, event_date, event_time, location, image_path FROM announcements WHERE announcement_id=$1", [$requested_id]);
-  if ($res) { 
-    $featured = pg_fetch_assoc($res);
-    $deep_linked = true;
-    pg_free_result($res); 
+$featured = null; $past = []; $deep_linked = false;
+if ($rows) {
+  if ($requested_id !== null) {
+    foreach ($rows as $r) { if ((int)$r['announcement_id'] === $requested_id) { $featured = $r; $deep_linked = true; break; } }
   }
-}
-
-// If no deep-link or not found, get the active/latest announcement
-if (!$featured) {
-  // Get active announcement or latest one
-  $res = @pg_query($connection, "SELECT announcement_id, title, remarks, posted_at, is_active, event_date, event_time, location, image_path FROM announcements ORDER BY is_active DESC, posted_at DESC LIMIT 1");
-  if ($res) {
-    $featured = pg_fetch_assoc($res);
-    pg_free_result($res);
+  if (!$featured) {
+    // fall back to active then newest
+    foreach ($rows as $r) { if ($r['is_active'] === 't' || $r['is_active'] === true) { $featured = $r; break; } }
+    if (!$featured) { $featured = $rows[0]; }
   }
-}
-
-// Fallback to sample if no announcements exist
-if (!$featured) {
+  foreach ($rows as $r) { if ($r['announcement_id'] != $featured['announcement_id']) { $past[] = $r; } }
+} else {
+  // Sample fallback
   $featured = [ 'announcement_id'=>0,'title'=>'Orientation for New Applicants (Sample)','remarks'=>"This is a sample announcement. Admins can post real announcements from the admin portal. Provide guidance, instructions, schedules, or distribution details here.\n\nYou can include reminders about necessary documents, assembly times, and conduct expectations.",'posted_at'=>date('Y-m-d H:i:s'),'is_active'=>'t','event_date'=>date('Y-m-d', strtotime('+5 days')),'event_time'=>'09:00:00','location'=>'City Multipurpose Hall','image_path'=>null ];
-  $total_count = 3; // Sample data count
+  $past = [
+    ['announcement_id'=>-1,'title'=>'System Maintenance Completed (Sample)','remarks'=>'The system maintenance window has concluded successfully. You may now continue using the portal normally.','posted_at'=>date('Y-m-d H:i:s', strtotime('-2 days')),'is_active'=>'f','event_date'=>null,'event_time'=>null,'location'=>null,'image_path'=>null],
+    ['announcement_id'=>-2,'title'=>'Distribution Day Reminders (Sample)','remarks'=>'Bring your valid school ID, QR code, and arrive 15 minutes early for orderly processing.','posted_at'=>date('Y-m-d H:i:s', strtotime('-10 days')),'is_active'=>'f','event_date'=>date('Y-m-d', strtotime('-9 days')),'event_time'=>'07:30:00','location'=>'Plaza Grounds','image_path'=>null]
+  ];
 }
 
 function format_event($row){ $parts=[]; if(!empty($row['event_date'])){ $d=DateTime::createFromFormat('Y-m-d',$row['event_date']); if($d) $parts[]=$d->format('M d, Y'); } if(!empty($row['event_time'])){ $t=DateTime::createFromFormat('H:i:s',$row['event_time']); if($t) $parts[]=$t->format('g:i A'); } return implode(' • ', $parts); }
@@ -231,16 +216,19 @@ $custom_nav_links = [
   <h2 class="h5 fw-bold mb-1"<?php echo ann_block_style('past-title'); ?> data-lp-key="past-title" contenteditable="<?php echo $IS_EDIT_MODE ? 'true' : 'false'; ?>"><?php echo ann_block('past-title', '<i class="bi bi-archive me-2 text-primary"></i>Past Announcements'); ?></h2>
   <p class="small text-body-secondary mb-0"<?php echo ann_block_style('past-subtitle'); ?> data-lp-key="past-subtitle" contenteditable="<?php echo $IS_EDIT_MODE ? 'true' : 'false'; ?>"><?php echo ann_block('past-subtitle', 'Historical updates &amp; previous schedules'); ?></p>
       </div>
-      <div class="small text-body-secondary">Total: <?php echo max(0, $total_count - 1); ?></div>
+      <div class="small text-body-secondary">Total: <?php echo count($past); ?></div>
     </div>
         <div id="pastGrid" class="past-grid fade-in-stagger"></div>
         <div id="pastEmpty" class="text-center py-5 d-none">
           <p class="text-body-secondary small mb-0">No past announcements to display.</p>
         </div>
-        <div class="text-center mt-4">
-          <button id="loadMoreBtn" class="btn btn-outline-primary btn-sm px-4">
-            <span class="default-text"><i class="bi bi-arrow-down-circle me-1"></i>Load More</span>
-            <span class="loading-text d-none"><span class="spinner-border spinner-border-sm me-2"></span>Loading…</span>
+        <div class="d-flex justify-content-center align-items-center gap-3 mt-4" id="paginationBar">
+          <button id="prevPage" class="btn btn-outline-primary btn-sm" disabled>
+            <i class="bi bi-chevron-left"></i> Prev
+          </button>
+          <span id="pageInfo" class="small text-body-secondary">Page 1 of 1</span>
+          <button id="nextPage" class="btn btn-outline-primary btn-sm">
+            Next <i class="bi bi-chevron-right"></i>
           </button>
         </div>
   </div>
@@ -342,69 +330,44 @@ $custom_nav_links = [
     function showMsg(text,type){ msg.textContent=text; msg.className = `small text-center ${type==='success'?'text-success':'text-danger'}`; msg.style.display='block'; if(type==='success'){ setTimeout(()=> msg.style.display='none',5000); } }
   })();
 
-  // Incremental loading for past announcements (excluding featured)
+  // Client-side pagination for past announcements (no stacking)
   (function(){
     const grid = document.getElementById('pastGrid');
     const emptyState = document.getElementById('pastEmpty');
-    const loadBtn = document.getElementById('loadMoreBtn');
-    if(!grid || !loadBtn) return;
-    const PAGE_SIZE = 9; // cards per batch
-    let offset = 0; // will skip featured client-side
-    let firstFetch = true;
-    let reachedEnd = false;
-    const featuredId = <?php echo $featured? (int)$featured['announcement_id'] : 'null'; ?>;
+    const prevBtn = document.getElementById('prevPage');
+    const nextBtn = document.getElementById('nextPage');
+    const pageInfo = document.getElementById('pageInfo');
+    if(!grid || !prevBtn || !nextBtn || !pageInfo) return;
 
-    function setLoading(is){
-      const def = loadBtn.querySelector('.default-text');
-      const ld = loadBtn.querySelector('.loading-text');
-      if(is){ loadBtn.disabled=true; def.classList.add('d-none'); ld.classList.remove('d-none'); }
-      else { loadBtn.disabled=false; def.classList.remove('d-none'); ld.classList.add('d-none'); }
-    }
+  const PAGE_SIZE = 8; // cards per page
+    const PAST_DATA = <?php echo json_encode($past, JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT); ?>;
+    const total = Array.isArray(PAST_DATA) ? PAST_DATA.length : 0;
+    const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+    let currentPage = 1;
 
-    async function fetchBatch(){
-      if(reachedEnd) return; setLoading(true);
-      try {
-        const res = await fetch(`announcements_feed.php?limit=${PAGE_SIZE}&offset=${offset}`);
-        if(!res.ok) throw new Error('HTTP '+res.status);
-        const data = await res.json();
-        let anns = data.announcements || [];
-        // Remove featured (active) if first batch and it appears
-        if(firstFetch && featuredId){ anns = anns.filter(a => parseInt(a.announcement_id) !== featuredId); }
-        firstFetch = false;
-        if(anns.length === 0){
-          if(offset === 0){ emptyState.classList.remove('d-none'); }
-          reachedEnd = true; loadBtn.classList.add('d-none'); return;
-        }
-        anns.forEach(a => grid.appendChild(buildCard(a)));
-        // If fewer than requested, end
-        if(anns.length < PAGE_SIZE){ reachedEnd = true; loadBtn.classList.add('d-none'); }
-        offset += PAGE_SIZE; // advance for next server page (even if some filtered) for simplicity
-      } catch(err){
-        console.error('Past announcements load error', err);
-        loadBtn.classList.add('btn-danger');
-        loadBtn.innerHTML = '<i class="bi bi-exclamation-triangle me-1"></i>Retry';
-        loadBtn.disabled = false;
-      } finally { setLoading(false); }
-    }
+    // Optional: start on ?page=N
+    const params = new URLSearchParams(window.location.search);
+    const pageParam = parseInt(params.get('page'), 10);
+    if(!isNaN(pageParam) && pageParam >= 1 && pageParam <= totalPages) currentPage = pageParam;
 
     function buildCard(a){
       const img = a.image_path ? '../'+a.image_path : 'https://images.unsplash.com/photo-1543269865-cbf427effbad?q=80&w=1200&auto=format&fit=crop';
       const eventParts=[];
       if(a.event_date){ try{ const d=new Date(a.event_date); if(!isNaN(d)) eventParts.push(d.toLocaleDateString('en-US',{month:'short', day:'2-digit', year:'numeric'})); }catch(e){} }
-      if(a.event_time){ const tm=a.event_time.substring(0,5); const [H,M]=tm.split(':'); let h=parseInt(H); const ampm=h>=12?'PM':'AM'; h=h%12||12; eventParts.push(`${h}:${M} ${ampm}`); }
+      if(a.event_time){ const tm=(a.event_time||'').substring(0,5); const [H,M]=tm.split(':'); if(H!==undefined){ let h=parseInt(H); const ampm=h>=12?'PM':'AM'; h=h%12||12; eventParts.push(`${h}:${M} ${ampm}`); } }
       const eventLine = eventParts.join(' • ');
       const link = document.createElement('a');
-      link.href = `announcements.php?id=${encodeURIComponent(a.announcement_id)}`;
+      link.href = `announcements.php?id=${encodeURIComponent(a.announcement_id)}&page=${currentPage}`;
       link.className = 'ann-card-link';
       link.innerHTML = `
         <article class="ann-card fade-in">
           <img src="${img}" alt="Announcement image" style="cursor: pointer;" onclick="event.preventDefault(); event.stopPropagation(); showImageModal('${img}', '${escapeHtml(a.title||'')}');" />
           <div class="ann-card-body">
-            <div class="ann-date">${new Date(a.posted_at).toLocaleDateString('en-US',{month:'short', day:'2-digit', year:'numeric'})}${a.is_active==='t'? ' <span class=\'badge bg-success ms-1\'>Active</span>':''}</div>
+            <div class="ann-date">${new Date(a.posted_at).toLocaleDateString('en-US',{month:'short', day:'2-digit', year:'numeric'})}${(a.is_active==='t'||a.is_active===true)? ' <span class=\'badge bg-success ms-1\'>Active</span>':''}</div>
             <h6 class="ann-title">${escapeHtml(a.title||'')}</h6>
             ${eventLine? `<div class=\"small text-primary fw-semibold\">${eventLine}</div>`:''}
             ${a.location? `<div class=\"small text-body-secondary\"><i class='bi bi-geo-alt me-1'></i>${escapeHtml(a.location)}</div>`:''}
-            <p class="ann-remarks mb-0">${escapeHtml(truncate(a.remarks||'',140))}</p>
+            <p class="ann-remarks mb-0">${escapeHtml(truncate((a.remarks||'').toString(),140))}</p>
           </div>
         </article>`;
       requestAnimationFrame(()=> link.querySelector('.ann-card').classList.add('visible'));
@@ -413,9 +376,29 @@ $custom_nav_links = [
     function truncate(t,l){ t=t.trim(); return t.length>l? t.substring(0,l)+'…': t; }
     function escapeHtml(str){ return (str||'').replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c])); }
 
-    loadBtn.addEventListener('click', ()=> fetchBatch());
-    // Auto-load first batch
-    fetchBatch();
+    function render(){
+      grid.innerHTML = '';
+      if(total === 0){ emptyState.classList.remove('d-none'); pageInfo.textContent = 'Page 1 of 1'; prevBtn.disabled = true; nextBtn.disabled = true; return; }
+      const start = (currentPage - 1) * PAGE_SIZE;
+      const slice = PAST_DATA.slice(start, start + PAGE_SIZE);
+      slice.forEach(a => grid.appendChild(buildCard(a)));
+      pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
+      prevBtn.disabled = currentPage <= 1;
+      nextBtn.disabled = currentPage >= totalPages;
+      emptyState.classList.add('d-none');
+    }
+
+    prevBtn.addEventListener('click', ()=>{ if(currentPage>1){ currentPage--; updateUrl(); render(); window.scrollTo({top: document.getElementById('pastGrid').offsetTop - 120, behavior:'smooth'}); } });
+    nextBtn.addEventListener('click', ()=>{ if(currentPage<totalPages){ currentPage++; updateUrl(); render(); window.scrollTo({top: document.getElementById('pastGrid').offsetTop - 120, behavior:'smooth'}); } });
+
+    function updateUrl(){
+      const params = new URLSearchParams(window.location.search);
+      params.set('page', String(currentPage));
+      const base = window.location.pathname + '?' + params.toString();
+      history.replaceState(null, '', base);
+    }
+
+    render();
   })();
 
   // Copy direct link button for featured announcement
