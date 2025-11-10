@@ -101,7 +101,6 @@ $isDistributionActive = in_array($current, $distributionFiles, true);
 $sysControlsFiles = [
     'blacklist_archive.php',
     'archived_students.php',
-    'advance_year_levels.php',
     'admin_management.php',
     'municipality_content.php',
     'system_data.php',
@@ -132,9 +131,6 @@ $isSysControlsActive = in_array($current, $sysControlsFiles, true);
 
     <!-- Review Registrations -->
     <?= menu_link('review_registrations.php', 'bi bi-clipboard-check', 'Review Registrations', is_active('review_registrations.php', $current)); ?>
-
-    <!-- Manage Course Mappings -->
-    <?= menu_link('manage_course_mappings.php', 'bi bi-journal-check', 'Course Mappings', is_active('manage_course_mappings.php', $current)); ?>
 
     <!-- Manage Applicants -->
     <?php
@@ -342,11 +338,6 @@ $isSysControlsActive = in_array($current, $sysControlsFiles, true);
           <li>
             <a class="submenu-link <?= is_active('archived_students.php', $current) ? 'active' : '' ?>" href="archived_students.php">
               <i class="bi bi-archive-fill me-2"></i> Archived Students
-            </a>
-          </li>
-          <li>
-            <a class="submenu-link <?= is_active('advance_year_levels.php', $current) ? 'active' : '' ?>" href="advance_year_levels.php">
-              <i class="bi bi-arrow-up-circle me-2"></i> Advance Year Levels
             </a>
           </li>
           <li>

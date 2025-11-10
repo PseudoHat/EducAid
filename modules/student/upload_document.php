@@ -10,7 +10,11 @@ require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../services/UnifiedFileService.php';
 require_once __DIR__ . '/../../services/DocumentReuploadService.php';
 require_once __DIR__ . '/../../services/EnrollmentFormOCRService.php';
-require_once __DIR__ . '/../../services/CourseMappingService.php';
+
+// PHPMailer for email notifications
+use PHPMailer\PHPMailer\PHPMailer;
+use PHPMailer\PHPMailer\Exception;
+require __DIR__ . '/../../phpmailer/vendor/autoload.php';
 
 // Check if student is logged in
 if (!isset($_SESSION['student_id'])) {
@@ -28,6 +32,9 @@ $student_query = pg_query_params($connection,
             COALESCE(s.needs_document_upload, FALSE) as needs_upload,
             s.documents_to_reupload,
             s.document_rejection_reasons,
+            s.current_year_level,
+            s.is_graduating,
+            s.status_academic_year,
             b.name as barangay_name,
             u.name as university_name,
             yl.name as year_level_name
@@ -44,6 +51,49 @@ if (!$student_query || pg_num_rows($student_query) === 0) {
 }
 
 $student = pg_fetch_assoc($student_query);
+
+// Get current active academic year from distribution config (not just signup_slots)
+$current_academic_year = null;
+
+// First try to get from active slot
+$current_ay_query = pg_query($connection, "SELECT academic_year FROM signup_slots WHERE is_active = TRUE LIMIT 1");
+if ($current_ay_query && pg_num_rows($current_ay_query) > 0) {
+    $ay_row = pg_fetch_assoc($current_ay_query);
+    $current_academic_year = $ay_row['academic_year'];
+}
+
+// If no active slot, check config table for current distribution
+if (!$current_academic_year) {
+    $config_query = pg_query($connection, "SELECT value FROM config WHERE key = 'current_academic_year'");
+    if ($config_query && pg_num_rows($config_query) > 0) {
+        $config_row = pg_fetch_assoc($config_query);
+        $current_academic_year = $config_row['value'];
+    }
+}
+
+// Check if student has updated their year level credentials for the current academic year
+// They need to update if:
+// 1. They don't have year level data at all, OR
+// 2. There's an active distribution and their status_academic_year doesn't match the current one
+$has_year_level_credentials = !empty($student['current_year_level']) && 
+                               !empty($student['status_academic_year']) && 
+                               $student['is_graduating'] !== null &&
+                               (!$current_academic_year || $student['status_academic_year'] === $current_academic_year);
+
+// Store year level update requirement in variable (don't redirect, show modal instead)
+$needs_year_level_update = !$has_year_level_credentials;
+$year_level_update_message = '';
+$force_update = isset($_GET['force_update']) && $_GET['force_update'] == '1';
+
+if ($needs_year_level_update) {
+    if ($force_update) {
+        $year_level_update_message = "You must update your year level before accessing other pages. Please provide your current information below.";
+    } elseif ($current_academic_year && !empty($student['status_academic_year']) && $student['status_academic_year'] !== $current_academic_year) {
+        $year_level_update_message = "A new distribution has started for Academic Year {$current_academic_year}. Your last recorded year level was for A.Y. {$student['status_academic_year']}. Please update your current information.";
+    } else {
+        $year_level_update_message = "Please provide your current year level and graduation status to continue.";
+    }
+}
 
 // PostgreSQL returns 'f'/'t' strings for booleans
 $needs_upload = ($student['needs_upload'] === 't' || $student['needs_upload'] === true);
@@ -180,6 +230,529 @@ if (!isset($_SESSION['processing_lock'])) {
     $_SESSION['processing_lock'] = [];
 }
 
+// Handle AJAX year level update
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_year_level'])) {
+    header('Content-Type: application/json');
+    
+    try {
+        $year_level = $_POST['year_level'] ?? '';
+        $is_graduating = isset($_POST['is_graduating']) ? ($_POST['is_graduating'] === '1') : false;
+        $academic_year = $_POST['academic_year'] ?? '';
+        
+        if (empty($year_level) || empty($academic_year)) {
+            echo json_encode(['success' => false, 'message' => 'Please fill in all required fields.']);
+            exit;
+        }
+        
+        // Get student's current year level info for validation
+        $current_info_query = pg_query_params($connection, 
+            "SELECT current_year_level, is_graduating, status_academic_year FROM students WHERE student_id = $1",
+            [$student_id]
+        );
+        $current_info = pg_fetch_assoc($current_info_query);
+        
+        // CRITICAL CHECK: Prevent students who already graduated from claiming graduation again
+        if ($is_graduating && 
+            $current_info['is_graduating'] === 't' && 
+            !empty($current_info['status_academic_year']) && 
+            $current_info['status_academic_year'] < $academic_year) {
+            
+            echo json_encode([
+                'success' => false,
+                'already_graduated' => true,
+                'message' => "⚠️ <strong>Already Graduated!</strong><br><br>" .
+                            "Our records show you were graduating in <strong>A.Y. {$current_info['status_academic_year']}</strong>. " .
+                            "You cannot claim graduation status again for <strong>A.Y. {$academic_year}</strong>.<br><br>" .
+                            "<strong>What this means:</strong><br>" .
+                            "• You should have completed your degree already<br>" .
+                            "• If you're continuing education, uncheck 'Graduating'<br>" .
+                            "• If this is an error, contact the admin office<br><br>" .
+                            "<strong>Action required:</strong> Your account will be archived for administrator review. Please visit the CSWDO office."
+            ]);
+            
+            // Auto-archive the student since they're claiming graduation multiple times
+            $archive_reason = "Student claimed graduation multiple times - Was graduating in A.Y. {$current_info['status_academic_year']}, attempting to graduate again in A.Y. {$academic_year}";
+            $archived_by = null; // System auto-archive
+            
+            $archive_query = "UPDATE students 
+                             SET is_archived = TRUE,
+                                 archived_at = NOW(),
+                                 archived_by = $1,
+                                 archive_reason = $2,
+                                 status = 'disabled'
+                             WHERE student_id = $3";
+            
+            pg_query_params($connection, $archive_query, [
+                $archived_by,
+                $archive_reason,
+                $student_id
+            ]);
+            
+            // Log in history
+            $history_query = "INSERT INTO student_status_history 
+                             (student_id, year_level, is_graduating, academic_year, updated_at, update_source, notes)
+                             VALUES ($1, $2, $3, $4, NOW(), 'auto_archive_duplicate_graduation', $5)";
+            
+            pg_query_params($connection, $history_query, [
+                $student_id,
+                $year_level,
+                'true',
+                $academic_year,
+                $archive_reason
+            ]);
+            
+            // Send email notifications
+            $student_email_query = pg_query_params($connection,
+                "SELECT email, first_name, last_name FROM students WHERE student_id = $1",
+                [$student_id]
+            );
+            $student_data = pg_fetch_assoc($student_email_query);
+            
+            if ($student_data && !empty($student_data['email'])) {
+                try {
+                    $mail = new PHPMailer(true);
+                    $mail->isSMTP();
+                    $mail->Host = 'smtp.gmail.com';
+                    $mail->SMTPAuth = true;
+                    $mail->Username = 'dilucayaka02@gmail.com';
+                    $mail->Password = 'jlld eygl hksj flvg';
+                    $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+                    $mail->Port = 587;
+                    
+                    $mail->setFrom('dilucayaka02@gmail.com', 'EducAid System');
+                    $mail->addAddress($student_data['email'], $student_data['first_name'] . ' ' . $student_data['last_name']);
+                    
+                    $mail->isHTML(true);
+                    $mail->Subject = '⚠️ EducAid Account Archived - Duplicate Graduation Claim';
+                    
+                    $student_name = htmlspecialchars($student_data['first_name'] . ' ' . $student_data['last_name']);
+                    
+                    $mail->Body = "
+                        <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;'>
+                            <div style='background: #dc3545; color: white; padding: 20px; text-align: center;'>
+                                <h2 style='margin: 0;'>⚠️ Account Archived</h2>
+                            </div>
+                            
+                            <div style='padding: 20px; background: #f8f9fa;'>
+                                <p>Dear <strong>{$student_name}</strong>,</p>
+                                
+                                <p>Your EducAid account has been automatically archived due to a duplicate graduation claim.</p>
+                                
+                                <div style='background: white; padding: 15px; border-left: 4px solid #dc3545; margin: 20px 0;'>
+                                    <h3 style='color: #dc3545; margin-top: 0;'>Issue Detected:</h3>
+                                    <p><strong>You were already graduating in A.Y. {$current_info['status_academic_year']}</strong></p>
+                                    <p>You attempted to claim graduation status again for A.Y. {$academic_year}</p>
+                                </div>
+                                
+                                <h3>What This Means:</h3>
+                                <ul>
+                                    <li>You should have completed your degree in {$current_info['status_academic_year']}</li>
+                                    <li>Students cannot graduate twice from the same program</li>
+                                    <li>Your account has been flagged for administrator review</li>
+                                </ul>
+                                
+                                <h3>Next Steps:</h3>
+                                <p><strong>Please visit the CSWDO office immediately</strong> to resolve this issue.</p>
+                                
+                                <div style='background: #fff3cd; padding: 15px; border-left: 4px solid #ffc107; margin: 20px 0;'>
+                                    <p style='margin: 0;'><strong>Contact Information:</strong></p>
+                                    <p style='margin: 5px 0;'>CSWDO General Trias</p>
+                                    <p style='margin: 5px 0;'>Email: cswdo.generaltrias@gmail.com</p>
+                                </div>
+                            </div>
+                        </div>
+                    ";
+                    
+                    $mail->AltBody = "Your EducAid account has been archived due to a duplicate graduation claim. You were already graduating in A.Y. {$current_info['status_academic_year']}. Please contact CSWDO office.";
+                    
+                    $mail->send();
+                    error_log("✅ Duplicate graduation email sent to student: " . $student_data['email']);
+                } catch (Exception $e) {
+                    error_log("❌ Failed to send duplicate graduation email: " . $e->getMessage());
+                }
+            }
+            
+            // Send admin notification
+            try {
+                $mail_admin = new PHPMailer(true);
+                $mail_admin->isSMTP();
+                $mail_admin->Host = 'smtp.gmail.com';
+                $mail_admin->SMTPAuth = true;
+                $mail_admin->Username = 'dilucayaka02@gmail.com';
+                $mail_admin->Password = 'jlld eygl hksj flvg';
+                $mail_admin->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+                $mail_admin->Port = 587;
+                
+                $mail_admin->setFrom('dilucayaka02@gmail.com', 'EducAid System');
+                $mail_admin->addAddress('cswdo.generaltrias@gmail.com', 'CSWDO Admin');
+                
+                $mail_admin->isHTML(true);
+                $mail_admin->Subject = '🚨 ALERT: Student Claiming Duplicate Graduation - ' . $student_id;
+                
+                $student_name = htmlspecialchars($student_data['first_name'] . ' ' . $student_data['last_name']);
+                
+                $mail_admin->Body = "
+                    <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;'>
+                        <div style='background: #dc3545; color: white; padding: 20px;'>
+                            <h2 style='margin: 0;'>🚨 DUPLICATE GRADUATION ALERT</h2>
+                        </div>
+                        
+                        <div style='padding: 20px; background: #f8f9fa;'>
+                            <h3>Student Attempting Multiple Graduations</h3>
+                            
+                            <div style='background: white; padding: 15px; border: 1px solid #dee2e6; margin: 15px 0;'>
+                                <p><strong>Student ID:</strong> {$student_id}</p>
+                                <p><strong>Name:</strong> {$student_name}</p>
+                                <p><strong>Email:</strong> {$student_data['email']}</p>
+                                <p><strong>Previous Graduation:</strong> A.Y. {$current_info['status_academic_year']} ({$current_info['current_year_level']})</p>
+                                <p><strong>Attempted Graduation:</strong> A.Y. {$academic_year} ({$year_level})</p>
+                            </div>
+                            
+                            <div style='background: #fff3cd; padding: 15px; border-left: 4px solid #ffc107;'>
+                                <p style='margin: 0;'><strong>Action Taken:</strong> Account automatically archived</p>
+                            </div>
+                            
+                            <h4>Possible Scenarios:</h4>
+                            <ul>
+                                <li><strong>Student Error:</strong> Did not understand they already graduated</li>
+                                <li><strong>Data Error:</strong> Previous year data was incorrect</li>
+                                <li><strong>Fraud Attempt:</strong> Trying to claim aid multiple times</li>
+                                <li><strong>Continuing Education:</strong> Should have unchecked 'graduating'</li>
+                            </ul>
+                            
+                            <p><strong>Recommended Action:</strong> Contact student immediately for verification</p>
+                        </div>
+                    </div>
+                ";
+                
+                $mail_admin->AltBody = "ALERT: Student {$student_id} ({$student_name}) attempted to claim graduation in A.Y. {$academic_year}, but was already graduating in A.Y. {$current_info['status_academic_year']}. Account automatically archived.";
+                
+                $mail_admin->send();
+                error_log("✅ Duplicate graduation admin notification sent");
+            } catch (Exception $e) {
+                error_log("❌ Failed to send admin notification: " . $e->getMessage());
+            }
+            
+            exit;
+        }
+        
+        // Define year level hierarchy for comparison
+        $year_levels = ['1st Year' => 1, '2nd Year' => 2, '3rd Year' => 3, '4th Year' => 4, '5th Year' => 5];
+        
+        // Check if student is trying to stay in same year level or go down
+        // This requires admin verification - archive the account
+        $confirm_archive = isset($_POST['confirm_archive']) && $_POST['confirm_archive'] === '1';
+        
+        if (!empty($current_info['current_year_level']) && 
+            isset($year_levels[$current_info['current_year_level']]) && 
+            isset($year_levels[$year_level])) {
+            
+            $previous_level_num = $year_levels[$current_info['current_year_level']];
+            $new_level_num = $year_levels[$year_level];
+            
+            // If same or lower year level (not advancing), require admin verification
+            if ($new_level_num <= $previous_level_num && !$is_graduating) {
+                
+                if (!$confirm_archive) {
+                    // First warning - ask for confirmation
+                    $reason = ($new_level_num < $previous_level_num) 
+                        ? "You selected a lower year level ({$year_level}) than last year ({$current_info['current_year_level']})."
+                        : "You selected the same year level ({$year_level}) as last year.";
+                    
+                    echo json_encode([
+                        'success' => false,
+                        'requires_admin' => true,
+                        'message' => "{$reason} Students who are repeating a year or not advancing require administrator verification before receiving aid. Your account will be deactivated and you will need to contact the admin office to reactivate it.",
+                        'confirm_required' => true
+                    ]);
+                    exit;
+                } else {
+                    // User confirmed - archive their account
+                    $archive_reason = ($new_level_num < $previous_level_num)
+                        ? "Student went from {$current_info['current_year_level']} to {$year_level} (lower year level) - requires admin verification"
+                        : "Student repeated {$year_level} for two consecutive years - requires admin verification";
+                    
+                    // Get admin ID for archiving (use system if no admin logged in)
+                    $archived_by = $_SESSION['admin_id'] ?? null;
+                    
+                    $archive_query = "UPDATE students 
+                                     SET is_archived = TRUE,
+                                         archived_at = NOW(),
+                                         archived_by = $1,
+                                         archive_reason = $2,
+                                         status = 'disabled'
+                                     WHERE student_id = $3";
+                    
+                    $archive_result = pg_query_params($connection, $archive_query, [
+                        $archived_by,
+                        $archive_reason,
+                        $student_id
+                    ]);
+                    
+                    if ($archive_result) {
+                        // Log in student_status_history
+                        $history_query = "INSERT INTO student_status_history 
+                                         (student_id, year_level, is_graduating, academic_year, updated_at, update_source, notes)
+                                         VALUES ($1, $2, $3, $4, NOW(), 'auto_archive_repeating_year', $5)";
+                        
+                        pg_query_params($connection, $history_query, [
+                            $student_id,
+                            $year_level,
+                            'false',
+                            $academic_year,
+                            $archive_reason
+                        ]);
+                        
+                        // Create admin notification
+                        $notification_query = "INSERT INTO admin_notifications 
+                                             (message, created_at, is_read)
+                                             VALUES ($1, NOW(), FALSE)";
+                        
+                        $notification_message = "⚠️ STUDENT AUTO-ARCHIVED: {$student_id} - {$archive_reason}";
+                        pg_query_params($connection, $notification_query, [
+                            $notification_message
+                        ]);
+                        
+                        // Get student email and name for notification
+                        $student_email_query = pg_query_params($connection,
+                            "SELECT email, first_name, last_name FROM students WHERE student_id = $1",
+                            [$student_id]
+                        );
+                        $student_data = pg_fetch_assoc($student_email_query);
+                        
+                        // Send email notification to student
+                        if ($student_data && !empty($student_data['email'])) {
+                            try {
+                                $mail = new PHPMailer(true);
+                                
+                                $mail->isSMTP();
+                                $mail->Host = 'smtp.gmail.com';
+                                $mail->SMTPAuth = true;
+                                $mail->Username = 'dilucayaka02@gmail.com';
+                                $mail->Password = 'jlld eygl hksj flvg';
+                                $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+                                $mail->Port = 587;
+                                
+                                $mail->setFrom('dilucayaka02@gmail.com', 'EducAid System');
+                                $mail->addAddress($student_data['email'], $student_data['first_name'] . ' ' . $student_data['last_name']);
+                                
+                                $mail->isHTML(true);
+                                $mail->Subject = '⚠️ EducAid Account Deactivated - Action Required';
+                                
+                                $student_name = htmlspecialchars($student_data['first_name'] . ' ' . $student_data['last_name']);
+                                $reason_html = htmlspecialchars($archive_reason);
+                                
+                                $mail->Body = "
+                                    <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;'>
+                                        <div style='background: #f8d7da; border-left: 4px solid #dc3545; padding: 20px; margin-bottom: 20px;'>
+                                            <h2 style='color: #721c24; margin-top: 0;'>⚠️ Account Deactivated</h2>
+                                        </div>
+                                        
+                                        <p>Dear <strong>{$student_name}</strong>,</p>
+                                        
+                                        <p>Your EducAid account (<strong>{$student_id}</strong>) has been automatically deactivated and requires administrator verification.</p>
+                                        
+                                        <div style='background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0;'>
+                                            <p style='margin: 0;'><strong>Reason:</strong></p>
+                                            <p style='margin: 5px 0 0 0;'>{$reason_html}</p>
+                                        </div>
+                                        
+                                        <p><strong>What this means:</strong></p>
+                                        <ul>
+                                            <li>Your account has been temporarily disabled</li>
+                                            <li>You cannot participate in the current distribution</li>
+                                            <li>Your case requires administrator review</li>
+                                        </ul>
+                                        
+                                        <p><strong>What you need to do:</strong></p>
+                                        <ol>
+                                            <li>Contact the General Trias CSWDO office</li>
+                                            <li>Bring supporting documents (enrollment proof, grades, etc.)</li>
+                                            <li>Explain your situation to the administrator</li>
+                                            <li>Wait for your account to be reviewed and reactivated</li>
+                                        </ol>
+                                        
+                                        <div style='background: #d1ecf1; border-left: 4px solid #0c5460; padding: 15px; margin: 20px 0;'>
+                                            <p style='margin: 0;'><strong>📞 Contact Information:</strong></p>
+                                            <p style='margin: 5px 0 0 0;'>General Trias CSWDO<br>
+                                            Email: <a href='mailto:cswdo.generaltrias@gmail.com'>cswdo.generaltrias@gmail.com</a></p>
+                                        </div>
+                                        
+                                        <p>If you believe this is an error, please contact the administrator immediately.</p>
+                                        
+                                        <hr style='border: none; border-top: 1px solid #ddd; margin: 30px 0;'>
+                                        
+                                        <p style='font-size: 12px; color: #666;'>
+                                            This is an automated message from the EducAid System. Please do not reply to this email.
+                                        </p>
+                                    </div>
+                                ";
+                                
+                                $mail->AltBody = "Dear {$student_name},\n\n"
+                                    . "Your EducAid account ({$student_id}) has been automatically deactivated.\n\n"
+                                    . "Reason: {$archive_reason}\n\n"
+                                    . "Please contact the General Trias CSWDO office for account reactivation.\n\n"
+                                    . "Email: cswdo.generaltrias@gmail.com";
+                                
+                                $mail->send();
+                                error_log("✅ Archive email sent successfully to student: " . $student_data['email']);
+                            } catch (Exception $e) {
+                                error_log("❌ Failed to send archive email to student: " . $e->getMessage());
+                                error_log("PHPMailer Error Info: " . $mail->ErrorInfo);
+                            }
+                        } else {
+                            error_log("⚠️ Cannot send archive email - student email not found for ID: " . $student_id);
+                        }
+                        
+                        // Send email notification to admin
+                        try {
+                            $mail_admin = new PHPMailer(true);
+                            
+                            $mail_admin->isSMTP();
+                            $mail_admin->Host = 'smtp.gmail.com';
+                            $mail_admin->SMTPAuth = true;
+                            $mail_admin->Username = 'dilucayaka02@gmail.com';
+                            $mail_admin->Password = 'jlld eygl hksj flvg';
+                            $mail_admin->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+                            $mail_admin->Port = 587;
+                            
+                            $mail_admin->setFrom('dilucayaka02@gmail.com', 'EducAid System');
+                            $mail_admin->addAddress('cswdo.generaltrias@gmail.com', 'CSWDO Admin');
+                            
+                            $mail_admin->isHTML(true);
+                            $mail_admin->Subject = '⚠️ Student Account Auto-Deactivated - ' . $student_id;
+                            
+                            $student_name = htmlspecialchars($student_data['first_name'] . ' ' . $student_data['last_name']);
+                            $reason_html = htmlspecialchars($archive_reason);
+                            $student_email = htmlspecialchars($student_data['email'] ?? 'No email');
+                            
+                            $mail_admin->Body = "
+                                <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;'>
+                                    <div style='background: #fff3cd; border-left: 4px solid #ffc107; padding: 20px; margin-bottom: 20px;'>
+                                        <h2 style='color: #856404; margin-top: 0;'>⚠️ Student Account Auto-Deactivated</h2>
+                                    </div>
+                                    
+                                    <p>A student account has been automatically deactivated due to year level advancement policy.</p>
+                                    
+                                    <div style='background: #f8f9fa; padding: 15px; border-radius: 5px; margin: 20px 0;'>
+                                        <p style='margin: 5px 0;'><strong>Student ID:</strong> {$student_id}</p>
+                                        <p style='margin: 5px 0;'><strong>Name:</strong> {$student_name}</p>
+                                        <p style='margin: 5px 0;'><strong>Email:</strong> {$student_email}</p>
+                                    </div>
+                                    
+                                    <div style='background: #f8d7da; border-left: 4px solid #dc3545; padding: 15px; margin: 20px 0;'>
+                                        <p style='margin: 0;'><strong>Deactivation Reason:</strong></p>
+                                        <p style='margin: 5px 0 0 0;'>{$reason_html}</p>
+                                    </div>
+                                    
+                                    <p><strong>Action Required:</strong></p>
+                                    <ul>
+                                        <li>Review the student's case</li>
+                                        <li>Verify enrollment status and documents</li>
+                                        <li>Determine if account should be reactivated</li>
+                                        <li>Contact student if additional information is needed</li>
+                                    </ul>
+                                    
+                                    <p>The student has been notified and instructed to contact your office.</p>
+                                    
+                                    <hr style='border: none; border-top: 1px solid #ddd; margin: 30px 0;'>
+                                    
+                                    <p style='font-size: 12px; color: #666;'>
+                                        This is an automated notification from the EducAid System.
+                                    </p>
+                                </div>
+                            ";
+                            
+                            $mail_admin->AltBody = "STUDENT ACCOUNT AUTO-DEACTIVATED\n\n"
+                                . "Student ID: {$student_id}\n"
+                                . "Name: {$student_name}\n"
+                                . "Email: {$student_email}\n\n"
+                                . "Reason: {$archive_reason}\n\n"
+                                . "Please review and take appropriate action.";
+                            
+                            $mail_admin->send();
+                            error_log("✅ Archive notification sent successfully to admin: cswdo.generaltrias@gmail.com");
+                        } catch (Exception $e) {
+                            error_log("❌ Failed to send archive email to admin: " . $e->getMessage());
+                            error_log("PHPMailer Error Info: " . $mail_admin->ErrorInfo);
+                        }
+                        
+                        echo json_encode([
+                            'success' => true,
+                            'archived' => true,
+                            'message' => 'Your account has been deactivated. Please check your email for further instructions and contact the admin office for verification and reactivation.',
+                            'logout_required' => true
+                        ]);
+                    } else {
+                        echo json_encode([
+                            'success' => false,
+                            'message' => 'Failed to archive account. Please contact administrator.'
+                        ]);
+                    }
+                    exit;
+                }
+            }
+        }
+        
+        // Update student year level credentials
+        $update_query = "UPDATE students 
+                        SET current_year_level = $1,
+                            is_graduating = $2,
+                            last_status_update = NOW(),
+                            status_academic_year = $3
+                        WHERE student_id = $4";
+        
+        $update_result = pg_query_params($connection, $update_query, [
+            $year_level,
+            $is_graduating ? 'true' : 'false',
+            $academic_year,
+            $student_id
+        ]);
+        
+        if ($update_result) {
+            // Log the change in student_status_history
+            $history_query = "INSERT INTO student_status_history 
+                             (student_id, year_level, is_graduating, academic_year, updated_at, update_source, notes)
+                             VALUES ($1, $2, $3, $4, NOW(), 'student_self_update_modal', $5)";
+            
+            $note = "Student updated via upload documents page modal";
+            if (!empty($current_info['current_year_level']) && $current_info['current_year_level'] === $year_level) {
+                $note .= " - Same year level as previous year (possibly repeating)";
+            }
+            
+            pg_query_params($connection, $history_query, [
+                $student_id,
+                $year_level,
+                $is_graduating ? 'true' : 'false',
+                $academic_year,
+                $note
+            ]);
+            
+            // If student marked themselves as graduating, notify admin
+            if ($is_graduating) {
+                $notification_query = "INSERT INTO admin_notifications 
+                                     (message, created_at, is_read)
+                                     VALUES ($1, NOW(), FALSE)";
+                
+                $notification_message = "🎓 GRADUATING STUDENT: {$student_id} marked themselves as graduating ({$year_level} - {$academic_year})";
+                pg_query_params($connection, $notification_query, [
+                    $notification_message
+                ]);
+            }
+            
+            echo json_encode([
+                'success' => true,
+                'message' => 'Year level updated successfully! You can now upload documents.'
+            ]);
+        } else {
+            echo json_encode(['success' => false, 'message' => 'Failed to update year level. Please try again.']);
+        }
+    } catch (Exception $e) {
+        echo json_encode(['success' => false, 'message' => 'Error: ' . $e->getMessage()]);
+    }
+    exit;
+}
+
 // Handle AJAX OCR processing before regular form handling
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['process_document'])) {
     // Suppress error display for AJAX requests (log errors instead)
@@ -267,7 +840,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['process_document'])) 
         if ($doc_type_code === '00') {
             try {
                 $enrollmentOCR = new EnrollmentFormOCRService($connection);
-                $courseMappingService = new CourseMappingService($connection);
                 
                 $studentData = [
                     'first_name' => $student['first_name'] ?? '',
@@ -291,20 +863,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['process_document'])) 
                 $overallConfidence = $ocrResult['overall_confidence'];
                 $tsvQuality = $ocrResult['tsv_quality'];
                 
-                // Process course if found
+                // Process course if found - simplified, no database lookup
                 $courseData = null;
                 if ($extracted['course']['found']) {
-                    $courseMatch = $courseMappingService->findMatchingCourse($extracted['course']['normalized']);
-                    
-                    if ($courseMatch) {
-                        $courseData = [
-                            'raw_course' => $extracted['course']['raw'],
-                            'normalized_course' => $courseMatch['normalized_course'],
-                            'course_category' => $courseMatch['course_category'],
-                            'program_duration' => $courseMatch['program_duration_years'],
-                            'confidence' => $courseMatch['confidence']
-                        ];
-                    }
+                    $courseData = [
+                        'raw_course' => $extracted['course']['raw'],
+                        'normalized_course' => $extracted['course']['normalized']
+                    ];
                 }
                 
                 // Store TSV OCR results in session
@@ -1303,7 +1868,7 @@ $page_title = 'Upload Documents';
                             <i class="bi bi-arrow-repeat" style="animation: spin 2s linear infinite;"></i>
                             <span>Auto-updating</span>
                         </small>
-                        <small class="text-muted" style="font-size: 0.7rem;">Checks every 1s</small>
+                        <small class="text-muted" style="font-size: 0.7rem;">Checks every 3s</small>
                     </div>
                     <a href="student_homepage.php" class="btn btn-outline-secondary">
                         <i class="bi bi-arrow-left"></i> Back
@@ -2000,6 +2565,100 @@ $page_title = 'Upload Documents';
         </div>
     </div>
     
+    <!-- Year Level Update Modal -->
+    <div class="modal fade" id="yearLevelUpdateModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title">
+                        <i class="bi bi-person-badge me-2"></i>
+                        <?php if ($current_academic_year): ?>
+                            Update Year Level for A.Y. <?= htmlspecialchars($current_academic_year) ?>
+                        <?php else: ?>
+                            Update Your Year Level
+                        <?php endif; ?>
+                    </h5>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-info mb-3">
+                        <i class="bi bi-info-circle me-2"></i>
+                        <strong><?= htmlspecialchars($year_level_update_message) ?></strong>
+                    </div>
+                    
+                    <?php if (!empty($student['current_year_level']) && !empty($student['status_academic_year'])): ?>
+                    <div class="alert alert-light border mb-3">
+                        <small class="text-muted d-block mb-1">Your previous record:</small>
+                        <strong><?= htmlspecialchars($student['current_year_level']) ?></strong> 
+                        <span class="text-muted">for A.Y. <?= htmlspecialchars($student['status_academic_year']) ?></span>
+                        <?php if ($student['is_graduating'] === 't'): ?>
+                            <span class="badge bg-success ms-2">Was Graduating</span>
+                        <?php elseif ($student['is_graduating'] === 'f'): ?>
+                            <span class="badge bg-primary ms-2">Was Continuing</span>
+                        <?php endif; ?>
+                    </div>
+                    <?php endif; ?>
+                    
+                    <form id="yearLevelUpdateForm">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">
+                                <i class="bi bi-mortarboard me-1"></i> Current Year Level <span class="text-danger">*</span>
+                            </label>
+                            <select class="form-select" name="year_level" required>
+                                <option value="">-- Select Year Level --</option>
+                                <option value="1st Year" <?= ($student['current_year_level'] ?? '') === '1st Year' ? 'selected' : '' ?>>1st Year</option>
+                                <option value="2nd Year" <?= ($student['current_year_level'] ?? '') === '2nd Year' ? 'selected' : '' ?>>2nd Year</option>
+                                <option value="3rd Year" <?= ($student['current_year_level'] ?? '') === '3rd Year' ? 'selected' : '' ?>>3rd Year</option>
+                                <option value="4th Year" <?= ($student['current_year_level'] ?? '') === '4th Year' ? 'selected' : '' ?>>4th Year</option>
+                                <option value="5th Year" <?= ($student['current_year_level'] ?? '') === '5th Year' ? 'selected' : '' ?>>5th Year</option>
+                            </select>
+                            <small class="text-muted">
+                                <i class="bi bi-arrow-up-circle me-1"></i>
+                                Students must advance to the next year level each academic year
+                            </small>
+                            <small class="text-danger d-block mt-1">
+                                <i class="bi bi-exclamation-triangle me-1"></i>
+                                If you are repeating a year or went down a level, your account will be deactivated for admin verification
+                            </small>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">
+                                <i class="bi bi-calendar-check me-1"></i> Graduation Status <span class="text-danger">*</span>
+                            </label>
+                            <div class="row g-2">
+                                <div class="col-6">
+                                    <input type="radio" class="btn-check" name="is_graduating" id="not_graduating" value="0" <?= (isset($student['is_graduating']) && $student['is_graduating'] === 'f') ? 'checked' : '' ?>>
+                                    <label class="btn btn-outline-primary w-100" for="not_graduating">
+                                        <i class="bi bi-arrow-repeat d-block fs-3 mb-2"></i>
+                                        <strong>Still Continuing</strong>
+                                        <p class="mb-0 small">I will continue next year</p>
+                                    </label>
+                                </div>
+                                <div class="col-6">
+                                    <input type="radio" class="btn-check" name="is_graduating" id="graduating" value="1" <?= (isset($student['is_graduating']) && $student['is_graduating'] === 't') ? 'checked' : '' ?>>
+                                    <label class="btn btn-outline-success w-100" for="graduating">
+                                        <i class="bi bi-trophy d-block fs-3 mb-2"></i>
+                                        <strong>Graduating</strong>
+                                        <p class="mb-0 small">This is my final year</p>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <input type="hidden" name="academic_year" value="<?= htmlspecialchars($current_academic_year ?? '') ?>">
+                        <input type="hidden" name="update_year_level" value="1">
+                        
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="bi bi-check-circle me-2"></i> Update & Continue
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    
     <script src="../../assets/js/bootstrap.bundle.min.js"></script>
     <script src="../../assets/js/student/sidebar.js"></script>
     
@@ -2009,6 +2668,126 @@ $page_title = 'Upload Documents';
     <script>
         // Mark body as ready after scripts load
         document.body.classList.add('js-ready');
+        
+        // Store return URL if this is a forced update
+        <?php if ($force_update && isset($_SESSION['return_after_year_update'])): ?>
+        sessionStorage.setItem('return_after_year_update', <?= json_encode($_SESSION['return_after_year_update']) ?>);
+        <?php endif; ?>
+        
+        // Show year level update modal on page load if needed
+        <?php if ($needs_year_level_update): ?>
+        document.addEventListener('DOMContentLoaded', function() {
+            const yearLevelModal = new bootstrap.Modal(document.getElementById('yearLevelUpdateModal'));
+            yearLevelModal.show();
+        });
+        <?php endif; ?>
+        
+        // Handle year level update form submission
+        document.addEventListener('DOMContentLoaded', function() {
+            const form = document.getElementById('yearLevelUpdateForm');
+            if (form) {
+                form.addEventListener('submit', async function(e) {
+                    e.preventDefault();
+                    
+                    const formData = new FormData(form);
+                    const submitBtn = form.querySelector('button[type="submit"]');
+                    const originalBtnText = submitBtn.innerHTML;
+                    
+                    // Disable button and show loading
+                    submitBtn.disabled = true;
+                    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Updating...';
+                    
+                    try {
+                        const response = await fetch('upload_document.php', {
+                            method: 'POST',
+                            body: formData
+                        });
+                        
+                        const result = await response.json();
+                        
+                        if (result.success) {
+                            if (result.archived && result.logout_required) {
+                                // Account was archived - show message and logout
+                                alert(result.message);
+                                window.location.href = '../../unified_login.php?archived=1';
+                            } else {
+                                // Normal success - Show success message
+                                const alertDiv = document.createElement('div');
+                                alertDiv.className = 'alert alert-success alert-dismissible fade show';
+                                alertDiv.innerHTML = `
+                                    <i class="bi bi-check-circle me-2"></i>
+                                    ${result.message}
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                                `;
+                                
+                                // Close modal
+                                const modal = bootstrap.Modal.getInstance(document.getElementById('yearLevelUpdateModal'));
+                                modal.hide();
+                                
+                                // Check if there's a return URL from forced update
+                                const urlParams = new URLSearchParams(window.location.search);
+                                const returnUrl = sessionStorage.getItem('return_after_year_update');
+                                
+                                if (returnUrl && urlParams.has('force_update')) {
+                                    // Redirect back to page they were trying to access
+                                    sessionStorage.removeItem('return_after_year_update');
+                                    window.location.href = returnUrl;
+                                } else {
+                                    // Insert alert at top of page
+                                    document.querySelector('.container-fluid').insertBefore(alertDiv, document.querySelector('.container-fluid').firstChild);
+                                    
+                                    // Reload page after 1 second to reflect changes
+                                    setTimeout(() => {
+                                        window.location.reload();
+                                    }, 1000);
+                                }
+                            }
+                        } else if (result.requires_admin && result.confirm_required) {
+                            // Student is repeating/going down - requires admin verification
+                            submitBtn.disabled = false;
+                            submitBtn.innerHTML = originalBtnText;
+                            
+                            const confirmMsg = result.message + '\n\nClick OK to confirm and deactivate your account. You will need to contact admin to reactivate.';
+                            
+                            if (confirm(confirmMsg)) {
+                                // User confirmed - add archive flag and resubmit
+                                formData.append('confirm_archive', '1');
+                                
+                                // Resubmit with archive confirmation
+                                submitBtn.disabled = true;
+                                submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Archiving...';
+                                
+                                const archiveResponse = await fetch('upload_document.php', {
+                                    method: 'POST',
+                                    body: formData
+                                });
+                                
+                                const archiveResult = await archiveResponse.json();
+                                
+                                if (archiveResult.success && archiveResult.archived) {
+                                    alert(archiveResult.message);
+                                    window.location.href = '../../unified_login.php?archived=1';
+                                } else {
+                                    alert(archiveResult.message || 'Failed to deactivate account. Please contact administrator.');
+                                    submitBtn.disabled = false;
+                                    submitBtn.innerHTML = originalBtnText;
+                                }
+                            }
+                        } else {
+                            // Show error message
+                            alert(result.message || 'Failed to update year level. Please try again.');
+                            submitBtn.disabled = false;
+                            submitBtn.innerHTML = originalBtnText;
+                        }
+                    } catch (error) {
+                        console.error('Error updating year level:', error);
+                        alert('An error occurred. Please try again.');
+                        submitBtn.disabled = false;
+                        submitBtn.innerHTML = originalBtnText;
+                    }
+                });
+            }
+        });
         
         // Helper function to strip HTML tags from text (for alert messages)
         function stripHtml(html) {

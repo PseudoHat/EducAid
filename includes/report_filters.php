@@ -140,16 +140,7 @@ class ReportFilters {
             $this->paramCount++;
         }
         
-        // Course category filter
-        if (!empty($this->filters['course_category'])) {
-            $this->whereConditions[] = "EXISTS (
-                SELECT 1 FROM courses_mapping cm
-                WHERE LOWER(cm.normalized_course) = LOWER(s.course)
-                AND cm.course_category = \$$this->paramCount
-            )";
-            $this->params[] = $this->filters['course_category'];
-            $this->paramCount++;
-        }
+        // Course category filter removed - course mapping no longer used
         
         // Date range filter (registration date)
         if (!empty($this->filters['date_from'])) {

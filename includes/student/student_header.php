@@ -46,7 +46,7 @@ if (isset($connection) && $studentId) {
             <li><a class="dropdown-item" href="student_profile.php"><i class="bi bi-person me-2"></i>Profile</a></li>
             <li><a class="dropdown-item" href="student_settings.php"><i class="bi bi-gear me-2"></i>Settings</a></li>
             <li><hr class="dropdown-divider"/></li>
-            <li><a class="dropdown-item" href="../../unified_login.php?logout=true"><i class="bi bi-box-arrow-right me-2"></i>Logout</a></li>
+            <li><a class="dropdown-item" href="../../unified_login.php?logout=true" onclick="return confirm('Are you sure you want to logout?\n\nYou will be returned to the login page.');"><i class="bi bi-box-arrow-right me-2"></i>Logout</a></li>
           </ul>
         </div>
       </div>

@@ -295,7 +295,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processEnrollmentOcr'
     
     // Load the new TSV-based OCR services
     require_once(__DIR__ . '/../../services/EnrollmentFormOCRService.php');
-    require_once(__DIR__ . '/../../services/CourseMappingService.php');
     
     if (!isset($_FILES['enrollment_form']) || $_FILES['enrollment_form']['error'] !== UPLOAD_ERR_OK) {
         $errorMsg = 'No file uploaded or upload error.';
@@ -425,33 +424,17 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processEnrollmentOcr'
         $overallConfidence = $ocrResult['overall_confidence'];
         $tsvQuality = $ocrResult['tsv_quality'];
 
-        // Process extracted course if found
+        // Process extracted course if found - simplified, no course matching
         $courseData = null;
         $normalizedCourse = null;
         
         if ($extracted['course']['found']) {
-            $courseMappingService = new CourseMappingService($connection);
-            $courseMatch = $courseMappingService->findMatchingCourse($extracted['course']['normalized']);
-            
-            if ($courseMatch) {
-                $courseData = [
-                    'raw_course' => $extracted['course']['raw'],
-                    'normalized_course' => $courseMatch['normalized_course'],
-                    'course_category' => $courseMatch['course_category'],
-                    'program_duration' => $courseMatch['program_duration_years'],
-                    'match_confidence' => $courseMatch['confidence'],
-                    'match_type' => $courseMatch['match_type']
-                ];
-                $normalizedCourse = $courseMatch['normalized_course'];
-            } else {
-                // Course found but not in database
-                $courseData = [
-                    'raw_course' => $extracted['course']['raw'],
-                    'normalized_course' => $extracted['course']['normalized'],
-                    'needs_admin_review' => true,
-                    'message' => 'Course name detected but needs admin verification'
-                ];
-            }
+            // Just use the extracted course as-is, no database lookup
+            $courseData = [
+                'raw_course' => $extracted['course']['raw'],
+                'normalized_course' => $extracted['course']['normalized']
+            ];
+            $normalizedCourse = $extracted['course']['normalized'];
         }
 
         // Build verification response
@@ -4735,6 +4718,22 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['register'])) {
     $password = trim($_POST['password'] ?? '');
     $hashed = password_hash($password, PASSWORD_DEFAULT);
 
+    // Get year level name for new current_year_level column
+    $yearLevelName = '';
+    if ($year_level > 0) {
+        $yearResult = pg_query_params($connection, "SELECT name FROM year_levels WHERE year_level_id = $1", [$year_level]);
+        if ($yearRow = pg_fetch_assoc($yearResult)) {
+            $yearLevelName = $yearRow['name'];
+        }
+    }
+
+    // Get current academic year
+    $currentAcademicYear = '';
+    $academicYearResult = pg_query($connection, "SELECT year_code FROM academic_years WHERE is_current = TRUE LIMIT 1");
+    if ($academicYearRow = pg_fetch_assoc($academicYearResult)) {
+        $currentAcademicYear = $academicYearRow['year_code'];
+    }
+
     // Validate required fields
     $requiredFields = [$firstname, $lastname, $email, $mobile, $bdate, $sex, $barangay, $university, $year_level, $password];
     if (in_array('', $requiredFields, true)) {
@@ -4894,12 +4893,14 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['register'])) {
         student_id, municipality_id, first_name, middle_name, last_name, extension_name, 
         email, mobile, password, sex, status, payroll_no, application_date, bdate, 
         barangay_id, university_id, year_level_id, slot_id, school_student_id, course, course_verified,
-        household_verified, household_primary, household_group_id, archival_type
+        household_verified, household_primary, household_group_id, archival_type,
+        current_year_level, is_graduating, last_status_update, status_academic_year
     )
     VALUES (
         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 
         'under_registration', 0, NOW(), $11, $12, $13, $14, $15, $16, $17, $18,
-        FALSE, FALSE, NULL, NULL
+        FALSE, FALSE, NULL, NULL,
+        $19, FALSE, NOW(), $20
     ) RETURNING student_id";
 
     $result = pg_query_params($connection, $insertQuery, [
@@ -4920,7 +4921,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['register'])) {
         $slot_id,
         $school_student_id,  // School/University-issued ID number
         $course,             // Course/Program from OCR
-        $course_verified ? 'true' : 'false'  // Convert boolean to PostgreSQL boolean string
+        $course_verified ? 'true' : 'false',  // Convert boolean to PostgreSQL boolean string
+        $yearLevelName,      // New: current_year_level (e.g., "2nd Year")
+        $currentAcademicYear // New: status_academic_year (e.g., "2025-2026")
     ]);
 
 

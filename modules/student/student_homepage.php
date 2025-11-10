@@ -13,11 +13,42 @@ include __DIR__ . '/../../includes/workflow_control.php';
 // Track session activity
 include __DIR__ . '/../../includes/student_session_tracker.php';
 
+// Require year level update before accessing this page
+include __DIR__ . '/../../includes/require_year_level_update.php';
+
 // Fetch student info including last login
 $studentId = $_SESSION['student_id'];
-$student_info_query = "SELECT last_login, first_name, last_name FROM students WHERE student_id = $1";
+$student_info_query = "SELECT last_login, first_name, last_name, current_year_level, is_graduating, status_academic_year FROM students WHERE student_id = $1";
 $student_info_result = pg_query_params($connection, $student_info_query, [$studentId]);
 $student_info = pg_fetch_assoc($student_info_result);
+
+// Get current active academic year from distribution config (not just signup_slots)
+$current_academic_year = null;
+
+// First try to get from active slot
+$current_ay_query = pg_query($connection, "SELECT academic_year FROM signup_slots WHERE is_active = TRUE LIMIT 1");
+if ($current_ay_query && pg_num_rows($current_ay_query) > 0) {
+    $ay_row = pg_fetch_assoc($current_ay_query);
+    $current_academic_year = $ay_row['academic_year'];
+}
+
+// If no active slot, check config table for current distribution
+if (!$current_academic_year) {
+    $config_query = pg_query($connection, "SELECT value FROM config WHERE key = 'current_academic_year'");
+    if ($config_query && pg_num_rows($config_query) > 0) {
+        $config_row = pg_fetch_assoc($config_query);
+        $current_academic_year = $config_row['value'];
+    }
+}
+
+// Check if student needs to update their year level credentials
+// They need to update if:
+// 1. They don't have year level data at all, OR
+// 2. There's an active distribution and their status_academic_year doesn't match the current one
+$needs_year_level_update = empty($student_info['current_year_level']) || 
+                           empty($student_info['status_academic_year']) || 
+                           $student_info['is_graduating'] === null ||
+                           ($current_academic_year && $student_info['status_academic_year'] !== $current_academic_year);
 
 // Check if this is a fresh login (within last 5 minutes) and adjust display
 $current_time = new DateTime('now', new DateTimeZone('Asia/Manila'));
@@ -275,6 +306,38 @@ if (!isset($_SESSION['schedule_modal_shown'])) {
             </div>
           </div>
         </div>
+        
+        <!-- Year Level Update Notification -->
+        <?php if ($needs_year_level_update): ?>
+          <div class="alert alert-info alert-dismissible fade show d-flex align-items-start" role="alert">
+            <i class="bi bi-info-circle-fill me-3 fs-4"></i>
+            <div class="flex-grow-1">
+              <h5 class="alert-heading mb-2">
+                <?php if ($current_academic_year): ?>
+                  Update Your Year Level for A.Y. <?php echo htmlspecialchars($current_academic_year); ?>
+                <?php else: ?>
+                  Update Your Year Level Information
+                <?php endif; ?>
+              </h5>
+              <p class="mb-2">
+                <?php if ($current_academic_year && !empty($student_info['status_academic_year']) && $student_info['status_academic_year'] !== $current_academic_year): ?>
+                  A new distribution has started for Academic Year <strong><?php echo htmlspecialchars($current_academic_year); ?></strong>. 
+                  Your last recorded year level was for A.Y. <?php echo htmlspecialchars($student_info['status_academic_year']); ?>.
+                  Please update your current year level and graduation status.
+                <?php else: ?>
+                  We need you to update your current year level and graduation status. This information helps us track your academic progress and determine eligibility for distributions.
+                <?php endif; ?>
+              </p>
+              <hr class="my-2">
+              <p class="mb-0">
+                <a href="upload_document.php" class="btn btn-info btn-sm">
+                  <i class="bi bi-pencil-square me-1"></i> Update Now
+                </a>
+                <button type="button" class="btn-close ms-2" data-bs-dismiss="alert" aria-label="Dismiss"></button>
+              </p>
+            </div>
+          </div>
+        <?php endif; ?>
         
         <!-- Global Documents Deadline Banner (if distribution started) -->
         <?php

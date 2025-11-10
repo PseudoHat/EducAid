@@ -27,7 +27,8 @@ $validActions = [
     'override_applicant',
     'archive_student',
     'reject_documents',
-    'csv_migration'
+    'csv_migration',
+    'distribution_control'  // Added for graduating students archive modal
 ];
 
 if (!in_array($action, $validActions)) {
