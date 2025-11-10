@@ -672,18 +672,26 @@ if (isset($_GET['api'])) {
                     </div>
                 </div>
 
-                <!-- Instructions Alert -->
-                <div class="alert alert-info alert-dismissible fade show" role="alert">
-                    <h6 class="alert-heading">
-                        <i class="bi bi-lightbulb me-2"></i>How to Resolve Household Duplicates
-                    </h6>
-                    <ol class="mb-0 small">
-                        <li><strong>Review:</strong> Students with the same surname who may be siblings/family members</li>
-                        <li><strong>Mark Primary:</strong> Select one student as the primary recipient (usually the oldest or first to register)</li>
-                        <li><strong>Archive Duplicates:</strong> Archive the remaining family members to prevent duplicate distributions</li>
-                        <li><strong>Verification:</strong> Once resolved, the group will be marked as "Verified" ✓</li>
-                    </ol>
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                <!-- Help Button -->
+                <div class="mb-3">
+                    <button class="btn btn-outline-info btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#helpInstructions" aria-expanded="false" aria-controls="helpInstructions">
+                        <i class="bi bi-question-circle me-1"></i> Show Instructions
+                    </button>
+                </div>
+
+                <!-- Collapsible Instructions -->
+                <div class="collapse" id="helpInstructions">
+                    <div class="alert alert-info mb-3">
+                        <h6 class="alert-heading">
+                            <i class="bi bi-lightbulb me-2"></i>How to Resolve Household Duplicates
+                        </h6>
+                        <ol class="mb-0 small">
+                            <li><strong>Review:</strong> Students with the same surname who may be siblings/family members</li>
+                            <li><strong>Mark Primary:</strong> Select one student as the primary recipient (usually the oldest or first to register)</li>
+                            <li><strong>Archive Duplicates:</strong> Archive the remaining family members to prevent duplicate distributions</li>
+                            <li><strong>Verification:</strong> Once resolved, the group will be marked as "Verified" ✓</li>
+                        </ol>
+                    </div>
                 </div>
 
                 <!-- Filters Section -->
