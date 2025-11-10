@@ -265,6 +265,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $posted = isset($_GET['posted']);
 ?>
 <?php $page_title='Manage Announcements'; $extra_css=['../../assets/css/admin/manage_announcements.css']; include __DIR__ . '/../../includes/admin/admin_head.php'; ?>
+
+<!-- TinyMCE Rich Text Editor -->
+<script src="https://cdn.tiny.cloud/1/no-api-key/tinymce/6/tinymce.min.js" referrerpolicy="origin"></script>
+
 <style>
   .card:hover { transform:none!important; transition:none!important; }
   .card h5 { font-size:1.25rem; font-weight:600; color:#333; }
@@ -332,7 +336,7 @@ $posted = isset($_GET['posted']);
           </div>
           <div class="mb-3">
             <label class="form-label">Remarks / Description</label>
-            <textarea name="remarks" class="form-control form-control-lg" rows="6" placeholder="Provide details, agenda, instructions, deadlines..." required></textarea>
+            <textarea name="remarks" id="remarksEditor" class="form-control form-control-lg" rows="6" placeholder="Provide details, agenda, instructions, deadlines..." required></textarea>
           </div>
           <div class="mb-3">
             <div class="form-section-title">Image (Optional)</div>
@@ -592,6 +596,28 @@ if(dropZone && imgInput && inlinePreview){
   ['dragleave','drop'].forEach(ev => dropZone.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); dropZone.classList.remove('dragover'); }));
   dropZone.addEventListener('drop', e => { const file = e.dataTransfer.files && e.dataTransfer.files[0]; if(file){ imgInput.files = e.dataTransfer.files; imgInput.dispatchEvent(new Event('change')); }});
 }
+
+// Initialize TinyMCE Rich Text Editor
+tinymce.init({
+  selector: '#remarksEditor',
+  height: 300,
+  menubar: false,
+  plugins: [
+    'lists', 'link', 'charmap', 'preview', 'searchreplace',
+    'wordcount', 'fullscreen'
+  ],
+  toolbar: 'undo redo | formatselect | bold italic underline | bullist numlist | link | removeformat | preview fullscreen',
+  content_style: 'body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; font-size: 14px; }',
+  branding: false,
+  promotion: false,
+  block_formats: 'Paragraph=p; Heading 1=h1; Heading 2=h2; Heading 3=h3',
+  setup: function(editor) {
+    // Ensure form validation works with TinyMCE
+    editor.on('change', function() {
+      editor.save(); // Save content back to textarea
+    });
+  }
+});
 </script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="../../assets/js/admin/sidebar.js"></script>

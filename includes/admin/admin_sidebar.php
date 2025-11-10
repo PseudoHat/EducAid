@@ -113,6 +113,7 @@ $cmsFiles = [
     'topbar_settings.php',
     'sidebar_settings.php',
     'footer_settings.php',
+    'municipality_content.php',
 ];
 $isCMSActive = in_array($current, $cmsFiles, true);
 ?>
@@ -359,11 +360,6 @@ $isCMSActive = in_array($current, $cmsFiles, true);
             </a>
           </li>
           <li>
-            <a class="submenu-link <?= is_active('municipality_content.php', $current) ? 'active' : '' ?>" href="municipality_content.php">
-              <i class="bi bi-geo-alt me-2"></i> Municipalities
-            </a>
-          </li>
-          <li>
             <a class="submenu-link <?= is_active('system_data.php', $current) ? 'active' : '' ?>" href="system_data.php">
               <i class="bi bi-database me-2"></i> System Data
             </a>
@@ -400,6 +396,11 @@ $isCMSActive = in_array($current, $cmsFiles, true);
           <li>
             <a class="submenu-link <?= is_active('footer_settings.php', $current) ? 'active' : '' ?>" href="footer_settings.php">
               <i class="bi bi-layout-text-sidebar-reverse me-2"></i> Footer Settings
+            </a>
+          </li>
+          <li>
+            <a class="submenu-link <?= is_active('municipality_content.php', $current) ? 'active' : '' ?>" href="municipality_content.php">
+              <i class="bi bi-building me-2"></i> Municipality Branding
             </a>
           </li>
         </ul>

@@ -761,11 +761,9 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
             flex-direction: column;
         }
         
-        /* FIX 4: Footer always sticks to bottom but flows naturally */
-        .login-page-isolated #dynamic-footer,
-        .login-page-isolated .login-compact-footer {
-            flex-shrink: 0;
-            margin-top: auto;
+        /* FIX 4: Content container uses remaining space */
+        .login-page-isolated .login-content-container {
+            flex: 1;
         }
         
         /* FIX 4: CSS isolation for navbar to prevent page CSS bleed */
@@ -1022,32 +1020,6 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
         }
         
         /* ============================================
-           COMPACT FOOTER FOR LOGIN PAGE
-           ============================================ */
-        
-        .login-compact-footer {
-            background: #f8f9fa;
-            border-top: 1px solid #e9ecef;
-            margin-top: auto;
-            flex-shrink: 0;
-            padding: 0;
-            width: 100%;
-        }
-        
-        .login-compact-footer small {
-            font-size: 0.8125rem;
-            line-height: 1.8;
-        }
-        
-        .login-compact-footer a {
-            transition: color 0.2s ease;
-        }
-        
-        .login-compact-footer a.hover-primary:hover {
-            color: var(--thm-primary) !important;
-        }
-        
-        /* ============================================
            COMPACT LOGIN CARD CONTENT - BALANCED
            ============================================ */
         
@@ -1154,24 +1126,15 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
             margin-top: 0.75rem !important;
         }
         
-        /* Adjust login card max-height to account for compact footer */
+        /* Adjust login card max-height - no footer now */
         .login-page-isolated .login-card {
-            max-height: calc(100vh - var(--navbar-height) - 70px);
+            max-height: calc(100vh - var(--navbar-height) - 3rem);
         }
         
         /* Mobile adjustments - BALANCED */
         @media (max-width: 575.98px) {
-            .login-compact-footer small {
-                font-size: 0.75rem;
-            }
-            
-            .login-compact-footer .py-3 {
-                padding-top: 0.75rem !important;
-                padding-bottom: 0.75rem !important;
-            }
-            
             .login-page-isolated .login-card {
-                max-height: calc(100vh - var(--navbar-height) - 80px);
+                max-height: calc(100vh - var(--navbar-height) - 2rem);
                 padding: 1.5rem 1.25rem !important;
             }
             
@@ -1200,13 +1163,8 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
         
         /* Very short viewports - BALANCED */
         @media (max-height: 700px) {
-            .login-compact-footer .py-3 {
-                padding-top: 0.5rem !important;
-                padding-bottom: 0.5rem !important;
-            }
-            
             .login-page-isolated .login-card {
-                max-height: calc(100vh - var(--navbar-height) - 50px);
+                max-height: calc(100vh - var(--navbar-height) - 2rem);
                 padding: 1.375rem 1.25rem !important;
             }
             
@@ -1228,13 +1186,8 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
         }
         
         @media (max-height: 600px) {
-            .login-compact-footer .py-3 {
-                padding-top: 0.375rem !important;
-                padding-bottom: 0.375rem !important;
-            }
-            
             .login-page-isolated .login-card {
-                max-height: calc(100vh - var(--navbar-height) - 40px);
+                max-height: calc(100vh - var(--navbar-height) - 1.5rem);
                 padding: 1.125rem 1rem !important;
             }
             
@@ -1262,13 +1215,6 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
             .login-page-isolated .btn-lg {
                 padding: 0.5625rem 1.125rem !important;
                 font-size: 0.875rem !important;
-            }
-        }
-        
-        /* Hide some footer elements on very small screens */
-        @media (max-width: 375px) {
-            .login-compact-footer br.d-sm-none {
-                display: block !important;
             }
         }
         
