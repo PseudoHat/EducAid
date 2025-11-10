@@ -242,7 +242,9 @@ class EnrollmentFormOCRService {
         
         $extracted = [
             'student_name' => $this->extractStudentName($words, $studentData),
-            'course' => $this->extractCourse($words),
+            // Course removed - students will input their course manually
+            // 'course' => $this->extractCourse($words),
+            'course' => ['raw' => null, 'normalized' => null, 'confidence' => 0, 'found' => false],
             'year_level' => $this->extractYearLevel($words),
             'university' => $this->extractUniversity($words, $studentData),
             'academic_year' => $this->extractAcademicYear($words),
