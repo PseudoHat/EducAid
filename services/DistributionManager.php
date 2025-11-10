@@ -1,13 +1,18 @@
 <?php
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../config/FilePathConfig.php';
 
 class DistributionManager {
     private $conn;
     private $studentResetColumnCache = null;
+    private $pathConfig;
     
     public function __construct() {
         global $connection;
         $this->conn = $connection;
+        $this->pathConfig = FilePathConfig::getInstance();
+        
+        error_log("DistributionManager: Environment=" . ($this->pathConfig->isRailway() ? 'Railway' : 'Localhost'));
     }
     
     public function endDistribution($distributionId, $adminId, $compressNow = true) {
@@ -119,9 +124,8 @@ class DistributionManager {
             return []; // No distributed students yet
         }
         
-        // Scan actual files in uploads directory
-        // Files are stored in shared folders, not per-student folders
-        $uploadsPath = __DIR__ . '/../assets/uploads';
+        // Scan actual files in uploads directory using pathConfig
+        $uploadsPath = $this->pathConfig->getUploadsDir();
         $totalFiles = 0;
         $totalSize = 0;
         
@@ -250,15 +254,15 @@ class DistributionManager {
         $result = pg_query($this->conn, $query);
         $distributions = $result ? pg_fetch_all($result) ?: [] : [];
         
-        // Enhance with actual file data from ZIP archives
-        $distributionsPath = __DIR__ . '/../assets/uploads/distributions';
+        // Enhance with actual file data from ZIP archives using pathConfig
+        $distributionsPath = $this->pathConfig->getDistributionsPath();
         
         foreach ($distributions as &$dist) {
             // Primary: Use archive_filename if stored
             $zipFile = null;
             
             if (!empty($dist['archive_filename'])) {
-                $primaryZip = $distributionsPath . '/' . $dist['archive_filename'];
+                $primaryZip = $distributionsPath . DIRECTORY_SEPARATOR . $dist['archive_filename'];
                 if (file_exists($primaryZip) && is_file($primaryZip)) {
                     $zipFile = $primaryZip;
                 }
@@ -328,13 +332,13 @@ class DistributionManager {
         
         $distStats = pg_fetch_assoc($distQuery);
         
-        // Scan actual distribution ZIP files to calculate space
-        $distributionsPath = __DIR__ . '/../assets/uploads/distributions';
+        // Scan actual distribution ZIP files to calculate space using pathConfig
+        $distributionsPath = $this->pathConfig->getDistributionsPath();
         $totalCompressedSize = 0;
         $distributionCount = 0;
         
         if (is_dir($distributionsPath)) {
-            $zipFiles = glob($distributionsPath . '/*.zip');
+            $zipFiles = glob($distributionsPath . DIRECTORY_SEPARATOR . '*.zip');
             foreach ($zipFiles as $zipFile) {
                 if (is_file($zipFile)) {
                     $totalCompressedSize += filesize($zipFile);
@@ -387,8 +391,8 @@ class DistributionManager {
     public function getStorageStatistics() {
         $stats = [];
         
-        // 1. ACTIVE STUDENTS - Scan actual files in assets/uploads/student/
-        $activeUploadsPath = __DIR__ . '/../assets/uploads/student';
+        // 1. ACTIVE STUDENTS - Scan actual files using pathConfig
+        $activeUploadsPath = $this->pathConfig->getStudentPath();
         $activeFolders = ['enrollment_forms', 'grades', 'id_pictures', 'indigency', 'letter_to_mayor'];
         
         $activeFiles = 0;
@@ -397,7 +401,7 @@ class DistributionManager {
         $activeStudentCount = pg_fetch_assoc($activeStudentsQuery)['count'] ?? 0;
         
         foreach ($activeFolders as $folder) {
-            $folderPath = $activeUploadsPath . '/' . $folder;
+            $folderPath = $this->pathConfig->getStudentPath($folder);
             if (is_dir($folderPath)) {
                 $files = glob($folderPath . '/*.*');
                 foreach ($files as $file) {
@@ -416,8 +420,8 @@ class DistributionManager {
             'total_size' => $activeSize
         ];
         
-        // 2. PAST DISTRIBUTIONS - Scan ZIP files in assets/uploads/distributions/
-        $distributionsPath = __DIR__ . '/../assets/uploads/distributions';
+        // 2. PAST DISTRIBUTIONS - Scan ZIP files using pathConfig
+        $distributionsPath = $this->pathConfig->getDistributionsPath();
         $distFiles = 0;
         $distSize = 0;
         $distCount = 0;
@@ -471,13 +475,13 @@ class DistributionManager {
                 'total_size' => (int)$archivedData['total_size']
             ];
         } else {
-            // Fallback: scan archived_students folder if exists
-            $archivedPath = __DIR__ . '/../assets/uploads/archived_students';
+            // Fallback: scan archived_students folder if exists using pathConfig
+            $archivedPath = $this->pathConfig->getArchivedStudentsPath();
             $archivedFiles = 0;
             $archivedSize = 0;
             
             if (is_dir($archivedPath)) {
-                $files = glob($archivedPath . '/*.*', GLOB_BRACE);
+                $files = glob($archivedPath . DIRECTORY_SEPARATOR . '*.*', GLOB_BRACE);
                 foreach ($files as $file) {
                     if (is_file($file)) {
                         $archivedFiles++;

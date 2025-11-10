@@ -6,14 +6,14 @@ echo "Creating upload directory structure..."
 # Create temp directories
 mkdir -p /app/assets/uploads/temp/enrollment_forms
 mkdir -p /app/assets/uploads/temp/id_pictures
-mkdir -p /app/assets/uploads/temp/letter_mayor
+mkdir -p /app/assets/uploads/temp/letter_to_mayor
 mkdir -p /app/assets/uploads/temp/indigency
 mkdir -p /app/assets/uploads/temp/grades
 
 # Create student directories
 mkdir -p /app/assets/uploads/student/enrollment_forms
 mkdir -p /app/assets/uploads/student/id_pictures
-mkdir -p /app/assets/uploads/student/letter_mayor
+mkdir -p /app/assets/uploads/student/letter_to_mayor
 mkdir -p /app/assets/uploads/student/indigency
 mkdir -p /app/assets/uploads/student/grades
 

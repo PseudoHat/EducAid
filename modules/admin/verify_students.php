@@ -10,6 +10,19 @@ if (!isset($_SESSION['admin_username'])) {
     exit;
 }
 
+// Lightweight API for sidebar: return active students count as JSON
+if (isset($_GET['api']) && $_GET['api'] === 'badge_count') {
+    header('Content-Type: application/json');
+    $countRes = @pg_query($connection, "SELECT COUNT(*) FROM students WHERE status = 'active' AND (is_archived IS NULL OR is_archived = FALSE)");
+    $count = 0;
+    if ($countRes) {
+        $count = (int) pg_fetch_result($countRes, 0, 0);
+        pg_free_result($countRes);
+    }
+    echo json_encode(['count' => $count]);
+    exit;
+}
+
 // Check workflow permissions - must have active distribution
 $workflow_status = getWorkflowStatus($connection);
 if (!$workflow_status['can_verify_students']) {
@@ -411,7 +424,7 @@ while ($row = pg_fetch_assoc($barangayResult)) {
                     <th>Mobile Number</th>
                     <th>Barangay</th>
                     <th class="payroll-col">Payroll #</th>
-                    <th class="qr-col">QR Code</th>
+                    <th class="qr-col">QR Generated?</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -426,13 +439,10 @@ while ($row = pg_fetch_assoc($barangayResult)) {
                       $mobile   = htmlspecialchars($row['mobile'] ?? '');
                       $barangay = htmlspecialchars($row['barangay'] ?? '');
                       $payroll  = htmlspecialchars((string)($row['payroll_no'] ?? ''));
-                      $qr_img = '';
                       $unique_id = $row['unique_id'];
                       
-                      // Only show QR image if payroll and unique_id exist (no automatic generation)
-                      if (!empty($payroll) && !empty($unique_id)) {
-                        $qr_img = '../../modules/admin/phpqrcode/generate_qr.php?data=' . urlencode($unique_id);
-                      }
+                      // Check if QR code exists (don't display the actual QR image for security)
+                      $has_qr = !empty($payroll) && !empty($unique_id);
                   ?>
                       <tr onclick="showStudentOptions('<?= $id ?>', '<?= htmlspecialchars($name, ENT_QUOTES) ?>', '<?= htmlspecialchars($email, ENT_QUOTES) ?>', '<?= htmlspecialchars($barangay, ENT_QUOTES) ?>')" style="cursor: pointer;" title="Click for options">
                         <td onclick="event.stopPropagation();">
@@ -450,11 +460,18 @@ while ($row = pg_fetch_assoc($barangayResult)) {
                           <?php endif; ?>
                         </td>
                         <td class="qr-col">
-                          <?php if ($isFinalized && $qr_img): ?>
-                            <img src="<?= $qr_img ?>" alt="QR Code" style="width:60px;height:60px;" onerror="this.onerror=null;this.src='';this.nextElementSibling.style.display='inline';" />
-                            <span class="text-danger" style="display:none;">QR Error</span>
+                          <?php if ($isFinalized && $has_qr): ?>
+                            <span class="badge bg-success">
+                              <i class="bi bi-check-circle me-1"></i>Yes
+                            </span>
+                          <?php elseif ($isFinalized && !empty($payroll)): ?>
+                            <span class="badge bg-warning text-dark">
+                              <i class="bi bi-clock me-1"></i>Pending
+                            </span>
                           <?php else: ?>
-                            <span class="text-muted">N/A</span>
+                            <span class="badge bg-secondary">
+                              <i class="bi bi-x-circle me-1"></i>No
+                            </span>
                           <?php endif; ?>
                         </td>
                       </tr>

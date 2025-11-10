@@ -3,13 +3,20 @@
  * DataExportService
  * Compiles a student's personal data into a downloadable ZIP archive of JSON files.
  */
+ 
+require_once __DIR__ . '/../config/FilePathConfig.php';
+
 class DataExportService {
     private $db;
     private $baseExportDir;
+    private $pathConfig;
 
     public function __construct($dbConnection, $baseExportDir = null) {
         $this->db = $dbConnection;
-        $this->baseExportDir = $baseExportDir ?: __DIR__ . '/../data/exports';
+        $this->pathConfig = FilePathConfig::getInstance();
+        $this->baseExportDir = $baseExportDir ?: $this->pathConfig->getDataExportsPath();
+        
+        error_log("DataExportService: Environment=" . ($this->pathConfig->isRailway() ? 'Railway' : 'Localhost') . ", ExportDir=" . $this->baseExportDir);
     }
 
     /**

@@ -45,7 +45,7 @@ function getValidationDetails_Registration($connection, $student_id, $document_t
         '04' => 'id_pictures',
         '00' => 'enrollment_forms',
         '01' => 'grades',
-        '02' => 'letter_mayor',
+        '02' => 'letter_to_mayor',
         '03' => 'indigency'
     ];
     

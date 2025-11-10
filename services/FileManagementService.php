@@ -8,6 +8,7 @@
 class FileManagementService {
     private $conn;
     private $basePath;
+    private $pathConfig;
     
     // Folder mappings
     private $folders = [
@@ -15,13 +16,21 @@ class FileManagementService {
         'grades' => 'grades',
         'id_pictures' => 'id_pictures',
         'indigency' => 'indigency',
-        'letter_mayor' => 'letter_to_mayor' // Note: temp uses letter_mayor, permanent uses letter_to_mayor
+        'letter_to_mayor' => 'letter_to_mayor' // Standardized: letter_to_mayor for both temp and permanent
     ];
     
     public function __construct($connection = null) {
+        require_once __DIR__ . '/../config/FilePathConfig.php';
+        
         global $connection;
         $this->conn = $connection ?? $connection;
-        $this->basePath = __DIR__ . '/../assets/uploads';
+        $this->pathConfig = FilePathConfig::getInstance();
+        
+        // Use centralized path configuration (supports both Railway and localhost)
+        $this->basePath = $this->pathConfig->getUploadsPath();
+        
+        error_log("FileManagementService: Environment=" . ($this->pathConfig->isRailway() ? 'Railway' : 'Localhost') . 
+                  ", BasePath=" . $this->basePath);
     }
     
     /**
@@ -57,15 +66,21 @@ class FileManagementService {
         $documentIdsToUpdate = [];
         
         foreach ($this->folders as $tempFolder => $permanentFolder) {
-            $tempPath = $this->basePath . '/temp/' . $tempFolder;
-            $permanentPath = $this->basePath . '/student/' . $permanentFolder;
+            $tempPath = $this->pathConfig->getTempPath($tempFolder);
+            $permanentPath = $this->pathConfig->getStudentPath($permanentFolder);
             
             if (!is_dir($tempPath)) {
+                error_log("FileManagement: Temp path does not exist: $tempPath");
                 continue;
             }
             
+            if (!is_dir($permanentPath)) {
+                error_log("FileManagement: Creating permanent path: $permanentPath");
+                mkdir($permanentPath, 0755, true);
+            }
+            
             // Get all files in temp folder that belong to this student
-            $files = glob($tempPath . '/' . $studentId . '_*');
+            $files = glob($tempPath . DIRECTORY_SEPARATOR . $studentId . '_*');
             
             foreach ($files as $file) {
                 if (!is_file($file)) continue;
@@ -100,7 +115,7 @@ class FileManagementService {
                 
                 // Create new filename: STUDENTID_Lastname_Firstname_TYPE.ext
                 $newFilename = $studentId . '_' . $lastName . '_' . $firstName . '_' . $docType . '.' . $extension;
-                $newPath = $permanentPath . '/' . $newFilename;
+                $newPath = $permanentPath . DIRECTORY_SEPARATOR . $newFilename;
                 
                 // Move file
                 if (rename($file, $newPath)) {
@@ -129,9 +144,9 @@ class FileManagementService {
         // Update documents table to mark all moved files as 'approved'
         if (!empty($documentIdsToUpdate)) {
             foreach ($documentIdsToUpdate as $pathInfo) {
-                // Find document by old file path
-                $oldPathForDb = str_replace(__DIR__ . '/../', '', $pathInfo['old_path']);
-                $newPathForDb = str_replace(__DIR__ . '/../', '', $pathInfo['new_path']);
+                // Convert absolute paths to relative database paths
+                $oldPathForDb = $this->pathConfig->getRelativePath($pathInfo['old_path']);
+                $newPathForDb = $this->pathConfig->getRelativePath($pathInfo['new_path']);
                 
                 // Update document status, file path, approved_by, and approved_date
                 $updateQuery = "UPDATE documents 
@@ -195,13 +210,13 @@ class FileManagementService {
         $student = pg_fetch_assoc($studentQuery);
         $fullName = trim($student['first_name'] . ' ' . ($student['middle_name'] ?? '') . ' ' . $student['last_name']);
         
-        // Create ZIP file
-        $archivePath = __DIR__ . '/../assets/uploads/archived_students';
+        // Create ZIP file in archived_students folder
+        $archivePath = $this->pathConfig->getArchivedStudentsPath();
         if (!is_dir($archivePath)) {
             mkdir($archivePath, 0755, true);
         }
         
-        $zipFile = $archivePath . '/' . $studentId . '.zip';
+        $zipFile = $archivePath . DIRECTORY_SEPARATOR . $studentId . '.zip';
         $zip = new ZipArchive();
         
         if ($zip->open($zipFile, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== TRUE) {
@@ -218,15 +233,15 @@ class FileManagementService {
             ['temp' => 'grades', 'permanent' => 'grades'],
             ['temp' => 'id_pictures', 'permanent' => 'id_pictures'],
             ['temp' => 'indigency', 'permanent' => 'indigency'],
-            ['temp' => 'letter_mayor', 'permanent' => 'letter_to_mayor']
+            ['temp' => 'letter_to_mayor', 'permanent' => 'letter_to_mayor']
         ];
         
         // First, check temp folders (for rejected applicants who never got approved)
         foreach ($folderPairs as $folderPair) {
-            $tempPath = $this->basePath . '/temp/' . $folderPair['temp'];
+            $tempPath = $this->pathConfig->getTempPath($folderPair['temp']);
             
             if (is_dir($tempPath)) {
-                $files = glob($tempPath . '/*.*');
+                $files = glob($tempPath . DIRECTORY_SEPARATOR . '*.*');
                 
                 foreach ($files as $file) {
                     if (!is_file($file)) continue;
@@ -251,13 +266,13 @@ class FileManagementService {
         
         // Then check permanent folders (for students who were previously approved)
         foreach ($folderPairs as $folderPair) {
-            $folderPath = $this->basePath . '/student/' . $folderPair['permanent'];
+            $folderPath = $this->pathConfig->getStudentPath($folderPair['permanent']);
             
             if (!is_dir($folderPath)) {
                 continue;
             }
             
-            $files = glob($folderPath . '/*.*');
+            $files = glob($folderPath . DIRECTORY_SEPARATOR . '*.*');
             
             foreach ($files as $file) {
                 if (!is_file($file)) continue;
@@ -336,7 +351,7 @@ class FileManagementService {
         $deletedSize = 0;
         
         $tempPath = $this->basePath . '/temp';
-        $folders = ['enrollment_forms', 'grades', 'id_pictures', 'indigency', 'letter_mayor'];
+        $folders = ['enrollment_forms', 'grades', 'id_pictures', 'indigency', 'letter_to_mayor'];
         
         foreach ($folders as $folder) {
             $folderPath = $tempPath . '/' . $folder;

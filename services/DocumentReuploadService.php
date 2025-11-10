@@ -12,12 +12,13 @@ class DocumentReuploadService {
     private $db;
     private $baseDir;
     private $docService;
+    private $pathConfig;
     
     const DOCUMENT_TYPES = [
         '04' => ['name' => 'id_picture', 'folder' => 'id_pictures'],
         '00' => ['name' => 'eaf', 'folder' => 'enrollment_forms'],
         '01' => ['name' => 'academic_grades', 'folder' => 'grades'],
-        '02' => ['name' => 'letter_to_mayor', 'folder' => 'letter_mayor'],
+        '02' => ['name' => 'letter_to_mayor', 'folder' => 'letter_to_mayor'],
         '03' => ['name' => 'certificate_of_indigency', 'folder' => 'indigency']
     ];
 
@@ -42,7 +43,11 @@ class DocumentReuploadService {
     
     public function __construct($dbConnection) {
         $this->db = $dbConnection;
-        $this->baseDir = dirname(__DIR__) . '/assets/uploads/';
+        
+        // Initialize FilePathConfig for path management
+        require_once __DIR__ . '/../config/FilePathConfig.php';
+        $this->pathConfig = FilePathConfig::getInstance();
+        $this->baseDir = $this->pathConfig->getUploadsDir();
         
         // Initialize DocumentService for database operations
         require_once __DIR__ . '/DocumentService.php';
@@ -74,13 +79,13 @@ class DocumentReuploadService {
             $timestamp = time();
             $newFilename = "{$studentId}_{$docInfo['name']}_{$timestamp}.{$extension}";
             
-            // Create TEMP path (like registration)
-            $tempFolder = $this->baseDir . 'temp/' . $docInfo['folder'] . '/';
+            // Create TEMP path using FilePathConfig
+            $tempFolder = $this->pathConfig->getTempPath($docInfo['folder']);
             if (!is_dir($tempFolder)) {
                 mkdir($tempFolder, 0755, true);
             }
             
-            $tempPath = $tempFolder . $newFilename;
+            $tempPath = $tempFolder . DIRECTORY_SEPARATOR . $newFilename;
             
             // Move file to TEMP storage
             if (!move_uploaded_file($tmpPath, $tempPath)) {
@@ -136,11 +141,25 @@ class DocumentReuploadService {
             
             $docInfo = self::DOCUMENT_TYPES[$docTypeCode];
             
-            // Create organized permanent directory structure: {doc_type}/{student_id}/
-            $permanentFolder = $this->baseDir . 'student/' . $docInfo['folder'] . '/' . $studentId . '/';
+            // Create organized permanent directory structure using FilePathConfig
+            // Pattern: assets/uploads/student/{doc_type}/{student_id}/
+            $permanentFolder = $this->pathConfig->getStudentPath($docInfo['folder']) . DIRECTORY_SEPARATOR . $studentId . DIRECTORY_SEPARATOR;
             if (!is_dir($permanentFolder)) {
                 mkdir($permanentFolder, 0755, true);
                 error_log("DocumentReuploadService: Created student folder: $permanentFolder");
+            }
+            
+            // DELETE ALL EXISTING FILES for this student and document type to prevent duplicates
+            // This ensures clean re-upload without accumulating old versions
+            $existingFiles = glob($permanentFolder . $studentId . '_' . $docInfo['name'] . '_*');
+            if (!empty($existingFiles)) {
+                foreach ($existingFiles as $oldFile) {
+                    if (is_file($oldFile)) {
+                        @unlink($oldFile);
+                        error_log("DocumentReuploadService: Deleted old file during reupload: " . basename($oldFile));
+                    }
+                }
+                error_log("DocumentReuploadService: Cleaned up " . count($existingFiles) . " old files before new upload");
             }
             
             // Generate unique filename with timestamp to prevent overwrites
@@ -248,6 +267,19 @@ class DocumentReuploadService {
                 error_log("confirmUpload: Read verification data - Confidence: {$ocrData['ocr_confidence']}%, Status: {$ocrData['verification_status']}");
             }
             
+            // DELETE existing database record for this document type to prevent duplicates
+            // This ensures only ONE record per student per document type
+            $deleteResult = pg_query_params($this->db,
+                "DELETE FROM documents WHERE student_id = $1 AND document_type_code = $2",
+                [$studentId, $docTypeCode]
+            );
+            if ($deleteResult) {
+                $deletedRows = pg_affected_rows($deleteResult);
+                if ($deletedRows > 0) {
+                    error_log("DocumentReuploadService: Deleted $deletedRows existing database record(s) for $studentId - $docTypeCode");
+                }
+            }
+            
             // Use DocumentService to save to database
             $saveResult = $this->docService->saveDocument(
                 $studentId,
@@ -322,12 +354,17 @@ class DocumentReuploadService {
             $quickText = strtolower($quickOcrResult['text'] ?? '');
             
             // Define document type signatures (keywords that strongly indicate document type)
+            // IMPROVED: More specific and comprehensive keywords
             $documentSignatures = [
-                '01' => ['semester', 'subject', 'gwa', 'units', 'prelim', 'midterm', 'final'],
-                '02' => ['mayor', 'office of the mayor', 'municipal', 'honorable mayor'],
-                '03' => ['indigency', 'indigent', 'certificate of indigency'],
+                // Grades: Focus on STRUCTURAL keywords (table headers, grade columns)
+                '01' => ['subject', 'final grade', 'prelim', 'midterm', 'finals', 'general average', 'units', 'remarks'],
+                // Letter: Focus on letter-specific keywords
+                '02' => ['dear mayor', 'honorable mayor', 'mayor ferrer', 'request', 'assistance', 'respectfully', 'sincerely', 'gratitude', 'scholarship'],
+                // Certificate: Focus on certification keywords
+                '03' => ['certificate of indigency', 'certify', 'indigent', 'barangay captain'],
                 '04' => ['student id', 'identification card', 'id number', 'valid until'],
-                '00' => ['enrollment', 'assessment', 'tuition fee', 'registration']
+                // Enrollment: Focus on enrollment-specific keywords
+                '00' => ['enrollment', 'assessment', 'eaf', 'tuition fee', 'billing statement', 'certificate of registration', 'matriculation']
             ];
             
             // Get expected keywords for THIS document type
@@ -347,10 +384,48 @@ class DocumentReuploadService {
                     }
                 }
                 
-                // STRICTER: Require 3+ keywords from ANOTHER document type (reduced false positives)
-                // OR 2+ keywords if they're very specific (like "certificate of indigency")
-                $isStrongMatch = ($matchCount >= 3) || 
-                                 ($matchCount >= 2 && strlen($keywords[0]) > 15);
+                // STRICTER MATCHING LOGIC to prevent false positives:
+                // 1. Letter vs Grades: Need 6+ grade STRUCTURAL keywords (prevent "I got good grades" from triggering)
+                // 2. Enrollment vs Grades: Need 5+ matches
+                // 3. Other documents: Need 3+ matches OR 2+ if very specific (15+ chars)
+                $isStrongMatch = false;
+                
+                // Special case: Letter to Mayor vs Grades (HIGH FALSE POSITIVE RISK)
+                // Letters often mention "grades", "GPA", "semester" when discussing academic performance
+                // Only flag as grades if it has STRUCTURAL keywords (subject, prelim, midterm, finals, units)
+                if (($docTypeCode === '02' && $otherDocCode === '01')) {
+                    // Need 6+ STRUCTURAL grade keywords (very strict to avoid false positives)
+                    // AND must NOT have letter-specific keywords
+                    $hasLetterKeywords = stripos($quickText, 'dear mayor') !== false || 
+                                        stripos($quickText, 'honorable') !== false ||
+                                        stripos($quickText, 'respectfully') !== false ||
+                                        stripos($quickText, 'sincerely') !== false ||
+                                        stripos($quickText, 'scholarship') !== false;
+                    
+                    // If it has letter keywords, don't flag as grades (even if it mentions "grades")
+                    if ($hasLetterKeywords) {
+                        $isStrongMatch = false;
+                        error_log("CROSS-DOCUMENT: Letter has grade keywords but also has letter structure - PASS");
+                    } else {
+                        // Only flag if 6+ structural grade keywords AND no letter keywords
+                        $isStrongMatch = ($matchCount >= 6);
+                    }
+                }
+                // Special case: Grades vs Letter (also check)
+                elseif (($docTypeCode === '01' && $otherDocCode === '02')) {
+                    // Need 5+ letter keywords to flag as letter (not grades)
+                    $isStrongMatch = ($matchCount >= 5);
+                }
+                // Special case: Enrollment form vs Grades (high confusion risk)
+                elseif (($docTypeCode === '00' && $otherDocCode === '01') || 
+                        ($docTypeCode === '01' && $otherDocCode === '00')) {
+                    // Need 5+ keyword matches to flag as wrong document type
+                    $isStrongMatch = ($matchCount >= 5);
+                } else {
+                    // Standard matching for other document types
+                    $isStrongMatch = ($matchCount >= 3) || 
+                                     ($matchCount >= 2 && strlen($keywords[0]) > 15);
+                }
                 
                 if ($isStrongMatch) {
                     $docTypeNames = [
@@ -364,11 +439,11 @@ class DocumentReuploadService {
                     $expectedDocName = $docTypeNames[$docTypeCode] ?? 'this document';
                     $detectedDocName = $docTypeNames[$otherDocCode] ?? 'another document';
                     
-                    error_log("CROSS-DOCUMENT CONFUSION: Expected $expectedDocName ($docTypeCode), but detected $detectedDocName ($otherDocCode) keywords: " . implode(', ', $matchedKeywords));
+                    error_log("CROSS-DOCUMENT CONFUSION: Expected $expectedDocName ($docTypeCode), but detected $detectedDocName ($otherDocCode) with $matchCount keywords: " . implode(', ', $matchedKeywords));
                     
                     return [
                         'success' => false,
-                        'message' => "This appears to be a <strong>$detectedDocName</strong>, not a <strong>$expectedDocName</strong>. Please upload it in the correct document field."
+                        'message' => "This appears to be a \"$detectedDocName\", not a \"$expectedDocName\". Please upload it in the correct document field."
                     ];
                 }
             }
@@ -1466,15 +1541,35 @@ class DocumentReuploadService {
             if ($hasIndigencyKeywords) {
                 // This is likely a Certificate of Indigency, not a Letter to Mayor
                 error_log("Letter OCR REJECTED: Document contains indigency keywords - likely Certificate of Indigency");
+                
+                // Return structured validation failure (not an error)
+                $verification['overall_success'] = false;
+                $verification['wrong_document_type'] = true;
+                $verification['detected_document_type'] = 'Certificate of Indigency';
+                $verification['summary'] = [
+                    'passed_checks' => 0,
+                    'total_checks' => 5,
+                    'average_confidence' => 0,
+                    'recommendation' => 'This appears to be a "Certificate of Indigency", not a "Letter to Mayor". Please upload it in the correct document field.',
+                    'error_type' => 'cross_document_confusion'
+                ];
+                
+                // Save verification data for display
+                @file_put_contents($tempPath . '.verify.json', json_encode($verification, JSON_PRETTY_PRINT));
+                
                 return [
-                    'success' => false,
-                    'message' => 'This appears to be a Certificate of Indigency, not a Letter to Mayor. Please upload it in the correct document field.'
+                    'success' => true, // OCR succeeded, but validation failed
+                    'ocr_confidence' => 0,
+                    'verification_score' => 0,
+                    'verification_status' => 'failed',
+                    'verification_passed' => false
                 ];
             }
             
             // STRICTER SUCCESS CRITERIA: ALL 5 checks must pass (matching registration)
             // This prevents wrong documents (like indigency certificates) from being accepted
             $verification['overall_success'] = ($passedChecks >= 5 && $averageConfidence >= 70);
+            $verification['verification_passed'] = $verification['overall_success'];
             
             $verification['summary'] = [
                 'passed_checks' => $passedChecks,
@@ -1490,10 +1585,11 @@ class DocumentReuploadService {
             $ocrData['verification_score'] = round($averageConfidence, 1);
             $ocrData['verification_status'] = $verification['overall_success'] ? 'passed' : 'manual_review';
             
-            // Add root-level confidence values for easier parsing in confirmUpload
+            // Add root-level fields for UI display
             $verification['ocr_confidence'] = $ocrData['ocr_confidence'];
             $verification['verification_score'] = $ocrData['verification_score'];
             $verification['verification_status'] = $ocrData['verification_status'];
+            $verification['verification_passed'] = $verification['overall_success'];
             
             // Save verification data
             @file_put_contents($tempPath . '.verify.json', json_encode($verification, JSON_PRETTY_PRINT));
@@ -1503,6 +1599,7 @@ class DocumentReuploadService {
                 'ocr_confidence' => $ocrData['ocr_confidence'],
                 'verification_score' => $ocrData['verification_score'],
                 'status' => $ocrData['verification_status'],
+                'verification_passed' => $verification['verification_passed'],
                 'timestamp' => date('Y-m-d H:i:s'),
                 'checks_passed' => $passedChecks,
                 'total_checks' => 5
@@ -1514,7 +1611,8 @@ class DocumentReuploadService {
                 'success' => true,
                 'ocr_confidence' => $ocrData['ocr_confidence'],
                 'verification_score' => $ocrData['verification_score'],
-                'verification_status' => $ocrData['verification_status']
+                'verification_status' => $ocrData['verification_status'],
+                'verification_passed' => $verification['verification_passed']
             ];
             
         } catch (Exception $e) {
@@ -1728,22 +1826,60 @@ class DocumentReuploadService {
             $hasIndigency = stripos($ocrTextLower, 'indigency') !== false || stripos($ocrTextLower, 'indigent') !== false;
             if ($hasMayorKeywords >= 2 && !$hasIndigency) {
                 error_log("Certificate OCR REJECTED: Document contains mayor/endorsement keywords but no indigency - likely Letter to Mayor");
+                
+                // Return structured validation failure (not an error)
+                $verification['overall_success'] = false;
+                $verification['wrong_document_type'] = true;
+                $verification['detected_document_type'] = 'Letter to Mayor';
+                $verification['summary'] = [
+                    'passed_checks' => 0,
+                    'total_checks' => 5,
+                    'average_confidence' => 0,
+                    'recommendation' => 'This appears to be a "Letter to Mayor", not a "Certificate of Indigency". Please upload it in the correct document field.',
+                    'error_type' => 'cross_document_confusion'
+                ];
+                
+                // Save verification data for display
+                @file_put_contents($tempPath . '.verify.json', json_encode($verification, JSON_PRETTY_PRINT));
+                
                 return [
-                    'success' => false,
-                    'message' => 'This appears to be a Letter to Mayor, not a Certificate of Indigency. Please upload it in the correct document field.'
+                    'success' => true, // OCR succeeded, but validation failed
+                    'ocr_confidence' => 0,
+                    'verification_score' => 0,
+                    'verification_status' => 'failed',
+                    'verification_passed' => false
                 ];
             }
             
             // CRITICAL: Must have "indigency" or "indigent" keyword
             if (!$hasIndigency) {
                 error_log("Certificate OCR REJECTED: No 'indigency' or 'indigent' keyword found");
+                
+                // Return structured validation failure
+                $verification['overall_success'] = false;
+                $verification['missing_keywords'] = true;
+                $verification['summary'] = [
+                    'passed_checks' => 0,
+                    'total_checks' => 5,
+                    'average_confidence' => 0,
+                    'recommendation' => 'Document does not contain "indigency" or "indigent" keyword - not a valid Certificate of Indigency.',
+                    'error_type' => 'missing_critical_keyword'
+                ];
+                
+                // Save verification data for display
+                @file_put_contents($tempPath . '.verify.json', json_encode($verification, JSON_PRETTY_PRINT));
+                
                 return [
-                    'success' => false,
-                    'message' => 'Document does not contain "indigency" or "indigent" keyword - not a valid Certificate of Indigency.'
+                    'success' => true, // OCR succeeded, but validation failed
+                    'ocr_confidence' => 0,
+                    'verification_score' => 0,
+                    'verification_status' => 'failed',
+                    'verification_passed' => false
                 ];
             }
             
             $verification['overall_success'] = ($passedChecks >= 5 && $averageConfidence >= 70);
+            $verification['verification_passed'] = $verification['overall_success'];
             
             $verification['summary'] = [
                 'passed_checks' => $passedChecks,
@@ -1758,10 +1894,11 @@ class DocumentReuploadService {
             $ocrData['verification_score'] = round($averageConfidence, 1);
             $ocrData['verification_status'] = $verification['overall_success'] ? 'passed' : 'manual_review';
             
-            // Add root-level confidence values for easier parsing in confirmUpload
+            // Add root-level fields for UI display
             $verification['ocr_confidence'] = $ocrData['ocr_confidence'];
             $verification['verification_score'] = $ocrData['verification_score'];
             $verification['verification_status'] = $ocrData['verification_status'];
+            $verification['verification_passed'] = $verification['overall_success'];
             
             // Save verification data
             @file_put_contents($tempPath . '.verify.json', json_encode($verification, JSON_PRETTY_PRINT));
@@ -1771,6 +1908,7 @@ class DocumentReuploadService {
                 'ocr_confidence' => $ocrData['ocr_confidence'],
                 'verification_score' => $ocrData['verification_score'],
                 'status' => $ocrData['verification_status'],
+                'verification_passed' => $verification['verification_passed'],
                 'timestamp' => date('Y-m-d H:i:s'),
                 'checks_passed' => $passedChecks,
                 'total_checks' => 5
@@ -1782,7 +1920,8 @@ class DocumentReuploadService {
                 'success' => true,
                 'ocr_confidence' => $ocrData['ocr_confidence'],
                 'verification_score' => $ocrData['verification_score'],
-                'verification_status' => $ocrData['verification_status']
+                'verification_status' => $ocrData['verification_status'],
+                'verification_passed' => $verification['verification_passed']
             ];
             
         } catch (Exception $e) {
@@ -2141,12 +2280,14 @@ class DocumentReuploadService {
                     $uploadedDocs[] = $row['document_type_code'];
                 }
                 
-                // If all documents are uploaded, clear the rejection status
+                // If all documents are uploaded, notify student but KEEP them in reupload mode
+                // Admin must approve the reuploaded documents before clearing the reupload flag
                 if (count($uploadedDocs) >= count($documentsToReupload)) {
+                    // Don't clear needs_document_upload yet - wait for admin approval
+                    // Only clear documents_to_reupload list since all are now uploaded
                     pg_query_params($this->db,
                         "UPDATE students 
-                         SET documents_to_reupload = NULL,
-                             needs_document_upload = FALSE
+                         SET documents_to_reupload = NULL
                          WHERE student_id = $1",
                         [$studentId]
                     );
@@ -2156,6 +2297,8 @@ class DocumentReuploadService {
                          VALUES ($1, $2, FALSE, NOW())",
                         [$studentId, 'All required documents have been re-uploaded successfully. An admin will review them shortly.']
                     );
+                    
+                    error_log("DocumentReuploadService: All documents uploaded for $studentId - Waiting for admin approval");
                 }
             }
         } catch (Exception $e) {
@@ -2179,18 +2322,17 @@ class DocumentReuploadService {
         ];
         
         try {
-            $tempBaseDir = $this->baseDir . 'temp/';
             $cutoffTime = time() - ($maxAgeMinutes * 60);
             
             // Iterate through all document type folders
             foreach (self::DOCUMENT_TYPES as $code => $docInfo) {
-                $tempFolder = $tempBaseDir . $docInfo['folder'] . '/';
+                $tempFolder = $this->pathConfig->getTempPath($docInfo['folder']);
                 
                 if (!is_dir($tempFolder)) {
                     continue;
                 }
                 
-                $files = glob($tempFolder . '*');
+                $files = glob($tempFolder . DIRECTORY_SEPARATOR . '*');
                 
                 foreach ($files as $file) {
                     if (!is_file($file)) {

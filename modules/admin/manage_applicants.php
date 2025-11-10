@@ -8,6 +8,7 @@ if (!isset($_SESSION['admin_username'])) {
     exit;
 }
 include __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../../config/FilePathConfig.php';
 require_once __DIR__ . '/../../includes/student_notification_helper.php';
 
 // Get workflow permissions to control approval actions
@@ -16,6 +17,22 @@ $workflow_status = getWorkflowStatus($connection);
 
 require_once __DIR__ . '/../../phpmailer/vendor/autoload.php';
 require_once __DIR__ . '/../../includes/util/student_id.php';
+
+// Lightweight API for sidebar: return pending applicants count as JSON
+if (isset($_GET['api']) && $_GET['api'] === 'badge_count') {
+    header('Content-Type: application/json');
+    $countRes = @pg_query($connection, "SELECT COUNT(*) FROM students WHERE status = 'applicant' AND (is_archived IS NULL OR is_archived = FALSE)");
+    $count = 0;
+    if ($countRes) {
+        $count = (int) pg_fetch_result($countRes, 0, 0);
+        pg_free_result($countRes);
+    }
+    echo json_encode(['count' => $count]);
+    exit;
+}
+
+// Initialize FilePathConfig for Railway/Localhost compatibility
+$pathConfig = FilePathConfig::getInstance();
 
 // Resolve current admin's municipality context
 $adminMunicipalityId = null;
@@ -225,10 +242,15 @@ $migration_result = $_SESSION['migration_result'] ?? null;
 $csrfMigrationToken = CSRFProtection::generateToken('csv_migration');
 
 // Generate CSRF tokens for applicant approval flows
+// Note: reject_documents token is NOT generated here—it's fetched via AJAX when the modal opens
+// to avoid rotation issues from the page auto-refresh mechanism.
 $csrfApproveApplicantToken = CSRFProtection::generateToken('approve_applicant');
 $csrfOverrideApplicantToken = CSRFProtection::generateToken('override_applicant');
 $csrfArchiveStudentToken = CSRFProtection::generateToken('archive_student');
-$csrfRejectDocumentsToken = CSRFProtection::generateToken('reject_documents');
+// For reject_documents, set empty placeholder - the actual token will be fetched via AJAX when modal opens
+$csrfRejectDocumentsToken = ''; // Will be populated by AJAX fetch
+// Reject applicant token (if needed in future)
+$csrfRejectApplicantToken = CSRFProtection::generateToken('reject_applicant');
 
 // Clear migration sessions on GET request to prevent resubmission warnings
 if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['clear_migration'])) {
@@ -758,8 +780,9 @@ function _normalize_token($s) {
 // Searches permanent storage: student/{doc_type}/{student_id}/ and legacy flat structure
 // For modal display, use get_applicant_details.php endpoint instead
 function find_student_documents($first_name, $last_name, $student_id = null) {
-    $server_base = dirname(__DIR__, 2) . '/assets/uploads/student/'; // absolute server path
-    $web_base    = '../../assets/uploads/student/';                   // web path from this PHP file
+    global $pathConfig; // Use global FilePathConfig instance
+    $server_base = $pathConfig->getStudentPath(); // absolute server path with trailing separator
+    $web_base    = 'assets/uploads/student/';     // web path (relative from document root)
 
     $first = _normalize_token($first_name);
     $last  = _normalize_token($last_name);
@@ -777,7 +800,7 @@ function find_student_documents($first_name, $last_name, $student_id = null) {
         
         // NEW STRUCTURE: Search student/{doc_type}/{student_id}/ folders first if student_id is provided
         if ($student_id) {
-            $studentDir = $server_base . $folder . '/' . $student_id . '/';
+            $studentDir = $server_base . DIRECTORY_SEPARATOR . $folder . DIRECTORY_SEPARATOR . $student_id . DIRECTORY_SEPARATOR;
             if (is_dir($studentDir)) {
                 foreach (glob($studentDir . '*.*') as $file) {
                     // Skip associated files
@@ -791,7 +814,7 @@ function find_student_documents($first_name, $last_name, $student_id = null) {
         }
         
         // OLD STRUCTURE: Search flat student/{doc_type}/ folder
-        $dir = $server_base . $folder . '/';
+        $dir = $server_base . DIRECTORY_SEPARATOR . $folder . DIRECTORY_SEPARATOR;
         if (is_dir($dir)) {
             // Scan all files and pick the newest that contains both name tokens
             foreach (glob($dir . '*.*') as $file) {
@@ -1039,7 +1062,7 @@ function render_table($applicants, $connection) {
                 </tr>
                 <!-- Modal -->
                 <div class="modal fade" id="modal<?= $student_id ?>" tabindex="-1">
-                    <div class="modal-dialog modal-lg">
+                    <div class="modal-dialog modal-lg modal-dialog-scrollable modal-fullscreen-sm-down">
                         <div class="modal-content">
                             <div class="modal-header">
                                 <h5 class="modal-title">
@@ -1088,15 +1111,12 @@ function render_table($applicants, $connection) {
                                     </form>
                                     <?php endif; ?>
                                     
-                                    <!-- Reject Documents Button - always visible -->
-                                    <form method="POST" class="d-inline ms-2" onsubmit="return confirm('⚠️ DELETE ALL DOCUMENTS?\n\nThis will:\n• Delete all uploaded files from the server\n• Clear all document records from database\n• Require student to re-upload everything\n\nThis action cannot be undone. Continue?');">
-                                        <input type="hidden" name="student_id" value="<?= $student_id ?>">
-                                        <input type="hidden" name="reject_documents" value="1">
-                                        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfRejectDocumentsToken) ?>">
-                                        <button type="submit" class="btn btn-danger btn-sm" title="Delete all documents and request re-upload">
-                                            <i class="bi bi-trash me-1"></i> Reject Documents
-                                        </button>
-                                    </form>
+                                    <!-- Reject Documents Button - opens modal for selective rejection -->
+                                    <button type="button" class="btn btn-danger btn-sm ms-2" 
+                                            onclick="showRejectDocumentsModal('<?= $student_id ?>', '<?= htmlspecialchars($applicant['first_name'] . ' ' . $applicant['last_name'], ENT_QUOTES) ?>')"
+                                            title="Reject specific documents with reasons">
+                                        <i class="bi bi-x-circle me-1"></i> Reject Documents
+                                    </button>
                                 <?php endif; ?>
                                 
                                 <?php if ($_SESSION['admin_role'] === 'super_admin'): ?>
@@ -1152,6 +1172,9 @@ function render_pagination($page, $totalPages) {
 
 // Handle verify/reject/archive actions before AJAX or page render
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    error_log("=== POST REQUEST to manage_applicants.php ===");
+    error_log("POST keys: " . implode(', ', array_keys($_POST)));
+    
     $applicantCsrfAction = null;
     if (!empty($_POST['mark_verified']) && isset($_POST['student_id'])) {
         $applicantCsrfAction = 'approve_applicant';
@@ -1167,11 +1190,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($applicantCsrfAction !== null) {
         $token = $_POST['csrf_token'] ?? '';
-        if (!CSRFProtection::validateToken($applicantCsrfAction, $token)) {
-            $_SESSION['error'] = 'Security validation failed. Please refresh the page and try again.';
+
+        // Extra diagnostics
+        $storedTokens = $_SESSION['csrf_tokens'][$applicantCsrfAction] ?? [];
+        error_log("CSRF Validation - Action: $applicantCsrfAction");
+        error_log("CSRF Validation - Token received (first 20): " . ($token ? substr($token, 0, 20) : 'MISSING') . "...");
+        error_log("CSRF Validation - Stored token count: " . (is_array($storedTokens) ? count($storedTokens) : (empty($storedTokens)?0:1)));
+        
+        // Log all stored token prefixes for comparison
+        if (is_array($storedTokens) && !empty($storedTokens)) {
+            $prefixes = array_map(function($t) { return substr($t, 0, 16); }, $storedTokens);
+            error_log("CSRF Validation - Stored tokens (first 16): " . implode(', ', $prefixes));
+        }
+        
+        error_log("CSRF Validation - POST keys: " . implode(', ', array_keys($_POST)));
+
+        // For reject_documents and reject_applicant allow re-use (do not consume on first attempt)
+        $consume = !in_array($applicantCsrfAction, ['reject_documents','reject_applicant'], true);
+        $valid = CSRFProtection::validateToken($applicantCsrfAction, $token, $consume);
+        if (!$valid) {
+            error_log("CSRF Validation FAILED for action: $applicantCsrfAction | Stored tokens: " . json_encode($storedTokens));
+            // Regenerate a fresh token to avoid forcing full page refresh
+            if ($applicantCsrfAction === 'reject_documents') {
+                $newToken = CSRFProtection::generateToken('reject_documents');
+                $_SESSION['pending_csrf_refresh'] = $newToken; // flag for front-end (optional)
+                error_log("CSRF Validation - Issued replacement token for reject_documents: " . substr($newToken,0,16));
+            } elseif ($applicantCsrfAction === 'reject_applicant') {
+                $newToken = CSRFProtection::generateToken('reject_applicant');
+                $_SESSION['pending_csrf_refresh_reject_applicant'] = $newToken;
+                error_log("CSRF Validation - Issued replacement token for reject_applicant: " . substr($newToken,0,16));
+            }
+            $_SESSION['error'] = 'Security validation failed. Please retry the action.';
             header('Location: ' . $_SERVER['PHP_SELF']);
             exit;
         }
+
+        error_log("CSRF Validation PASSED for action: $applicantCsrfAction (consume=" . ($consume?'true':'false') . ")");
     }
 
     // Verify student
@@ -1190,15 +1244,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $student = pg_fetch_assoc($studentQuery);
         
         /** @phpstan-ignore-next-line */
-        pg_query_params($connection, "UPDATE students SET status = 'active' WHERE student_id = $1", [$sid]);
+        pg_query_params($connection, 
+            "UPDATE students 
+             SET status = 'active',
+                 needs_document_upload = FALSE,
+                 documents_to_reupload = NULL
+             WHERE student_id = $1", 
+            [$sid]
+        );
         
-        // Move files from temp to permanent storage AND update documents table
-        require_once __DIR__ . '/../../services/UnifiedFileService.php';
-        $fileService = new UnifiedFileService($connection);
-        $fileMoveResult = $fileService->moveToPermStorage($sid, $_SESSION['admin_id']);
+        // Check if student has temp documents that need to be moved
+        // (Skip if files were already moved during registration approval or are re-uploads)
+        $tempDocsCheck = pg_query_params($connection,
+            "SELECT COUNT(*) FROM documents WHERE student_id = $1 AND status = 'temp'",
+            [$sid]
+        );
+        $hasTempDocs = pg_fetch_result($tempDocsCheck, 0, 0) > 0;
         
-        if (!$fileMoveResult['success']) {
-            error_log("UnifiedFileService: Error moving files for student $sid: " . implode(', ', $fileMoveResult['errors'] ?? []));
+        if ($hasTempDocs) {
+            // Move files from temp to permanent storage AND update documents table
+            require_once __DIR__ . '/../../services/UnifiedFileService.php';
+            $fileService = new UnifiedFileService($connection);
+            $fileMoveResult = $fileService->moveToPermStorage($sid, $_SESSION['admin_id']);
+            
+            if (!$fileMoveResult['success']) {
+                error_log("UnifiedFileService: Error moving files for student $sid: " . implode(', ', $fileMoveResult['errors'] ?? []));
+            } else {
+                error_log("UnifiedFileService: Successfully moved temp files to permanent for student $sid");
+            }
+        } else {
+            error_log("UnifiedFileService: Skipping file move for student $sid - no temp documents found (files likely already permanent)");
         }
         
         // Add admin notification
@@ -1253,7 +1328,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $student = pg_fetch_assoc($studentQuery);
 
             /** @phpstan-ignore-next-line */
-            pg_query_params($connection, "UPDATE students SET status = 'active' WHERE student_id = $1", [$sid]);
+            pg_query_params($connection, 
+                "UPDATE students 
+                 SET status = 'active',
+                     needs_document_upload = FALSE,
+                     documents_to_reupload = NULL
+                 WHERE student_id = $1", 
+                [$sid]
+            );
 
             // Move files from temp to permanent storage AND update documents table
             require_once __DIR__ . '/../../services/UnifiedFileService.php';
@@ -1363,19 +1445,72 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
     
-    // Reject Documents - Delete all uploaded files and request re-upload
+    // Reject Documents - Selective rejection with reasons
     if (!empty($_POST['reject_documents']) && isset($_POST['student_id'])) {
+        error_log("=== REJECT DOCUMENTS HANDLER START ===");
+        error_log("POST keys: " . implode(', ', array_keys($_POST)));
+        error_log("CSRF token from POST: " . substr(($_POST['csrf_token'] ?? 'MISSING'), 0, 20) . "...");
+        
         $student_id = trim($_POST['student_id']);
         error_log("Reject documents triggered for student: " . $student_id);
         
         try {
-            // Delete all document files from filesystem
-            $uploadsPath = dirname(__DIR__, 2) . '/assets/uploads/student';
-            $documentTypes = ['enrollment_forms', 'grades', 'id_pictures', 'indigency', 'letter_mayor'];
+            // Get selected documents to reject and their reasons
+            $documentsToReject = $_POST['reject_doc_types'] ?? [];
+            $rejectionReasons = [];
+            
+            // Document type code to folder mapping
+            $docTypeToFolder = [
+                '00' => 'enrollment_forms',
+                '01' => 'grades',
+                '02' => 'letter_to_mayor',
+                '03' => 'indigency',
+                '04' => 'id_pictures'
+            ];
+            
+            $docTypeNames = [
+                '00' => 'Enrollment Form (EAF)',
+                '01' => 'Academic Grades',
+                '02' => 'Letter to Mayor',
+                '03' => 'Certificate of Indigency',
+                '04' => 'ID Picture'
+            ];
+            
+            // Validate that at least one document is selected
+            if (empty($documentsToReject)) {
+                $_SESSION['error'] = "Please select at least one document to reject.";
+                header('Location: ' . $_SERVER['PHP_SELF']);
+                exit;
+            }
+            
+            // Collect rejection reasons for each document
+            foreach ($documentsToReject as $docCode) {
+                $reasonKey = 'reject_reason_' . $docCode;
+                $reason = trim($_POST[$reasonKey] ?? '');
+                
+                if (empty($reason)) {
+                    $reason = 'Document needs to be re-uploaded.'; // Default reason
+                }
+                
+                $rejectionReasons[$docCode] = $reason;
+            }
+            
+            // Get student details for email notification
+            $studentQuery = pg_query_params($connection, 
+                "SELECT first_name, last_name, email FROM students WHERE student_id = $1", 
+                [$student_id]
+            );
+            $student = $studentQuery ? pg_fetch_assoc($studentQuery) : null;
+            
+            // Delete selected document files from filesystem
+            $uploadsPath = $pathConfig->getStudentPath();
             $deletedCount = 0;
             
-            foreach ($documentTypes as $type) {
-                $folderPath = $uploadsPath . '/' . $type;
+            foreach ($documentsToReject as $docCode) {
+                $folderName = $docTypeToFolder[$docCode] ?? null;
+                if (!$folderName) continue;
+                
+                $folderPath = $uploadsPath . '/' . $folderName;
                 if (is_dir($folderPath)) {
                     // OLD STRUCTURE: Delete files in flat folder
                     $files = glob($folderPath . '/' . $student_id . '_*');
@@ -1402,23 +1537,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
             
-            // Delete all document records from database
-            $deleteDocsQuery = "DELETE FROM documents WHERE student_id = $1";
-            pg_query_params($connection, $deleteDocsQuery, [$student_id]);
+            // Delete selected document records from database
+            $placeholders = implode(',', array_fill(0, count($documentsToReject), '?'));
+            $deleteDocsQuery = "DELETE FROM documents WHERE student_id = $1 AND document_type_code = ANY($2::text[])";
+            pg_query_params($connection, $deleteDocsQuery, [
+                $student_id,
+                '{' . implode(',', $documentsToReject) . '}'
+            ]);
             
-            // Set needs_document_upload flag, mark documents_to_reupload, and reset submission flags
+            // Prepare rejection data with reasons for storage
+            $rejectionData = [];
+            foreach ($documentsToReject as $docCode) {
+                $rejectionData[] = [
+                    'code' => $docCode,
+                    'name' => $docTypeNames[$docCode] ?? 'Unknown',
+                    'reason' => $rejectionReasons[$docCode] ?? 'No reason provided'
+                ];
+            }
+            
+            // Set needs_document_upload flag, mark documents_to_reupload with reasons
             // CRITICAL: Reset documents_submitted and documents_validated to allow re-upload
             $updateQuery = "UPDATE students 
                            SET needs_document_upload = TRUE,
                                documents_to_reupload = $1,
+                               document_rejection_reasons = $2,
                                documents_submitted = FALSE,
                                documents_validated = FALSE,
                                documents_submission_date = NULL
-                           WHERE student_id = $2";
+                           WHERE student_id = $3";
             pg_query_params($connection, $updateQuery, [
-                json_encode(['00', '01', '02', '03', '04']), // All document types
+                json_encode($documentsToReject), // Array of codes
+                json_encode($rejectionData), // Array of objects with code, name, reason
                 $student_id
             ]);
+            
+            // Build detailed rejection message for audit log
+            $rejectedDocsList = [];
+            foreach ($documentsToReject as $docCode) {
+                $rejectedDocsList[] = $docTypeNames[$docCode] . ': ' . $rejectionReasons[$docCode];
+            }
+            $rejectionDetails = implode('; ', $rejectedDocsList);
             
             // Log audit
             $auditQuery = "INSERT INTO audit_log (admin_id, student_id, action, description, ip_address, created_at)
@@ -1426,22 +1584,125 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             pg_query_params($connection, $auditQuery, [
                 $_SESSION['admin_id'] ?? null,
                 $student_id,
-                "Admin rejected all documents. Deleted $deletedCount files. Student must re-upload all documents.",
+                "Admin rejected " . count($documentsToReject) . " document(s). Deleted $deletedCount files. Reasons: $rejectionDetails",
                 $_SERVER['REMOTE_ADDR']
             ]);
+            
+            // Build student notification message with specific documents and reasons
+            $notificationMsg = "The following documents have been rejected and need to be re-uploaded:\n\n";
+            foreach ($rejectionData as $doc) {
+                $notificationMsg .= "• " . $doc['name'] . "\n  Reason: " . $doc['reason'] . "\n\n";
+            }
+            $notificationMsg .= "Please upload the corrected documents through the Upload Documents page.";
             
             // Send student notification about document rejection
             createStudentNotification(
                 $connection,
                 $student_id,
                 'Documents Rejected - Re-upload Required',
-                'Your submitted documents have been rejected by the admin. Please re-upload all required documents through the Upload Documents page.',
+                $notificationMsg,
                 'warning',
                 'high',
                 'upload_document.php'
             );
             
-            $_SESSION['success'] = "All documents rejected. Student will be notified to re-upload.";
+            // Send email notification if student has email
+            if ($student && !empty($student['email'])) {
+                require_once __DIR__ . '/../../phpmailer/vendor/autoload.php';
+                
+                try {
+                    $mail = new PHPMailer\PHPMailer\PHPMailer(true);
+                    
+                    // Server settings
+                    $mail->isSMTP();
+                    $mail->Host       = 'smtp.gmail.com';
+                    $mail->SMTPAuth   = true;
+                    $mail->Username   = 'dilucayaka02@gmail.com';
+                    $mail->Password   = 'jlld eygl hksj flvg';
+                    $mail->SMTPSecure = PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
+                    $mail->Port       = 587;
+                    
+                    // Recipients
+                    $mail->setFrom('dilucayaka02@gmail.com', 'EducAid System');
+                    $mail->addAddress($student['email'], $student['first_name'] . ' ' . $student['last_name']);
+                    
+                    // Content
+                    $mail->isHTML(true);
+                    $mail->Subject = 'Document Rejection Notice - EducAid';
+                    
+                    // Build email body with document list
+                    $emailDocs = '';
+                    foreach ($rejectionData as $doc) {
+                        $emailDocs .= '<tr>
+                            <td style="padding: 12px; border: 1px solid #e0e0e0; background: #f9f9f9;">
+                                <strong>' . htmlspecialchars($doc['name']) . '</strong>
+                            </td>
+                            <td style="padding: 12px; border: 1px solid #e0e0e0;">
+                                ' . htmlspecialchars($doc['reason']) . '
+                            </td>
+                        </tr>';
+                    }
+                    
+                    $loginUrl = (isset($_SERVER['HTTPS'])?'https':'http') . '://' . $_SERVER['HTTP_HOST'] . '/EducAid/unified_login.php';
+                    
+                    $mail->Body = '
+                    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f8f9fa;">
+                        <div style="background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                            <div style="text-align: center; margin-bottom: 30px;">
+                                <h1 style="color: #dc3545; margin: 0;">Document Rejection Notice</h1>
+                            </div>
+                            
+                            <p>Dear ' . htmlspecialchars($student['first_name'] . ' ' . $student['last_name']) . ',</p>
+                            
+                            <p>Your application has been reviewed, and the following documents need to be re-uploaded:</p>
+                            
+                            <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+                                <thead>
+                                    <tr style="background: #dc3545; color: white;">
+                                        <th style="padding: 12px; text-align: left; border: 1px solid #c82333;">Document Type</th>
+                                        <th style="padding: 12px; text-align: left; border: 1px solid #c82333;">Reason for Rejection</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ' . $emailDocs . '
+                                </tbody>
+                            </table>
+                            
+                            <div style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0;">
+                                <strong>⚠️ Action Required:</strong> Please log in to your account and re-upload the rejected documents as soon as possible.
+                            </div>
+                            
+                            <div style="text-align: center; margin: 30px 0;">
+                                <a href="' . $loginUrl . '" style="display: inline-block; padding: 12px 30px; background: #007bff; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">Login to Upload Documents</a>
+                            </div>
+                            
+                            <p style="color: #666; font-size: 14px; margin-top: 30px;">
+                                If you have any questions, please contact your administrator.
+                            </p>
+                            
+                            <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
+                            
+                            <p style="color: #999; font-size: 12px; text-align: center;">
+                                This is an automated message from EducAid System. Please do not reply to this email.
+                            </p>
+                        </div>
+                    </div>';
+                    
+                    $mail->AltBody = "Dear " . $student['first_name'] . " " . $student['last_name'] . ",\n\n" .
+                                     "Your application has been reviewed, and the following documents need to be re-uploaded:\n\n" .
+                                     $notificationMsg . "\n\n" .
+                                     "Please log in to your account at: " . $loginUrl . "\n\n" .
+                                     "If you have any questions, please contact your administrator.\n\n" .
+                                     "EducAid System";
+                    
+                    $mail->send();
+                    error_log("Rejection email sent successfully to: " . $student['email']);
+                } catch (Exception $e) {
+                    error_log("Failed to send rejection email: " . $mail->ErrorInfo);
+                }
+            }
+            
+            $_SESSION['success'] = count($documentsToReject) . " document(s) rejected. Student will be notified to re-upload.";
             
         } catch (Exception $e) {
             $_SESSION['error'] = "Error rejecting documents: " . $e->getMessage();
@@ -1551,10 +1812,10 @@ if (isset($_GET['refresh_modal']) && isset($_GET['student_id'])) {
         $db_documents['grades'] = $db_documents['academic_grades'];
     }
     
-    // Then, search for documents in student directory using student_id pattern
+    // Then, search for documents in student directory using student_id pattern with FilePathConfig
     $found_documents = [];
-    $server_base = dirname(__DIR__, 2) . '/assets/uploads/student/';
-    $web_base = '../../assets/uploads/student/';
+    $server_base = $pathConfig->getStudentPath(); // Use FilePathConfig for base path
+    $web_base = 'assets/uploads/student/'; // Web path relative from document root
     
     $document_folders = [
         'id_pictures' => 'id_picture',
@@ -1568,7 +1829,7 @@ if (isset($_GET['refresh_modal']) && isset($_GET['student_id'])) {
         $matches = [];
         
         // NEW STRUCTURE: Check student/{doc_type}/{student_id}/ folder first
-        $student_subdir = $server_base . $folder . '/' . $student_id . '/';
+        $student_subdir = $server_base . DIRECTORY_SEPARATOR . $folder . DIRECTORY_SEPARATOR . $student_id . DIRECTORY_SEPARATOR;
         if (is_dir($student_subdir)) {
             foreach (glob($student_subdir . '*') as $file) {
                 // Skip associated files
@@ -1583,7 +1844,7 @@ if (isset($_GET['refresh_modal']) && isset($_GET['student_id'])) {
         }
         
         // OLD STRUCTURE: Check flat student/{doc_type}/ folder
-        $dir = $server_base . $folder . '/';
+        $dir = $server_base . DIRECTORY_SEPARATOR . $folder . DIRECTORY_SEPARATOR;
         if (is_dir($dir)) {
             // Look for files starting with student_id OR containing student's name
             $pattern = $dir . $student_id . '_*';
@@ -1632,9 +1893,9 @@ if (isset($_GET['refresh_modal']) && isset($_GET['student_id'])) {
         }
     }
     
-    // Also search temp folders for documents not yet moved to permanent storage
-    $temp_base = dirname(__DIR__, 2) . '/assets/uploads/temp/';
-    $temp_web_base = '../../assets/uploads/temp/';
+    // Also search temp folders for documents not yet moved to permanent storage using FilePathConfig
+    $temp_base = $pathConfig->getTempPath(); // Use FilePathConfig for temp path
+    $temp_web_base = 'assets/uploads/temp/'; // Web path relative from document root
     
     foreach ($document_folders as $folder => $type) {
         // Skip if already found in student directory
@@ -1642,7 +1903,7 @@ if (isset($_GET['refresh_modal']) && isset($_GET['student_id'])) {
             continue;
         }
         
-        $temp_dir = $temp_base . $folder . '/';
+        $temp_dir = $temp_base . DIRECTORY_SEPARATOR . $folder . DIRECTORY_SEPARATOR;
         if (is_dir($temp_dir)) {
             // Search by student_id or name
             $all_files = glob($temp_dir . '*');
@@ -2111,6 +2372,129 @@ if ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '' === 'XMLHttpRequest' || (isset($_GET
                     </button>
                     <button type="submit" class="btn btn-warning" id="confirmArchiveBtn">
                         <i class="bi bi-archive me-1"></i> Archive Student
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Reject Documents Modal -->
+<div class="modal fade" id="rejectDocumentsModal" tabindex="-1" aria-labelledby="rejectDocumentsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-fullscreen-sm-down">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="rejectDocumentsModalLabel">
+                    <i class="bi bi-x-circle-fill me-2"></i>Reject Documents
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="POST" id="rejectDocumentsForm">
+                <input type="hidden" name="student_id" id="rejectStudentId">
+                <input type="hidden" name="reject_documents" value="1">
+                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfRejectDocumentsToken) ?>">
+                
+                <div class="modal-body">
+                    <div class="alert alert-warning">
+                        <i class="bi bi-exclamation-triangle me-2"></i>
+                        <strong>Select documents to reject:</strong> Choose which documents need to be re-uploaded and provide a reason for each.
+                    </div>
+                    
+                    <p class="mb-3">Student: <strong id="rejectStudentName"></strong></p>
+                    
+                    <div class="document-reject-list">
+                        <!-- ID Picture -->
+                        <div class="card mb-3 reject-card" data-doc="04">
+                            <div class="card-body">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="reject_doc_types[]" value="04" id="reject_04">
+                                    <label class="form-check-label fw-bold" for="reject_04">
+                                        <i class="bi bi-person-badge text-primary me-2"></i>ID Picture
+                                    </label>
+                                </div>
+                                <div class="mt-2 reject-reason-container" id="reason_container_04" style="display: none;">
+                                    <label class="form-label small text-muted">Reason for rejection:</label>
+                                    <input type="text" class="form-control form-control-sm" name="reject_reason_04" placeholder="e.g., Image is blurry, face not clearly visible" maxlength="200">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- EAF -->
+                        <div class="card mb-3 reject-card" data-doc="00">
+                            <div class="card-body">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="reject_doc_types[]" value="00" id="reject_00">
+                                    <label class="form-check-label fw-bold" for="reject_00">
+                                        <i class="bi bi-file-earmark-text text-success me-2"></i>Enrollment Assistance Form (EAF)
+                                    </label>
+                                </div>
+                                <div class="mt-2 reject-reason-container" id="reason_container_00" style="display: none;">
+                                    <label class="form-label small text-muted">Reason for rejection:</label>
+                                    <input type="text" class="form-control form-control-sm" name="reject_reason_00" placeholder="e.g., Form is incomplete, signature missing" maxlength="200">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Grades -->
+                        <div class="card mb-3 reject-card" data-doc="01">
+                            <div class="card-body">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="reject_doc_types[]" value="01" id="reject_01">
+                                    <label class="form-check-label fw-bold" for="reject_01">
+                                        <i class="bi bi-file-earmark-bar-graph text-info me-2"></i>Academic Grades
+                                    </label>
+                                </div>
+                                <div class="mt-2 reject-reason-container" id="reason_container_01" style="display: none;">
+                                    <label class="form-label small text-muted">Reason for rejection:</label>
+                                    <input type="text" class="form-control form-control-sm" name="reject_reason_01" placeholder="e.g., Grades are not from the latest semester" maxlength="200">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Letter to Mayor -->
+                        <div class="card mb-3 reject-card" data-doc="02">
+                            <div class="card-body">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="reject_doc_types[]" value="02" id="reject_02">
+                                    <label class="form-check-label fw-bold" for="reject_02">
+                                        <i class="bi bi-envelope text-warning me-2"></i>Letter to Mayor
+                                    </label>
+                                </div>
+                                <div class="mt-2 reject-reason-container" id="reason_container_02" style="display: none;">
+                                    <label class="form-label small text-muted">Reason for rejection:</label>
+                                    <input type="text" class="form-control form-control-sm" name="reject_reason_02" placeholder="e.g., Letter format is incorrect, missing details" maxlength="200">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Certificate of Indigency -->
+                        <div class="card mb-3 reject-card" data-doc="03">
+                            <div class="card-body">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="reject_doc_types[]" value="03" id="reject_03">
+                                    <label class="form-check-label fw-bold" for="reject_03">
+                                        <i class="bi bi-award text-danger me-2"></i>Certificate of Indigency
+                                    </label>
+                                </div>
+                                <div class="mt-2 reject-reason-container" id="reason_container_03" style="display: none;">
+                                    <label class="form-label small text-muted">Reason for rejection:</label>
+                                    <input type="text" class="form-control form-control-sm" name="reject_reason_03" placeholder="e.g., Certificate is expired or not signed" maxlength="200">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="alert alert-info mt-3">
+                        <i class="bi bi-info-circle me-2"></i>
+                        <strong>Note:</strong> The student will receive an email and notification with the rejection reasons for each document.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle me-1"></i> Cancel
+                    </button>
+                    <button type="submit" class="btn btn-danger" id="confirmRejectBtn" disabled>
+                        <i class="bi bi-send me-1"></i> Reject Selected Documents
                     </button>
                 </div>
             </form>
@@ -2838,10 +3222,49 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }, 100);
     
-    // Attach refresh listeners to all initial modals
-    setTimeout(() => {
-        attachModalRefreshListeners();
-    }, 200);
+    // Dynamic modal stacking: raise z-index incrementally for each shown modal
+    (function initDynamicModalStacking(){
+        const baseZ = 1050; // Bootstrap default
+        let seq = 0;
+
+        function updateStack(){
+            // Sort open modals by the sequence they were opened
+            const openModals = Array.from(document.querySelectorAll('.modal.show'))
+                .sort((a,b) => (parseInt(a.dataset.stackIndex||'0')||0) - (parseInt(b.dataset.stackIndex||'0')||0));
+            const backdrops = Array.from(document.querySelectorAll('.modal-backdrop.show'));
+
+            // Normalize all backdrops to base first
+            backdrops.forEach((bd, i) => { bd.style.zIndex = (baseZ + i*20).toString(); });
+
+            openModals.forEach((modalEl, idx) => {
+                const z = baseZ + idx * 20;
+                modalEl.style.zIndex = (z + 10).toString();
+                const bd = backdrops[idx];
+                if (bd) bd.style.zIndex = z.toString();
+            });
+        }
+
+        document.addEventListener('shown.bs.modal', function(e){
+            const el = e.target;
+            if (el && el.classList && el.classList.contains('modal')) {
+                el.dataset.stackIndex = (++seq).toString();
+                // Allow Bootstrap to insert backdrop before stacking
+                setTimeout(updateStack, 10);
+            }
+        });
+
+        document.addEventListener('hidden.bs.modal', function(e){
+            const el = e.target;
+            if (el && el.dataset) delete el.dataset.stackIndex;
+            setTimeout(updateStack, 10);
+        });
+
+        // Initial pass in case any modal is already open
+        setTimeout(updateStack, 50);
+    })();
+
+    // Attach refresh listeners to all initial modals (after stacking init)
+    setTimeout(attachModalRefreshListeners, 200);
     
     setTimeout(updateTableData, 300);
     // Auto-open migration modal if preview/result exists
@@ -3202,9 +3625,48 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 <style>
-/* Ensure Bootstrap modal appears above any custom overlay/backdrop from the admin layout */
-.modal { z-index: 200000 !important; }
-.modal-backdrop { z-index: 199999 !important; }
+/* ------------------ Mobile Responsiveness Enhancements ------------------ */
+@media (max-width: 575.98px) {
+    .modal-dialog { margin: 8px auto; }
+    #rejectDocumentsModal .modal-dialog { max-width: 100%; }
+    #rejectDocumentsModal .card { border: 1px solid #eee; box-shadow: none; }
+    #rejectDocumentsModal .card-body { padding: 10px 12px; }
+    #rejectDocumentsModal .form-check-label { font-size: .9rem; }
+    #rejectDocumentsModal .reject-reason-container input { font-size: .85rem; }
+    /* Make content flex so body can scroll while header/footer stay visible */
+    #rejectDocumentsModal .modal-content { display: flex; flex-direction: column; max-height: 100vh; }
+    #rejectDocumentsModal .modal-header { flex: 0 0 auto; }
+    #rejectDocumentsModal .modal-body { flex: 1 1 auto; overflow-y: auto; }
+    #rejectDocumentsModal .modal-footer { flex: 0 0 auto; position: sticky; bottom: 0; background: #fff; box-shadow: 0 -2px 6px rgba(0,0,0,.08); }
+    .doc-grid { grid-template-columns: 1fr !important; }
+    .doc-card-body { min-height: 140px; }
+    .doc-actions .btn { padding: 4px 6px; font-size: .75rem; }
+    .doc-meta { font-size: .65rem; }
+    .modal-title { font-size: 1rem; }
+    .badge { font-size: .55rem; }
+        .doc-viewer-toolbar { flex-wrap: wrap; gap: 8px; }
+        .doc-viewer-toolbar .btn { padding: 6px 10px; font-size: .85rem; }
+}
+
+/* Compact view for very small heights (mobile browser chrome visible) */
+@media (max-height: 640px) and (max-width: 575.98px) {
+    #rejectDocumentsModal .modal-content { max-height: 100vh; }
+    #rejectDocumentsModal .modal-body { max-height: none; }
+}
+
+/* Improve touch targets */
+#rejectDocumentsModal .form-check-input { width: 1.2rem; height: 1.2rem; }
+#rejectDocumentsModal .form-check { display: flex; align-items: center; gap: 8px; }
+
+/* Auto-grow textarea pattern for future (if changed from input) */
+.auto-grow { resize: none; overflow:hidden; }
+
+/* Modal stacking: use Bootstrap defaults; dynamic z-index handled via JS below. */
+/* Avoid hardcoding z-index here to prevent backdrop conflicts when stacking modals. */
+
+
+/* Reject Documents Modal: rely on dynamic stacking (no fixed z-index here). */
+
 /* Document grid */
 .doc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
 .doc-card { 
@@ -3309,8 +3771,33 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 
 /* Fullscreen viewer - Must appear ABOVE modals (z-index 200000+) */
-.doc-viewer-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.85); display: none; z-index: 210000 !important; }
-.doc-viewer { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 95vw; max-width: 1280px; height: 85vh; background: #111; border-radius: 8px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); }
+.doc-viewer-backdrop { 
+    position: fixed !important; 
+    inset: 0 !important; 
+    background: rgba(0,0,0,0.85) !important; 
+    display: none; 
+    z-index: 999999 !important; 
+}
+.doc-viewer-backdrop.show {
+    display: block !important;
+    z-index: 99999 !important;
+}
+.doc-viewer { 
+    position: absolute; 
+    top: 50%; 
+    left: 50%; 
+    transform: translate(-50%, -50%); 
+    width: 95vw; 
+    max-width: 1280px; 
+    height: 85vh; 
+    background: #111; 
+    border-radius: 8px; 
+    overflow: hidden; 
+    display: flex; 
+    flex-direction: column; 
+    box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); 
+    z-index: 1000000 !important;
+}
 .doc-viewer-toolbar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; justify-content: space-between; padding: 8px 12px; background: #1f2937; color: #fff; }
 .doc-viewer-toolbar .btn { padding: 4px 8px; }
 .doc-viewer-content { flex: 1; background: #000; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; }
@@ -3537,12 +4024,22 @@ function openDocumentViewer(src, title) {
     canvas.ondblclick = () => { if (!_viewState.isImage) return; _viewState.scale = _viewState.scale < 2 ? 2 : 1; _viewState.panX = 0; _viewState.panY = 0; applyImageTransform(img); };
     canvas.ontouchend = () => { const now = Date.now(); if (now - lastTap < 300) { canvas.ondblclick(); } lastTap = now; };
 
+    // Ensure viewer is above any Bootstrap modals/backdrops
     backdrop.style.display = 'block';
+    backdrop.classList.add('show');
+    backdrop.style.zIndex = '1000000';
+    const viewerEl = backdrop.querySelector('.doc-viewer');
+    if (viewerEl) viewerEl.style.zIndex = '1000001';
+    document.body.classList.add('doc-viewer-open');
 }
 
 function closeDocumentViewer() {
     const backdrop = document.getElementById('docViewerBackdrop');
-    if (backdrop) backdrop.style.display = 'none';
+    if (backdrop) {
+        backdrop.style.display = 'none';
+        backdrop.classList.remove('show');
+        document.body.classList.remove('doc-viewer-open');
+    }
 }
 
 // Archive Student Modal and Functions
@@ -4433,11 +4930,244 @@ function showValidationModal() {
         backdrop.classList.remove('show');
     }, { once: true });
 }
+
+// Reject Documents Modal Functions
+async function showRejectDocumentsModal(studentId, studentName) {
+    // If the fullscreen Document Viewer is open, close it first so this modal isn't hidden behind it
+    try {
+        const dv = document.getElementById('docViewerBackdrop');
+        if (dv && dv.classList.contains('show')) {
+            closeDocumentViewer();
+        }
+    } catch (e) { /* no-op */ }
+
+    // If Validation Modal is open, hide it first (this keeps stacking predictable)
+    try {
+        const validationModalEl = document.getElementById('validationModal');
+        const vm = validationModalEl ? bootstrap.Modal.getInstance(validationModalEl) : null;
+        if (vm) {
+            vm.hide();
+        }
+        const vBackdrop = document.getElementById('validationModalBackdrop');
+        if (vBackdrop) vBackdrop.classList.remove('show');
+    } catch (e) { /* no-op */ }
+
+    // Set values in modal
+    document.getElementById('rejectStudentId').value = studentId;
+    document.getElementById('rejectStudentName').textContent = studentName;
+    
+    // Reset form FIRST (before token refresh, as reset will clear the token input)
+    document.getElementById('rejectDocumentsForm').reset();
+    
+    // Refresh CSRF token AFTER reset to ensure token is always fresh and not cleared by reset()
+    try {
+        console.log('[RejectDocuments] Fetching fresh CSRF token...');
+        const response = await fetch('get_csrf_token.php?action=reject_documents');
+        if (response.ok) {
+            const data = await response.json();
+            console.log('[RejectDocuments] Token response:', data);
+            if (data && data.success && data.token) {
+                const tokenInput = document.querySelector('#rejectDocumentsForm input[name="csrf_token"]');
+                if (tokenInput) {
+                    const oldToken = tokenInput.value;
+                    tokenInput.value = data.token;
+                    console.log('[RejectDocuments] CSRF token updated');
+                    console.log('[RejectDocuments] Old token (first 16):', oldToken.substring(0, 16));
+                    console.log('[RejectDocuments] New token (first 16):', data.token.substring(0, 16));
+                } else {
+                    console.error('[RejectDocuments] Token input field not found!');
+                }
+            } else {
+                console.error('[RejectDocuments] Invalid token response:', data);
+            }
+        } else {
+            console.warn('[RejectDocuments] CSRF refresh failed: HTTP', response.status);
+        }
+    } catch(e) {
+        console.error('[RejectDocuments] CSRF refresh exception:', e);
+    }
+    
+    // Hide all reason containers and uncheck all checkboxes
+    const reasonContainers = document.querySelectorAll('.reject-reason-container');
+    reasonContainers.forEach(container => {
+        container.style.display = 'none';
+    });
+    
+    const checkboxes = document.querySelectorAll('input[name="reject_doc_types[]"]');
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = false;
+        // Re-enable by default; availability will adjust below
+        checkbox.disabled = false;
+        const label = document.querySelector('label[for="' + checkbox.id + '"]');
+        if (label) label.removeAttribute('title');
+    });
+    
+    // Disable submit button
+    document.getElementById('confirmRejectBtn').disabled = true;
+    
+    // Show modal with higher z-index to appear above student info modal
+    const modalEl = document.getElementById('rejectDocumentsModal');
+    const modal = new bootstrap.Modal(modalEl, {
+        backdrop: 'static',
+        keyboard: false
+    });
+    
+    // Use small timeout to ensure other overlays are fully hidden before showing this modal
+    setTimeout(() => modal.show(), 30);
+
+    // After showing, fetch current doc statuses and disable unavailable or already-rejected types
+    await updateRejectDocumentsAvailability(studentId);
+}
+
+// Map reject modal codes to document keys returned by get_applicant_details.php
+const _rejectDocCodeToKey = {
+    '04': 'id_picture',
+    '00': 'eaf',
+    '01': 'grades',
+    '02': 'letter_to_mayor',
+    '03': 'certificate_of_indigency'
+};
+
+// Adjust availability for rejection:
+//  - Disable documents that are already approved OR already rejected (cannot re-reject / no action needed)
+//  - Enable documents that are missing (allow admin to flag them with a reason: "Not uploaded" etc.)
+//  - Enable documents that exist but are still in temp/unverified state
+async function updateRejectDocumentsAvailability(studentId) {
+    try {
+        const url = 'get_applicant_details.php?student_id=' + encodeURIComponent(studentId) + '&_=' + Date.now();
+        const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+        if (!res.ok) return; // fallback: leave all enabled
+        const data = await res.json();
+        if (!data || !data.success || !data.documents) return;
+
+        Object.entries(_rejectDocCodeToKey).forEach(([code, key]) => {
+            const cb = document.querySelector('input[name="reject_doc_types[]"][value="' + code + '"]');
+            if (!cb) return;
+            const label = document.querySelector('label[for="' + cb.id + '"]');
+            const reasonContainer = document.getElementById('reason_container_' + code);
+            const doc = data.documents[key];
+
+            // Check if document is missing (endpoint sets missing:true when not found)
+            const isMissing = !doc || doc.missing === true;
+            
+            // Extract status with fallback field names
+            const status = (doc && (doc.status || doc.document_status || doc.state || doc.verdict)) ? String(doc.status || doc.document_status || doc.state || doc.verdict).toLowerCase() : null;
+            const isRejected = status === 'rejected';
+
+            // Rule: Only allow selecting documents that EXIST (not missing) and are not already rejected
+            if (isMissing) {
+                cb.disabled = true;
+                if (reasonContainer) reasonContainer.style.display = 'none';
+                if (label) label.title = 'Disabled: not uploaded';
+                return;
+            }
+            if (isRejected) {
+                cb.disabled = true;
+                if (reasonContainer) reasonContainer.style.display = 'none';
+                if (label) label.title = 'Disabled: already rejected';
+                return;
+            }
+
+            // Has a file and not rejected: allow selection regardless of approved/pending status
+            cb.disabled = false;
+            if (label) label.title = 'Uploaded: you can request re-upload';
+        });
+
+        // Re-evaluate submit button enabled state after applying disables
+        const enabledChecked = Array.from(document.querySelectorAll('input[name="reject_doc_types[]"]')).some(cb => cb.checked && !cb.disabled);
+        const submitBtn = document.getElementById('confirmRejectBtn');
+        if (submitBtn) submitBtn.disabled = !enabledChecked;
+    } catch (e) {
+        // Silent fail; modal still usable with all options enabled
+        console.warn('updateRejectDocumentsAvailability failed', e);
+    }
+}
+
+// Handle checkbox changes to show/hide reason inputs
+document.addEventListener('DOMContentLoaded', function() {
+    const checkboxes = document.querySelectorAll('input[name="reject_doc_types[]"]');
+    const submitBtn = document.getElementById('confirmRejectBtn');
+    
+    checkboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            const docCode = this.value;
+            const reasonContainer = document.getElementById('reason_container_' + docCode);
+            const reasonInput = reasonContainer.querySelector('input');
+            
+            if (this.checked) {
+                // Show reason input when checkbox is checked
+                reasonContainer.style.display = 'block';
+                reasonInput.required = true;
+            } else {
+                // Hide reason input when checkbox is unchecked
+                reasonContainer.style.display = 'none';
+                reasonInput.required = false;
+                reasonInput.value = '';
+            }
+            
+            // Enable/disable submit button based on whether any non-disabled checkbox is checked
+            const anyChecked = Array.from(checkboxes).some(cb => cb.checked && !cb.disabled);
+            submitBtn.disabled = !anyChecked;
+        });
+    });
+    
+    // Validate form before submission
+    document.getElementById('rejectDocumentsForm').addEventListener('submit', function(e) {
+        const checkedBoxes = Array.from(checkboxes).filter(cb => cb.checked && !cb.disabled);
+        
+        if (checkedBoxes.length === 0) {
+            e.preventDefault();
+            alert('Please select at least one document to reject.');
+            return false;
+        }
+        
+        // Log token being submitted for debugging
+        const tokenInput = document.querySelector('#rejectDocumentsForm input[name="csrf_token"]');
+        if (tokenInput) {
+            console.log('[RejectDocuments] Submitting with token (first 16):', tokenInput.value.substring(0, 16));
+        } else {
+            console.error('[RejectDocuments] No token input found at submission!');
+        }
+        
+        // Check that all checked documents have reasons
+        let allHaveReasons = true;
+        checkedBoxes.forEach(checkbox => {
+            const docCode = checkbox.value;
+            const reasonInput = document.querySelector('input[name="reject_reason_' + docCode + '"]');
+            if (!reasonInput.value.trim()) {
+                allHaveReasons = false;
+            }
+        });
+        
+        if (!allHaveReasons) {
+            e.preventDefault();
+            alert('Please provide a reason for each rejected document.');
+            return false;
+        }
+        
+        // Confirm before submitting
+        const studentName = document.getElementById('rejectStudentName').textContent;
+        const docCount = checkedBoxes.length;
+        const message = `Are you sure you want to reject ${docCount} document(s) for ${studentName}?\n\nThe student will be notified via email and the system.`;
+        
+        if (!confirm(message)) {
+            e.preventDefault();
+            return false;
+        }
+    });
+
+    // Optional: auto-grow any future textarea with class auto-grow
+    document.querySelectorAll('textarea.auto-grow').forEach(tx => {
+        const resize = () => { tx.style.height = 'auto'; tx.style.height = (tx.scrollHeight) + 'px'; };
+        tx.addEventListener('input', resize);
+        resize();
+    });
+});
 </script>
 
 <!-- Validation Modal -->
 <div class="modal fade" id="validationModal" tabindex="-1">
-    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable modal-fullscreen-sm-down">
         <div class="modal-content">
             <div class="modal-header bg-info text-white">
                 <h5 class="modal-title" id="validationModalLabel">

@@ -11,19 +11,27 @@
 
 class DocumentService {
     private $db;
-    private $baseDir = __DIR__ . '/../assets/uploads/';
+    private $baseDir;
+    private $pathConfig;
     
     // Document type mapping
     const DOCUMENT_TYPES = [
         'eaf' => ['code' => '00', 'name' => 'eaf', 'folder' => 'enrollment_forms'],
         'academic_grades' => ['code' => '01', 'name' => 'academic_grades', 'folder' => 'grades'],
-        'letter_to_mayor' => ['code' => '02', 'name' => 'letter_to_mayor', 'folder' => 'letter_mayor'],
+        'letter_to_mayor' => ['code' => '02', 'name' => 'letter_to_mayor', 'folder' => 'letter_to_mayor'],
         'certificate_of_indigency' => ['code' => '03', 'name' => 'certificate_of_indigency', 'folder' => 'indigency'],
         'id_picture' => ['code' => '04', 'name' => 'id_picture', 'folder' => 'id_pictures']
     ];
     
     public function __construct($dbConnection) {
+        require_once __DIR__ . '/../config/FilePathConfig.php';
+        
         $this->db = $dbConnection;
+        $this->pathConfig = FilePathConfig::getInstance();
+        $this->baseDir = $this->pathConfig->getUploadsDir();
+        
+        error_log("DocumentService: Environment=" . ($this->pathConfig->isRailway() ? 'Railway' : 'Localhost') . 
+                  ", BaseDir=" . $this->baseDir);
     }
     
     /**
@@ -33,28 +41,8 @@ class DocumentService {
      * @return string Relative web path
      */
     private function convertToWebPath($filePath) {
-        // Normalize path separators
-        $filePath = str_replace('\\', '/', $filePath);
-        $baseDir = str_replace('\\', '/', $this->baseDir);
-        
-        // If path starts with base directory, make it relative
-        if (strpos($filePath, $baseDir) === 0) {
-            $relativePath = substr($filePath, strlen($baseDir));
-            return 'assets/uploads/' . ltrim($relativePath, '/');
-        }
-        
-        // If it's already a relative path starting with assets/
-        if (strpos($filePath, 'assets/uploads/') === 0) {
-            return $filePath;
-        }
-        
-        // If it's a relative path with ../../
-        if (strpos($filePath, '../../assets/uploads/') === 0) {
-            return str_replace('../../', '', $filePath);
-        }
-        
-        // Fallback: return as-is
-        return $filePath;
+        // Use pathConfig for proper conversion
+        return $this->pathConfig->getRelativePath($filePath);
     }
     
     /**

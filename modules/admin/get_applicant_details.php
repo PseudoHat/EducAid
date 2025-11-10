@@ -6,8 +6,11 @@
  * whose files are stored in permanent storage:
  * assets/uploads/student/{filetype}/{studentID}/
  * 
- * Folders: indigency, grades, id_pictures, enrollment_forms, letter_mayor
+ * Folders: indigency, grades, id_pictures, enrollment_forms, letter_to_mayor
  */
+
+require_once __DIR__ . '/../../config/FilePathConfig.php';
+$pathConfig = FilePathConfig::getInstance();
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -53,16 +56,17 @@ $student_type = ($student['needs_document_upload'] === 't' || $student['needs_do
 $doc_type_config = [
     '04' => ['folder' => 'id_pictures', 'label' => 'ID Picture', 'key' => 'id_picture'],
     '00' => ['folder' => 'enrollment_forms', 'label' => 'EAF', 'key' => 'eaf'],
-    '02' => ['folder' => 'letter_mayor', 'label' => 'Letter to Mayor', 'key' => 'letter_to_mayor'],
+    '02' => ['folder' => 'letter_to_mayor', 'label' => 'Letter to Mayor', 'key' => 'letter_to_mayor'],
     '03' => ['folder' => 'indigency', 'label' => 'Certificate of Indigency', 'key' => 'certificate_of_indigency'],
     '01' => ['folder' => 'grades', 'label' => 'Academic Grades', 'key' => 'grades']
 ];
 
 $documents = [];
 $server_root = dirname(__DIR__, 2);
-// Use relative path from modules/admin/ directory
-// Paths stored in DB as "assets/uploads/..." need ../../ prefix for browser resolution
-$web_base = '../../assets/uploads/student/';
+// Use FilePathConfig for Railway/Localhost compatibility
+$student_base = $pathConfig->getStudentPath();
+// Web path needs to be relative for browser resolution
+$web_base = 'assets/uploads/student/';
 
 // Step 1: Check documents table for approved/permanent documents
 $docs_query = pg_query_params($connection, 
@@ -79,35 +83,53 @@ while ($doc = pg_fetch_assoc($docs_query)) {
     if (!isset($doc_type_config[$docTypeCode])) continue;
     
     $config = $doc_type_config[$docTypeCode];
-    $filePath = $doc['file_path'];
+    $dbPath = $doc['file_path'];
     
-    // Convert database path format to web-accessible path
-    // Database stores: assets/uploads/student/...
-    // We need: ../../assets/uploads/student/... (relative to modules/admin/)
-    if (strpos($filePath, 'assets/uploads/') === 0) {
-        $filePath = '../../' . $filePath;
+    // Database stores: assets/uploads/student/{folder}/{student_id}/{file}
+    // We need to:
+    // 1. Convert to server path for file existence check (Railway/localhost compatible)
+    // 2. Convert to web path for browser access
+    
+    // Convert database path to server path using FilePathConfig
+    // Remove 'assets/uploads/' prefix and use FilePathConfig base path
+    $pathParts = explode('/', $dbPath);
+    
+    // Server path: Use FilePathConfig to get correct base (Railway or localhost)
+    if (strpos($dbPath, 'assets/uploads/student/') === 0) {
+        // Extract: student/{folder}/{student_id}/{filename}
+        // Database: assets/uploads/student/grades/STUDENT-ID/file.jpg
+        // Server: /path/to/uploads/student/grades/STUDENT-ID/file.jpg
+        $relativePath = str_replace('assets/uploads/', '', $dbPath);
+        $server_path = $server_root . DIRECTORY_SEPARATOR . 'assets' . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $relativePath);
+    } elseif (strpos($dbPath, 'assets/uploads/temp/') === 0) {
+        // Temp path (shouldn't happen for approved docs, but handle it)
+        $relativePath = str_replace('assets/uploads/', '', $dbPath);
+        $server_path = $server_root . DIRECTORY_SEPARATOR . 'assets' . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $relativePath);
+    } else {
+        // Legacy or unknown format - try as-is
+        $server_path = $server_root . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $dbPath);
     }
     
-    // Convert temp paths to permanent paths for approved students
-    if ($student['status'] === 'active' && strpos($filePath, '/temp/') !== false) {
-        $filePath = str_replace('/temp/', '/student/', $filePath);
-    }
+    // Web path for browser: relative to modules/admin/
+    // Database: assets/uploads/student/...
+    // Web: ../../assets/uploads/student/...
+    $web_path = '../../' . $dbPath;
     
-    // Verify file exists
-    $relative_from_root = ltrim(str_replace('../../', '', $filePath), '/');
-    $server_path = $server_root . '/' . $relative_from_root;
-    
+    // Verify file exists on file system
     if (file_exists($server_path)) {
         // Store only if not already found (newest first from query)
         if (!isset($db_documents[$config['key']])) {
             $db_documents[$config['key']] = [
-                'path' => $filePath,
+                'path' => $web_path,
                 'server_path' => $server_path,
                 'uploaded_at' => $doc['upload_date'],
                 'status' => $doc['status'],
                 'source' => 'database'
             ];
         }
+    } else {
+        // File not found - log for debugging
+        error_log("Document file not found: $server_path (DB path: $dbPath)");
     }
 }
 
@@ -122,7 +144,7 @@ foreach ($doc_type_config as $code => $config) {
     }
     
     // Check permanent storage: student/{folder}/{studentID}/
-    $student_dir = $server_root . '/assets/uploads/student/' . $folder . '/' . $student_id . '/';
+    $student_dir = $student_base . DIRECTORY_SEPARATOR . $folder . DIRECTORY_SEPARATOR . $student_id . DIRECTORY_SEPARATOR;
     
     if (is_dir($student_dir)) {
         $files = glob($student_dir . '*');

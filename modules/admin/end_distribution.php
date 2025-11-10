@@ -8,16 +8,20 @@ if (!isset($_SESSION['admin_username'])) {
 }
 
 require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../../config/FilePathConfig.php';
 require_once __DIR__ . '/../../services/DistributionManager.php';
 require_once __DIR__ . '/../../services/FileCompressionService.php';
+
+$pathConfig = FilePathConfig::getInstance();
 
 /**
  * Delete all student uploaded documents from the file system
  * INCLUDING associated OCR and verification files (.ocr.txt, .verify.json, etc.)
  */
 function deleteAllStudentUploads() {
-    $uploadsPath = __DIR__ . '/../../assets/uploads/student';
-    $documentTypes = ['enrollment_forms', 'grades', 'id_pictures', 'indigency', 'letter_mayor']; // Fixed: letter_mayor not letter_to_mayor
+    global $pathConfig;
+    $uploadsPath = $pathConfig->getStudentPath();
+    $documentTypes = ['enrollment_forms', 'grades', 'id_pictures', 'indigency', 'letter_to_mayor']; // Standardized: letter_to_mayor
     
     $totalDeleted = 0;
     $associatedDeleted = 0;
@@ -27,14 +31,14 @@ function deleteAllStudentUploads() {
     $associatedExtensions = ['.ocr.txt', '.verify.json', '.confidence.json', '.tsv', '.ocr.json'];
     
     foreach ($documentTypes as $type) {
-        $folderPath = $uploadsPath . '/' . $type;
+        $folderPath = $uploadsPath . DIRECTORY_SEPARATOR . $type;
         if (is_dir($folderPath)) {
             $items = scandir($folderPath);
             $hasStudentFolders = false;
             
             // Check if we have student subdirectories (new structure)
             foreach ($items as $item) {
-                if ($item !== '.' && $item !== '..' && is_dir($folderPath . '/' . $item)) {
+                if ($item !== '.' && $item !== '..' && is_dir($folderPath . DIRECTORY_SEPARATOR . $item)) {
                     // If it looks like a student ID folder, we have new structure
                     $hasStudentFolders = true;
                     break;
@@ -48,10 +52,10 @@ function deleteAllStudentUploads() {
                 error_log("  Deleting from new structure: $type/");
                 foreach ($items as $item) {
                     if ($item !== '.' && $item !== '..') {
-                        $studentFolder = $folderPath . '/' . $item;
+                        $studentFolder = $folderPath . DIRECTORY_SEPARATOR . $item;
                         if (is_dir($studentFolder)) {
                             // Get all files in student folder
-                            $studentFiles = glob($studentFolder . '/*.*');
+                            $studentFiles = glob($studentFolder . DIRECTORY_SEPARATOR . '*.*');
                             foreach ($studentFiles as $file) {
                                 if (is_file($file)) {
                                     $filesToProcess[] = $file;
@@ -63,7 +67,7 @@ function deleteAllStudentUploads() {
             } else {
                 // OLD STRUCTURE: flat files in student/{doc_type}/
                 error_log("  Deleting from legacy structure: $type/");
-                $filesToProcess = glob($folderPath . '/*.*');
+                $filesToProcess = glob($folderPath . DIRECTORY_SEPARATOR . '*.*');
             }
             
             foreach ($filesToProcess as $file) {
@@ -555,17 +559,17 @@ if (in_array($distribution_status, ['preparing', 'active']) && $has_completed_sn
     // Count total files in student folders (handles both new nested and old flat structure)
     $file_count = 0;
     $total_size = 0;
-    $document_types = ['enrollment_forms', 'grades', 'id_pictures', 'indigency', 'letter_mayor'];
+    $document_types = ['enrollment_forms', 'grades', 'id_pictures', 'indigency', 'letter_to_mayor'];
     
     foreach ($document_types as $type) {
-        $folder = __DIR__ . "/../../assets/uploads/student/{$type}";
+        $folder = $pathConfig->getStudentPath() . DIRECTORY_SEPARATOR . $type;
         if (is_dir($folder)) {
             $items = scandir($folder);
             $hasStudentFolders = false;
             
             // Check if we have student subdirectories (new structure)
             foreach ($items as $item) {
-                if ($item !== '.' && $item !== '..' && is_dir($folder . '/' . $item)) {
+                if ($item !== '.' && $item !== '..' && is_dir($folder . DIRECTORY_SEPARATOR . $item)) {
                     $hasStudentFolders = true;
                     break;
                 }
@@ -575,10 +579,10 @@ if (in_array($distribution_status, ['preparing', 'active']) && $has_completed_sn
                 // NEW STRUCTURE: student/{doc_type}/{student_id}/files
                 foreach ($items as $item) {
                     if ($item !== '.' && $item !== '..') {
-                        $studentFolder = $folder . '/' . $item;
+                        $studentFolder = $folder . DIRECTORY_SEPARATOR . $item;
                         if (is_dir($studentFolder)) {
                             // Get all files in student folder
-                            $studentFiles = glob($studentFolder . '/*.*');
+                            $studentFiles = glob($studentFolder . DIRECTORY_SEPARATOR . '*.*');
                             foreach ($studentFiles as $file) {
                                 if (is_file($file)) {
                                     $file_count++;
@@ -590,7 +594,7 @@ if (in_array($distribution_status, ['preparing', 'active']) && $has_completed_sn
                 }
             } else {
                 // OLD STRUCTURE: flat files in student/{doc_type}/
-                $files = glob($folder . '/*.*');
+                $files = glob($folder . DIRECTORY_SEPARATOR . '*.*');
                 foreach ($files as $file) {
                     if (is_file($file)) {
                         $file_count++;

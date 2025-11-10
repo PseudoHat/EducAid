@@ -283,9 +283,9 @@ class EnrollmentFormOCRService {
         // Check first name - Use improved matching for compound/long names
         if (!empty($firstName)) {
             $similarity = $this->fuzzyMatchName($firstName, $fullText);
-            // VERY RELAXED: 33% threshold (at least 1/3 of words must match)
-            // This handles cases like "Reb Miguel Luys" where even if 1-2 words match it's likely correct
-            $result['first_name_found'] = $similarity >= 33;
+            // STRICTER: 60% threshold for first names (at least 2/3 of words must match)
+            // This prevents completely different names from passing validation
+            $result['first_name_found'] = $similarity >= 60;
             $result['first_name_similarity'] = $similarity;
             error_log("First name '{$firstName}' similarity: {$similarity}% - " . ($result['first_name_found'] ? '✓ FOUND' : '✗ NOT FOUND'));
         }
@@ -293,8 +293,8 @@ class EnrollmentFormOCRService {
         // Check middle name (optional)
         if (!empty($middleName)) {
             $similarity = $this->fuzzyMatchName($middleName, $fullText);
-            // VERY RELAXED: 33% threshold for middle names (often abbreviated or missing)
-            $result['middle_name_found'] = $similarity >= 33;
+            // MODERATE: 50% threshold for middle names (often abbreviated or missing)
+            $result['middle_name_found'] = $similarity >= 50;
             $result['middle_name_similarity'] = $similarity;
             error_log("Middle name '{$middleName}' similarity: {$similarity}% - " . ($result['middle_name_found'] ? '✓ FOUND' : '✗ NOT FOUND'));
         } else {
@@ -306,8 +306,9 @@ class EnrollmentFormOCRService {
         // Check last name - Use improved matching
         if (!empty($lastName)) {
             $similarity = $this->fuzzyMatchName($lastName, $fullText);
-            // RELAXED: 50% threshold for last names (usually single word but could be compound)
-            $result['last_name_found'] = $similarity >= 50;
+            // STRICTER: 70% threshold for last names (usually single/compound word)
+            // Last names are critical - must have strong match
+            $result['last_name_found'] = $similarity >= 70;
             $result['last_name_similarity'] = $similarity;
             error_log("Last name '{$lastName}' similarity: {$similarity}% - " . ($result['last_name_found'] ? '✓ FOUND' : '✗ NOT FOUND'));
         }
@@ -670,24 +671,66 @@ class EnrollmentFormOCRService {
     
     /**
      * Verify document type is enrollment/assessment form
+     * IMPROVED: More specific keywords and stricter matching
      */
     private function verifyDocumentType($fullTextLower) {
-        $keywords = [
-            'enrollment', 'assessment', 'eaf', 'form', 'billing',
-            'statement', 'certificate', 'registration', 'tuition'
+        // CRITICAL KEYWORDS: Must have at least ONE of these
+        $criticalKeywords = [
+            'enrollment', 'assessment', 'eaf', 'tuition fee', 'billing statement',
+            'certificate of registration', 'registration form'
         ];
         
-        $foundCount = 0;
-        foreach ($keywords as $keyword) {
-            if (strpos($fullTextLower, $keyword) !== false) {
-                $foundCount++;
+        // SUPPORTING KEYWORDS: General education-related terms
+        $supportingKeywords = [
+            'semester', 'academic year', 'course', 'subject', 'units',
+            'matriculation', 'student number', 'assessment form'
+        ];
+        
+        // EXCLUDE if these grade-specific keywords are dominant
+        $gradeKeywords = [
+            'final grade', 'prelim', 'midterm', 'finals', 'general average',
+            'grade point', 'remarks', 'passed', 'failed'
+        ];
+        
+        $criticalFound = 0;
+        $supportingFound = 0;
+        $gradeFound = 0;
+        
+        foreach ($criticalKeywords as $keyword) {
+            if (stripos($fullTextLower, $keyword) !== false) {
+                $criticalFound++;
             }
         }
         
+        foreach ($supportingKeywords as $keyword) {
+            if (stripos($fullTextLower, $keyword) !== false) {
+                $supportingFound++;
+            }
+        }
+        
+        foreach ($gradeKeywords as $keyword) {
+            if (stripos($fullTextLower, $keyword) !== false) {
+                $gradeFound++;
+            }
+        }
+        
+        // STRICTER LOGIC:
+        // 1. Must have at least 1 critical keyword
+        // 2. Must have at least 2 supporting keywords
+        // 3. Must NOT have more grade keywords than enrollment keywords
+        $isEnrollmentForm = ($criticalFound >= 1) && 
+                           ($supportingFound >= 2) && 
+                           ($gradeFound < ($criticalFound + $supportingFound));
+        
+        $totalFound = $criticalFound + $supportingFound;
+        
         return [
-            'is_enrollment_form' => $foundCount >= 2,
-            'keywords_found' => $foundCount,
-            'confidence' => min(100, $foundCount * 25)
+            'is_enrollment_form' => $isEnrollmentForm,
+            'keywords_found' => $totalFound,
+            'critical_found' => $criticalFound,
+            'supporting_found' => $supportingFound,
+            'grade_keywords_found' => $gradeFound,
+            'confidence' => $isEnrollmentForm ? min(100, ($totalFound * 15) + ($criticalFound * 20)) : 0
         ];
     }
     
@@ -901,20 +944,40 @@ class EnrollmentFormOCRService {
     
     /**
      * Verify if extracted data passes validation
+     * STRICTER: Name validation is now MANDATORY - cannot be bypassed
      */
     private function verifyExtractedData($extracted, $studentData) {
-        $checks = [
-            $extracted['student_name']['first_name_found'] ?? false,
-            $extracted['student_name']['last_name_found'] ?? false,
-            $extracted['course']['found'] ?? false,
-            $extracted['year_level']['found'] ?? false,
-            $extracted['document_type']['is_enrollment_form'] ?? false
-        ];
+        // CRITICAL CHECKS: These MUST pass (cannot be bypassed)
+        $firstNameFound = $extracted['student_name']['first_name_found'] ?? false;
+        $lastNameFound = $extracted['student_name']['last_name_found'] ?? false;
+        $isEnrollmentForm = $extracted['document_type']['is_enrollment_form'] ?? false;
         
-        $passedChecks = count(array_filter($checks));
+        // SUPPORTING CHECKS: At least 2 out of 3 must pass
+        $courseFound = $extracted['course']['found'] ?? false;
+        $yearLevelFound = $extracted['year_level']['found'] ?? false;
+        $universityFound = ($extracted['university']['found'] ?? false);
         
-        // Need at least 4 out of 5 checks to pass
-        return $passedChecks >= 4;
+        $supportingPassed = ($courseFound ? 1 : 0) + ($yearLevelFound ? 1 : 0) + ($universityFound ? 1 : 0);
+        
+        // STRICT VALIDATION LOGIC:
+        // 1. BOTH first name AND last name MUST be found (no exceptions)
+        // 2. Document MUST be verified as enrollment form
+        // 3. At least 2 out of 3 supporting checks must pass
+        $passed = $firstNameFound && 
+                  $lastNameFound && 
+                  $isEnrollmentForm && 
+                  ($supportingPassed >= 2);
+        
+        error_log("=== ENROLLMENT FORM VALIDATION ===");
+        error_log("First Name Found: " . ($firstNameFound ? 'YES' : 'NO'));
+        error_log("Last Name Found: " . ($lastNameFound ? 'YES' : 'NO'));
+        error_log("Is Enrollment Form: " . ($isEnrollmentForm ? 'YES' : 'NO'));
+        error_log("Supporting Checks Passed: $supportingPassed/3 (Course: " . ($courseFound ? 'Y' : 'N') . 
+                  ", Year: " . ($yearLevelFound ? 'Y' : 'N') . ", University: " . ($universityFound ? 'Y' : 'N') . ")");
+        error_log("OVERALL VALIDATION: " . ($passed ? 'PASSED ✓' : 'FAILED ✗'));
+        error_log("===================================");
+        
+        return $passed;
     }
     
     /**

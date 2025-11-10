@@ -93,6 +93,7 @@ $distributionFiles = [
     'end_distribution.php',
     'distribution_archives.php',
     'storage_dashboard.php',
+    'file_browser.php',
 ];
 $isDistributionActive = in_array($current, $distributionFiles, true);
 
@@ -140,7 +141,19 @@ $isCMSActive = in_array($current, $cmsFiles, true);
     <?= menu_link('manage_course_mappings.php', 'bi bi-journal-check', 'Course Mappings', is_active('manage_course_mappings.php', $current)); ?>
 
     <!-- Manage Applicants -->
-    <?= menu_link('manage_applicants.php', 'bi bi-people', 'Manage Applicants', is_active('manage_applicants.php', $current)); ?>
+    <?php
+      // Render Manage Applicants with a live badge (updated via JavaScript)
+      $ma_href = 'manage_applicants.php';
+      $ma_active = is_active('manage_applicants.php', $current);
+      $ma_html  = '<li class="nav-item ' . $ma_active . '">';
+      $ma_html .=   '<a href="' . $ma_href . '">';
+      $ma_html .=     '<i class="bi bi-people icon"></i>';
+      $ma_html .=     '<span class="links_name">Manage Applicants</span>';
+      $ma_html .=     '<span id="manage-applicants-badge" class="badge bg-transparent ms-2" role="status" aria-live="polite"></span>';
+      $ma_html .=   '</a>';
+      $ma_html .= '</li>';
+      echo $ma_html;
+    ?>
 
   <!-- Potential Household Matches -->
     <?php
@@ -231,7 +244,7 @@ $isCMSActive = in_array($current, $cmsFiles, true);
             <?php if ($canVerifyStudents): ?>
               <a class="submenu-link <?= is_active('verify_students.php', $current) ? 'active' : '' ?>" href="verify_students.php">
                 <i class="bi bi-person-check me-2"></i> Verify Students
-                <span class="badge bg-info ms-2">Ready</span>
+                <span id="verify-students-badge" class="badge bg-transparent ms-2" role="status" aria-live="polite"></span>
               </a>
             <?php else: ?>
               <a class="submenu-link text-muted" href="#"
@@ -295,6 +308,11 @@ $isCMSActive = in_array($current, $cmsFiles, true);
           <li>
             <a class="submenu-link <?= is_active('storage_dashboard.php', $current) ? 'active' : '' ?>" href="storage_dashboard.php">
               <i class="bi bi-hdd me-2"></i> Storage Dashboard
+            </a>
+          </li>
+          <li>
+            <a class="submenu-link <?= is_active('file_browser.php', $current) ? 'active' : '' ?>" href="file_browser.php">
+              <i class="bi bi-folder2-open me-2"></i> File Browser
             </a>
           </li>
         </ul>
@@ -398,7 +416,10 @@ $isCMSActive = in_array($current, $cmsFiles, true);
       <?= menu_link('audit_logs.php', 'bi bi-shield-lock-fill', 'Audit Trail', is_active('audit_logs.php', $current)); ?>
     <?php endif; ?>
 
-  
+    <!-- Reports & Analytics (super_admin only) -->
+    <?php if ($admin_role === 'super_admin'): ?>
+      <?= menu_link('reports.php', 'bi bi-file-earmark-bar-graph-fill', 'Reports & Analytics', is_active('reports.php', $current)); ?>
+    <?php endif; ?>
 
     <!-- Filler flex spacer -->
     <li class="mt-auto p-0 m-0"></li>
@@ -505,6 +526,142 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   } catch (err) {
     console.debug('review badge init error', err);
+  }
+});
+</script>
+
+<!-- Live badge for Manage Applicants (client-side polling) -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  try {
+    const sidebar = document.getElementById('sidebar');
+    if (!sidebar) return;
+    
+    // Find badge element by ID (already rendered in HTML)
+    const badgeEl = document.getElementById('manage-applicants-badge');
+    if (!badgeEl) return;
+
+    // Polling function to update count
+    const apiUrl = 'manage_applicants.php?api=badge_count';
+    async function updateBadge() {
+      try {
+        const res = await fetch(apiUrl, {cache: 'no-store'});
+        if (!res.ok) return;
+        const data = await res.json();
+        const count = parseInt(data.count || 0, 10) || 0;
+        if (count > 0) {
+          badgeEl.textContent = count;
+          badgeEl.classList.remove('bg-transparent', 'bg-secondary');
+          badgeEl.classList.add(count > 9 ? 'bg-danger' : 'bg-info');
+          badgeEl.setAttribute('aria-label', count + ' pending applicants');
+        } else {
+          badgeEl.textContent = '';
+          badgeEl.classList.remove('bg-danger', 'bg-info');
+          badgeEl.classList.add('bg-transparent');
+          badgeEl.setAttribute('aria-label', '');
+        }
+      } catch (e) {
+        // silent
+      }
+    }
+
+    // initial update shortly after load and then every 90s
+    let badgePollInterval;
+    
+    function startBadgePolling() {
+      if (badgePollInterval) clearInterval(badgePollInterval);
+      badgePollInterval = setInterval(() => {
+        // Only poll if page is visible
+        if (!document.hidden) {
+          updateBadge();
+        }
+      }, 90000);
+    }
+    
+    setTimeout(() => {
+      updateBadge();
+      startBadgePolling();
+    }, 500); // Slightly delayed to avoid race with review badge
+    
+    // Pause polling when page is hidden
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) {
+        updateBadge();
+        startBadgePolling();
+      } else if (badgePollInterval) {
+        clearInterval(badgePollInterval);
+      }
+    });
+  } catch (err) {
+    console.debug('manage applicants badge init error', err);
+  }
+});
+</script>
+
+<!-- Live badge for Verify Students (client-side polling) -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  try {
+    const sidebar = document.getElementById('sidebar');
+    if (!sidebar) return;
+    
+    // Find badge element by ID (already rendered in HTML)
+    const badgeEl = document.getElementById('verify-students-badge');
+    if (!badgeEl) return;
+
+    // Polling function to update count
+    const apiUrl = 'verify_students.php?api=badge_count';
+    async function updateBadge() {
+      try {
+        const res = await fetch(apiUrl, {cache: 'no-store'});
+        if (!res.ok) return;
+        const data = await res.json();
+        const count = parseInt(data.count || 0, 10) || 0;
+        if (count > 0) {
+          badgeEl.textContent = count;
+          badgeEl.classList.remove('bg-transparent', 'bg-secondary');
+          badgeEl.classList.add(count > 9 ? 'bg-danger' : 'bg-success');
+          badgeEl.setAttribute('aria-label', count + ' active students to verify');
+        } else {
+          badgeEl.textContent = '';
+          badgeEl.classList.remove('bg-danger', 'bg-success');
+          badgeEl.classList.add('bg-transparent');
+          badgeEl.setAttribute('aria-label', '');
+        }
+      } catch (e) {
+        // silent
+      }
+    }
+
+    // initial update shortly after load and then every 90s
+    let badgePollInterval;
+    
+    function startBadgePolling() {
+      if (badgePollInterval) clearInterval(badgePollInterval);
+      badgePollInterval = setInterval(() => {
+        // Only poll if page is visible
+        if (!document.hidden) {
+          updateBadge();
+        }
+      }, 90000);
+    }
+    
+    setTimeout(() => {
+      updateBadge();
+      startBadgePolling();
+    }, 700); // Slightly delayed to avoid race with other badges
+    
+    // Pause polling when page is hidden
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) {
+        updateBadge();
+        startBadgePolling();
+      } else if (badgePollInterval) {
+        clearInterval(badgePollInterval);
+      }
+    });
+  } catch (err) {
+    console.debug('verify students badge init error', err);
   }
 });
 </script>
