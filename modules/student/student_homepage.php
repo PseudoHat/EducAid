@@ -16,9 +16,9 @@ include __DIR__ . '/../../includes/student_session_tracker.php';
 // Require year level update before accessing this page
 include __DIR__ . '/../../includes/require_year_level_update.php';
 
-// Fetch student info including last login
+// Fetch student info including last login and mother's maiden name
 $studentId = $_SESSION['student_id'];
-$student_info_query = "SELECT last_login, first_name, last_name, current_year_level, is_graduating, status_academic_year FROM students WHERE student_id = $1";
+$student_info_query = "SELECT last_login, first_name, last_name, current_year_level, is_graduating, status_academic_year, mothers_maiden_name FROM students WHERE student_id = $1";
 $student_info_result = pg_query_params($connection, $student_info_query, [$studentId]);
 $student_info = pg_fetch_assoc($student_info_result);
 

@@ -244,7 +244,7 @@ if (!function_exists('cleanup_old_document_files')) {
         $deletedCount = 0;
         
         // Find all files matching pattern: sessionPrefix + filePattern + any extension
-        $pattern = $uploadDir . $sessionPrefix . $filePattern . '*';
+        $pattern = $uploadDir . DIRECTORY_SEPARATOR . $sessionPrefix . $filePattern . '*';
         $matchingFiles = glob($pattern);
         
         if ($matchingFiles === false) {
@@ -326,7 +326,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processEnrollmentOcr'
     
     // Create session-based filename: sessionPrefix_EAF.extension
     $sessionFileName = $sessionPrefix . '_EAF.' . $fileExtension;
-    $targetPath = $uploadDir . $sessionFileName;
+    $targetPath = $uploadDir . DIRECTORY_SEPARATOR . $sessionFileName;
 
     // FILENAME VALIDATION DISABLED: Allow any filename format
     // Students can now upload files with any name - system will rename automatically
@@ -495,7 +495,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processEnrollmentOcr'
 
         // Save OCR data for later use during registration (with session prefix to prevent conflicts)
         $sessionPrefix = $_SESSION['file_prefix'] ?? 'session';
-        $confidenceFile = $uploadDir . $sessionPrefix . '_enrollment_confidence.json';
+        $confidenceFile = $uploadDir . DIRECTORY_SEPARATOR . $sessionPrefix . '_enrollment_confidence.json';
         $confidenceData = [
             'overall_confidence' => $overallConfidence,
             'detailed_scores' => $verification['confidence_scores'],
@@ -1632,7 +1632,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processIdPictureOcr']
     // Session-based file naming to prevent conflicts
     $fileExt = pathinfo($_FILES['id_picture']['name'], PATHINFO_EXTENSION);
     $fileName = $sessionPrefix . '_idpic.' . $fileExt;
-    $targetPath = $uploadDir . $fileName;
+    $targetPath = $uploadDir . DIRECTORY_SEPARATOR . $fileName;
 
     if (!move_uploaded_file($_FILES['id_picture']['tmp_name'], $targetPath)) {
         echo json_encode(['status' => 'error', 'message' => 'Failed to save uploaded file.']);
@@ -2349,7 +2349,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processLetterOcr'])) 
     // Use session-based file naming
     $fileExt = pathinfo($_FILES['letter_to_mayor']['name'], PATHINFO_EXTENSION);
     $fileName = $sessionPrefix . '_Letter to mayor.' . $fileExt;
-    $targetPath = $uploadDir . $fileName;
+    $targetPath = $uploadDir . DIRECTORY_SEPARATOR . $fileName;
 
     if (!move_uploaded_file($_FILES['letter_to_mayor']['tmp_name'], $targetPath)) {
         json_response(['status' => 'error', 'message' => 'Failed to save uploaded letter file.']);
@@ -2372,7 +2372,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processLetterOcr'])) 
     }
 
     // Perform OCR using Tesseract with optimized settings for letter documents
-    $outputBase = $uploadDir . 'letter_ocr_' . pathinfo($fileName, PATHINFO_FILENAME);
+    $outputBase = $uploadDir . DIRECTORY_SEPARATOR . 'letter_ocr_' . pathinfo($fileName, PATHINFO_FILENAME);
     
     // Check if the file is a PDF and handle accordingly
     $fileExtension = strtolower(pathinfo($targetPath, PATHINFO_EXTENSION));
@@ -2666,7 +2666,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processLetterOcr'])) 
     // Save OCR confidence score to temp file for later use during registration
     // Use session-based filename to prevent conflicts between multiple users
     $sessionPrefix = $_SESSION['file_prefix'] ?? 'session';
-    $confidenceFile = $uploadDir . $sessionPrefix . '_letter_confidence.json';
+    $confidenceFile = $uploadDir . DIRECTORY_SEPARATOR . $sessionPrefix . '_letter_confidence.json';
     $confidenceData = [
         'overall_confidence' => $averageConfidence,
         'detailed_scores' => $verification['confidence_scores'],
@@ -2723,10 +2723,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processCertificateOcr
         json_response(['status' => 'error', 'message' => 'No certificate file uploaded or upload error.']);
     }
 
-    // Use Railway volume path if available, fallback to local path
-    $uploadDir = file_exists('/mnt/assets/uploads/') 
-        ? '/mnt/assets/uploads/temp/Indigency/' 
-        : __DIR__ . '/../../assets/uploads/temp/indigency/';
+    // Initialize FilePathConfig for path management
+    $pathConfig = FilePathConfig::getInstance();
+    $uploadDir = $pathConfig->getTempPath('indigency');
     if (!file_exists($uploadDir)) {
         mkdir($uploadDir, 0777, true);
     }
@@ -2738,7 +2737,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processCertificateOcr
     // Use session-based file naming
     $fileExt = pathinfo($_FILES['certificate_of_indigency']['name'], PATHINFO_EXTENSION);
     $fileName = $sessionPrefix . '_Indigency.' . $fileExt;
-    $targetPath = $uploadDir . $fileName;
+    $targetPath = $uploadDir . DIRECTORY_SEPARATOR . $fileName;
 
     if (!move_uploaded_file($_FILES['certificate_of_indigency']['tmp_name'], $targetPath)) {
         json_response(['status' => 'error', 'message' => 'Failed to save uploaded certificate file.']);
@@ -2761,7 +2760,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processCertificateOcr
     }
 
     // Perform OCR using Tesseract with optimized settings for certificate documents
-    $outputBase = $uploadDir . 'certificate_ocr_' . pathinfo($fileName, PATHINFO_FILENAME);
+    $outputBase = $uploadDir . DIRECTORY_SEPARATOR . 'certificate_ocr_' . pathinfo($fileName, PATHINFO_FILENAME);
     
     // Check if the file is a PDF and handle accordingly
     $fileExtension = strtolower(pathinfo($targetPath, PATHINFO_EXTENSION));
@@ -3049,7 +3048,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processCertificateOcr
     // Save OCR confidence score to temp file for later use during registration
     // Use session-based filename to prevent conflicts between multiple users
     $sessionPrefix = $_SESSION['file_prefix'] ?? 'session';
-    $confidenceFile = $uploadDir . $sessionPrefix . '_certificate_confidence.json';
+    $confidenceFile = $uploadDir . DIRECTORY_SEPARATOR . $sessionPrefix . '_certificate_confidence.json';
     $confidenceData = [
         'overall_confidence' => $averageConfidence,
         'detailed_scores' => $verification['confidence_scores'],
@@ -3110,10 +3109,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processGradesOcr'])) 
             json_response(['status' => 'error', 'message' => 'No grades document uploaded or upload error.']);
         }
 
-        // Use Railway volume path if available, fallback to local path
-        $uploadDir = file_exists('/mnt/assets/uploads/') 
-            ? '/mnt/assets/uploads/temp/Grades/' 
-            : __DIR__ . '/../../assets/uploads/temp/grades/';
+        // Initialize FilePathConfig for path management
+        $pathConfig = FilePathConfig::getInstance();
+        $uploadDir = $pathConfig->getTempPath('grades');
         if (!file_exists($uploadDir)) {
             mkdir($uploadDir, 0777, true);
         }
@@ -3125,7 +3123,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processGradesOcr'])) 
         // Use session-based file naming
         $fileExt = pathinfo($_FILES['grades_document']['name'], PATHINFO_EXTENSION);
         $fileName = $sessionPrefix . '_Grades.' . $fileExt;
-        $targetPath = $uploadDir . $fileName;
+        $targetPath = $uploadDir . DIRECTORY_SEPARATOR . $fileName;
 
         if (!move_uploaded_file($_FILES['grades_document']['tmp_name'], $targetPath)) {
             json_response(['status' => 'error', 'message' => 'Failed to save uploaded grades file.']);
@@ -3443,8 +3441,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processGradesOcr'])) 
     
     // Try to get course from enrollment form confidence JSON (optional)
     $sessionPrefix = $_SESSION['file_prefix'] ?? 'session';
-    $tempEnrollmentDir = '../../assets/uploads/temp/enrollment_forms/';
-    $enrollmentConfidenceFile = $tempEnrollmentDir . $sessionPrefix . '_enrollment_confidence.json';
+    $pathConfig = FilePathConfig::getInstance();
+    $tempEnrollmentDir = $pathConfig->getTempPath('enrollment_forms');
+    $enrollmentConfidenceFile = $tempEnrollmentDir . DIRECTORY_SEPARATOR . $sessionPrefix . '_enrollment_confidence.json';
     
     if (file_exists($enrollmentConfidenceFile)) {
         $enrollmentData = json_decode(file_get_contents($enrollmentConfidenceFile), true);
@@ -4825,14 +4824,19 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['register'])) {
 
     // Use academic year from the slot the student registered under
     // This ensures the student's status is tracked to the correct enrollment period
-    $currentAcademicYear = $slotAcademicYear ?? '';
+    $currentAcademicYear = !empty($slotAcademicYear) ? $slotAcademicYear : null;
     
     // If slot doesn't have academic year (shouldn't happen), fall back to current academic year
-    if (empty($currentAcademicYear)) {
+    if ($currentAcademicYear === null || $currentAcademicYear === '') {
         $academicYearResult = pg_query($connection, "SELECT year_code FROM academic_years WHERE is_current = TRUE LIMIT 1");
         if ($academicYearRow = pg_fetch_assoc($academicYearResult)) {
             $currentAcademicYear = $academicYearRow['year_code'];
         }
+    }
+    
+    // Ensure we have a valid academic year or use NULL (not empty string)
+    if ($currentAcademicYear === '') {
+        $currentAcademicYear = null;
     }
 
     // Validate required fields (mothers_maiden_name can be NULL for backward compatibility, but should be provided)
@@ -5033,6 +5037,16 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['register'])) {
     $slot_id = $activeSlot ? $activeSlot['slot_id'] : null;
     $slotAcademicYear = $activeSlot ? $activeSlot['academic_year'] : null;
     $slotSemester = $activeSlot ? $activeSlot['semester'] : null;
+    
+    // CRITICAL: Validate that slot has academic year configured
+    // This prevents database errors from empty academic year values
+    if ($slot_id && (empty($slotAcademicYear) || $slotAcademicYear === '')) {
+        error_log("REGISTRATION ERROR: Slot $slot_id has no academic year configured. This should never happen.");
+        json_response([
+            'status' => 'error',
+            'message' => 'System configuration error: The registration slot is missing academic year information. Please contact the administrator to resolve this issue.'
+        ]);
+    }
 
     // Get school student ID from form
     $school_student_id = trim($_POST['school_student_id'] ?? '');

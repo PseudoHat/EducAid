@@ -265,6 +265,62 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_mobile'])) {
     header("Location: student_settings.php"); exit;
 }
 
+// --------- Handle Update Mother's Maiden Name Submission ----------
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_mothers_maiden_name'])) {
+    $mothers_maiden_name = trim($_POST['mothers_maiden_name'] ?? '');
+    
+    // Validate input
+    if (empty($mothers_maiden_name)) {
+        $_SESSION['profile_flash'] = 'Mother\'s maiden name cannot be empty.';
+        $_SESSION['profile_flash_type'] = 'error';
+        header("Location: student_settings.php");
+        exit;
+    }
+    
+    // Validate format (only letters, spaces, hyphens, apostrophes)
+    if (!preg_match("/^[A-Za-zÑñ\s\-\']+$/", $mothers_maiden_name)) {
+        $_SESSION['profile_flash'] = 'Mother\'s maiden name can only contain letters, spaces, hyphens, and apostrophes.';
+        $_SESSION['profile_flash_type'] = 'error';
+        header("Location: student_settings.php");
+        exit;
+    }
+    
+    // Capitalize properly
+    $mothers_maiden_name = ucwords(strtolower($mothers_maiden_name));
+    
+    // Check if same as student's surname (requires admin review)
+    $studentRes = pg_query_params($connection, "SELECT last_name FROM students WHERE student_id = $1", [$student_id]);
+    $studentRow = pg_fetch_assoc($studentRes);
+    $admin_review_required = false;
+    
+    if ($studentRow && strcasecmp($mothers_maiden_name, $studentRow['last_name']) === 0) {
+        $admin_review_required = true;
+    }
+    
+    // Update the database
+    $updateQuery = "UPDATE students SET mothers_maiden_name = $1, admin_review_required = $2 WHERE student_id = $3";
+    $result = pg_query_params($connection, $updateQuery, [$mothers_maiden_name, $admin_review_required ? 'true' : 'false', $student_id]);
+    
+    if ($result) {
+        $successMsg = $admin_review_required 
+            ? 'Mother\'s maiden name updated successfully. Note: Your profile has been flagged for admin review since the maiden name matches your surname.'
+            : 'Mother\'s maiden name updated successfully.';
+        
+        $_SESSION['profile_flash'] = $successMsg;
+        $_SESSION['profile_flash_type'] = 'success';
+        
+        // Send notification
+        $notifMsg = 'Your mother\'s maiden name has been updated in your profile.';
+        pg_query_params($connection, "INSERT INTO notifications (student_id, message) VALUES ($1, $2)", [$student_id, $notifMsg]);
+    } else {
+        $_SESSION['profile_flash'] = 'Failed to update mother\'s maiden name. Please try again.';
+        $_SESSION['profile_flash_type'] = 'error';
+    }
+    
+    header("Location: student_settings.php#account");
+    exit;
+}
+
 // --------- Handle Change Password Submission ----------
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_password'])) {
     $currentPwd = $_POST['current_password'] ?? '';
@@ -321,7 +377,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_password'])) {
 }
 
 // Fetch student data
-$stuRes = pg_query($connection, "SELECT first_name, middle_name, last_name, bdate, email, mobile FROM students WHERE student_id = '" . pg_escape_string($connection, $student_id) . "'");
+$stuRes = pg_query($connection, "SELECT first_name, middle_name, last_name, mothers_maiden_name, bdate, email, mobile FROM students WHERE student_id = '" . pg_escape_string($connection, $student_id) . "'");
 $student = pg_fetch_assoc($stuRes);
 
 // Get student info for header dropdown
@@ -1115,6 +1171,34 @@ unset($_SESSION['profile_flash'], $_SESSION['profile_flash_type']);
                     </div>
                   </div>
                   
+                  <div class="setting-item <?php echo empty($student['mothers_maiden_name']) ? 'border-warning' : ''; ?>">
+                    <div class="setting-info">
+                      <div class="setting-label">
+                        Mother's Maiden Name 
+                        <?php if (empty($student['mothers_maiden_name'])): ?>
+                          <span class="badge bg-warning text-dark ms-2">Required</span>
+                        <?php endif; ?>
+                      </div>
+                      <div class="setting-value">
+                        <?php if (!empty($student['mothers_maiden_name'])): ?>
+                          <?php echo htmlspecialchars($student['mothers_maiden_name']); ?>
+                        <?php else: ?>
+                          <span class="text-muted">Not provided</span>
+                        <?php endif; ?>
+                      </div>
+                      <div class="setting-description">
+                        <i class="bi bi-shield-check me-1"></i>
+                        Mother's surname before marriage - helps prevent household duplicate registrations
+                      </div>
+                    </div>
+                    <div class="setting-actions">
+                      <button type="button" class="btn btn-sm <?php echo empty($student['mothers_maiden_name']) ? 'btn-warning' : 'btn-outline-primary'; ?>" 
+                              data-bs-toggle="modal" data-bs-target="#updateMothersMaidenNameModal">
+                        <i class="bi bi-pencil me-1"></i><?php echo empty($student['mothers_maiden_name']) ? 'Add' : 'Edit'; ?>
+                      </button>
+                    </div>
+                  </div>
+                  
                   <div class="setting-item">
                     <div class="setting-info">
                       <div class="setting-label">Date of Birth</div>
@@ -1457,6 +1541,59 @@ unset($_SESSION['profile_flash'], $_SESSION['profile_flash_type']);
             </form>
           </div>
         </div>
+        
+        <!-- Update Mother's Maiden Name Modal -->
+        <div class="modal fade" id="updateMothersMaidenNameModal" tabindex="-1" data-bs-backdrop="false">
+          <div class="modal-dialog modal-dialog-centered">
+            <form id="mothersMaidenNameForm" method="POST" class="modal-content">
+              <div class="modal-header">
+                <h5 class="modal-title">
+                  <i class="bi bi-person-hearts me-2"></i><?php echo empty($student['mothers_maiden_name']) ? 'Add' : 'Update'; ?> Mother's Maiden Name
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+              </div>
+              <div class="modal-body">
+                <div class="alert alert-info">
+                  <i class="bi bi-info-circle me-2"></i>
+                  <strong>Why we need this:</strong> Your mother's maiden name (her surname before marriage) helps us prevent duplicate household registrations and ensures only one student per household receives assistance.
+                </div>
+                
+                <div class="mb-3">
+                  <label class="form-label">Mother's Maiden Name <span class="text-danger">*</span></label>
+                  <input 
+                    type="text" 
+                    class="form-control" 
+                    name="mothers_maiden_name" 
+                    id="mothersMaidenNameInput"
+                    value="<?php echo htmlspecialchars($student['mothers_maiden_name'] ?? ''); ?>"
+                    placeholder="Enter mother's surname before marriage"
+                    required
+                    maxlength="100"
+                    pattern="[A-Za-zÑñ\s\-\']+"
+                    title="Only letters, spaces, hyphens, and apostrophes allowed"
+                  >
+                  <div class="form-text">
+                    <i class="bi bi-lightbulb me-1"></i>
+                    Example: If your mother's full name before marriage was "Maria Santos", enter "Santos"
+                  </div>
+                </div>
+                
+                <div class="alert alert-warning" id="sameSurnameWarning" style="display: none;">
+                  <i class="bi bi-exclamation-triangle me-2"></i>
+                  <strong>Notice:</strong> The maiden name matches your surname. This may require admin verification.
+                </div>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                  Cancel
+                </button>
+                <button type="submit" name="update_mothers_maiden_name" class="btn btn-primary">
+                  <i class="bi bi-save me-2"></i>Save
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -1686,6 +1823,32 @@ unset($_SESSION['profile_flash'], $_SESSION['profile_flash_type']);
       if (enableEl && freqEl && saveBtn) {
         loadPrefs();
         saveBtn.addEventListener('click', savePrefs);
+      }
+    });
+    
+    // Mother's Maiden Name validation - warn if matches student surname
+    document.addEventListener('DOMContentLoaded', function() {
+      const maidenNameInput = document.getElementById('mothersMaidenNameInput');
+      const sameNameWarning = document.getElementById('sameSurnameWarning');
+      const studentLastName = '<?php echo addslashes($student['last_name']); ?>';
+      
+      if (maidenNameInput && sameNameWarning) {
+        maidenNameInput.addEventListener('input', function() {
+          const enteredName = this.value.trim().toLowerCase();
+          const surname = studentLastName.toLowerCase();
+          
+          if (enteredName === surname) {
+            sameNameWarning.style.display = 'block';
+          } else {
+            sameNameWarning.style.display = 'none';
+          }
+        });
+        
+        // Check on load if already has value
+        const currentValue = maidenNameInput.value.trim().toLowerCase();
+        if (currentValue === studentLastName.toLowerCase()) {
+          sameNameWarning.style.display = 'block';
+        }
       }
     });
   </script>
