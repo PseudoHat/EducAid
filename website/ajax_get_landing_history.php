@@ -53,12 +53,60 @@ if ($block !== '') { $clauses[] = 'block_key=$'.(count($params)+1); $params[] = 
 if ($actionType !== '') { $clauses[] = 'action_type=$'.(count($params)+1); $params[] = $actionType; }
 if ($cursor !== null && $cursor > 0) { $clauses[] = 'audit_id < $'.(count($params)+1); $params[] = $cursor; }
 $where = implode(' AND ', $clauses);
-$sql = "SELECT audit_id, block_key, action_type, created_at, new_html, old_html, new_text_color, old_text_color, new_bg_color, old_bg_color
+$sql = "SELECT audit_id, block_key, action_type, created_at, new_html, old_html, new_text_color, old_text_color, new_bg_color, old_bg_color, admin_username
         FROM landing_content_audit
         WHERE $where
         ORDER BY audit_id DESC
         LIMIT " . ($limit + 1);
 $res = $params ? @pg_query_params($connection, $sql, $params) : @pg_query($connection, $sql);
+
+// Check for database errors
+if (!$res) {
+  $error = pg_last_error($connection);
+  error_log("Landing history query failed: " . $error);
+  respond(false, 'Database error: ' . $error);
+}
+// Generate a summary of what changed
+function generate_summary($row) {
+  $action = $row['action_type'];
+  $changes = [];
+  
+  // Check content changes
+  if ($action === 'update') {
+    $old_text = strip_tags($row['old_html'] ?? '');
+    $new_text = strip_tags($row['new_html'] ?? '');
+    
+    if ($old_text !== $new_text) {
+      $old_words = str_word_count($old_text);
+      $new_words = str_word_count($new_text);
+      $diff = $new_words - $old_words;
+      
+      if ($diff > 0) {
+        $changes[] = "Added $diff words";
+      } elseif ($diff < 0) {
+        $changes[] = "Removed " . abs($diff) . " words";
+      } else {
+        $changes[] = "Modified text";
+      }
+    }
+    
+    // Check color changes
+    if (($row['old_text_color'] ?? '') !== ($row['new_text_color'] ?? '')) {
+      $changes[] = "Changed text color";
+    }
+    if (($row['old_bg_color'] ?? '') !== ($row['new_bg_color'] ?? '')) {
+      $changes[] = "Changed background";
+    }
+    
+    return !empty($changes) ? implode(', ', $changes) : 'Updated content';
+  }
+  
+  if ($action === 'reset_all') return 'Reset all content to default';
+  if ($action === 'rollback') return 'Rolled back to previous version';
+  
+  return 'Modified';
+}
+
 $has_more = false;
 if ($res) {
   while ($row = pg_fetch_assoc($res)) {
@@ -73,7 +121,9 @@ if ($res) {
       'created_at' => $row['created_at'],
       'html' => lp_hist_sanitize($content_html),
       'text_color' => $text_color,
-      'bg_color' => $bg_color
+      'bg_color' => $bg_color,
+      'admin_username' => $row['admin_username'] ?? 'System',
+      'summary' => generate_summary($row)
     ];
   }
 }

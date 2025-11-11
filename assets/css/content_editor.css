@@ -347,6 +347,122 @@ body.lp-editing * {
   user-select: text;
 }
 
+/* ============================================
+   History Modal
+   ============================================ */
+.lp-history-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 99999;
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+
+.lp-history-modal.show {
+  display: flex;
+}
+
+.lp-hist-backdrop {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(2px);
+}
+
+.lp-hist-dialog {
+  position: relative;
+  z-index: 1;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  max-width: 90vw;
+  width: 1000px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  animation: slideIn 0.2s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.lp-hist-header {
+  padding: 1rem 1.25rem;
+  border-bottom: 2px solid #e2e8f0;
+  background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+  color: white;
+  border-radius: 12px 12px 0 0;
+}
+
+.lp-hist-body {
+  padding: 1.25rem;
+  overflow: auto;
+  flex: 1;
+  max-height: 70vh;
+}
+
+.lp-hist-footer {
+  padding: 0.75rem 1.25rem;
+  border-top: 1px solid #e2e8f0;
+  background: #f8fafc;
+  border-radius: 0 0 12px 12px;
+}
+
+/* Accordion items */
+.lp-hist-body .accordion-item {
+  border: 1px solid #e2e8f0;
+  margin-bottom: 0.75rem;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.lp-hist-body .accordion-button {
+  font-size: 0.9rem;
+  padding: 1rem 1.25rem;
+  background: #f8fafc;
+}
+
+.lp-hist-body .accordion-button:not(.collapsed) {
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+  color: #1e40af;
+  box-shadow: none;
+}
+
+.lp-hist-body .accordion-button:focus {
+  box-shadow: none;
+  border-color: #e2e8f0;
+}
+
+.lp-hist-body .accordion-body {
+  padding: 0.5rem 1.25rem 1rem;
+  background: #ffffff;
+}
+
+.lp-hist-body .list-group-item {
+  border: none;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 0.85rem;
+}
+
+.lp-hist-body .list-group-item:last-child {
+  border-bottom: none;
+}
+
 body.lp-editing img,
 body.lp-editing button,
 body.lp-editing a:not([data-lp-key]) {

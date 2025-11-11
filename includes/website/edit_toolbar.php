@@ -198,14 +198,9 @@ if (!$toolbar_config['exit_url']) {
 <div id="lp-edit-toolbar" class="lp-edit-toolbar shadow-sm">
     <div class="lp-toolbar-header mb-2">
         <strong class="small mb-0 lp-toolbar-title"><?php echo htmlspecialchars($toolbar_config['page_title']); ?></strong>
-        <div class="d-flex gap-1">
-            <button id="lp-help-btn" type="button" class="lp-help-btn" aria-label="Help" title="How to use this editor">
-                <i class="bi bi-question-circle-fill"></i>
-            </button>
-            <button id="lp-lock-toggle" type="button" class="lp-lock-toggle" data-locked="0" aria-label="Lock toolbar" title="Lock toolbar">
-                <i class="bi bi-lock-fill"></i>
-            </button>
-        </div>
+        <button id="lp-lock-toggle" type="button" class="lp-lock-toggle" data-locked="0" aria-label="Lock toolbar" title="Lock toolbar">
+            <i class="bi bi-lock-fill"></i>
+        </button>
     </div>
     
     <div class="mb-2">
@@ -231,14 +226,8 @@ if (!$toolbar_config['exit_url']) {
         </div>
     </div>
     
-    <div class="lp-toolbar-section">Block Controls</div>
-    <div class="d-flex gap-2 mb-2">
-        <?php if ($toolbar_config['show_reset']): ?>
-        <button id="lp-reset-btn" class="btn btn-sm btn-outline-warning w-100" disabled>
-            <i class="bi bi-arrow-counterclockwise me-1"></i>Reset Block
-        </button>
-        <?php endif; ?>
-        
+    <div class="lp-toolbar-section">View Controls</div>
+    <div class="mb-2">
         <button id="lp-highlight-toggle" class="btn btn-sm btn-outline-primary w-100" data-active="1">
             <i class="bi bi-bounding-box-circles me-1"></i>Hide Boxes
         </button>
@@ -286,6 +275,10 @@ if (!$toolbar_config['exit_url']) {
             <i class="bi bi-x-lg"></i>
         </a>
         <?php endif; ?>
+        
+        <button id="lp-help-btn" type="button" class="btn btn-sm btn-outline-info w-100 mt-2" title="How to use this editor">
+            <i class="bi bi-question-circle-fill me-1"></i>Help
+        </button>
     </div>
     
     <div class="text-end">
@@ -654,13 +647,11 @@ if (!$toolbar_config['exit_url']) {
                 <ul class="mb-4">
                     <li><strong>Text Color:</strong> Changes the color of the text in the selected element</li>
                     <li><strong>Background Color:</strong> Changes the background color of the selected element</li>
-                    <li><strong>Hide Boxes:</strong> Toggles the blue outlines on/off for a cleaner view</li>
                 </ul>
 
-                <h6 class="text-primary mb-3"><i class="bi bi-tools me-2"></i>Block Controls</h6>
+                <h6 class="text-primary mb-3"><i class="bi bi-eye me-2"></i>View Controls</h6>
                 <ul class="mb-4">
-                    <li><strong>Reset Block:</strong> Restores the currently selected element to its original content (before any edits)</li>
-                    <li><strong>Hide Boxes:</strong> Toggles visibility of the blue edit outlines around all editable elements</li>
+                    <li><strong>Hide Boxes:</strong> Toggles the blue edit outlines on/off for a cleaner view while editing</li>
                 </ul>
 
                 <h6 class="text-primary mb-3"><i class="bi bi-floppy me-2"></i>Page Actions</h6>
@@ -686,8 +677,9 @@ if (!$toolbar_config['exit_url']) {
                     <li>Changes are <strong>not permanent</strong> until you click Save or Save All</li>
                     <li>You can <strong>drag the toolbar</strong> by its header to reposition it</li>
                     <li><strong>Double-click the toolbar header</strong> to reset its position</li>
-                    <li>Use <strong>Reset Block</strong> if you want to undo changes to just one element</li>
+                    <li>Use <strong>History</strong> to view past versions and rollback if needed</li>
                     <li>The <strong>lock icon</strong> toggles whether the toolbar can be moved</li>
+                    <li>Toggle <strong>Hide Boxes</strong> for a cleaner view while editing</li>
                     <li>Always <strong>test your changes</strong> by viewing the public page before closing the editor</li>
                 </ul>
             </div>

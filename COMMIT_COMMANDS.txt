@@ -1,0 +1,25 @@
+git add includes/website/edit_toolbar.php assets/js/website/content_editor.js assets/css/content_editor.css website/ajax_get_landing_history.php website/ajax_get_about_history.php
+
+git commit -m "feat: Add CMS help modal and redesign history as user summary accordion
+
+Editor Improvements:
+- Add help button with comprehensive usage guide modal
+- Remove Reset Block button (simplified workflow)
+- Fix Hide Boxes toggle (now uses CSS class, not inline styles)
+- Rename 'Block Controls' to 'View Controls'
+
+History Modal Redesign:
+- Redesign as user-grouped accordion instead of long list
+- Show summary stats per user (edits, blocks, actions, timestamp)
+- Remove rollback/preview features (safer, simpler)
+- Add admin username and change summaries to backend
+- Auto-expand first user section for convenience
+
+Bug Fixes:
+- Add missing History modal CSS (was invisible)
+- Fix Hide Boxes toggle CSS !important override issue
+- Update help documentation
+
+Files: edit_toolbar.php, content_editor.js/css, ajax_get_*_history.php"
+
+git push origin main

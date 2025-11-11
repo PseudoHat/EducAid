@@ -89,39 +89,83 @@
 
     // History modal module
     const Hist=(function(){
-      let modal,listEl,filter,blockSel,limitSel,actionSel,closeBtn,loadBtn,preview,applyBtn,cancelBtn,notice,live=null;
+      let modal,listEl,closeBtn,loadBtn;
       function ensure(){
         if(modal) return;
   modal=document.createElement('div');
   modal.className='lp-history-modal';
-  modal.innerHTML=`<div class="lp-hist-backdrop"></div><div class="lp-hist-dialog"><div class="lp-hist-header d-flex justify-content-between align-items-center"><strong class="small mb-0">${esc(historyHeading)}</strong><div class="d-flex gap-2"><button type="button" class="btn btn-sm btn-outline-primary" data-load><i class="bi bi-arrow-repeat"></i></button><button type="button" class="btn btn-sm btn-outline-secondary" data-close><i class="bi bi-x"></i></button></div></div><div class="lp-hist-body"><div class="row g-2 mb-2"><div class="col-4"><input data-filter type="text" class="form-control form-control-sm" placeholder="Filter key"/></div><div class="col-3"><select data-limit class="form-select form-select-sm"><option value="25">25</option><option value="50" selected>50</option><option value="100">100</option></select></div><div class="col-3"><select data-block class="form-select form-select-sm"><option value="">All Blocks</option></select></div><div class="col-2"><select data-action class="form-select form-select-sm"><option value="">All</option><option value="update">Update</option><option value="reset_all">Reset</option><option value="rollback">Rollback</option></select></div></div><div class="d-flex gap-2"><div style="flex:1;min-height:250px;max-height:330px;overflow:auto;border:1px solid #e2e8f0;border-radius:8px;padding:.45rem;background:#fff;font-size:.7rem" data-list></div><div style="flex:1;display:flex;flex-direction:column;gap:.4rem"><div style="flex:1;border:1px solid #e2e8f0;border-radius:8px;padding:.5rem;background:#f8fafc;overflow:auto" data-preview>(select)</div><div class="d-flex gap-2"><button class="btn btn-sm btn-outline-success w-100" data-apply disabled><i class="bi bi-eye"></i> Preview</button><button class="btn btn-sm btn-outline-warning w-100" data-cancel disabled><i class="bi bi-x"></i> Cancel</button></div><div class="small text-warning-emphasis" data-notice style="display:none;">Preview active. Cancel to revert.</div></div></div></div><div class="lp-hist-footer small text-end text-muted">Double‑click preview to apply rollback permanently.</div></div>`;
+  modal.innerHTML=`<div class="lp-hist-backdrop"></div><div class="lp-hist-dialog"><div class="lp-hist-header d-flex justify-content-between align-items-center"><strong class="small mb-0">${esc(historyHeading)}</strong><div class="d-flex gap-2"><button type="button" class="btn btn-sm btn-outline-primary" data-load><i class="bi bi-arrow-repeat"></i></button><button type="button" class="btn btn-sm btn-outline-secondary" data-close><i class="bi bi-x"></i></button></div></div><div class="lp-hist-body"><div class="accordion" data-list></div></div><div class="lp-hist-footer small text-muted"><i class="bi bi-info-circle"></i> Expand each section to see what changes were made</div></div>`;
         document.body.appendChild(modal);
-        listEl=qs('[data-list]',modal); filter=qs('[data-filter]',modal); blockSel=qs('[data-block]',modal); limitSel=qs('[data-limit]',modal); actionSel=qs('[data-action]',modal); closeBtn=qs('[data-close]',modal); loadBtn=qs('[data-load]',modal); preview=qs('[data-preview]',modal); applyBtn=qs('[data-apply]',modal); cancelBtn=qs('[data-cancel]',modal); notice=qs('[data-notice]',modal);
-        closeBtn.addEventListener('click',hide); modal.querySelector('.lp-hist-backdrop').addEventListener('click',hide); loadBtn.addEventListener('click',load); filter.addEventListener('input',applyFilter); actionSel.addEventListener('change',load);
-        listEl.addEventListener('click',e=>{ const item=e.target.closest('.lp-hist-item'); if(!item) return; qsa('.lp-hist-item',listEl).forEach(x=>x.classList.remove('active')); item.classList.add('active'); preview.innerHTML=item._html||'(empty)'; preview.style.color=item._textColor||''; preview.style.backgroundColor=item._bgColor||'#f8fafc'; applyBtn.disabled=false; applyBtn._sel=item; });
-        applyBtn.addEventListener('click',()=>{ const it=applyBtn._sel; if(!it) return; const key=it.getAttribute('data-key'); const target=document.querySelector('[data-lp-key="'+CSS.escape(key)+'"]'); if(!target){ alert('Block not on page'); return; } if(live && live.key!==key) revert(); if(!live){ live={ key, el:target, originalHtml:target.innerHTML, originalTextColor:target.style.color, originalBgColor:target.style.backgroundColor }; } target.innerHTML=it._html||''; target.style.color=it._textColor||''; target.style.backgroundColor=it._bgColor||''; notice.style.display='block'; cancelBtn.disabled=false; });
-        cancelBtn.addEventListener('click',()=>revert());
-        if(cfg.history.rollbackEndpoint){ preview.addEventListener('dblclick', async ()=>{ const sel=applyBtn._sel; if(!sel) return; if(!confirm('Apply rollback permanently?')) return; try{ const r=await fetchWithCSRF(cfg.history.rollbackEndpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({audit_id: sel.getAttribute('data-id')})}); const d=await r.json(); if(!d.success) throw new Error(d.message||'Rollback failed'); if(cfg.refreshAfterSave) await cfg.refreshAfterSave([d.block_key]); alert('Rollback applied'); }catch(err){ alert('Rollback error: '+err.message); } }); }
+        listEl=qs('[data-list]',modal); closeBtn=qs('[data-close]',modal); loadBtn=qs('[data-load]',modal);
+        closeBtn.addEventListener('click',hide); modal.querySelector('.lp-hist-backdrop').addEventListener('click',hide); loadBtn.addEventListener('click',load);
       }
-      function revert(){ if(!live) return; const {el,originalHtml,originalTextColor,originalBgColor}=live; el.innerHTML=originalHtml; el.style.color=originalTextColor; el.style.backgroundColor=originalBgColor; live=null; cancelBtn.disabled=true; applyBtn.disabled=!applyBtn._sel; notice.style.display='none'; }
       async function load(){
-        listEl.innerHTML='<div class="text-muted small">Loading...</div>';
-        const block=blockSel.value.trim(); const limit=limitSel.value; const action=actionSel.value.trim();
+        listEl.innerHTML='<div class="text-center text-muted p-3"><div class="spinner-border spinner-border-sm me-2"></div>Loading history...</div>';
         try{
-          const r=await fetchWithCSRF(cfg.history.fetchEndpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({block,limit,action_type:action})});
+          const r=await fetchWithCSRF(cfg.history.fetchEndpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({})});
           const d=await r.json();
-          if(!d.success){ listEl.innerHTML='<div class="text-danger small">Failed</div>'; return; }
+          if(!d.success){ listEl.innerHTML='<div class="alert alert-danger small">Failed to load history</div>'; return; }
           const recs=d.records||[];
-          if(blockSel.options.length===1){ const keys=[...new Set(recs.map(r=>r.block_key))].sort(); keys.forEach(k=>{ const o=document.createElement('option'); o.value=k; o.textContent=k; blockSel.appendChild(o); }); }
+          if(!recs.length){ listEl.innerHTML='<div class="alert alert-info small">No edit history found</div>'; return; }
+          
+          // Group by user
+          const byUser={};
+          recs.forEach(r=>{
+            const user=r.admin_username||'System';
+            if(!byUser[user]) byUser[user]={username:user,edits:[],blocks:new Set(),actions:{}};
+            byUser[user].edits.push(r);
+            byUser[user].blocks.add(r.block_key);
+            byUser[user].actions[r.action_type]=(byUser[user].actions[r.action_type]||0)+1;
+          });
+          
+          // Build accordion
           listEl.innerHTML='';
-          if(!recs.length){ listEl.innerHTML='<div class="text-muted small">No records</div>'; return; }
-          recs.forEach(r=>{ const div=document.createElement('div'); div.className='lp-hist-item'; div.setAttribute('data-id',r.audit_id); div.setAttribute('data-key',r.block_key); div._html=r.html; div._textColor=r.text_color; div._bgColor=r.bg_color; div.innerHTML=`<div class=\"d-flex justify-content-between\"><span class=\"text-primary\">${esc(r.block_key)}</span><span class=\"badge text-bg-light border\">${esc(r.action_type)}</span></div><div class=\"text-muted small\">${esc(r.created_at)}</div>`; listEl.appendChild(div); });
-          applyFilter();
-        }catch(err){ listEl.innerHTML='<div class="text-danger small">Error</div>'; }
+          let idx=0;
+          Object.values(byUser).forEach(userData=>{
+            const totalEdits=userData.edits.length;
+            const uniqueBlocks=userData.blocks.size;
+            const actionSummary=Object.entries(userData.actions).map(([action,count])=>`${count} ${action}`).join(', ');
+            const latestEdit=userData.edits[0].created_at;
+            
+            const accordionItem=document.createElement('div');
+            accordionItem.className='accordion-item';
+            accordionItem.innerHTML=`
+              <h2 class="accordion-header">
+                <button class="accordion-button ${idx>0?'collapsed':''}" type="button" data-bs-toggle="collapse" data-bs-target="#histUser${idx}">
+                  <div class="w-100">
+                    <div class="d-flex justify-content-between align-items-center">
+                      <strong><i class="bi bi-person-circle me-2"></i>${esc(userData.username)}</strong>
+                      <span class="badge bg-primary">${totalEdits} ${totalEdits===1?'edit':'edits'}</span>
+                    </div>
+                    <small class="text-muted d-block mt-1">
+                      Edited ${uniqueBlocks} ${uniqueBlocks===1?'block':'blocks'} • ${actionSummary} • Last: ${esc(latestEdit)}
+                    </small>
+                  </div>
+                </button>
+              </h2>
+              <div id="histUser${idx}" class="accordion-collapse collapse ${idx===0?'show':''}" data-bs-parent="[data-list]">
+                <div class="accordion-body">
+                  <ul class="list-group list-group-flush">
+                    ${userData.edits.map(edit=>`
+                      <li class="list-group-item px-0 py-2">
+                        <div class="d-flex justify-content-between">
+                          <span class="fw-semibold text-primary">${esc(edit.block_key)}</span>
+                          <small class="text-muted">${esc(edit.created_at)}</small>
+                        </div>
+                        <small class="text-muted">${esc(edit.summary||'Modified content')}</small>
+                      </li>
+                    `).join('')}
+                  </ul>
+                </div>
+              </div>
+            `;
+            listEl.appendChild(accordionItem);
+            idx++;
+          });
+        }catch(err){ listEl.innerHTML='<div class="alert alert-danger small">Error loading history</div>'; console.error(err); }
       }
-      function applyFilter(){ const term=filter.value.toLowerCase(); qsa('.lp-hist-item',listEl).forEach(it=>{ const key=it.getAttribute('data-key').toLowerCase(); it.style.display= term && !key.includes(term)?'none':'block'; }); }
       function show(){ ensure(); modal.classList.add('show'); load(); }
-      function hide(){ if(modal){ modal.classList.remove('show'); if(live) revert(); } }
+      function hide(){ if(modal) modal.classList.remove('show'); }
       return { open: show, close: hide };
     })();
 
