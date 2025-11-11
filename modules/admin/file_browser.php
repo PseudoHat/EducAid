@@ -380,7 +380,7 @@ $pageTitle = 'Railway Volume Browser';
         .home-section {
             position: relative;
             min-height: 100vh;
-            left: 250px;
+            margin-left: 250px;
             width: calc(100% - 250px);
             /* transition removed - animations are driven by JS requestAnimationFrame */
             background: #f8f9fa;
@@ -388,7 +388,7 @@ $pageTitle = 'Railway Volume Browser';
         }
         
         .sidebar.close ~ .home-section {
-            left: 70px;
+            margin-left: 70px;
             width: calc(100% - 70px);
         }
         
@@ -398,7 +398,7 @@ $pageTitle = 'Railway Volume Browser';
             }
             
             .home-section {
-                left: 0 !important;
+                margin-left: 0 !important;
                 width: 100% !important;
             }
         }
