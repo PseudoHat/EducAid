@@ -45,20 +45,33 @@ $connString = sprintf(
     $dbPass
 );
 
-error_log(sprintf('Attempting DB connection: host=%s port=%s dbname=%s user=%s', $dbHost, $dbPort, $dbName, $dbUser));
-
 // Make connection globally accessible
 global $connection;
-$connection = @pg_connect($connString);
 
-if (!$connection) {
-    error_log(sprintf('Database connection failed: host=%s port=%s dbname=%s user=%s', $dbHost, $dbPort, $dbName, $dbUser));
-    error_log('Last PostgreSQL error: ' . (function_exists('pg_last_error') ? pg_last_error() : 'N/A'));
-    // Set connection to null explicitly for safety checks
-    $connection = null;
-    http_response_code(500);
-    die('Database connection failed. Check server logs.');
+// Connection guard: Only create connection if it doesn't exist or is invalid
+// Compatible with PHP 7 (resource) and PHP 8 (PgSql\Connection object)
+$needsConnection = !isset($connection) || 
+                   $connection === null || 
+                   $connection === false ||
+                   (@pg_connection_status($connection) !== PGSQL_CONNECTION_OK);
+
+if ($needsConnection) {
+    error_log(sprintf('Attempting DB connection: host=%s port=%s dbname=%s user=%s', $dbHost, $dbPort, $dbName, $dbUser));
+    
+    $connection = @pg_connect($connString);
+
+    if (!$connection) {
+        error_log(sprintf('Database connection failed: host=%s port=%s dbname=%s user=%s', $dbHost, $dbPort, $dbName, $dbUser));
+        error_log('Last PostgreSQL error: ' . (function_exists('pg_last_error') ? pg_last_error() : 'N/A'));
+        // Set connection to null explicitly for safety checks
+        $connection = null;
+        http_response_code(500);
+        die('Database connection failed. Check server logs.');
+    }
+
+    // Log successful connection (no sensitive data)
+    error_log(sprintf('Database connected: host=%s port=%s dbname=%s', $dbHost, $dbPort, $dbName));
+} else {
+    // Reusing existing connection
+    error_log('Reusing existing database connection');
 }
-
-// Log successful connection (no sensitive data)
-error_log(sprintf('Database connected: host=%s port=%s dbname=%s', $dbHost, $dbPort, $dbName));
