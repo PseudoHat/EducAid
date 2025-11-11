@@ -1503,7 +1503,8 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
         
         #recaptchaModal .modal-dialog {
             position: relative;
-            max-width: 450px !important;
+            width: auto !important;
+            max-width: min(92vw, 460px) !important;
             margin: 1.75rem auto !important;
             z-index: 10501 !important;
         }
@@ -1515,7 +1516,6 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
             background: #ffffff !important;
             position: relative;
             z-index: 10502;
-            width: 100%;
         }
         
         #recaptchaModal .modal-header {
@@ -1539,6 +1539,11 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
         #recaptchaModal .modal-body {
             padding: 2rem 1.5rem;
             background: #ffffff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: .75rem;
+            text-align: center;
         }
         
         #recaptchaModal .modal-body p {
@@ -1585,6 +1590,8 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
             display: inline-block;
             margin: 0 auto;
         }
+        /* Ensure Google reCAPTCHA inner container centers as well */
+        #recaptchaWidget > div { margin: 0 auto !important; }
     </style>
     <?php endif; ?>
 
@@ -2101,16 +2108,18 @@ $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_
                 modalEl.id = 'recaptchaModal';
                 modalEl.tabIndex = -1;
                 modalEl.innerHTML = `
-                    <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-dialog modal-dialog-centered modal-sm" style="max-width: 460px;">
                         <div class="modal-content">
                             <div class="modal-header">
                                 <h5 class="modal-title">Security Check</h5>
                                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                             </div>
-                            <div class="modal-body text-center">
-                                <p>Please complete the reCAPTCHA to continue.</p>
-                                <div id="recaptchaWidget"></div>
-                                <div id="recaptchaError" class="text-danger mt-2" style="display:none;"></div>
+                            <div class="modal-body">
+                                <p style="text-align: center; margin-bottom: 1.5rem;">Please complete the reCAPTCHA to continue.</p>
+                                <div style="display: flex; justify-content: center; align-items: center; width: 100%;">
+                                    <div id="recaptchaWidget" style="display: inline-block;"></div>
+                                </div>
+                                <div id="recaptchaError" class="text-danger mt-2" style="display:none; text-align: center;"></div>
                             </div>
                         </div>
                     </div>
