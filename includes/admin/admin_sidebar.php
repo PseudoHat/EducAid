@@ -665,15 +665,17 @@ $submenuActiveBg = $sidebarThemeSettings['submenu_active_bg'] ?? '#e7f3ff';
 $submenuActiveText = $sidebarThemeSettings['submenu_active_text'] ?? '#0d6efd';
 
 // Function to adjust color opacity for subtle effects
-function adjustColorOpacity($color, $opacity = 0.3) {
-    $color = str_replace('#', '', $color);
-    if (strlen($color) === 3) {
-        $color = $color[0].$color[0].$color[1].$color[1].$color[2].$color[2];
+if (!function_exists('adjustColorOpacity')) {
+    function adjustColorOpacity($color, $opacity = 0.3) {
+        $color = str_replace('#', '', $color);
+        if (strlen($color) === 3) {
+            $color = $color[0].$color[0].$color[1].$color[1].$color[2].$color[2];
+        }
+        $r = hexdec(substr($color, 0, 2));
+        $g = hexdec(substr($color, 2, 2));
+        $b = hexdec(substr($color, 4, 2));
+        return "rgba($r, $g, $b, $opacity)";
     }
-    $r = hexdec(substr($color, 0, 2));
-    $g = hexdec(substr($color, 2, 2));
-    $b = hexdec(substr($color, 4, 2));
-    return "rgba($r, $g, $b, $opacity)";
 }
 ?>
 .admin-sidebar {

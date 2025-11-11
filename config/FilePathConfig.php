@@ -216,7 +216,8 @@ class FilePathConfig {
         if ($this->isRailway) {
             return '/mnt/assets/data/exports';
         }
-        return dirname(dirname(__DIR__)) . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'exports';
+        // Store in application directory, not parent
+        return dirname(__DIR__) . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'exports';
     }
     
     /**
@@ -282,8 +283,10 @@ class FilePathConfig {
     /**
      * Convert relative path to absolute system path
      * Handles both Railway and localhost paths
+     * @param string $relativePath Relative path to convert
+     * @return string Absolute system path
      */
-    public function resolveRelativePath($relativePath) {
+    public function resolveRelativePath($relativePath = '') {
         // Remove leading 'assets/uploads/' if present
         $relativePath = preg_replace('#^/?assets/uploads/?#', '', $relativePath);
         
@@ -294,8 +297,10 @@ class FilePathConfig {
     /**
      * Convert absolute path to relative path (for database storage)
      * Returns path in format: assets/uploads/...
+     * @param string $absolutePath Absolute system path to convert
+     * @return string Relative path in format: assets/uploads/...
      */
-    public function getRelativePath($absolutePath) {
+    public function getRelativePath($absolutePath = '') {
         // Normalize separators
         $absolutePath = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $absolutePath);
         
@@ -315,8 +320,11 @@ class FilePathConfig {
     
     /**
      * Build file path with proper separators
+     * @param string ...$parts Path components to join
+     * @return string Complete path with proper directory separators
      */
     public function buildPath(...$parts) {
+        if (empty($parts)) return '';
         return implode(DIRECTORY_SEPARATOR, $parts);
     }
     
@@ -327,11 +335,13 @@ class FilePathConfig {
      * @param string $standardName Standard folder name (enrollment_forms, id_pictures, etc.)
      * @return string|null Path to existing folder, or null if not found
      */
-    public function findExistingFolder($baseFolder, $standardName) {
+    public function findExistingFolder($baseFolder = 'temp', $standardName = '') {
+        /** @var string $basePath */
         $basePath = $baseFolder === 'temp' ? $this->getTempPath() : $this->getStudentPath();
         $basePath = rtrim($basePath, DIRECTORY_SEPARATOR);
         
         // Get all possible folder name variations
+        /** @var array<string> $variations */
         $variations = $this->getFolderNameVariations($standardName);
         
         foreach ($variations as $variation) {
@@ -348,13 +358,16 @@ class FilePathConfig {
      * Get all document folders with their actual names on the filesystem
      * Returns array with standard names as keys and actual paths as values
      * @param string $baseFolder 'temp' or 'student'
-     * @return array ['enrollment_forms' => '/path/to/EAF', 'grades' => '/path/to/Grades', ...]
+     * @return array<string, string> Array with standard names as keys and actual paths as values
      */
-    public function getAllDocumentFolders($baseFolder) {
+    public function getAllDocumentFolders($baseFolder = 'temp') {
+        /** @var array<string, string> $folders */
         $folders = [];
+        /** @var array<string> $structure */
         $structure = $baseFolder === 'temp' ? $this->folderStructure['temp'] : $this->folderStructure['student'];
         
         foreach ($structure as $standardName) {
+            /** @var string|null $path */
             $path = $this->findExistingFolder($baseFolder, $standardName);
             if ($path !== null) {
                 $folders[$standardName] = $path;

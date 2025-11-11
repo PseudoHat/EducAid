@@ -154,15 +154,17 @@ $profileRoleColor = $sidebarThemeSettings['profile_role_color'] ?? '#6c757d';
 $profileBorderColor = $sidebarThemeSettings['profile_border_color'] ?? '#dee2e6';
 
 // Function to adjust color opacity for subtle effects
-function adjustColorOpacity($color, $opacity = 0.3) {
-    $color = str_replace('#', '', $color);
-    if (strlen($color) === 3) {
-        $color = $color[0].$color[0].$color[1].$color[1].$color[2].$color[2];
+if (!function_exists('adjustColorOpacity')) {
+    function adjustColorOpacity($color, $opacity = 0.3) {
+        $color = str_replace('#', '', $color);
+        if (strlen($color) === 3) {
+            $color = $color[0].$color[0].$color[1].$color[1].$color[2].$color[2];
+        }
+        $r = hexdec(substr($color, 0, 2));
+        $g = hexdec(substr($color, 2, 2));
+        $b = hexdec(substr($color, 4, 2));
+        return "rgba($r, $g, $b, $opacity)";
     }
-    $r = hexdec(substr($color, 0, 2));
-    $g = hexdec(substr($color, 2, 2));
-    $b = hexdec(substr($color, 4, 2));
-    return "rgba($r, $g, $b, $opacity)";
 }
 ?>
 .student-sidebar {

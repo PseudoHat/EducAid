@@ -1645,6 +1645,56 @@ unset($_SESSION['profile_flash'], $_SESSION['profile_flash_type']);
       </div>
     </section>
 
+  <!-- Export Data Confirmation Modal -->
+  <div class="modal fade" id="exportConfirmModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">
+            <i class="bi bi-cloud-arrow-down me-2"></i>Request Data Export
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="alert alert-info">
+            <i class="bi bi-info-circle me-2"></i>
+            <strong>What data will be exported?</strong>
+          </div>
+          
+          <p class="mb-3">Your export will include:</p>
+          <ul class="mb-3">
+            <li><i class="bi bi-check-circle text-success me-2"></i>Personal information (name, contact details)</li>
+            <li><i class="bi bi-check-circle text-success me-2"></i>Application status and history</li>
+            <li><i class="bi bi-check-circle text-success me-2"></i>Uploaded documents</li>
+            <li><i class="bi bi-check-circle text-success me-2"></i>Communication records</li>
+            <li><i class="bi bi-check-circle text-success me-2"></i>Account activity logs</li>
+          </ul>
+
+          <div class="alert alert-warning">
+            <i class="bi bi-clock-history me-2"></i>
+            <strong>Processing time:</strong> Your export will be prepared in the background. 
+            This may take a few minutes depending on the amount of data. You'll be able to 
+            download it once it's ready.
+          </div>
+
+          <div class="alert alert-success">
+            <i class="bi bi-shield-check me-2"></i>
+            <strong>Security:</strong> Your data export will be securely encrypted and will 
+            expire after 7 days for your protection.
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+            <i class="bi bi-x-circle me-2"></i>Cancel
+          </button>
+          <button type="button" id="confirmExportBtn" class="btn btn-primary">
+            <i class="bi bi-cloud-arrow-down me-2"></i>Confirm & Export
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="../../assets/js/bootstrap.bundle.min.js"></script>
   <script src="../../assets/js/student/sidebar.js"></script>
   <script src="../../assets/js/student/student_profile.js"></script>
@@ -1760,12 +1810,43 @@ unset($_SESSION['profile_flash'], $_SESSION['profile_flash_type']);
 
       if (!statusEl || !btn) return; // Section not on page
 
+      const exportModalEl = document.getElementById('exportConfirmModal');
+      const confirmBtn = document.getElementById('confirmExportBtn');
+      
+      if (!exportModalEl || !confirmBtn) {
+        console.error('Export modal or confirm button not found');
+        return;
+      }
+      
+      const exportModal = new bootstrap.Modal(exportModalEl);
+
       async function fetchStatus() {
         try {
+          console.log('Fetching export status...');
           const res = await fetch('../../api/student/export_status.php', { credentials: 'include' });
+          console.log('Response status:', res.status);
+          
+          if (!res.ok) {
+            const text = await res.text();
+            console.error('Export status API error:', text);
+            statusEl.textContent = `Unable to fetch export status (${res.status}).`;
+            return;
+          }
+          
           const data = await res.json();
-          if (!data.success) { statusEl.textContent = 'Unable to fetch export status.'; return; }
-          if (!data.exists) { statusEl.textContent = 'No export requested yet.'; dlWrap.classList.add('d-none'); return; }
+          console.log('Export status data:', data);
+          
+          if (!data.success) { 
+            statusEl.textContent = 'Unable to fetch export status: ' + (data.error || 'Unknown error');
+            console.error('Export status failed:', data.error);
+            return;
+          }
+          
+          if (!data.exists) { 
+            statusEl.textContent = 'No export requested yet.'; 
+            dlWrap.classList.add('d-none'); 
+            return; 
+          }
 
           statusEl.textContent = `Status: ${data.status}` + (data.processed_at ? ` • Processed: ${new Date(data.processed_at).toLocaleString()}` : '');
           if (data.status === 'ready' && data.download_url) {
@@ -1781,21 +1862,43 @@ unset($_SESSION['profile_flash'], $_SESSION['profile_flash_type']);
             dlWrap.classList.add('d-none');
           }
         } catch (e) {
-          statusEl.textContent = 'Error fetching export status.';
+          console.error('Error fetching export status:', e);
+          statusEl.textContent = 'Error fetching export status: ' + e.message;
         }
       }
 
-      btn.addEventListener('click', async () => {
-        btn.disabled = true; const original = btn.innerHTML; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Processing…';
+      async function processExport() {
+        confirmBtn.disabled = true; 
+        const original = confirmBtn.innerHTML; 
+        confirmBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Processing…';
+        
         try {
           const res = await fetch('../../api/student/request_data_export.php', { method: 'POST', credentials: 'include' });
           const data = await res.json();
-          if (!data.success) { statusEl.textContent = 'Export request failed.'; }
+          if (!data.success) { 
+            statusEl.textContent = 'Export request failed.'; 
+          } else {
+            statusEl.textContent = 'Export request submitted successfully. Processing...';
+          }
           await fetchStatus();
+          exportModal.hide();
         } catch (e) {
-          statusEl.textContent = 'Export request failed.';
-        } finally { btn.disabled = false; btn.innerHTML = original; }
+          console.error('Export request error:', e);
+          statusEl.textContent = 'Export request failed: ' + e.message;
+        } finally { 
+          confirmBtn.disabled = false; 
+          confirmBtn.innerHTML = original; 
+        }
+      }
+
+      // Open modal when "Request Export" is clicked
+      btn.addEventListener('click', () => {
+        console.log('Request Export clicked, opening modal...');
+        exportModal.show();
       });
+
+      // Handle confirmation in modal
+      confirmBtn.addEventListener('click', processExport);
 
       // Initial status
       fetchStatus();
