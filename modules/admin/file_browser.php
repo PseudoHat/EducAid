@@ -368,7 +368,7 @@ $pageTitle = 'Railway Volume Browser';
             left: 250px; /* Aligned with sidebar */
             right: 0;
             z-index: 1030;
-            transition: left 0.3s ease;
+            /* transition removed - animations are driven by JS requestAnimationFrame */
         }
         
         /* When sidebar is closed */
@@ -382,7 +382,7 @@ $pageTitle = 'Railway Volume Browser';
             min-height: 100vh;
             left: 250px;
             width: calc(100% - 250px);
-            transition: all 0.3s ease;
+            /* transition removed - animations are driven by JS requestAnimationFrame */
             background: #f8f9fa;
             margin-top: calc(38px + 60px); /* Topbar + Header */
         }
@@ -395,13 +395,11 @@ $pageTitle = 'Railway Volume Browser';
         @media (max-width: 768px) {
             .admin-main-header {
                 left: 0 !important;
-                transition: none;
             }
             
             .home-section {
                 left: 0 !important;
                 width: 100% !important;
-                transition: none;
             }
         }
         
