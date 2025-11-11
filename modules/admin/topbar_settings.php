@@ -186,30 +186,402 @@ if (empty($preview_text_color)) {
 ?>
 <?php $page_title='Topbar Settings'; $extra_css=[]; include __DIR__ . '/../../includes/admin/admin_head.php'; ?>
 <style>
-  /* Page-specific styling (scoped where possible) */
+  /* Modern Enhanced UI Styling */
+  body.topbar-settings-page {
+    background: linear-gradient(135deg, #f5f7fa 0%, #e8ecf1 100%);
+  }
+  
   body.topbar-settings-page .settings-card {
     background: #ffffff;
-    border-radius: 0.5rem;
-    padding: 1.5rem;
+    border-radius: 12px;
+    padding: 2rem;
     margin-bottom: 1.5rem;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    box-shadow: 0 4px 6px rgba(0,0,0,0.07), 0 1px 3px rgba(0,0,0,0.06);
+    border: 1px solid rgba(0,0,0,0.05);
+    transition: all 0.3s ease;
   }
+  
+  body.topbar-settings-page .settings-card:hover {
+    box-shadow: 0 8px 15px rgba(0,0,0,0.1), 0 3px 6px rgba(0,0,0,0.08);
+    transform: translateY(-2px);
+  }
+  
+  body.topbar-settings-page .settings-card h5 {
+    color: #1e293b;
+    font-weight: 700;
+    font-size: 1.15rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid #e2e8f0;
+  }
+  
+  body.topbar-settings-page .settings-card h5 i {
+    color: #2e7d32;
+    font-size: 1.3rem;
+  }
+  
   body.topbar-settings-page .preview-topbar {
     color: #fff;
-    padding: 0.75rem 1rem;
-    border-radius: 0.375rem;
+    padding: 1rem 1.5rem;
+    border-radius: 10px;
     margin-bottom: 1.5rem;
     font-size: 0.875rem;
     font-family: 'Poppins', var(--bs-font-sans-serif, Arial, sans-serif);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    transition: all 0.3s ease;
+    animation: fadeInDown 0.5s ease;
   }
-  body.topbar-settings-page .form-label { font-weight:600; color:#374151; }
-  body.topbar-settings-page .form-control:focus { border-color:#2e7d32; box-shadow:0 0 0 0.2rem rgba(46,125,50,0.25); }
+  
+  /* Sticky preview wrapper */
+  body.topbar-settings-page .preview-wrapper {
+    position: sticky;
+    top: 80px;
+    z-index: 100;
+    margin-bottom: 1.5rem;
+    transition: all 0.3s ease;
+  }
+  
+  body.topbar-settings-page .preview-wrapper.stuck {
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  }
+  
+  body.topbar-settings-page .preview-wrapper.stuck .settings-card {
+    border-radius: 0 0 12px 12px;
+    box-shadow: 0 6px 16px rgba(0,0,0,0.1);
+    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+  }
+  
+  body.topbar-settings-page .preview-wrapper.stuck .preview-topbar {
+    box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+  }
+  
+  /* Add a subtle indicator when stuck */
+  body.topbar-settings-page .preview-wrapper.stuck::before {
+    content: '';
+    position: absolute;
+    top: -3px;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #2e7d32 0%, #66bb6a 50%, #2e7d32 100%);
+    border-radius: 12px 12px 0 0;
+    animation: shimmer 2s ease-in-out infinite;
+  }
+  
+  @keyframes shimmer {
+    0%, 100% { opacity: 0.6; }
+    50% { opacity: 1; }
+  }
+  
+  @keyframes fadeInDown {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  body.topbar-settings-page .preview-topbar:hover {
+    box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+  }
+  
+  body.topbar-settings-page .form-label {
+    font-weight: 600;
+    color: #334155;
+    margin-bottom: 0.5rem;
+    font-size: 0.95rem;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+  
+  body.topbar-settings-page .form-label i {
+    color: #64748b;
+    font-size: 1rem;
+  }
+  
+  body.topbar-settings-page .form-control {
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 0.65rem 1rem;
+    font-size: 0.95rem;
+    transition: all 0.2s ease;
+  }
+  
+  body.topbar-settings-page .form-control:focus {
+    border-color: #2e7d32;
+    box-shadow: 0 0 0 0.25rem rgba(46, 125, 50, 0.15);
+    background-color: #f8fffe;
+  }
+  
+  body.topbar-settings-page .form-control:hover:not(:focus) {
+    border-color: #cbd5e1;
+  }
+  
+  body.topbar-settings-page .input-group {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  
+  body.topbar-settings-page .input-group-text {
+    background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+    border: 2px solid #e2e8f0;
+    border-right: none;
+    color: #475569;
+    font-weight: 500;
+  }
+  
+  body.topbar-settings-page .input-group .form-control {
+    border-left: none;
+  }
+  
+  body.topbar-settings-page .form-control-color {
+    width: 70px;
+    height: 45px;
+    border-radius: 8px 0 0 8px;
+    cursor: pointer;
+    border: 2px solid #e2e8f0;
+    transition: all 0.2s ease;
+  }
+  
+  body.topbar-settings-page .form-control-color:hover {
+    transform: scale(1.05);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  }
+  
   body.topbar-settings-page .input-group.gradient-disabled {
-    opacity: 0.65;
+    opacity: 0.5;
+    pointer-events: none;
   }
+  
   body.topbar-settings-page .input-group.gradient-disabled input[type="text"] {
     font-style: italic;
-    color: #4b5563;
+    color: #94a3b8;
+    background: #f8fafc;
+  }
+  
+  body.topbar-settings-page .form-text {
+    color: #64748b;
+    font-size: 0.85rem;
+    margin-top: 0.4rem;
+  }
+  
+  body.topbar-settings-page .form-check-input:checked {
+    background-color: #2e7d32;
+    border-color: #2e7d32;
+  }
+  
+  body.topbar-settings-page .btn {
+    border-radius: 8px;
+    padding: 0.65rem 1.5rem;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    border: none;
+  }
+  
+  body.topbar-settings-page .btn-success {
+    background: linear-gradient(135deg, #2e7d32 0%, #1b5e20 100%);
+    box-shadow: 0 4px 10px rgba(46, 125, 50, 0.3);
+  }
+  
+  body.topbar-settings-page .btn-success:hover {
+    background: linear-gradient(135deg, #1b5e20 0%, #2e7d32 100%);
+    box-shadow: 0 6px 15px rgba(46, 125, 50, 0.4);
+    transform: translateY(-2px);
+  }
+  
+  body.topbar-settings-page .btn-secondary {
+    background: #64748b;
+    box-shadow: 0 3px 8px rgba(100, 116, 139, 0.25);
+  }
+  
+  body.topbar-settings-page .btn-secondary:hover {
+    background: #475569;
+    box-shadow: 0 5px 12px rgba(100, 116, 139, 0.35);
+    transform: translateY(-2px);
+  }
+  
+  body.topbar-settings-page .btn-outline-secondary {
+    border: 2px solid #cbd5e1;
+    color: #475569;
+    background: white;
+  }
+  
+  body.topbar-settings-page .btn-outline-secondary:hover {
+    background: #f8fafc;
+    border-color: #94a3b8;
+    color: #334155;
+    transform: translateX(-3px);
+  }
+  
+  body.topbar-settings-page .alert {
+    border-radius: 10px;
+    border: none;
+    padding: 1rem 1.25rem;
+    font-weight: 500;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+    animation: slideInRight 0.4s ease;
+  }
+  
+  @keyframes slideInRight {
+    from {
+      opacity: 0;
+      transform: translateX(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+  
+  body.topbar-settings-page .alert-success {
+    background: linear-gradient(135deg, #d1f4dd 0%, #a7f3d0 100%);
+    color: #065f46;
+  }
+  
+  body.topbar-settings-page .alert-danger {
+    background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+    color: #991b1b;
+  }
+  
+  body.topbar-settings-page .preview-header {
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+  
+  body.topbar-settings-page h2 {
+    color: #1e293b;
+    font-weight: 700;
+    font-size: 2rem;
+  }
+  
+  body.topbar-settings-page .text-muted {
+    color: #64748b !important;
+  }
+  
+  body.topbar-settings-page .instruction-card {
+    background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+    border-left: 4px solid #2e7d32;
+    padding: 1.5rem;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  }
+  
+  body.topbar-settings-page .instruction-card h6 {
+    color: #1e293b;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  
+  body.topbar-settings-page .instruction-card ul li {
+    padding: 0.4rem 0;
+    color: #334155;
+  }
+  
+  body.topbar-settings-page .instruction-card ul li strong {
+    color: #1e293b;
+  }
+  
+  body.topbar-settings-page .instruction-card .bi-check {
+    color: #2e7d32;
+    font-size: 1.1rem;
+    font-weight: bold;
+  }
+  
+  body.topbar-settings-page .vr {
+    opacity: 0.3;
+  }
+  
+  /* Smooth scroll behavior */
+  html {
+    scroll-behavior: smooth;
+  }
+  
+  /* Color input styling improvements */
+  body.topbar-settings-page .input-group .form-control[readonly] {
+    background-color: #f8fafc;
+    border: 2px solid #e2e8f0;
+    border-left: none;
+    font-family: 'Courier New', monospace;
+    font-weight: 600;
+    color: #334155;
+  }
+  
+  /* Loading spinner animation */
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+  
+  body.topbar-settings-page .spinner-border {
+    animation: spin 0.75s linear infinite;
+  }
+  
+  /* Form validation styling */
+  body.topbar-settings-page .form-control.is-invalid {
+    border-color: #dc2626;
+    background-image: none;
+  }
+  
+  body.topbar-settings-page .form-control.is-invalid:focus {
+    border-color: #dc2626;
+    box-shadow: 0 0 0 0.25rem rgba(220, 38, 38, 0.15);
+  }
+  
+  body.topbar-settings-page .invalid-feedback {
+    color: #dc2626;
+    font-size: 0.85rem;
+    font-weight: 500;
+    margin-top: 0.4rem;
+  }
+  
+  /* Responsive improvements */
+  @media (max-width: 991.98px) {
+    body.topbar-settings-page .settings-card {
+      padding: 1.5rem;
+    }
+    
+    body.topbar-settings-page h2 {
+      font-size: 1.5rem;
+    }
+    
+    body.topbar-settings-page .btn {
+      padding: 0.5rem 1rem;
+      font-size: 0.9rem;
+    }
+    
+    /* Adjust sticky position for mobile */
+    body.topbar-settings-page .preview-wrapper {
+      top: 60px;
+    }
+  }
+  
+  @media (max-width: 767.98px) {
+    body.topbar-settings-page .preview-wrapper {
+      top: 50px;
+    }
+    
+    body.topbar-settings-page .preview-topbar {
+      font-size: 0.8rem;
+      padding: 0.75rem 1rem;
+    }
+  }
+  
+  /* Print styles */
+  @media print {
+    body.topbar-settings-page .btn,
+    body.topbar-settings-page .alert,
+    body.topbar-settings-page .instruction-card {
+      display: none;
+    }
   }
 </style>
 <body class="topbar-settings-page">
@@ -220,16 +592,22 @@ if (empty($preview_text_color)) {
     <?php include __DIR__ . '/../../includes/admin/admin_header.php'; ?>
 
     <section class="home-section" id="mainContent">
-      <div class="container-fluid py-4 px-4">
+      <div class="container-fluid py-4 px-4" style="max-width: 1400px; margin: 0 auto;">
         
         <div class="d-flex justify-content-between align-items-center mb-4">
           <div>
-            <h2 class="mb-1">Topbar Settings</h2>
-            <p class="text-muted mb-0">Customize the contact information displayed in the admin topbar</p>
+            <h2 class="mb-2 d-flex align-items-center gap-2">
+              <i class="bi bi-gear-fill" style="color: #2e7d32; font-size: 1.8rem;"></i>
+              Topbar Settings
+            </h2>
+            <p class="text-muted mb-0" style="font-size: 1.05rem;">
+              Customize the contact information displayed in the admin topbar
+            </p>
           </div>
           <div class="d-flex align-items-center gap-3">
-            <a href="homepage.php" class="btn btn-outline-secondary">
-              <i class="bi bi-arrow-left me-2"></i>Back to Dashboard
+            <a href="homepage.php" class="btn btn-outline-secondary d-flex align-items-center gap-2">
+              <i class="bi bi-arrow-left"></i>
+              <span>Back to Dashboard</span>
             </a>
           </div>
         </div>
@@ -248,30 +626,36 @@ if (empty($preview_text_color)) {
           </div>
         <?php endif; ?>
         
-        <!-- Topbar Live Preview -->
-        <div class="settings-card mb-3">
-          <h5 class="mb-3"><i class="bi bi-eye me-2"></i>Topbar Preview</h5>
-          <div class="preview-topbar" id="preview-topbar" style="background: <?= htmlspecialchars($preview_background, ENT_QUOTES) ?>; color: <?= htmlspecialchars($preview_text_color, ENT_QUOTES) ?>;">
-            <div class="d-flex align-items-center justify-content-between gap-3 flex-wrap">
-              <div class="d-flex align-items-center gap-3 small">
-                <i class="bi bi-shield-lock" id="preview-topbar-icon"></i>
-                <span>Administrative Panel</span>
-                <span class="vr mx-2 d-none d-md-inline"></span>
-                <i class="bi bi-envelope"></i>
-                <a href="#" class="text-decoration-none" id="preview-email" style="color: <?= htmlspecialchars($current_settings['topbar_link_color']) ?>;">
-                  <?= htmlspecialchars($current_settings['topbar_email']) ?>
-                </a>
-                <span class="vr mx-2 d-none d-lg-inline"></span>
-                <i class="bi bi-telephone"></i>
-                <span class="d-none d-sm-inline" id="preview-phone">
-                  <?= htmlspecialchars($current_settings['topbar_phone']) ?>
-                </span>
-              </div>
-              <div class="d-flex align-items-center gap-3 small">
-                <i class="bi bi-clock"></i>
-                <span class="d-none d-md-inline" id="preview-hours">
-                  <?= htmlspecialchars($current_settings['topbar_office_hours']) ?>
-                </span>
+        <!-- Topbar Live Preview (Sticky) -->
+        <div class="preview-wrapper" id="previewWrapper">
+          <div class="settings-card mb-0">
+            <h5 class="mb-3">
+              <i class="bi bi-eye-fill"></i>
+              Topbar Preview
+              <span class="badge bg-success ms-2" style="font-size: 0.7rem; padding: 0.35rem 0.6rem;">Live</span>
+            </h5>
+            <div class="preview-topbar" id="preview-topbar" style="background: <?= htmlspecialchars($preview_background, ENT_QUOTES) ?>; color: <?= htmlspecialchars($preview_text_color, ENT_QUOTES) ?>;">
+              <div class="d-flex align-items-center justify-content-between gap-3 flex-wrap">
+                <div class="d-flex align-items-center gap-3 small">
+                  <i class="bi bi-shield-lock" id="preview-topbar-icon"></i>
+                  <span>Administrative Panel</span>
+                  <span class="vr mx-2 d-none d-md-inline"></span>
+                  <i class="bi bi-envelope"></i>
+                  <a href="#" class="text-decoration-none" id="preview-email" style="color: <?= htmlspecialchars($current_settings['topbar_link_color']) ?>;">
+                    <?= htmlspecialchars($current_settings['topbar_email']) ?>
+                  </a>
+                  <span class="vr mx-2 d-none d-lg-inline"></span>
+                  <i class="bi bi-telephone"></i>
+                  <span class="d-none d-sm-inline" id="preview-phone">
+                    <?= htmlspecialchars($current_settings['topbar_phone']) ?>
+                  </span>
+                </div>
+                <div class="d-flex align-items-center gap-3 small">
+                  <i class="bi bi-clock"></i>
+                  <span class="d-none d-md-inline" id="preview-hours">
+                    <?= htmlspecialchars($current_settings['topbar_office_hours']) ?>
+                  </span>
+                </div>
               </div>
             </div>
           </div>
@@ -285,7 +669,10 @@ if (empty($preview_text_color)) {
           <div class="row">
             <div class="col-lg-8">
               <div class="settings-card">
-                <h5 class="mb-4"><i class="bi bi-gear me-2"></i>Topbar Contact Information</h5>
+                <h5 class="mb-4">
+                  <i class="bi bi-telephone-fill"></i>
+                  Topbar Contact Information
+                </h5>
                 
                 <div class="mb-3">
                   <label for="topbar_email" class="form-label">Email Address <span class="text-danger">*</span></label>
@@ -322,7 +709,10 @@ if (empty($preview_text_color)) {
               </div>
               
               <div class="settings-card">
-                <h5 class="mb-4"><i class="bi bi-building me-2"></i>System Information</h5>
+                <h5 class="mb-4">
+                  <i class="bi bi-building-fill"></i>
+                  System Information
+                </h5>
                 
                 <div class="mb-3">
                   <label for="system_name" class="form-label">System Name</label>
@@ -343,10 +733,13 @@ if (empty($preview_text_color)) {
               
               <!-- Color Settings Section -->
               <div class="settings-card">
-                <h5 class="mb-4"><i class="bi bi-palette me-2"></i>Topbar Color Settings</h5>
+                <h5 class="mb-4">
+                  <i class="bi bi-palette-fill"></i>
+                  Topbar Color Settings
+                </h5>
                 
                 <div class="row mb-3">
-                  <div class="col-md-6">
+                  <div class="col-md-6 mb-3 mb-md-0">
                     <label for="topbar_bg_color" class="form-label">
                       <i class="bi bi-paint-bucket"></i> Background Color
                     </label>
@@ -364,16 +757,16 @@ if (empty($preview_text_color)) {
                     </div>
                   </div>
                   <div class="col-md-6">
-                    <div class="d-flex justify-content-between align-items-center">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
                       <label for="topbar_bg_gradient" class="form-label mb-0">
                         <i class="bi bi-circle-half"></i> Gradient Color
                       </label>
                       <div class="form-check form-switch">
                         <input class="form-check-input" type="checkbox" role="switch" id="topbar_gradient_enabled" name="topbar_gradient_enabled" value="1" <?= $gradient_enabled ? 'checked' : '' ?>>
-                        <label class="form-check-label small" for="topbar_gradient_enabled">Use gradient</label>
+                        <label class="form-check-label small" for="topbar_gradient_enabled">Enable</label>
                       </div>
                     </div>
-                    <div class="input-group <?= $gradient_enabled ? '' : 'gradient-disabled' ?> mt-2" data-gradient-group>
+                    <div class="input-group <?= $gradient_enabled ? '' : 'gradient-disabled' ?>" data-gradient-group>
                       <input type="color" 
                              class="form-control form-control-color" 
                              id="topbar_bg_gradient" 
@@ -387,12 +780,12 @@ if (empty($preview_text_color)) {
                              value="<?= htmlspecialchars($gradient_text_display) ?>"
                              readonly>
                     </div>
-                    <div class="form-text">Toggle off to use a solid background without a gradient overlay.</div>
+                    <div class="form-text">Toggle to add a gradient overlay effect</div>
                   </div>
                 </div>
                 
                 <div class="row mb-0">
-                  <div class="col-md-6">
+                  <div class="col-md-6 mb-3 mb-md-0">
                     <label for="topbar_text_color" class="form-label">
                       <i class="bi bi-fonts"></i> Text Color
                     </label>
@@ -431,20 +824,23 @@ if (empty($preview_text_color)) {
 
               <!-- Header Color Settings (with inline preview) -->
               <div class="settings-card">
-                <h5 class="mb-4"><i class="bi bi-layout-three-columns me-2"></i>Header Appearance</h5>
+                <h5 class="mb-4">
+                  <i class="bi bi-layout-three-columns"></i>
+                  Header Appearance
+                </h5>
                 <div class="row mb-4 g-3 align-items-stretch">
                   <div class="col-lg-7">
                     <!-- Header color inputs -->
                     <div class="row mb-3">
-                      <div class="col-md-6">
-                        <label class="form-label">Header Background</label>
+                      <div class="col-md-6 mb-3 mb-md-0">
+                        <label class="form-label"><i class="bi bi-paint-bucket"></i> Header Background</label>
                         <div class="input-group">
                           <input type="color" class="form-control form-control-color" name="header_bg_color" id="header_bg_color" value="<?= htmlspecialchars($header_settings['header_bg_color']) ?>">
                           <input type="text" class="form-control" value="<?= htmlspecialchars($header_settings['header_bg_color']) ?>" readonly>
                         </div>
                       </div>
                       <div class="col-md-6">
-                        <label class="form-label">Header Border Color</label>
+                        <label class="form-label"><i class="bi bi-border-style"></i> Header Border Color</label>
                         <div class="input-group">
                           <input type="color" class="form-control form-control-color" name="header_border_color" id="header_border_color" value="<?= htmlspecialchars($header_settings['header_border_color']) ?>">
                           <input type="text" class="form-control" value="<?= htmlspecialchars($header_settings['header_border_color']) ?>" readonly>
@@ -452,15 +848,15 @@ if (empty($preview_text_color)) {
                       </div>
                     </div>
                     <div class="row mb-3">
-                      <div class="col-md-6">
-                        <label class="form-label">Header Text Color</label>
+                      <div class="col-md-6 mb-3 mb-md-0">
+                        <label class="form-label"><i class="bi bi-fonts"></i> Header Text Color</label>
                         <div class="input-group">
                           <input type="color" class="form-control form-control-color" name="header_text_color" id="header_text_color" value="<?= htmlspecialchars($header_settings['header_text_color']) ?>">
                           <input type="text" class="form-control" value="<?= htmlspecialchars($header_settings['header_text_color']) ?>" readonly>
                         </div>
                       </div>
                       <div class="col-md-6">
-                        <label class="form-label">Header Icon Color</label>
+                        <label class="form-label"><i class="bi bi-brightness-high"></i> Header Icon Color</label>
                         <div class="input-group">
                           <input type="color" class="form-control form-control-color" name="header_icon_color" id="header_icon_color" value="<?= htmlspecialchars($header_settings['header_icon_color']) ?>">
                           <input type="text" class="form-control" value="<?= htmlspecialchars($header_settings['header_icon_color']) ?>" readonly>
@@ -468,15 +864,15 @@ if (empty($preview_text_color)) {
                       </div>
                     </div>
                     <div class="row mb-0">
-                      <div class="col-md-6">
-                        <label class="form-label">Header Hover Background</label>
+                      <div class="col-md-6 mb-3 mb-md-0">
+                        <label class="form-label"><i class="bi bi-mouse"></i> Header Hover Background</label>
                         <div class="input-group">
                           <input type="color" class="form-control form-control-color" name="header_hover_bg" id="header_hover_bg" value="<?= htmlspecialchars($header_settings['header_hover_bg']) ?>">
                           <input type="text" class="form-control" value="<?= htmlspecialchars($header_settings['header_hover_bg']) ?>" readonly>
                         </div>
                       </div>
                       <div class="col-md-6">
-                        <label class="form-label">Header Hover Icon Color</label>
+                        <label class="form-label"><i class="bi bi-cursor"></i> Header Hover Icon Color</label>
                         <div class="input-group">
                           <input type="color" class="form-control form-control-color" name="header_hover_icon_color" id="header_hover_icon_color" value="<?= htmlspecialchars($header_settings['header_hover_icon_color']) ?>">
                           <input type="text" class="form-control" value="<?= htmlspecialchars($header_settings['header_hover_icon_color']) ?>" readonly>
@@ -485,19 +881,23 @@ if (empty($preview_text_color)) {
                     </div>
                   </div>
                   <div class="col-lg-5">
-                    <div class="border rounded p-3 h-100 d-flex flex-column" style="background: var(--bs-body-bg,#fff);">
-                      <div class="fw-semibold small text-muted mb-2"><i class="bi bi-eye me-1"></i>Header Preview</div>
-                      <div class="preview-header border rounded p-3 flex-grow-1" id="preview-header" style="background: <?= htmlspecialchars($header_settings['header_bg_color']) ?>; border:1px solid <?= htmlspecialchars($header_settings['header_border_color']) ?>;">
+                    <div class="border rounded-3 p-3 h-100 d-flex flex-column" style="background: linear-gradient(135deg, #fafafa 0%, #f0f0f0 100%); border: 2px solid #e2e8f0 !important;">
+                      <div class="fw-semibold small text-muted mb-3 d-flex align-items-center gap-2">
+                        <i class="bi bi-eye-fill"></i>
+                        Header Preview
+                        <span class="badge bg-info" style="font-size: 0.65rem; padding: 0.25rem 0.5rem;">Live</span>
+                      </div>
+                      <div class="preview-header border rounded-2 p-3 flex-grow-1" id="preview-header" style="background: <?= htmlspecialchars($header_settings['header_bg_color']) ?>; border:2px solid <?= htmlspecialchars($header_settings['header_border_color']) ?> !important;">
                         <div class="d-flex align-items-center justify-content-between">
                           <div class="d-flex align-items-center gap-2">
-                            <button type="button" class="btn btn-sm" id="preview-menu-btn" style="background: <?= htmlspecialchars($header_settings['header_hover_bg']) ?>; color: <?= htmlspecialchars($header_settings['header_icon_color']) ?>;">
+                            <button type="button" class="btn btn-sm" id="preview-menu-btn" style="background: <?= htmlspecialchars($header_settings['header_hover_bg']) ?>; color: <?= htmlspecialchars($header_settings['header_icon_color']) ?>; border-radius: 6px;">
                               <i class="bi bi-list"></i>
                             </button>
                             <span class="fw-semibold" id="preview-header-title" style="color: <?= htmlspecialchars($header_settings['header_text_color']) ?>;">Header Area</span>
                           </div>
                           <div class="d-flex align-items-center gap-2">
-                            <button type="button" class="btn btn-sm" style="background:#f8fbf8; color: <?= htmlspecialchars($header_settings['header_icon_color']) ?>;"><i class="bi bi-bell"></i></button>
-                            <button type="button" class="btn btn-sm" style="background:#f8fbf8; color: <?= htmlspecialchars($header_settings['header_icon_color']) ?>;"><i class="bi bi-person-circle"></i></button>
+                            <button type="button" class="btn btn-sm" style="background:#f8fbf8; color: <?= htmlspecialchars($header_settings['header_icon_color']) ?>; border-radius: 6px;"><i class="bi bi-bell"></i></button>
+                            <button type="button" class="btn btn-sm" style="background:#f8fbf8; color: <?= htmlspecialchars($header_settings['header_icon_color']) ?>; border-radius: 6px;"><i class="bi bi-person-circle"></i></button>
                           </div>
                         </div>
                       </div>
@@ -509,59 +909,61 @@ if (empty($preview_text_color)) {
                 </div>
               </div>
 
-              <div class="d-flex justify-content-end gap-2">
-                <a href="homepage.php" class="btn btn-secondary">
-                  <i class="bi bi-x-lg me-2"></i>Cancel
+              <div class="d-flex justify-content-end gap-3 mt-4">
+                <a href="homepage.php" class="btn btn-secondary d-flex align-items-center gap-2">
+                  <i class="bi bi-x-circle"></i>
+                  <span>Cancel</span>
                 </a>
-                <button type="submit" class="btn btn-success" id="topbarSettingsSubmit">
-                  <i class="bi bi-check-lg me-2"></i>Save Changes
+                <button type="submit" class="btn btn-success d-flex align-items-center gap-2" id="topbarSettingsSubmit">
+                  <i class="bi bi-check-circle"></i>
+                  <span>Save Changes</span>
                 </button>
               </div>
             </div>
             
             <div class="col-lg-4">
-              <div class="settings-card">
+              <div class="settings-card instruction-card">
                 <h6 class="mb-3"><i class="bi bi-info-circle me-2"></i>Instructions</h6>
                 <ul class="list-unstyled small">
                   <li class="mb-2">
-                    <i class="bi bi-check text-success me-2"></i>
+                    <i class="bi bi-check me-2"></i>
                     Changes will be applied immediately after saving
                   </li>
                   <li class="mb-2">
-                    <i class="bi bi-check text-success me-2"></i>
+                    <i class="bi bi-check me-2"></i>
                     Email must be a valid email address format
                   </li>
                   <li class="mb-2">
-                    <i class="bi bi-check text-success me-2"></i>
+                    <i class="bi bi-check me-2"></i>
                     Phone number can include formatting characters
                   </li>
                   <li class="mb-2">
-                    <i class="bi bi-check text-success me-2"></i>
+                    <i class="bi bi-check me-2"></i>
                     Colors must be valid hex codes (e.g., #2e7d32)
                   </li>
-                  <li class="mb-0">
-                    <i class="bi bi-check text-success me-2"></i>
+                  <li class="mb-3">
+                    <i class="bi bi-check me-2"></i>
                     Use the preview above to see how changes will look
                   </li>
                 </ul>
-                
-                <div class="mt-4">
-                  <h6 class="mb-3"><i class="bi bi-palette me-2"></i>Color Guide</h6>
-                  <ul class="list-unstyled small">
-                    <li class="mb-2">
-                      <strong>Background Color:</strong> Main topbar background
-                    </li>
-                    <li class="mb-2">
-                      <strong>Gradient Color:</strong> Creates depth with background
-                    </li>
-                    <li class="mb-2">
-                      <strong>Text Color:</strong> Main text and icon color
-                    </li>
-                    <li class="mb-0">
-                      <strong>Link Color:</strong> Email and other link colors
-                    </li>
-                  </ul>
-                </div>
+              </div>
+              
+              <div class="settings-card" style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border-left: 4px solid #f59e0b;">
+                <h6 class="mb-3"><i class="bi bi-palette me-2"></i>Color Guide</h6>
+                <ul class="list-unstyled small">
+                  <li class="mb-2">
+                    <strong>Background Color:</strong> Main topbar background
+                  </li>
+                  <li class="mb-2">
+                    <strong>Gradient Color:</strong> Creates depth with background
+                  </li>
+                  <li class="mb-2">
+                    <strong>Text Color:</strong> Main text and icon color
+                  </li>
+                  <li class="mb-0">
+                    <strong>Link Color:</strong> Email and other link colors
+                  </li>
+                </ul>
               </div>
             </div>
           </div>
@@ -575,5 +977,43 @@ if (empty($preview_text_color)) {
   <!-- Use unified Bootstrap version (5.3.0) to match admin_head include -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script src="../../assets/js/admin/topbar-settings.js"></script>
+  
+  <script>
+    // Sticky preview behavior enhancement
+    document.addEventListener('DOMContentLoaded', function() {
+      const previewWrapper = document.getElementById('previewWrapper');
+      
+      if (previewWrapper) {
+        // Create an Intersection Observer to detect when preview becomes sticky
+        const observer = new IntersectionObserver(
+          ([entry]) => {
+            // When the preview is not intersecting (scrolled past), add stuck class
+            if (!entry.isIntersecting) {
+              previewWrapper.classList.add('stuck');
+            } else {
+              previewWrapper.classList.remove('stuck');
+            }
+          },
+          {
+            root: null,
+            threshold: 0,
+            rootMargin: '-80px 0px 0px 0px' // Account for the sticky top position
+          }
+        );
+        
+        // Create a sentinel element to observe
+        const sentinel = document.createElement('div');
+        sentinel.style.height = '1px';
+        sentinel.style.position = 'absolute';
+        sentinel.style.top = '0';
+        sentinel.style.width = '100%';
+        sentinel.style.pointerEvents = 'none';
+        
+        // Insert sentinel before the preview wrapper
+        previewWrapper.parentNode.insertBefore(sentinel, previewWrapper);
+        observer.observe(sentinel);
+      }
+    });
+  </script>
 </body>
 </html>
