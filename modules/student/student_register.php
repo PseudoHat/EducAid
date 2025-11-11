@@ -2,7 +2,7 @@
 // Suppress all output and errors for AJAX requests
 if (isset($_POST['processIdPictureOcr']) || isset($_POST['processGradesOcr']) || 
     isset($_POST['processOcr']) || isset($_POST['processLetterOcr']) || isset($_POST['processCertificateOcr']) ||
-    (isset($_POST['action']) && in_array($_POST['action'], ['check_full_duplicate', 'check_email_duplicate', 'check_mobile_duplicate', 'check_name_duplicate', 'check_household_lastname']))) {
+    (isset($_POST['action']) && in_array($_POST['action'], ['check_full_duplicate', 'check_email_duplicate', 'check_mobile_duplicate', 'check_name_duplicate', 'check_household_lastname', 'check_household_duplicate']))) {
     @ini_set('display_errors', '0');
     error_reporting(0);
     if (!ob_get_level()) ob_start();
@@ -647,7 +647,7 @@ $isAjaxRequest = isset($_POST['sendOtp']) || isset($_POST['verifyOtp']) ||
                  isset($_POST['processCertificateOcr']) || isset($_POST['processGradesOcr']) ||
                  isset($_POST['cleanup_temp']) || isset($_POST['check_existing']) || isset($_POST['test_db']) ||
                  isset($_POST['check_school_student_id']) ||
-                 (isset($_POST['action']) && in_array($_POST['action'], ['check_full_duplicate', 'check_email_duplicate', 'check_mobile_duplicate', 'check_name_duplicate', 'check_household_lastname']));
+                 (isset($_POST['action']) && in_array($_POST['action'], ['check_full_duplicate', 'check_email_duplicate', 'check_mobile_duplicate', 'check_name_duplicate', 'check_household_lastname', 'check_household_duplicate']));
 
 // Only output HTML for non-AJAX requests
 if (!$isAjaxRequest) {
@@ -1058,6 +1058,105 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['action']) && $_POST['
     } catch (Exception $e) {
         error_log("Error checking household lastname: " . $e->getMessage());
         json_response(['exists' => false, 'count' => 0]);
+    }
+}
+
+// ============================================================
+// NEW: Check Household Duplicate (Surname + Maiden Name + Barangay)
+// ============================================================
+if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['action']) && $_POST['action'] === 'check_household_duplicate') {
+    $lastName = trim($_POST['last_name'] ?? '');
+    $mothersMaidenName = trim($_POST['mothers_maiden_name'] ?? '');
+    $barangayId = intval($_POST['barangay_id'] ?? 0);
+    
+    if (empty($lastName) || empty($mothersMaidenName) || $barangayId === 0) {
+        json_response(['household_exists' => false]);
+    }
+    
+    try {
+        // First, get the barangay name from ID
+        $barangayQuery = "SELECT name FROM barangays WHERE barangay_id = $1";
+        $barangayResult = pg_query_params($connection, $barangayQuery, [$barangayId]);
+        
+        if (!$barangayResult || pg_num_rows($barangayResult) === 0) {
+            json_response(['household_exists' => false, 'error' => 'Invalid barangay']);
+        }
+        
+        $barangayRow = pg_fetch_assoc($barangayResult);
+        $barangayName = $barangayRow['name'];
+        
+        // Check for EXACT match first (hard block)
+        $exactQuery = "SELECT student_id, first_name, last_name, created_at
+                       FROM students 
+                       WHERE LOWER(last_name) = LOWER($1) 
+                         AND LOWER(mothers_maiden_name) = LOWER($2)
+                         AND barangay_id = $3
+                         AND is_archived = FALSE
+                       LIMIT 1";
+        
+        $exactResult = pg_query_params($connection, $exactQuery, [$lastName, $mothersMaidenName, $barangayId]);
+        
+        if ($exactResult && pg_num_rows($exactResult) > 0) {
+            $row = pg_fetch_assoc($exactResult);
+            
+            json_response([
+                'household_exists' => true,
+                'match_type' => 'exact',
+                'existing_student' => [
+                    'student_id' => $row['student_id'],
+                    'first_name' => $row['first_name'],
+                    'last_name' => $row['last_name'],
+                    'registered_date' => $row['created_at']
+                ],
+                'household_info' => [
+                    'surname' => $lastName,
+                    'mothers_maiden_name' => $mothersMaidenName,
+                    'barangay' => $barangayName
+                ]
+            ]);
+        }
+        
+        // Check for FUZZY match (typos) using pg_trgm similarity
+        $fuzzyQuery = "SELECT student_id, first_name, last_name, mothers_maiden_name,
+                              similarity(mothers_maiden_name, $2) as match_score
+                       FROM students 
+                       WHERE LOWER(last_name) = LOWER($1)
+                         AND barangay_id = $3
+                         AND similarity(mothers_maiden_name, $2) > 0.70
+                         AND LOWER(mothers_maiden_name) != LOWER($2)
+                         AND is_archived = FALSE
+                       ORDER BY match_score DESC
+                       LIMIT 1";
+        
+        $fuzzyResult = pg_query_params($connection, $fuzzyQuery, [$lastName, $mothersMaidenName, $barangayId]);
+        
+        if ($fuzzyResult && pg_num_rows($fuzzyResult) > 0) {
+            $row = pg_fetch_assoc($fuzzyResult);
+            
+            json_response([
+                'household_exists' => true,
+                'match_type' => 'fuzzy',
+                'similarity_score' => round(floatval($row['match_score']), 2),
+                'existing_student' => [
+                    'first_name' => $row['first_name'],
+                    'last_name' => $row['last_name']
+                ],
+                'household_info' => [
+                    'surname' => $lastName,
+                    'mothers_maiden_name_database' => $row['mothers_maiden_name'],
+                    'mothers_maiden_name_entered' => $mothersMaidenName,
+                    'barangay' => $barangayName
+                ],
+                'message' => "Did you mean '{$row['mothers_maiden_name']}'? We found a similar household."
+            ]);
+        }
+        
+        // No match found - allow registration
+        json_response(['household_exists' => false]);
+        
+    } catch (Exception $e) {
+        error_log("Error checking household duplicate: " . $e->getMessage());
+        json_response(['household_exists' => false, 'error' => 'Database error']);
     }
 }
 
@@ -4697,6 +4796,12 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['register'])) {
     $middlename = capitalizeProperName($_POST['middle_name'] ?? '');
     $lastname = capitalizeProperName($_POST['last_name'] ?? '');
     $extension_name = trim($_POST['extension_name'] ?? ''); // Extensions like Jr., Sr. are already uppercase in select
+    
+    // NEW: Mother's maiden name for household prevention - convert empty string to NULL for database
+    $mothers_maiden_name_raw = capitalizeProperName($_POST['mothers_maiden_name'] ?? '');
+    $mothers_maiden_name = !empty($mothers_maiden_name_raw) ? $mothers_maiden_name_raw : null;
+    
+    $admin_review_required = (intval($_POST['admin_review_required'] ?? 0) === 1); // NEW: Flag for admin review
     $email = trim($_POST['email'] ?? '');
     $mobile = trim($_POST['mobile'] ?? '');
     $bdate = trim($_POST['bdate'] ?? '');
@@ -4730,10 +4835,30 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['register'])) {
         }
     }
 
-    // Validate required fields
-    $requiredFields = [$firstname, $lastname, $email, $mobile, $bdate, $sex, $barangay, $university, $year_level, $password];
-    if (in_array('', $requiredFields, true)) {
-        json_response(['status' => 'error', 'message' => 'Please fill in all required fields.']);
+    // Validate required fields (mothers_maiden_name can be NULL for backward compatibility, but should be provided)
+    $requiredFields = [
+        'first_name' => $firstname,
+        'last_name' => $lastname,
+        'email' => $email,
+        'mobile' => $mobile,
+        'birthdate' => $bdate,
+        'sex' => $sex,
+        'barangay' => $barangay,
+        'university' => $university,
+        'year_level' => $year_level,
+        'password' => $password
+    ];
+    
+    foreach ($requiredFields as $fieldName => $fieldValue) {
+        if (empty($fieldValue) && $fieldValue !== 0 && $fieldValue !== '0') {
+            json_response(['status' => 'error', 'message' => "Please fill in all required fields. Missing: $fieldName"]);
+        }
+    }
+    
+    // Recommend providing mother's maiden name for household duplicate prevention
+    if ($mothers_maiden_name === null || trim($mothers_maiden_name) === '') {
+        // Allow registration but flag for admin review
+        $admin_review_required = true;
     }
 
     // Validate email format
@@ -4835,6 +4960,50 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['register'])) {
         json_response(['status' => 'error', 'message' => 'This mobile number is already registered. Please use a different mobile number.']);
     }
 
+    // NEW: FINAL household duplicate check (prevent race conditions)
+    // Only check if mothers_maiden_name is provided
+    if ($mothers_maiden_name !== null && trim($mothers_maiden_name) !== '') {
+        // Check for exact match: Surname + Mother's Maiden Name + Barangay
+        $householdCheck = pg_query_params(
+            $connection,
+            "SELECT student_id, first_name, last_name 
+             FROM students 
+             WHERE LOWER(last_name) = LOWER($1)
+               AND LOWER(mothers_maiden_name) = LOWER($2)
+               AND barangay_id = $3
+               AND is_archived = FALSE
+             LIMIT 1",
+            [$lastname, $mothers_maiden_name, $barangay]
+        );
+        
+        if (pg_num_rows($householdCheck) > 0) {
+            $householdRow = pg_fetch_assoc($householdCheck);
+            
+            // Log the block attempt to household_block_attempts table
+            $logQuery = "INSERT INTO household_block_attempts (
+                attempted_first_name, attempted_last_name, attempted_email, attempted_mobile,
+                mothers_maiden_name_entered, barangay_entered, blocked_by_student_id,
+                match_type, ip_address
+            ) VALUES ($1, $2, $3, $4, $5, (SELECT name FROM barangays WHERE barangay_id = $6), $7, 'exact', $8)";
+            
+            pg_query_params($connection, $logQuery, [
+                $firstname,
+                $lastname,
+                $email,
+                $mobile,
+                $mothers_maiden_name,
+                $barangay,
+                $householdRow['student_id'],
+                $_SERVER['REMOTE_ADDR'] ?? 'unknown'
+            ]);
+            
+            json_response([
+                'status' => 'error',
+                'message' => 'A student from your household (' . $householdRow['first_name'] . ' ' . $householdRow['last_name'] . ') is already registered. Only one student per household can receive assistance.'
+            ]);
+        }
+    }
+
     // Generate system student ID: <MUNICIPALITY>-<YEAR>-<YEARLEVEL>-<SEQUENCE>
     require_once __DIR__ . '/../../includes/util/student_id.php';
     $student_id = generateSystemStudentId($connection, $year_level, $municipality_id, intval(date('Y')));
@@ -4893,13 +5062,13 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['register'])) {
         barangay_id, university_id, year_level_id, slot_id, school_student_id, course, course_verified,
         household_verified, household_primary, household_group_id, archival_type,
         current_year_level, is_graduating, last_status_update, status_academic_year,
-        first_registered_academic_year, current_academic_year
+        first_registered_academic_year, current_academic_year, mothers_maiden_name, admin_review_required
     )
     VALUES (
         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 
         'under_registration', 0, NOW(), $11, $12, $13, $14, $15, $16, $17, $18,
         FALSE, FALSE, NULL, NULL,
-        $19, FALSE, NOW(), $20, $21, $22
+        $19, FALSE, NOW(), $20, $21, $22, $23, $24
     ) RETURNING student_id";
 
     $result = pg_query_params($connection, $insertQuery, [
@@ -4924,7 +5093,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['register'])) {
         $yearLevelName,      // New: current_year_level (e.g., "2nd Year College")
         $currentAcademicYear, // New: status_academic_year (from slot, e.g., "2025-2026")
         $currentAcademicYear, // New: first_registered_academic_year (initial enrollment year)
-        $currentAcademicYear  // New: current_academic_year (tracks which year they're currently in)
+        $currentAcademicYear, // New: current_academic_year (tracks which year they're currently in)
+        $mothers_maiden_name, // NEW: Mother's maiden name for household duplicate prevention
+        $admin_review_required ? 'true' : 'false' // NEW: Admin review flag for edge cases
     ]);
 
 
@@ -5451,6 +5622,9 @@ if (!$isAjaxRequest) {
                 <span class="step" id="step-indicator-10">10</span>
             </div>
             <form id="multiStepForm" method="POST" autocomplete="off">
+                <!-- Hidden Fields -->
+                <input type="hidden" id="adminReviewRequiredFlag" name="admin_review_required" value="0" />
+                
                 <!-- Step 1: Personal Information -->
                 <div class="step-panel" id="step-1">
                     <div class="mb-3">
@@ -5491,6 +5665,43 @@ if (!$isAjaxRequest) {
                         </select>
                         <small class="form-text text-muted">Select suffix if applicable (Jr., Sr., I, II, etc.)</small>
                     </div>
+                    
+                    <!-- Mother's Maiden Name Field (Household Prevention) -->
+                    <div class="mb-3">
+                        <label class="form-label">
+                            Mother's Maiden Name (Before Marriage) <span class="text-danger">*</span>
+                            <i class="bi bi-info-circle ms-1" data-bs-toggle="tooltip" data-bs-placement="right" 
+                               title="This helps us identify if another student from your household is already registered. Only one student per household can receive assistance."></i>
+                        </label>
+                        <input type="text" class="form-control" name="mothers_maiden_name" id="mothersMaidenNameInput" 
+                               placeholder="e.g., Reyes, Garcia, Santos" 
+                               pattern="[A-Za-z\s\-]+" 
+                               maxlength="100"
+                               required />
+                        <small class="form-text text-muted">Enter your mother's last name before she got married</small>
+                        
+                        <!-- Loading Spinner for Household Check -->
+                        <div id="householdCheckSpinner" class="mt-2" style="display:none;">
+                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                <span class="visually-hidden">Checking...</span>
+                            </div>
+                            <small class="text-muted ms-2">Checking household...</small>
+                        </div>
+                        
+                        <!-- Success Indicator -->
+                        <div id="householdCheckSuccess" class="mt-2 text-success" style="display:none;">
+                            <i class="bi bi-check-circle-fill me-1"></i>
+                            <small>No duplicate household found</small>
+                        </div>
+                        
+                        <!-- Household Block Error -->
+                        <div id="householdBlockError" class="alert alert-danger mt-2" style="display:none;">
+                            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                            <strong>Cannot Proceed:</strong>
+                            <span id="householdBlockMessage"></span>
+                        </div>
+                    </div>
+                    
                     <button type="button" class="btn btn-primary w-100" onclick="nextStep()">Next</button>
                 </div>
                 <!-- Step 2: Birthdate and Sex -->
@@ -6360,23 +6571,50 @@ function closeNameDuplicateModal() {
 
 // Check household confirmation before proceeding from Step 1
 async function checkHouseholdBeforeProceeding() {
-    console.log('🏠 Checking household warning...');
+    console.log('🏠 NEW: Checking household duplicate prevention...');
     
-    // If no warning shown, allow
-    if (!hasHouseholdWarning) {
-        console.log('✅ No household warning');
-        return false; // Allow progression
+    // NEW SYSTEM: Check if household block is active
+    if (householdBlockActive) {
+        console.log('❌ Household block is active - cannot proceed');
+        
+        Swal.fire({
+            icon: 'error',
+            title: 'Cannot Proceed',
+            text: 'A student from your household is already registered. Please see the error message above for details.',
+            confirmButtonText: 'OK',
+            confirmButtonColor: '#dc3545'
+        });
+        
+        return true; // Block progression
     }
     
-    // If already confirmed different household, allow
-    if (householdConfirmed) {
-        console.log('✅ Household already confirmed as different');
-        return false; // Allow progression
+    // Check if all required fields are filled for household check
+    const lastNameInput = document.getElementById('lastNameInput');
+    const mothersMaidenNameInput = document.getElementById('mothersMaidenNameInput');
+    
+    if (!lastNameInput || !mothersMaidenNameInput) {
+        console.log('⚠️ Household check inputs not found');
+        return false; // Allow progression (shouldn't happen)
     }
     
-    // Show confirmation modal
-    const lastName = document.querySelector('input[name="last_name"]')?.value.trim();
-    return await showHouseholdConfirmationModal(lastName);
+    const lastName = lastNameInput.value.trim();
+    const maidenName = mothersMaidenNameInput.value.trim();
+    
+    if (!lastName || !maidenName) {
+        console.log('❌ Required fields not filled');
+        
+        Swal.fire({
+            icon: 'warning',
+            title: 'Required Information',
+            text: 'Please fill in all required fields, including your mother\'s maiden name.',
+            confirmButtonText: 'OK'
+        });
+        
+        return true; // Block progression
+    }
+    
+    console.log('✅ Household check passed - no blocks active');
+    return false; // Allow progression
 }
 
 // Show household confirmation modal
@@ -8197,6 +8435,310 @@ function setupHouseholdWarning() {
     });
 }
 
+// ============================================================
+// HOUSEHOLD DUPLICATE PREVENTION SYSTEM
+// Using: Surname + Mother's Maiden Name + Barangay
+// ============================================================
+
+// Global variables for household prevention
+let householdCheckPassed = false;
+let householdBlockActive = false;
+let sameAsSurnameAttempts = 0;
+let householdCheckDebounceTimer = null;
+
+// Check if mother's maiden name matches student's surname
+function setupMothersMaidenNameValidation() {
+    const lastNameInput = document.getElementById('lastNameInput');
+    const mothersMaidenNameInput = document.getElementById('mothersMaidenNameInput');
+    
+    if (!lastNameInput || !mothersMaidenNameInput) return;
+    
+    mothersMaidenNameInput.addEventListener('blur', async function() {
+        const lastName = lastNameInput.value.trim();
+        const maidenName = this.value.trim();
+        
+        if (!maidenName || !lastName) return;
+        
+        // Check if maiden name matches surname (potential error)
+        if (maidenName.toLowerCase() === lastName.toLowerCase()) {
+            sameAsSurnameAttempts++;
+            
+            if (sameAsSurnameAttempts >= 3) {
+                // After 3 attempts, show unusual case confirmation
+                const result = await Swal.fire({
+                    icon: 'question',
+                    title: 'Unusual Case Detected',
+                    html: `
+                        <p>Your mother's maiden name is the same as your surname (<strong>${lastName}</strong>).</p>
+                        <p>This is rare but can happen if your parents had the same last name before marriage.</p>
+                        <p class="text-muted small mt-3">Is this correct?</p>
+                    `,
+                    showCancelButton: true,
+                    confirmButtonText: 'Yes, this is correct',
+                    cancelButtonText: 'No, let me re-enter',
+                    confirmButtonColor: '#28a745',
+                    cancelButtonColor: '#6c757d'
+                });
+                
+                if (result.isConfirmed) {
+                    // Mark for admin review
+                    document.getElementById('adminReviewRequiredFlag') && (document.getElementById('adminReviewRequiredFlag').value = '1');
+                    
+                    // Show notice
+                    Swal.fire({
+                        icon: 'info',
+                        title: 'Application Will Be Reviewed',
+                        text: 'Your application will be manually reviewed by an administrator due to this unusual case.',
+                        confirmButtonText: 'I understand'
+                    });
+                    
+                    // Proceed with household check
+                    triggerHouseholdCheck();
+                } else {
+                    this.value = '';
+                    this.focus();
+                    sameAsSurnameAttempts = 0; // Reset counter
+                }
+            } else {
+                // Show warning for first 2 attempts
+                await Swal.fire({
+                    icon: 'warning',
+                    title: 'Please Check',
+                    html: `
+                        <p>You entered your mother's <strong>current married name</strong> (<strong>${maidenName}</strong>).</p>
+                        <p>We need her <strong>maiden name</strong> (last name <u>before marriage</u>).</p>
+                        <div class="alert alert-info mt-3 text-start">
+                            <strong>Example:</strong><br>
+                            If your mother was <em>"Maria Reyes"</em> before marriage<br>
+                            and is now <em>"Maria Santos"</em>, enter <strong>"Reyes"</strong>
+                        </div>
+                    `,
+                    confirmButtonText: 'Let me correct it',
+                    confirmButtonColor: '#0d6efd'
+                });
+                
+                this.value = '';
+                this.focus();
+            }
+        } else {
+            // Different from surname - trigger household check
+            sameAsSurnameAttempts = 0; // Reset counter
+            triggerHouseholdCheck();
+        }
+    });
+    
+    // Reset attempts when user changes surname
+    lastNameInput.addEventListener('input', function() {
+        sameAsSurnameAttempts = 0;
+        householdCheckPassed = false;
+        householdBlockActive = false;
+    });
+    
+    // Also trigger household check on input (debounced)
+    mothersMaidenNameInput.addEventListener('input', function() {
+        householdCheckPassed = false;
+        householdBlockActive = false;
+        triggerHouseholdCheck();
+    });
+}
+
+// Trigger household duplicate check (debounced)
+function triggerHouseholdCheck() {
+    // Clear existing timer
+    if (householdCheckDebounceTimer) {
+        clearTimeout(householdCheckDebounceTimer);
+    }
+    
+    // Debounce for 500ms
+    householdCheckDebounceTimer = setTimeout(() => {
+        checkHouseholdDuplicate();
+    }, 500);
+}
+
+// Check household duplicate: Surname + Mother's Maiden Name + Barangay
+async function checkHouseholdDuplicate() {
+    const lastNameInput = document.getElementById('lastNameInput');
+    const mothersMaidenNameInput = document.getElementById('mothersMaidenNameInput');
+    const barangaySelect = document.querySelector('select[name="barangay_id"]');
+    const spinner = document.getElementById('householdCheckSpinner');
+    const successIndicator = document.getElementById('householdCheckSuccess');
+    const errorDiv = document.getElementById('householdBlockError');
+    const errorMessage = document.getElementById('householdBlockMessage');
+    
+    if (!lastNameInput || !mothersMaidenNameInput || !barangaySelect) return;
+    
+    const lastName = lastNameInput.value.trim();
+    const maidenName = mothersMaidenNameInput.value.trim();
+    const barangayId = barangaySelect.value;
+    
+    // All three fields must be filled
+    if (!lastName || !maidenName || !barangayId) {
+        if (spinner) spinner.style.display = 'none';
+        if (successIndicator) successIndicator.style.display = 'none';
+        if (errorDiv) errorDiv.style.display = 'none';
+        return;
+    }
+    
+    // Skip if maiden name same as surname (handled separately)
+    if (maidenName.toLowerCase() === lastName.toLowerCase()) {
+        return;
+    }
+    
+    try {
+        // Show loading
+        if (spinner) spinner.style.display = 'block';
+        if (successIndicator) successIndicator.style.display = 'none';
+        if (errorDiv) errorDiv.style.display = 'none';
+        
+        const formData = new FormData();
+        formData.append('action', 'check_household_duplicate');
+        formData.append('last_name', lastName);
+        formData.append('mothers_maiden_name', maidenName);
+        formData.append('barangay_id', barangayId);
+        
+        const response = await fetch('student_register.php', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const data = await response.json();
+        
+        // Hide loading
+        if (spinner) spinner.style.display = 'none';
+        
+        if (data.household_exists) {
+            if (data.match_type === 'exact') {
+                // HARD BLOCK - Exact match found
+                handleExactHouseholdMatch(data);
+            } else if (data.match_type === 'fuzzy') {
+                // SOFT WARNING - Similar match found
+                await handleFuzzyHouseholdMatch(data);
+            }
+        } else {
+            // No match - success!
+            handleNoHouseholdMatch();
+        }
+    } catch (error) {
+        console.error('Error checking household duplicate:', error);
+        if (spinner) spinner.style.display = 'none';
+    }
+}
+
+// Handle exact household match (BLOCK)
+function handleExactHouseholdMatch(data) {
+    householdBlockActive = true;
+    householdCheckPassed = false;
+    
+    const errorDiv = document.getElementById('householdBlockError');
+    const errorMessage = document.getElementById('householdBlockMessage');
+    const successIndicator = document.getElementById('householdCheckSuccess');
+    
+    if (successIndicator) successIndicator.style.display = 'none';
+    
+    if (errorDiv && errorMessage) {
+        errorMessage.innerHTML = `
+            A student from your household is already registered and cannot proceed with registration.
+        `;
+        errorDiv.style.display = 'block';
+    }
+    
+    // Show detailed blocking modal
+    Swal.fire({
+        icon: 'error',
+        title: 'Household Already Registered',
+        html: `
+            <div class="text-start">
+                <p>A student from your household is already registered:</p>
+                <div class="alert alert-secondary">
+                    <strong>Student:</strong> ${data.existing_student.first_name} ${data.existing_student.last_name}<br>
+                    <strong>Student ID:</strong> ${data.existing_student.student_id}<br>
+                    <strong>Barangay:</strong> ${data.household_info.barangay}<br>
+                    <strong>Registered:</strong> ${new Date(data.existing_student.registered_date).toLocaleDateString('en-PH', {year: 'numeric', month: 'long', day: 'numeric'})}
+                </div>
+                <p class="text-muted"><strong>Policy:</strong> Only one student per household can receive scholarship assistance to ensure fair distribution of resources.</p>
+                <hr>
+                <p class="mb-2"><strong>If you believe this is an error,</strong> please contact our office:</p>
+                <p class="mb-1">📧 <strong>Email:</strong> scholarship@generaltrias.gov.ph</p>
+                <p class="mb-1">📞 <strong>Phone:</strong> (046) 123-4567</p>
+                <p class="mb-0">⏰ <strong>Office Hours:</strong> Monday-Friday, 8:00 AM - 5:00 PM</p>
+            </div>
+        `,
+        confirmButtonText: 'Close',
+        allowOutsideClick: false,
+        confirmButtonColor: '#dc3545'
+    });
+}
+
+// Handle fuzzy household match (WARNING)
+async function handleFuzzyHouseholdMatch(data) {
+    const result = await Swal.fire({
+        icon: 'question',
+        title: 'Please Verify',
+        html: `
+            <div class="text-start">
+                <p>We found a household with similar information:</p>
+                <div class="alert alert-warning">
+                    <strong>Student:</strong> ${data.existing_student.first_name} ${data.existing_student.last_name}<br>
+                    <strong>Barangay:</strong> ${data.household_info.barangay}<br>
+                    <strong>Mother's Maiden Name in system:</strong> <span class="badge bg-primary">${data.household_info.mothers_maiden_name_database}</span><br>
+                    <strong>You entered:</strong> <span class="badge bg-secondary">${data.household_info.mothers_maiden_name_entered}</span>
+                </div>
+                <p class="fw-bold">Is this the same household as yours?</p>
+            </div>
+        `,
+        showCancelButton: true,
+        confirmButtonText: 'Yes, Same Household',
+        cancelButtonText: 'No, Different Household',
+        confirmButtonColor: '#dc3545',
+        cancelButtonColor: '#6c757d',
+        allowOutsideClick: false
+    });
+    
+    if (result.isConfirmed) {
+        // User confirmed it's same household - treat as exact match
+        data.match_type = 'user_confirmed';
+        handleExactHouseholdMatch(data);
+    } else {
+        // User says it's different - allow to proceed
+        handleNoHouseholdMatch();
+        
+        // Log this for admin review (optional)
+        console.log('User denied fuzzy match - different household confirmed');
+    }
+}
+
+// Handle no household match (SUCCESS)
+function handleNoHouseholdMatch() {
+    householdBlockActive = false;
+    householdCheckPassed = true;
+    
+    const successIndicator = document.getElementById('householdCheckSuccess');
+    const errorDiv = document.getElementById('householdBlockError');
+    
+    if (errorDiv) errorDiv.style.display = 'none';
+    
+    if (successIndicator) {
+        successIndicator.style.display = 'block';
+        // Hide after 5 seconds
+        setTimeout(() => {
+            successIndicator.style.display = 'none';
+        }, 5000);
+    }
+}
+
+// Also check household when barangay changes
+function setupBarangayHouseholdCheck() {
+    const barangaySelect = document.querySelector('select[name="barangay_id"]');
+    
+    if (!barangaySelect) return;
+    
+    barangaySelect.addEventListener('change', function() {
+        householdCheckPassed = false;
+        householdBlockActive = false;
+        triggerHouseholdCheck();
+    });
+}
+
 // Password strength indicator
 function setupPasswordStrength() {
     const passwordInput = document.getElementById('password');
@@ -8277,7 +8819,9 @@ document.addEventListener('DOMContentLoaded', function() {
     setupEmailDuplicateCheck();
     setupMobileDuplicateCheck(); // Add mobile duplicate check
     setupNameDuplicateCheck(); // Add name duplicate check
-    setupHouseholdWarning(); // Add household warning check
+    setupHouseholdWarning(); // Add household warning check (old system)
+    setupMothersMaidenNameValidation(); // NEW: Mother's maiden name validation
+    setupBarangayHouseholdCheck(); // NEW: Barangay change triggers household check
     setupPasswordStrength();
     setupSessionCleanup();
     setupConnectionMonitoring();

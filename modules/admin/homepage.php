@@ -332,6 +332,51 @@ if ($DEMO_MODE) {
             </div>
             <div class="tile-label">Verified Students</div>
           </div>
+          
+          <!-- NEW: Household Prevention Statistics -->
+          <div class="dashboard-tile tile-warning">
+            <div class="tile-icon"><i class="bi bi-shield-check"></i></div>
+            <div class="tile-number">
+              <?php
+                if ($DEMO_MODE) {
+                  echo '47';
+                } else {
+                  // Get blocked attempts count (last 30 days)
+                  $blockedQuery = "SELECT COUNT(*) AS total FROM household_block_attempts WHERE blocked_at >= CURRENT_DATE - INTERVAL '30 days'";
+                  $blockedResult = @pg_query($connection, $blockedQuery);
+                  if ($blockedResult) {
+                    $blockedRow = pg_fetch_assoc($blockedResult);
+                    echo $blockedRow['total'] ?? 0;
+                  } else {
+                    echo '0';
+                  }
+                }
+              ?>
+            </div>
+            <div class="tile-label">Household Blocks (30d)</div>
+          </div>
+          
+          <div class="dashboard-tile tile-info">
+            <div class="tile-icon"><i class="bi bi-exclamation-triangle"></i></div>
+            <div class="tile-number">
+              <?php
+                if ($DEMO_MODE) {
+                  echo '3';
+                } else {
+                  // Get students requiring admin review
+                  $reviewQuery = "SELECT COUNT(*) AS total FROM students WHERE admin_review_required = TRUE AND is_archived = FALSE";
+                  $reviewResult = @pg_query($connection, $reviewQuery);
+                  if ($reviewResult) {
+                    $reviewRow = pg_fetch_assoc($reviewResult);
+                    echo $reviewRow['total'] ?? 0;
+                  } else {
+                    echo '0';
+                  }
+                }
+              ?>
+            </div>
+            <div class="tile-label">Requires Review</div>
+          </div>
         </div>
 
         <!-- Website Content Management (Super Admin Only) -->
