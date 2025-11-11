@@ -18,6 +18,8 @@ class FilePathConfig {
     private $baseUploadsPath;
     private $baseUploadsDir;
     
+    
+    
     /**
      * Folder structure mapping
      * Railway uses different names than localhost
@@ -235,6 +237,38 @@ class FilePathConfig {
     }
     
     /**
+     * Sanitize a relative path to prevent directory traversal and other unsafe segments.
+     * Converts separators, strips null bytes, resolves '.' and '..', and removes drive letters.
+     * @param string $relativePath
+     * @return string Safe relative path using the current OS directory separator
+     */
+    private function sanitizeRelativePath($relativePath) {
+        // Remove null bytes
+        $relativePath = str_replace("\0", '', (string)$relativePath);
+        // Normalize slashes to '/'
+        $relativePath = str_replace('\\', '/', $relativePath);
+        // Remove leading slashes
+        $relativePath = ltrim($relativePath, '/');
+        // Resolve '.' and '..' segments
+        $parts = [];
+        foreach (explode('/', $relativePath) as $part) {
+            if ($part === '' || $part === '.') {
+                continue;
+            }
+            if ($part === '..') {
+                array_pop($parts);
+                continue;
+            }
+            // Block attempts to include drive letters or protocols
+            if (strpos($part, ':') !== false) {
+                continue;
+            }
+            $parts[] = $part;
+        }
+        return implode(DIRECTORY_SEPARATOR, $parts);
+    }
+    
+    /**
      * Ensure all required directories exist
      * Creates missing directories with proper permissions
      */
@@ -248,7 +282,9 @@ class FilePathConfig {
         $dirsToCreate[] = $this->getArchivedStudentsPath();
         $dirsToCreate[] = $this->getDistributionsPath();
         $dirsToCreate[] = $this->getAnnouncementsPath();
-        $dirsToCreate[] = $this->getMunicipalLogosPath();
+    $dirsToCreate[] = $this->getMunicipalLogosPath();
+    // Data exports directory (outside assets/uploads)
+    $dirsToCreate[] = $this->getDataExportsPath();
         
         // Temp subfolders
         foreach ($this->folderStructure['temp'] as $folder) {
@@ -288,10 +324,11 @@ class FilePathConfig {
      */
     public function resolveRelativePath($relativePath = '') {
         // Remove leading 'assets/uploads/' if present
-        $relativePath = preg_replace('#^/?assets/uploads/?#', '', $relativePath);
-        
-        // Build absolute path
-        return $this->baseUploadsDir . $relativePath;
+    $relativePath = preg_replace('#^/?assets/uploads/?#', '', $relativePath);
+    // Sanitize to avoid path traversal
+    $relativePath = $this->sanitizeRelativePath((string)$relativePath);
+    // Build absolute path
+    return rtrim($this->baseUploadsDir, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . $relativePath;
     }
     
     /**
@@ -304,18 +341,26 @@ class FilePathConfig {
         // Normalize separators
         $absolutePath = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $absolutePath);
         
-        // Remove base path
-        $relativePath = str_replace($this->baseUploadsDir, '', $absolutePath);
-        
-        // Convert to forward slashes for database consistency
-        $relativePath = str_replace(DIRECTORY_SEPARATOR, '/', $relativePath);
-        
-        // Ensure it starts with assets/uploads/
-        if (strpos($relativePath, 'assets/uploads/') !== 0) {
-            $relativePath = 'assets/uploads/' . ltrim($relativePath, '/');
+        // If path is under uploads, produce assets/uploads/... form
+        if (strpos($absolutePath, $this->baseUploadsDir) === 0) {
+            $relativePath = str_replace($this->baseUploadsDir, '', $absolutePath);
+            $relativePath = str_replace(DIRECTORY_SEPARATOR, '/', $relativePath);
+            if (strpos($relativePath, 'assets/uploads/') !== 0) {
+                $relativePath = 'assets/uploads/' . ltrim($relativePath, '/');
+            }
+            return $relativePath;
         }
         
-        return $relativePath;
+        // If path is under data exports, return data/exports/... for clarity
+        $exportsPath = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $this->getDataExportsPath());
+        if (strpos($absolutePath, $exportsPath) === 0) {
+            $relativePath = str_replace($exportsPath, '', $absolutePath);
+            $relativePath = 'data/exports/' . ltrim(str_replace(DIRECTORY_SEPARATOR, '/', $relativePath), '/');
+            return $relativePath;
+        }
+        
+        // Fallback: return normalized forward-slash path without forcing a prefix
+        return ltrim(str_replace(DIRECTORY_SEPARATOR, '/', $absolutePath), '/');
     }
     
     /**
@@ -388,6 +433,7 @@ class FilePathConfig {
             'environment' => $this->isRailway ? 'Railway' : 'Localhost',
             'base_uploads_path' => $this->baseUploadsPath,
             'base_uploads_dir' => $this->baseUploadsDir,
+            'data_exports_path' => $this->getDataExportsPath(),
             'directory_separator' => DIRECTORY_SEPARATOR,
             'temp_path' => $this->getTempPath(),
             'student_path' => $this->getStudentPath(),
