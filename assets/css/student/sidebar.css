@@ -16,11 +16,12 @@
 }
 
 /* === SIDEBAR BASE (primary definition) === */
+/* Sidebar sits directly beneath the student topbar. Use unified --topbar-h variable (defined in homepage.css & topbar). */
 .sidebar {
   position: fixed;
-  top: var(--topbar-h, 60px); /* ensure it sits directly below the student topbar */
+  top: var(--topbar-h, 44px); /* unified with actual topbar height */
   left: 0;
-  height: calc(100vh - var(--topbar-h, 60px));
+  height: calc(100vh - var(--topbar-h, 44px));
   width: 250px;
   background-color: #f9f9f9;
   padding: 20px 0;
@@ -33,12 +34,13 @@
   flex-direction: column;
 }
 
-/* Mobile: sidebar covers entire screen including topbar when open */
-@media (max-width: 768px) {
+/* Mobile/Tablet: sidebar COVERS the topbar (overlay behavior like admin) */
+@media (max-width: 992px) {
   .sidebar {
-    top: var(--topbar-h, 60px);
-    height: calc(100vh - var(--topbar-h, 60px));
-    z-index: 1060; /* above topbar (1050) and header (1030) */
+    top: 0 !important;
+    height: 100vh !important;
+    z-index: 1080 !important; /* decisively above topbar (1050) and backdrop (1060) */
+    box-shadow: 4px 0 20px rgba(0, 0, 0, 0.3); /* drop shadow for overlay depth */
   }
 }
 
@@ -196,50 +198,41 @@
   border: none;
 }
 
-/* === BACKDROP === */
+/* === BACKDROP (enabled for overlay) === */
 .sidebar-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
-  z-index: 1055; /* Above topbar (1050) and header (1030), below sidebar (1060) */
+  background: rgba(0, 0, 0, 0.5); /* Darker overlay for better visibility */
+  backdrop-filter: blur(2px); /* Subtle blur effect (modern browsers) */
+  -webkit-backdrop-filter: blur(2px); /* Safari support */
+  z-index: 1060; /* below sidebar (1080) but above topbar (1050) */
   opacity: 0;
+  transition: opacity 0.3s ease, backdrop-filter 0.3s ease;
   pointer-events: none;
-  transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
+.sidebar-backdrop:not(.d-none) { opacity: 1; pointer-events: all; }
+.sidebar-backdrop.d-none { display: none; }
 
-.sidebar-backdrop:not(.d-none) {
-  opacity: 1;
-  pointer-events: all;
-}
-
-.sidebar-backdrop.d-none {
-  display: none;
-}
-
-/* === MOBILE RESPONSIVE === */
-@media (max-width: 768px) {
+/* === MOBILE/TABLET RESPONSIVE === */
+@media (max-width: 992px) {
   .sidebar {
-    top: 0; /* Start from very top of screen */
-    height: 100vh; /* Full viewport height */
-    width: 280px; /* Slightly narrower on mobile for better UX */
+    top: 0; /* cover topbar */
+    height: 100vh; /* full viewport */
+    width: 260px; /* slightly narrower mobile variant */
     transform: translateX(-100%);
-    transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
     border-top-right-radius: 0;
     border-bottom-right-radius: 0;
-    box-shadow: 4px 0 12px rgba(0, 0, 0, 0.15); /* More prominent shadow when open */
+    box-shadow: 4px 0 20px rgba(0, 0, 0, 0.3); /* enhanced shadow for overlay */
   }
 
-  .sidebar.open {
-    transform: translateX(0);
-  }
+  .sidebar.open { transform: translateX(0); }
 
-  .sidebar.close {
-    transform: translateX(-100%);
-    width: 280px; /* Keep same width even when "closed" class is present */
-  }
+  .sidebar.close { transform: translateX(-100%); width:260px; }
 
-  .sidebar-backdrop {
-    display: block;
+  .sidebar-backdrop { 
+    display:block; 
+    z-index: 1060; /* Below sidebar (1080), above topbar (1050) */
   }
 
   .home-section {

@@ -2567,92 +2567,214 @@ $page_title = 'Upload Documents';
     
     <!-- Year Level Update Modal -->
     <div class="modal fade" id="yearLevelUpdateModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header bg-primary text-white">
-                    <h5 class="modal-title">
-                        <i class="bi bi-person-badge me-2"></i>
-                        <?php if ($current_academic_year): ?>
-                            Update Year Level for A.Y. <?= htmlspecialchars($current_academic_year) ?>
-                        <?php else: ?>
-                            Update Your Year Level
-                        <?php endif; ?>
-                    </h5>
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; overflow: hidden;">
+                <!-- Enhanced Header with Gradient -->
+                <div class="modal-header border-0 text-white position-relative" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 28px 32px;">
+                    <div class="position-relative z-1 w-100">
+                        <div class="d-flex align-items-center mb-2">
+                            <div class="icon-wrapper me-3" style="width: 48px; height: 48px; background: rgba(255,255,255,0.2); border-radius: 12px; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(10px);">
+                                <i class="bi bi-calendar-check" style="font-size: 24px;"></i>
+                            </div>
+                            <div>
+                                <h5 class="modal-title mb-0" style="font-size: 1.4rem; font-weight: 700; text-shadow: 0 2px 4px rgba(0,0,0,0.2);">
+                                    <?php if ($current_academic_year): ?>
+                                        Update Year Level
+                                    <?php else: ?>
+                                        Update Your Year Level
+                                    <?php endif; ?>
+                                </h5>
+                                <?php if ($current_academic_year): ?>
+                                <p class="mb-0 mt-1" style="font-size: 0.9rem; opacity: 0.95;">Academic Year <?= htmlspecialchars($current_academic_year) ?></p>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Decorative Elements -->
+                    <div class="position-absolute" style="top: -50%; right: -10%; width: 200%; height: 200%; background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%); pointer-events: none;"></div>
                 </div>
-                <div class="modal-body">
-                    <div class="alert alert-info mb-3">
-                        <i class="bi bi-info-circle me-2"></i>
-                        <strong><?= htmlspecialchars($year_level_update_message) ?></strong>
+                
+                <div class="modal-body" style="padding: 32px;">
+                    <!-- Enhanced Info Alert -->
+                    <div class="alert border-0 mb-4" style="background: linear-gradient(135deg, #e0f2fe 0%, #dbeafe 100%); border-left: 4px solid #3b82f6 !important; border-radius: 12px; padding: 20px;">
+                        <div class="d-flex align-items-start">
+                            <div class="flex-shrink-0 me-3">
+                                <div style="width: 40px; height: 40px; background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); border-radius: 10px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);">
+                                    <i class="bi bi-info-circle" style="font-size: 20px; color: white;"></i>
+                                </div>
+                            </div>
+                            <div class="flex-grow-1">
+                                <strong style="color: #1e40af; font-size: 0.95rem;"><?= htmlspecialchars($year_level_update_message) ?></strong>
+                            </div>
+                        </div>
                     </div>
                     
                     <?php if (!empty($student['current_year_level']) && !empty($student['status_academic_year'])): ?>
-                    <div class="alert alert-light border mb-3">
-                        <small class="text-muted d-block mb-1">Your previous record:</small>
-                        <strong><?= htmlspecialchars($student['current_year_level']) ?></strong> 
-                        <span class="text-muted">for A.Y. <?= htmlspecialchars($student['status_academic_year']) ?></span>
-                        <?php if ($student['is_graduating'] === 't'): ?>
-                            <span class="badge bg-success ms-2">Was Graduating</span>
-                        <?php elseif ($student['is_graduating'] === 'f'): ?>
-                            <span class="badge bg-primary ms-2">Was Continuing</span>
-                        <?php endif; ?>
+                    <!-- Enhanced Previous Record Card -->
+                    <div class="card border-0 mb-4" style="background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.04);">
+                        <div class="card-body" style="padding: 20px;">
+                            <div class="d-flex align-items-center mb-2">
+                                <i class="bi bi-clock-history me-2" style="color: #6b7280; font-size: 18px;"></i>
+                                <small class="text-muted fw-semibold text-uppercase" style="font-size: 0.75rem; letter-spacing: 0.5px;">Your Previous Record</small>
+                            </div>
+                            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                                <div>
+                                    <strong style="font-size: 1.1rem; color: #1f2937;"><?= htmlspecialchars($student['current_year_level']) ?></strong> 
+                                    <span class="text-muted" style="font-size: 0.9rem;">• A.Y. <?= htmlspecialchars($student['status_academic_year']) ?></span>
+                                </div>
+                                <?php if ($student['is_graduating'] === 't'): ?>
+                                    <span class="badge" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 6px 12px; border-radius: 8px; font-weight: 600;">
+                                        <i class="bi bi-trophy me-1"></i> Was Graduating
+                                    </span>
+                                <?php elseif ($student['is_graduating'] === 'f'): ?>
+                                    <span class="badge" style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); padding: 6px 12px; border-radius: 8px; font-weight: 600;">
+                                        <i class="bi bi-arrow-repeat me-1"></i> Was Continuing
+                                    </span>
+                                <?php endif; ?>
+                            </div>
+                        </div>
                     </div>
                     <?php endif; ?>
                     
                     <form id="yearLevelUpdateForm">
-                        <div class="mb-3">
-                            <label class="form-label fw-bold">
-                                <i class="bi bi-mortarboard me-1"></i> Current Year Level <span class="text-danger">*</span>
+                        <!-- Enhanced Year Level Select -->
+                        <div class="mb-4">
+                            <label class="form-label fw-bold mb-3" style="color: #1f2937; font-size: 1rem;">
+                                <i class="bi bi-mortarboard me-2" style="color: #667eea;"></i> Current Year Level <span class="text-danger">*</span>
                             </label>
-                            <select class="form-select" name="year_level" required>
-                                <option value="">-- Select Year Level --</option>
+                            <select class="form-select form-select-lg" name="year_level" required style="border-radius: 12px; border: 2px solid #e5e7eb; padding: 14px 18px; font-size: 1rem; transition: all 0.2s;">
+                                <option value="">-- Select Your Current Year Level --</option>
                                 <option value="1st Year" <?= ($student['current_year_level'] ?? '') === '1st Year' ? 'selected' : '' ?>>1st Year</option>
                                 <option value="2nd Year" <?= ($student['current_year_level'] ?? '') === '2nd Year' ? 'selected' : '' ?>>2nd Year</option>
                                 <option value="3rd Year" <?= ($student['current_year_level'] ?? '') === '3rd Year' ? 'selected' : '' ?>>3rd Year</option>
                                 <option value="4th Year" <?= ($student['current_year_level'] ?? '') === '4th Year' ? 'selected' : '' ?>>4th Year</option>
                                 <option value="5th Year" <?= ($student['current_year_level'] ?? '') === '5th Year' ? 'selected' : '' ?>>5th Year</option>
                             </select>
-                            <small class="text-muted">
-                                <i class="bi bi-arrow-up-circle me-1"></i>
-                                Students must advance to the next year level each academic year
-                            </small>
-                            <small class="text-danger d-block mt-1">
-                                <i class="bi bi-exclamation-triangle me-1"></i>
-                                If you are repeating a year or went down a level, your account will be deactivated for admin verification
-                            </small>
+                            
+                            <!-- Enhanced Help Text -->
+                            <div class="mt-3" style="background: #fef3c7; border-left: 3px solid #f59e0b; padding: 12px 16px; border-radius: 8px;">
+                                <div class="d-flex align-items-start">
+                                    <i class="bi bi-arrow-up-circle me-2 flex-shrink-0" style="color: #d97706; font-size: 18px; margin-top: 2px;"></i>
+                                    <small style="color: #78350f; line-height: 1.5;">
+                                        <strong>Reminder:</strong> Students must advance to the next year level each academic year
+                                    </small>
+                                </div>
+                            </div>
+                            
+                            <div class="mt-2" style="background: #fee2e2; border-left: 3px solid #ef4444; padding: 12px 16px; border-radius: 8px;">
+                                <div class="d-flex align-items-start">
+                                    <i class="bi bi-exclamation-triangle me-2 flex-shrink-0" style="color: #dc2626; font-size: 18px; margin-top: 2px;"></i>
+                                    <small style="color: #7f1d1d; line-height: 1.5;">
+                                        <strong>Important:</strong> If you are repeating a year or went down a level, your account will be deactivated for admin verification
+                                    </small>
+                                </div>
+                            </div>
                         </div>
                         
-                        <div class="mb-3">
-                            <label class="form-label fw-bold">
-                                <i class="bi bi-calendar-check me-1"></i> Graduation Status <span class="text-danger">*</span>
+                        <!-- Enhanced Graduation Status -->
+                        <div class="mb-4">
+                            <label class="form-label fw-bold mb-3" style="color: #1f2937; font-size: 1rem;">
+                                <i class="bi bi-calendar-check me-2" style="color: #667eea;"></i> Graduation Status <span class="text-danger">*</span>
                             </label>
-                            <div class="row g-2">
-                                <div class="col-6">
+                            <div class="row g-3">
+                                <div class="col-md-6">
                                     <input type="radio" class="btn-check" name="is_graduating" id="not_graduating" value="0" <?= (isset($student['is_graduating']) && $student['is_graduating'] === 'f') ? 'checked' : '' ?>>
-                                    <label class="btn btn-outline-primary w-100" for="not_graduating">
-                                        <i class="bi bi-arrow-repeat d-block fs-3 mb-2"></i>
-                                        <strong>Still Continuing</strong>
-                                        <p class="mb-0 small">I will continue next year</p>
+                                    <label class="btn btn-outline-primary w-100 h-100 d-flex flex-column align-items-center justify-content-center p-4" for="not_graduating" style="border-radius: 12px; border-width: 2px; transition: all 0.3s; min-height: 180px;">
+                                        <div class="icon-circle mb-3" style="width: 70px; height: 70px; background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: all 0.3s;">
+                                            <i class="bi bi-arrow-repeat" style="font-size: 32px; color: #3b82f6;"></i>
+                                        </div>
+                                        <strong class="mb-2" style="font-size: 1.1rem;">Still Continuing</strong>
+                                        <p class="mb-0 small text-muted" style="line-height: 1.4;">I will continue my studies next academic year</p>
                                     </label>
                                 </div>
-                                <div class="col-6">
+                                <div class="col-md-6">
                                     <input type="radio" class="btn-check" name="is_graduating" id="graduating" value="1" <?= (isset($student['is_graduating']) && $student['is_graduating'] === 't') ? 'checked' : '' ?>>
-                                    <label class="btn btn-outline-success w-100" for="graduating">
-                                        <i class="bi bi-trophy d-block fs-3 mb-2"></i>
-                                        <strong>Graduating</strong>
-                                        <p class="mb-0 small">This is my final year</p>
+                                    <label class="btn btn-outline-success w-100 h-100 d-flex flex-column align-items-center justify-content-center p-4" for="graduating" style="border-radius: 12px; border-width: 2px; transition: all 0.3s; min-height: 180px;">
+                                        <div class="icon-circle mb-3" style="width: 70px; height: 70px; background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: all 0.3s;">
+                                            <i class="bi bi-trophy" style="font-size: 32px; color: #10b981;"></i>
+                                        </div>
+                                        <strong class="mb-2" style="font-size: 1.1rem;">Graduating</strong>
+                                        <p class="mb-0 small text-muted" style="line-height: 1.4;">This is my final year of studies</p>
                                     </label>
                                 </div>
                             </div>
                         </div>
                         
+                        <style>
+                            /* Enhanced select styling */
+                            .form-select:focus {
+                                border-color: #667eea !important;
+                                box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1) !important;
+                            }
+                            
+                            /* Enhanced radio button styling */
+                            .btn-check:checked + label {
+                                transform: translateY(-2px);
+                                box-shadow: 0 8px 20px rgba(0,0,0,0.12) !important;
+                            }
+                            
+                            .btn-check:checked + label.btn-outline-primary {
+                                background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
+                                border-color: #2563eb !important;
+                                color: white !important;
+                            }
+                            
+                            .btn-check:checked + label.btn-outline-primary .icon-circle {
+                                background: rgba(255,255,255,0.2) !important;
+                            }
+                            
+                            .btn-check:checked + label.btn-outline-primary .icon-circle i {
+                                color: white !important;
+                            }
+                            
+                            .btn-check:checked + label.btn-outline-primary .text-muted {
+                                color: rgba(255,255,255,0.9) !important;
+                            }
+                            
+                            .btn-check:checked + label.btn-outline-success {
+                                background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+                                border-color: #059669 !important;
+                                color: white !important;
+                            }
+                            
+                            .btn-check:checked + label.btn-outline-success .icon-circle {
+                                background: rgba(255,255,255,0.2) !important;
+                            }
+                            
+                            .btn-check:checked + label.btn-outline-success .icon-circle i {
+                                color: white !important;
+                            }
+                            
+                            .btn-check:checked + label.btn-outline-success .text-muted {
+                                color: rgba(255,255,255,0.9) !important;
+                            }
+                            
+                            .btn-outline-primary:hover,
+                            .btn-outline-success:hover {
+                                transform: translateY(-2px);
+                                box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+                            }
+                        </style>
+                        
                         <input type="hidden" name="academic_year" value="<?= htmlspecialchars($current_academic_year ?? '') ?>">
                         <input type="hidden" name="update_year_level" value="1">
                         
-                        <div class="d-grid">
-                            <button type="submit" class="btn btn-primary btn-lg">
+                        <div class="d-grid mt-4">
+                            <button type="submit" class="btn btn-lg text-white" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none; border-radius: 12px; padding: 16px; font-weight: 600; font-size: 1.05rem; transition: all 0.3s; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);">
                                 <i class="bi bi-check-circle me-2"></i> Update & Continue
                             </button>
                         </div>
+                        
+                        <style>
+                            button[type="submit"]:hover {
+                                transform: translateY(-2px);
+                                box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4) !important;
+                            }
+                            
+                            button[type="submit"]:active {
+                                transform: translateY(0);
+                            }
+                        </style>
                     </form>
                 </div>
             </div>

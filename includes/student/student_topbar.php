@@ -127,13 +127,15 @@ if (isset($connection)) {
   background: <?= htmlspecialchars($topbar_background_css, ENT_QUOTES) ?>;
   color: <?= htmlspecialchars($topbar_settings['topbar_text_color']) ?>;
   font-size: 0.775rem;
-  z-index: 1050;
+  z-index: 1050; /* below sidebar (1070) */
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
+  width: 100%;
   min-height: 44px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, .15);
+  box-sizing: border-box;
 }
 
 .student-topbar .container-fluid {

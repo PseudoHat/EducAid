@@ -219,6 +219,18 @@ function adjustColorOpacity($color, $opacity = 0.3) {
     .student-sidebar .nav-item a { margin: 2px 8px; }
     .student-sidebar .nav-item.logout a.logout-link { margin: 6px 8px 8px; }
 }
+
+/* Mobile overlay fix - ensure sidebar covers topbar */
+@media (max-width: 992px) {
+    .sidebar,
+    .student-sidebar {
+        top: 0 !important;
+        height: 100vh !important;
+        z-index: 1080 !important;
+        box-shadow: 4px 0 20px rgba(0, 0, 0, 0.3) !important;
+    }
+}
+
 /* Profile block */
 .student-sidebar .sidebar-profile {
     display: flex;

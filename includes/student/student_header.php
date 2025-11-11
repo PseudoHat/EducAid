@@ -83,20 +83,21 @@ $__hdr = educaid_get_student_header_theme($connection ?? null);
   border-bottom: 1px solid <?= htmlspecialchars($__hdr['header_border_color']) ?>;
   box-shadow: 0 2px 4px rgba(0,0,0,.06);
   padding: .55rem 0;
-  z-index: 1030;
+  z-index: 1030; /* below sidebar/backdrop/topbar */
   position: fixed;
   top: var(--topbar-h, 44px);
+  /* left property is animated by JS - no CSS transition to avoid collision */
   left: 250px;
   right: 0;
+  width: calc(100% - 250px);
   height: 56px;
   color: <?= htmlspecialchars($__hdr['header_text_color']) ?>;
   overflow: visible;
-  max-width: calc(100% - 250px);
   box-sizing: border-box;
 }
 .sidebar.close ~ .student-main-header { 
   left: 70px; 
-  max-width: calc(100% - 70px);
+  width: calc(100% - 70px);
 }
 .student-main-header .container-fluid { 
   height: 100%; 
@@ -131,7 +132,7 @@ $__hdr = educaid_get_student_header_theme($connection ?? null);
   padding: .55rem .65rem;
   position: relative;
   cursor: pointer;
-  transition: .2s;
+  transition: background-color .2s, border-color .2s, color .2s;
   color: <?= htmlspecialchars($__hdr['header_icon_color']) ?>;
 }
 .student-icon-btn .bi { font-size: 1.05rem; }
@@ -152,7 +153,7 @@ $__hdr = educaid_get_student_header_theme($connection ?? null);
   color: <?= htmlspecialchars($__hdr['header_icon_color']) ?>;
   border-radius: 8px;
   padding: 4px 8px;
-  transition: .2s;
+  transition: background-color .2s, color .2s;
   line-height: 1;
   display: flex;
   align-items: center;
@@ -200,12 +201,12 @@ $__hdr = educaid_get_student_header_theme($connection ?? null);
   padding: 0.25em 0.5em;
 }
 
-@media (max-width: 576px) {
+@media (max-width: 992px) {
   .student-main-header { 
     padding: .4rem 0; 
     left: 0 !important; 
     right: 0;
-    max-width: 100% !important;
+    width: 100% !important;
   }
   #menu-toggle { font-size: 26px; }
   .student-header-actions { gap: .65rem; }

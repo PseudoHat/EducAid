@@ -9,15 +9,23 @@ document.addEventListener("DOMContentLoaded", function () {
   const homeSection = document.querySelector(".home-section") || document.getElementById("mainContent");
 
   function isMobile() {
-    return window.innerWidth <= 768;
+    return window.innerWidth <= 992;
   }
 
   const header = document.querySelector('.student-main-header') || document.querySelector('.main-header');
   const adjustLayout = () => {
     if (!header) return;
     const closed = sidebar.classList.contains('close');
-    const left = closed ? 70 : 250; // match .sidebar.close { width: 70px; }
-    header.style.left = isMobile() ? '0px' : left + 'px';
+    const sidebarWidth = closed ? 70 : 250; // match .sidebar.close { width: 70px; }
+    
+    if (isMobile()) {
+      header.style.left = '0px';
+      header.style.width = '100%';
+    } else {
+      header.style.left = sidebarWidth + 'px';
+      header.style.width = `calc(100% - ${sidebarWidth}px)`;
+    }
+    
     if (homeSection) {
       // Remove any inline margin-left so CSS width calc stays accurate
       homeSection.style.marginLeft = isMobile() ? '0px' : '';
@@ -66,35 +74,29 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     if (isMobile()) {
-      // Mobile: Use CSS transitions for smooth animation
+      // Mobile: overlay behavior with backdrop (like admin)
       if (expand) {
-        // Show backdrop first
-        backdrop.classList.remove("d-none");
-        document.body.style.overflow = "hidden";
-        
-        // Force reflow to ensure transition works
-        void backdrop.offsetWidth;
-        
-        // Add open class to trigger CSS transition
+        if (backdrop) {
+          backdrop.classList.remove("d-none");
+          // force reflow to apply transition
+          void backdrop.offsetWidth;
+        }
         sidebar.classList.add("open");
         sidebar.classList.remove("close");
-        backdrop.style.opacity = "1";
+        if (backdrop) backdrop.style.opacity = "1";
+        document.body.style.overflow = "hidden";
       } else {
-        // Hide sidebar and backdrop
         sidebar.classList.remove("open");
         sidebar.classList.add("close");
-        backdrop.style.opacity = "0";
+        if (backdrop) backdrop.style.opacity = "0";
         document.body.style.overflow = "";
-        
-        // Hide backdrop after transition completes
         setTimeout(() => {
-          if (!sidebar.classList.contains("open")) {
+          if (!sidebar.classList.contains("open") && backdrop) {
             backdrop.classList.add("d-none");
             backdrop.style.opacity = "";
           }
-        }, 400); // Match CSS transition duration
+        }, 300);
       }
-      
       adjustLayout();
       return;
     }
@@ -123,7 +125,10 @@ document.addEventListener("DOMContentLoaded", function () {
       sidebar.style.width = current + 'px';
 
       // Animate header and content shift inline (will be cleaned up after)
-      if (header && !isMobile()) header.style.left = current + 'px';
+      if (header && !isMobile()) {
+        header.style.left = current + 'px';
+        header.style.width = `calc(100% - ${current}px)`;
+      }
       if (homeSection && !isMobile()) {
         homeSection.style.marginLeft = current + 'px';
         homeSection.style.width = `calc(100% - ${current}px)`;
@@ -145,6 +150,10 @@ document.addEventListener("DOMContentLoaded", function () {
           if (homeSection) homeSection.classList.remove("expanded");
         }
         // Clean up inline shifts - let adjustLayout() set final canonical values
+        if (header) {
+          header.style.left = '';
+          header.style.width = '';
+        }
         if (homeSection) {
           homeSection.style.marginLeft = '';
           homeSection.style.width = '';
@@ -156,9 +165,15 @@ document.addEventListener("DOMContentLoaded", function () {
     requestAnimationFrame(step);
   }
 
+  let suppressOutsideClickUntil = 0;
+  
   toggleBtn.addEventListener("click", function (e) {
     e.stopPropagation();
-    const expanding = sidebar.classList.contains("close");
+    e.preventDefault();
+    const expanding = isMobile() 
+      ? !sidebar.classList.contains("open") 
+      : sidebar.classList.contains("close");
+    suppressOutsideClickUntil = performance.now() + 500; // Suppress for 500ms
     animateSidebar(expanding);
   });
 
@@ -168,11 +183,17 @@ document.addEventListener("DOMContentLoaded", function () {
 
   // Hide sidebar on mobile when clicking outside of it
   document.addEventListener("click", function (e) {
-    if (isMobile() && sidebar.classList.contains("open")) {
-      const isClickInside = sidebar.contains(e.target) || toggleBtn.contains(e.target);
-      if (!isClickInside) {
-        animateSidebar(false); // Use animation for closing
-      }
+    if (!isMobile()) return;
+    if (!sidebar.classList.contains("open")) return;
+    if (sidebarAnimating) return;
+    if (performance.now() < suppressOutsideClickUntil) return;
+    
+    const toggleWrapper = toggleBtn.closest('.sidebar-toggle');
+    const isClickInside = sidebar.contains(e.target) || 
+                          toggleBtn.contains(e.target) || 
+                          (toggleWrapper && toggleWrapper.contains(e.target));
+    if (!isClickInside) {
+      animateSidebar(false);
     }
   });
 
