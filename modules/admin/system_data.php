@@ -158,15 +158,15 @@ $page_title = 'System Data Management';
             <h4 class="fw-bold mb-4"><i class="bi bi-database me-2 text-primary"></i>System Data Management</h4>
             
             <?php if (isset($success)): ?>
-                <div class="alert alert-success"><?= htmlspecialchars($success) ?></div>
+                <div class="modern-alert modern-alert-success"><?= htmlspecialchars($success) ?></div>
             <?php endif; ?>
             <?php if (isset($error)): ?>
-                <div class="alert alert-danger"><?= htmlspecialchars($error) ?></div>
+                <div class="modern-alert modern-alert-danger"><?= htmlspecialchars($error) ?></div>
             <?php endif; ?>
 
             <!-- Universities List -->
                     <div class="table-responsive">
-                        <table class="table table-striped" id="universitiesTable">
+                        <table class="table modern-table" id="universitiesTable">
                             <thead>
                                 <tr>
                                     <th>University Name</th>
@@ -180,7 +180,7 @@ $page_title = 'System Data Management';
                                 <?php foreach ($universities as $university): ?>
                                     <tr>
                                         <td><?= htmlspecialchars($university['name']) ?></td>
-                                        <td><span class="badge bg-info"><?= htmlspecialchars($university['code']) ?></span></td>
+                                        <td><span class="modern-badge modern-badge-info"><?= htmlspecialchars($university['code']) ?></span></td>
                                         <td><?= $university['student_count'] ?> students</td>
                                         <td><?= date('M d, Y', strtotime($university['created_at'])) ?></td>
                                         <td>
@@ -201,7 +201,7 @@ $page_title = 'System Data Management';
                     <!-- Pagination Controls -->
                     <div class="d-flex justify-content-between align-items-center mt-3">
                         <div>
-                            <select id="universitiesPerPage" class="form-select form-select-sm" style="width: auto;">
+                            <select id="universitiesPerPage" class="form-select form-select modern-form-control-sm" style="width: auto;">
                                 <option value="10">10 per page</option>
                                 <option value="25" selected>25 per page</option>
                                 <option value="50">50 per page</option>
@@ -219,22 +219,22 @@ $page_title = 'System Data Management';
                     </div>
 
             <!-- Barangays Management (now inside same container to align with Universities) -->
-            <div class="card mb-4">
+            <div class="modern-card mb-4">
                 <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
                     <h5 class="mb-0"><i class="bi bi-geo-alt me-2"></i>Barangays Management</h5>
                     <span class="badge bg-light text-dark"><?= count($barangays) ?> barangays</span>
                 </div>
-                <div class="card-body">
+                <div class="card-body p-4">
                     <!-- Controls Row -->
                     <div class="row mb-3">
                         <div class="col-md-6">
-                            <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addBarangayModal">
+                            <button type="button" class="modern-btn modern-btn-success" data-bs-toggle="modal" data-bs-target="#addBarangayModal">
                                 <i class="bi bi-plus"></i> Add Barangay
                             </button>
                         </div>
                         <div class="col-md-6">
                             <div class="input-group">
-                                <input type="text" class="form-control" id="barangaySearch" placeholder="Search barangays...">
+                                <input type="text" class="modern-form-control" id="barangaySearch" placeholder="Search barangays...">
                                 <span class="input-group-text"><i class="bi bi-search"></i></span>
                             </div>
                         </div>
@@ -242,7 +242,7 @@ $page_title = 'System Data Management';
                     
                     <!-- Barangays List -->
                     <div class="table-responsive">
-                        <table class="table table-striped" id="barangaysTable">
+                        <table class="table modern-table" id="barangaysTable">
                             <thead>
                                 <tr>
                                     <th>Barangay Name</th>
@@ -273,7 +273,7 @@ $page_title = 'System Data Management';
                     <!-- Pagination Controls -->
                     <div class="d-flex justify-content-between align-items-center mt-3">
                         <div>
-                            <select id="barangaysPerPage" class="form-select form-select-sm" style="width: auto;">
+                            <select id="barangaysPerPage" class="form-select form-select modern-form-control-sm" style="width: auto;">
                                 <option value="10">10 per page</option>
                                 <option value="25" selected>25 per page</option>
                                 <option value="50">50 per page</option>
@@ -294,12 +294,12 @@ $page_title = 'System Data Management';
             
             <!-- Year Levels (Read-only) -->
             <div class="card mt-5">
-                <div class="card-header bg-info text-white">
+                <div class="modern-card-header">
                     <h5 class="mb-0"><i class="bi bi-layers me-2"></i>Year Levels (System Defined)</h5>
                 </div>
-                <div class="card-body">
+                <div class="card-body p-4">
                     <div class="table-responsive">
-                        <table class="table table-striped">
+                        <table class="table modern-table">
                             <thead>
                                 <tr>
                                     <th>Year Level</th>
@@ -328,26 +328,26 @@ $page_title = 'System Data Management';
 <!-- Add University Modal -->
 <div class="modal fade" id="addUniversityModal" tabindex="-1" aria-labelledby="addUniversityModalLabel" aria-hidden="true">
     <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
+        <div class="modal-content modern-modal-content">
+            <div class="modal-header modern-modal-header">
                 <h5 class="modal-title" id="addUniversityModalLabel"><i class="bi bi-building me-2"></i>Add New University</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form method="POST" id="addUniversityForm">
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label for="university_name" class="form-label">University Name <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="university_name" name="university_name" required>
+                        <label for="university_name" class="modern-form-label">University Name <span class="text-danger">*</span></label>
+                        <input type="text" class="modern-form-control" id="university_name" name="university_name" required>
                     </div>
                     <div class="mb-3">
-                        <label for="university_code" class="form-label">University Code <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="university_code" name="university_code" placeholder="e.g., UST" maxlength="10" required>
+                        <label for="university_code" class="modern-form-label">University Code <span class="text-danger">*</span></label>
+                        <input type="text" class="modern-form-control" id="university_code" name="university_code" placeholder="e.g., UST" maxlength="10" required>
                         <small class="text-muted">Short code/abbreviation for the university</small>
                     </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" name="add_university" class="btn btn-primary">
+                    <button type="submit" name="add_university" class="modern-btn modern-btn-primary">
                         <i class="bi bi-plus"></i> Add University
                     </button>
                 </div>
@@ -359,21 +359,21 @@ $page_title = 'System Data Management';
 <!-- Add Barangay Modal -->
 <div class="modal fade" id="addBarangayModal" tabindex="-1" aria-labelledby="addBarangayModalLabel" aria-hidden="true">
     <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
+        <div class="modal-content modern-modal-content">
+            <div class="modal-header modern-modal-header">
                 <h5 class="modal-title" id="addBarangayModalLabel"><i class="bi bi-geo-alt me-2"></i>Add New Barangay</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form method="POST" id="addBarangayForm">
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label for="barangay_name" class="form-label">Barangay Name <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="barangay_name" name="barangay_name" required>
+                        <label for="barangay_name" class="modern-form-label">Barangay Name <span class="text-danger">*</span></label>
+                        <input type="text" class="modern-form-control" id="barangay_name" name="barangay_name" required>
                     </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" name="add_barangay" class="btn btn-success">
+                    <button type="submit" name="add_barangay" class="modern-btn modern-btn-success">
                         <i class="bi bi-plus"></i> Add Barangay
                     </button>
                 </div>
@@ -385,14 +385,14 @@ $page_title = 'System Data Management';
 <!-- Delete University Modal -->
 <div class="modal fade" id="deleteUniversityModal" tabindex="-1" aria-labelledby="deleteUniversityModalLabel" aria-hidden="true">
     <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
+        <div class="modal-content modern-modal-content">
+            <div class="modal-header modern-modal-header">
                 <h5 class="modal-title" id="deleteUniversityModalLabel"><i class="bi bi-exclamation-triangle me-2 text-danger"></i>Confirm Deletion</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form method="POST" id="deleteUniversityForm">
                 <div class="modal-body">
-                    <div class="alert alert-warning">
+                    <div class="modern-alert modern-alert-warning">
                         <i class="bi bi-exclamation-triangle me-2"></i>
                         <strong>Warning:</strong> This action cannot be undone.
                     </div>
@@ -413,14 +413,14 @@ $page_title = 'System Data Management';
 <!-- Delete Barangay Modal -->
 <div class="modal fade" id="deleteBarangayModal" tabindex="-1" aria-labelledby="deleteBarangayModalLabel" aria-hidden="true">
     <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
+        <div class="modal-content modern-modal-content">
+            <div class="modal-header modern-modal-header">
                 <h5 class="modal-title" id="deleteBarangayModalLabel"><i class="bi bi-exclamation-triangle me-2 text-danger"></i>Confirm Deletion</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form method="POST" id="deleteBarangayForm">
                 <div class="modal-body">
-                    <div class="alert alert-warning">
+                    <div class="modern-alert modern-alert-warning">
                         <i class="bi bi-exclamation-triangle me-2"></i>
                         <strong>Warning:</strong> This action cannot be undone.
                     </div>

@@ -151,6 +151,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 ?>
 <?php $page_title='Settings'; $extra_css=[]; include __DIR__ . '/../../includes/admin/admin_head.php'; ?>
+<link rel="stylesheet" href="../../assets/css/admin/modern-ui.css">
 <style>
     td button.btn-outline-danger {
       padding: 4px 8px;
@@ -178,16 +179,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       <?php endif; ?>
       
       <!-- Capacity Management Section -->
-      <div class="card mb-4">
-        <div class="card-header bg-warning text-dark">
+      <div class="modern-card mb-4">
+        <div class="modern-card-header">
           <h5 class="mb-0"><i class="bi bi-gear-fill me-2"></i>Program Capacity Management</h5>
         </div>
-        <div class="card-body">
+        <div class="card-body p-4">
           <?php if (isset($capacity_success)): ?>
-            <div class="alert alert-success"><?= htmlspecialchars($capacity_success) ?></div>
+            <div class="modern-alert modern-alert-success"><?= htmlspecialchars($capacity_success) ?></div>
           <?php endif; ?>
           <?php if (isset($capacity_error)): ?>
-            <div class="alert alert-danger"><?= htmlspecialchars($capacity_error) ?></div>
+            <div class="modern-alert modern-alert-danger"><?= htmlspecialchars($capacity_error) ?></div>
           <?php endif; ?>
           
           <div class="row mb-3">
@@ -241,8 +242,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <div class="row">
               <div class="col-md-8">
                 <div class="mb-3">
-                  <label for="max_capacity" class="form-label">Maximum Capacity <span class="text-danger">*</span></label>
-                  <input type="number" class="form-control" id="max_capacity" name="max_capacity" 
+                  <label for="max_capacity" class="modern-form-label">Maximum Capacity <span class="text-danger">*</span></label>
+                  <input type="number" class="modern-form-control" id="max_capacity" name="max_capacity" 
                          value="<?= htmlspecialchars($maxCapacity ?? '') ?>" 
                          min="<?= $currentTotalStudents ?>" required>
                   <small class="text-muted">Minimum allowed: <?= number_format($currentTotalStudents) ?> (current students)</small>
@@ -265,15 +266,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <!-- Capacity Update Modal -->
 <div class="modal fade" id="capacityModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header">
+    <div class="modal-content modern-modal-content">
+      <div class="modal-header modern-modal-header">
         <h5 class="modal-title">Update Maximum Capacity</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <form method="POST" id="capacityForm">
         <input type="hidden" name="csrf_token" value="<?php echo CSRFProtection::generateToken('admin_settings'); ?>">
         <div class="modal-body">
-          <div class="alert alert-info">
+          <div class="modern-alert modern-alert-info">
             <i class="bi bi-info-circle me-2"></i>
             <strong>Current Status:</strong> <?= number_format($currentTotalStudents) ?> students enrolled
             <?php if ($maxCapacity !== null): ?>
@@ -281,20 +282,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <?php endif; ?>
           </div>
           <div class="mb-3">
-            <label for="modal_capacity" class="form-label">New Maximum Capacity <span class="text-danger">*</span></label>
-            <input type="number" class="form-control" id="modal_capacity" name="max_capacity" 
+            <label for="modal_capacity" class="modern-form-label">New Maximum Capacity <span class="text-danger">*</span></label>
+            <input type="number" class="modern-form-control" id="modal_capacity" name="max_capacity" 
                    min="<?= $currentTotalStudents ?>" required>
             <small class="text-muted">Must be at least <?= number_format($currentTotalStudents) ?> (current students)</small>
           </div>
           <div class="mb-3">
-            <label for="modal_capacity_password" class="form-label">Current Password <span class="text-danger">*</span></label>
-            <input type="password" class="form-control" id="modal_capacity_password" name="current_password" required>
+            <label for="modal_capacity_password" class="modern-form-label">Current Password <span class="text-danger">*</span></label>
+            <input type="password" class="modern-form-control" id="modal_capacity_password" name="current_password" required>
             <small class="text-muted">Required for security verification</small>
           </div>
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-          <button type="submit" name="set_capacity" class="btn btn-warning">
+          <button type="button" class="modern-btn modern-btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" name="set_capacity" class="modern-btn modern-btn-warning">
             <i class="bi bi-gear me-1"></i> Update Capacity
           </button>
         </div>

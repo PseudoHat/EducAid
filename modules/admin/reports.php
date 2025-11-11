@@ -57,6 +57,7 @@ $pageTitle = "Reports & Analytics";
 include __DIR__ . '/../../includes/admin/admin_head.php';
 ?>
 <link rel="stylesheet" href="../../assets/css/admin/reports.css">
+<link rel="stylesheet" href="../../assets/css/admin/modern-ui.css">
 <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
 </head>
 <body>
@@ -69,40 +70,44 @@ include __DIR__ . '/../../includes/admin/admin_head.php';
     <section class="home-section" id="mainContent">
       <div class="container-fluid py-4">
     <!-- Header -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
-            <h1 class="mb-1">
-                <i class="bi bi-file-earmark-bar-graph-fill text-primary"></i>
-                Reports & Analytics
-            </h1>
-            <p class="text-muted mb-0">Generate comprehensive reports with advanced filtering</p>
-        </div>
-        <div>
-            <button class="btn btn-outline-secondary" onclick="resetFilters()">
-                <i class="bi bi-arrow-clockwise"></i> Reset All
-            </button>
+    <div class="modern-page-header">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h1 class="modern-page-title">
+                    <i class="bi bi-file-earmark-bar-graph-fill text-gradient"></i>
+                    Reports & Analytics
+                </h1>
+                <p class="modern-page-subtitle">Generate comprehensive reports with advanced filtering options</p>
+            </div>
+            <div>
+                <button class="modern-btn modern-btn-info" onclick="resetFilters()">
+                    <i class="bi bi-arrow-clockwise"></i> Reset All Filters
+                </button>
+            </div>
         </div>
     </div>
 
     <!-- Filter Panel -->
-    <div class="card shadow-sm mb-4">
-        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-            <h5 class="mb-0">
-                <i class="bi bi-funnel-fill"></i> Report Filters
-            </h5>
-            <span id="filterBadge" class="badge bg-light text-dark">0 filters applied</span>
+    <div class="modern-card mb-4">
+        <div class="modern-card-header">
+            <div class="d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="bi bi-funnel-fill me-2"></i> Report Filters
+                </h5>
+                <span id="filterBadge" class="modern-badge modern-badge-info">0 filters applied</span>
+            </div>
         </div>
-        <div class="card-body">
+        <div class="card-body p-4">
             <form id="reportFiltersForm">
                 <input type="hidden" name="csrf_token" value="<?php echo $csrfToken; ?>">
                 
                 <div class="row g-3">
                     <!-- Student Status -->
                     <div class="col-md-3">
-                        <label class="form-label fw-bold">
+                        <label class="modern-form-label">
                             <i class="bi bi-person-badge"></i> Student Status
                         </label>
-                        <select name="status[]" class="form-select multi-select" multiple>
+                        <select name="status[]" class="form-select modern-form-control multi-select" multiple>
                             <option value="active">Active</option>
                             <option value="applicant">Applicant</option>
                             <option value="under_registration">Under Registration</option>
@@ -118,10 +123,10 @@ include __DIR__ . '/../../includes/admin/admin_head.php';
 
                     <!-- Gender -->
                     <div class="col-md-3">
-                        <label class="form-label fw-bold">
+                        <label class="modern-form-label">
                             <i class="bi bi-gender-ambiguous"></i> Gender
                         </label>
-                        <select name="gender" class="form-select">
+                        <select name="gender" class="form-select modern-form-control">
                             <option value="">All</option>
                             <option value="Male">Male</option>
                             <option value="Female">Female</option>
@@ -130,7 +135,7 @@ include __DIR__ . '/../../includes/admin/admin_head.php';
 
                     <!-- Municipality -->
                     <div class="col-md-3">
-                        <label class="form-label fw-bold">
+                        <label class="modern-form-label">
                             <i class="bi bi-building"></i> Municipality
                         </label>
                         <?php 
@@ -144,17 +149,17 @@ include __DIR__ . '/../../includes/admin/admin_head.php';
                             }
                         }
                         ?>
-                        <input type="text" class="form-control" value="<?php echo htmlspecialchars($municipalityName); ?>" readonly>
+                        <input type="text" class="modern-form-control" value="<?php echo htmlspecialchars($municipalityName); ?>" readonly>
                         <input type="hidden" name="municipality_id" value="<?php echo $adminMunicipalityId; ?>" id="municipalityFilterValue">
                         <small class="text-muted">Your assigned municipality</small>
                     </div>
 
                     <!-- Barangay -->
                     <div class="col-md-3">
-                        <label class="form-label fw-bold">
+                        <label class="modern-form-label">
                             <i class="bi bi-geo-alt"></i> Barangay
                         </label>
-                        <select name="barangay_id[]" class="form-select multi-select" multiple id="barangayFilter">
+                        <select name="barangay_id[]" class="form-select modern-form-control multi-select" multiple id="barangayFilter">
                             <?php 
                             // Reset pointer to read barangays
                             pg_result_seek($barangays, 0);
@@ -169,10 +174,10 @@ include __DIR__ . '/../../includes/admin/admin_head.php';
 
                     <!-- University -->
                     <div class="col-md-3">
-                        <label class="form-label fw-bold">
+                        <label class="modern-form-label">
                             <i class="bi bi-mortarboard"></i> University
                         </label>
-                        <select name="university_id[]" class="form-select multi-select" multiple>
+                        <select name="university_id[]" class="form-select modern-form-control multi-select" multiple>
                             <?php while ($u = pg_fetch_assoc($universities)): ?>
                                 <option value="<?php echo $u['university_id']; ?>">
                                     <?php echo htmlspecialchars($u['name']); ?>
@@ -183,10 +188,10 @@ include __DIR__ . '/../../includes/admin/admin_head.php';
 
                     <!-- Year Level -->
                     <div class="col-md-3">
-                        <label class="form-label fw-bold">
+                        <label class="modern-form-label">
                             <i class="bi bi-calendar-range"></i> Year Level
                         </label>
-                        <select name="year_level_id[]" class="form-select multi-select" multiple>
+                        <select name="year_level_id[]" class="form-select modern-form-control multi-select" multiple>
                             <?php while ($yl = pg_fetch_assoc($yearLevels)): ?>
                                 <option value="<?php echo $yl['year_level_id']; ?>">
                                     <?php echo htmlspecialchars($yl['name']); ?>
@@ -197,10 +202,10 @@ include __DIR__ . '/../../includes/admin/admin_head.php';
 
                     <!-- Academic Year -->
                     <div class="col-md-3">
-                        <label class="form-label fw-bold">
+                        <label class="modern-form-label">
                             <i class="bi bi-calendar3"></i> Academic Year
                         </label>
-                        <select name="academic_year" class="form-select">
+                        <select name="academic_year" class="form-select modern-form-control">
                             <option value="">All Years</option>
                             <?php while ($ay = pg_fetch_assoc($academicYears)): ?>
                                 <option value="<?php echo htmlspecialchars($ay['current_academic_year']); ?>">
@@ -212,10 +217,10 @@ include __DIR__ . '/../../includes/admin/admin_head.php';
 
                     <!-- Distribution -->
                     <div class="col-md-3">
-                        <label class="form-label fw-bold">
+                        <label class="modern-form-label">
                             <i class="bi bi-box-seam"></i> Distribution
                         </label>
-                        <select name="distribution_id" class="form-select">
+                        <select name="distribution_id" class="form-select modern-form-control">
                             <option value="">All Distributions</option>
                             <?php while ($d = pg_fetch_assoc($distributions)): ?>
                                 <option value="<?php echo $d['snapshot_id']; ?>">
@@ -231,32 +236,32 @@ include __DIR__ . '/../../includes/admin/admin_head.php';
 
                     <!-- Date Range -->
                     <div class="col-md-3">
-                        <label class="form-label fw-bold">
+                        <label class="modern-form-label">
                             <i class="bi bi-calendar-check"></i> Registration Date From
                         </label>
-                        <input type="date" name="date_from" class="form-control">
+                        <input type="date" name="date_from" class="modern-form-control">
                     </div>
 
                     <div class="col-md-3">
-                        <label class="form-label fw-bold">
+                        <label class="modern-form-label">
                             <i class="bi bi-calendar-x"></i> Registration Date To
                         </label>
-                        <input type="date" name="date_to" class="form-control">
+                        <input type="date" name="date_to" class="modern-form-control">
                     </div>
 
                     <!-- Confidence Score Range -->
                     <div class="col-md-3">
-                        <label class="form-label fw-bold">
+                        <label class="modern-form-label">
                             <i class="bi bi-speedometer2"></i> Min Confidence Score
                         </label>
-                        <input type="number" name="confidence_min" class="form-control" min="0" max="100" placeholder="0-100">
+                        <input type="number" name="confidence_min" class="modern-form-control" min="0" max="100" placeholder="0-100">
                     </div>
 
                     <div class="col-md-3">
-                        <label class="form-label fw-bold">
+                        <label class="modern-form-label">
                             <i class="bi bi-speedometer"></i> Max Confidence Score
                         </label>
-                        <input type="number" name="confidence_max" class="form-control" min="0" max="100" placeholder="0-100">
+                        <input type="number" name="confidence_max" class="modern-form-control" min="0" max="100" placeholder="0-100">
                     </div>
                 </div>
 
@@ -271,7 +276,7 @@ include __DIR__ . '/../../includes/admin/admin_head.php';
                         <button type="button" class="btn btn-danger" onclick="exportPDF()">
                             <i class="bi bi-file-pdf-fill"></i> Export PDF
                         </button>
-                        <button type="button" class="btn btn-success" onclick="exportExcel()">
+                        <button type="button" class="modern-btn modern-btn-success" onclick="exportExcel()">
                             <i class="bi bi-file-excel-fill"></i> Export Excel
                         </button>
                     </div>
@@ -361,7 +366,7 @@ include __DIR__ . '/../../includes/admin/admin_head.php';
             </button>
         </div>
         <div class="card-body">
-            <div class="alert alert-info">
+            <div class="modern-alert modern-alert-info">
                 <i class="bi bi-info-circle"></i>
                 <strong>Preview Mode:</strong> Showing up to 50 records. Export to PDF/Excel for complete dataset.
             </div>

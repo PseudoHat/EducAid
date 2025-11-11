@@ -98,6 +98,7 @@ $admins = pg_fetch_all($adminsResult) ?: [];
 ?>
 
 <?php $page_title='Admin Management'; include __DIR__ . '/../../includes/admin/admin_head.php'; ?>
+<link rel="stylesheet" href="../../assets/css/admin/modern-ui.css">
 </head>
 <body>
 <?php include __DIR__ . '/../../includes/admin/admin_topbar.php'; ?>
@@ -106,35 +107,35 @@ $admins = pg_fetch_all($adminsResult) ?: [];
     <?php include __DIR__ . '/../../includes/admin/admin_header.php'; ?>
     <section class="home-section" id="mainContent">
         <div class="container-fluid py-4 px-4">
-            <h4 class="fw-bold mb-4"><i class="bi bi-people-fill me-2 text-primary"></i>Admin Management</h4>
+            <div class="modern-page-header mb-4"><h1 class="modern-page-title"><i class="bi bi-people-fill me-2 text-gradient"></i>Admin Management</h1><p class="modern-page-subtitle">Manage administrator accounts and permissions</p></div>
             
             <?php if (isset($success)): ?>
-                <div class="alert alert-success"><?= htmlspecialchars($success) ?></div>
+                <div class="modern-alert modern-alert-success"><?= htmlspecialchars($success) ?></div>
             <?php endif; ?>
             <?php if (isset($error)): ?>
-                <div class="alert alert-danger"><?= htmlspecialchars($error) ?></div>
+                <div class="modern-alert modern-alert-danger"><?= htmlspecialchars($error) ?></div>
             <?php endif; ?>
             
             <!-- Create New Admin -->
-            <div class="card mb-4">
-                <div class="card-header bg-success text-white">
+            <div class="modern-card mb-4">
+                <div class="modern-card-header">
                     <h5 class="mb-0"><i class="bi bi-person-plus me-2"></i>Create New Admin</h5>
                 </div>
-                <div class="card-body">
-                    <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#createAdminModal">
+                <div class="card-body p-4">
+                    <button type="button" class="modern-btn modern-btn-success" data-bs-toggle="modal" data-bs-target="#createAdminModal">
                         <i class="bi bi-person-plus"></i> Create New Admin
                     </button>
                 </div>
             </div>
             
             <!-- Admin List -->
-            <div class="card">
-                <div class="card-header bg-primary text-white">
+            <div class="modern-card">
+                <div class="modern-card-header">
                     <h5 class="mb-0"><i class="bi bi-list-ul me-2"></i>Existing Admins</h5>
                 </div>
-                <div class="card-body">
+                <div class="card-body p-4">
                     <div class="table-responsive">
-                        <table class="table table-striped">
+                        <table class="table modern-table">
                             <thead>
                                 <tr>
                                     <th>Name</th>
@@ -188,7 +189,7 @@ $admins = pg_fetch_all($adminsResult) ?: [];
                 <div class="card-header bg-info text-white">
                     <h5 class="mb-0"><i class="bi bi-info-circle me-2"></i>Role Permissions</h5>
                 </div>
-                <div class="card-body">
+                <div class="card-body p-4">
                     <div class="row">
                         <div class="col-md-6">
                             <h6 class="text-success"><i class="bi bi-shield-check me-1"></i>Super Admin</h6>
@@ -225,8 +226,8 @@ $admins = pg_fetch_all($adminsResult) ?: [];
 <!-- Create Admin Modal -->
 <div class="modal fade" id="createAdminModal" tabindex="-1" aria-labelledby="createAdminModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
+        <div class="modal-content modern-modal-content modern-modal-content">
+            <div class="modal-header modern-modal-header modern-modal-header">
                 <h5 class="modal-title" id="createAdminModalLabel"><i class="bi bi-person-plus me-2"></i>Create New Admin</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
@@ -236,43 +237,43 @@ $admins = pg_fetch_all($adminsResult) ?: [];
                     <div class="row">
                         <div class="col-md-4">
                             <div class="mb-3">
-                                <label for="first_name" class="form-label">First Name <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control" id="first_name" name="first_name" required>
+                                <label for="first_name" class="modern-form-label">First Name <span class="text-danger">*</span></label>
+                                <input type="text" class="modern-modern-form-control" id="first_name" name="first_name" required>
                             </div>
                         </div>
                         <div class="col-md-4">
                             <div class="mb-3">
-                                <label for="middle_name" class="form-label">Middle Name</label>
-                                <input type="text" class="form-control" id="middle_name" name="middle_name">
+                                <label for="middle_name" class="modern-form-label">Middle Name</label>
+                                <input type="text" class="modern-modern-form-control" id="middle_name" name="middle_name">
                             </div>
                         </div>
                         <div class="col-md-4">
                             <div class="mb-3">
-                                <label for="last_name" class="form-label">Last Name <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control" id="last_name" name="last_name" required>
+                                <label for="last_name" class="modern-form-label">Last Name <span class="text-danger">*</span></label>
+                                <input type="text" class="modern-modern-form-control" id="last_name" name="last_name" required>
                             </div>
                         </div>
                     </div>
                     <div class="row">
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label for="email" class="form-label">Email <span class="text-danger">*</span></label>
-                                <input type="email" class="form-control" id="email" name="email" required>
+                                <label for="email" class="modern-form-label">Email <span class="text-danger">*</span></label>
+                                <input type="email" class="modern-modern-form-control" id="email" name="email" required>
                             </div>
                         </div>
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label for="username" class="form-label">Username <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control" id="username" name="username" required>
+                                <label for="username" class="modern-form-label">Username <span class="text-danger">*</span></label>
+                                <input type="text" class="modern-modern-form-control" id="username" name="username" required>
                             </div>
                         </div>
                     </div>
                     <div class="row">
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label for="password" class="form-label">Password <span class="text-danger">*</span></label>
+                                <label for="password" class="modern-form-label">Password <span class="text-danger">*</span></label>
                                 <div class="input-group">
-                                    <input type="password" class="form-control" id="password" name="password" required minlength="6">
+                                    <input type="password" class="modern-modern-form-control" id="password" name="password" required minlength="6">
                                     <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility('password', 'passwordIcon')">
                                         <i class="bi bi-eye" id="passwordIcon"></i>
                                     </button>
@@ -282,9 +283,9 @@ $admins = pg_fetch_all($adminsResult) ?: [];
                         </div>
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label for="confirm_password" class="form-label">Confirm Password <span class="text-danger">*</span></label>
+                                <label for="confirm_password" class="modern-form-label">Confirm Password <span class="text-danger">*</span></label>
                                 <div class="input-group">
-                                    <input type="password" class="form-control" id="confirm_password" required minlength="6">
+                                    <input type="password" class="modern-modern-form-control" id="confirm_password" required minlength="6">
                                     <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility('confirm_password', 'confirmPasswordIcon')">
                                         <i class="bi bi-eye" id="confirmPasswordIcon"></i>
                                     </button>
@@ -295,8 +296,8 @@ $admins = pg_fetch_all($adminsResult) ?: [];
                     <div class="row">
                         <div class="col-md-12">
                             <div class="mb-3">
-                                <label for="role" class="form-label">Role <span class="text-danger">*</span></label>
-                                <select class="form-select" id="role" name="role" required>
+                                <label for="role" class="modern-form-label">Role <span class="text-danger">*</span></label>
+                                <select class="form-select modern-form-control modern-form-control" id="role" name="role" required>
                                     <option value="sub_admin">Sub Admin (Limited Access)</option>
                                     <option value="super_admin">Super Admin (Full Access)</option>
                                 </select>
@@ -307,7 +308,7 @@ $admins = pg_fetch_all($adminsResult) ?: [];
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" name="create_admin" class="btn btn-success">
+                    <button type="submit" name="create_admin" class="modern-btn modern-btn-success">
                         <i class="bi bi-person-plus me-1"></i> Create Admin
                     </button>
                 </div>
@@ -319,8 +320,8 @@ $admins = pg_fetch_all($adminsResult) ?: [];
 <!-- Toggle Status Modal -->
 <div class="modal fade" id="toggleStatusModal" tabindex="-1" aria-labelledby="toggleStatusModalLabel" aria-hidden="true">
     <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
+        <div class="modal-content modern-modal-content modern-modal-content">
+            <div class="modal-header modern-modal-header modern-modal-header">
                 <h5 class="modal-title" id="toggleStatusModalLabel"><i class="bi bi-exclamation-triangle me-2 text-warning"></i>Confirm Action</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
