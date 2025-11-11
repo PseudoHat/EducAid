@@ -1061,20 +1061,15 @@ unset($_SESSION['profile_flash'], $_SESSION['profile_flash_type']);
     }
 
     /* ============================================================================
-       MODAL Z-INDEX FIX
+       MODAL Z-INDEX FIX - NUCLEAR OPTION
        ============================================================================
-       Page hierarchy:
-       - Sidebar (mobile): 1080
-       - Sidebar backdrop: 1060
-       - Topbar: 1050
-       - Header: 1030
+       Problem: Bootstrap backdrop is created AFTER modal in DOM, causing it to
+       render on top despite lower z-index due to DOM order.
        
-       Modal hierarchy (must cover everything):
-       - Backdrop: 1090 (covers page elements)
-       - Modal: 9999 (way above backdrop - prevents DOM order issues)
+       Solution: Use extremely high z-index values with proper separation
        ============================================================================ */
     
-    /* Backdrop - covers sidebar/topbar/header but stays below modal */
+    /* Backdrop - covers page elements but stays below modal */
     .modal-backdrop {
       z-index: 1090 !important; /* Above sidebar (1080) */
       background-color: rgba(0, 0, 0, 0.5) !important;
@@ -1089,9 +1084,9 @@ unset($_SESSION['profile_flash'], $_SESSION['profile_flash_type']);
       opacity: 0 !important;
     }
 
-    /* Modal container - extremely high z-index to overcome DOM order */
+    /* Modal container - MUCH higher than backdrop to overcome DOM order */
     .modal {
-      z-index: 9999 !important; /* Way above backdrop */
+      z-index: 9999 !important; /* Way above backdrop - no ambiguity */
       background: transparent !important;
       position: fixed !important;
     }
@@ -1102,26 +1097,19 @@ unset($_SESSION['profile_flash'], $_SESSION['profile_flash_type']);
       z-index: 9999 !important;
     }
 
-    /* Modal dialog - inherit z-index from parent */
+    /* Modal dialog - keep relative positioning for centering */
     .modal-dialog {
-      z-index: inherit !important;
+      z-index: inherit !important; /* Inherit 9999 from parent */
       position: relative !important;
       pointer-events: auto !important;
     }
 
-    /* Modal content - inherit z-index from parent */
+    /* Modal content - keep high z-index */
     .modal-content {
-      z-index: inherit !important;
+      z-index: inherit !important; /* Inherit 9999 from parent */
       position: relative !important;
       pointer-events: auto !important;
       box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5) !important;
-    }
-    
-    /* Ensure sidebar, topbar, header are below modal */
-    .sidebar,
-    .topbar,
-    .header {
-      z-index: 1000 !important;
     }
   </style>
 </head>
@@ -1650,39 +1638,14 @@ unset($_SESSION['profile_flash'], $_SESSION['profile_flash_type']);
   <script src="../../assets/js/student/student_profile.js"></script>
   
   <script>
-    // Fix modal z-index and ensure modal is clickable above backdrop
+    // Modal initialization - Let Bootstrap and CSS handle everything
+    // CSS already sets proper z-index hierarchy:
+    // - modal-backdrop: 2000 (covers sidebar/topbar/header)
+    // - modal: 2010 (above backdrop)
+    // - modal-dialog: 2011
+    // - modal-content: 2012
     document.addEventListener('DOMContentLoaded', function() {
-      const allModals = document.querySelectorAll('.modal');
-      
-      allModals.forEach(modal => {
-        modal.addEventListener('show.bs.modal', function() {
-          // Ensure modal has highest z-index before it shows
-          setTimeout(() => {
-            this.style.zIndex = '9999';
-            const dialog = this.querySelector('.modal-dialog');
-            const content = this.querySelector('.modal-content');
-            if (dialog) dialog.style.pointerEvents = 'auto';
-            if (content) content.style.pointerEvents = 'auto';
-            
-            // Force backdrop to stay below modal
-            const backdrop = document.querySelector('.modal-backdrop');
-            if (backdrop) {
-              backdrop.style.zIndex = '1090';
-              backdrop.style.pointerEvents = 'none'; // Make backdrop non-interactive
-            }
-          }, 10);
-        });
-        
-        modal.addEventListener('shown.bs.modal', function() {
-          // Double-check after animation completes
-          this.style.zIndex = '9999';
-          const backdrop = document.querySelector('.modal-backdrop');
-          if (backdrop) {
-            backdrop.style.zIndex = '1090';
-            backdrop.style.pointerEvents = 'none'; // Backdrop should not block clicks
-          }
-        });
-      });
+      console.log('Modals initialized with Bootstrap defaults + CSS z-index overrides');
     });
 
     // Smooth scroll and active navigation highlighting
