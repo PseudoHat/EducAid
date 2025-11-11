@@ -533,7 +533,6 @@ const announcements = <?php echo json_encode($announcements); ?>;
 let currentPage = 0;
 const pageSize = 5;
 const totalPages = Math.ceil(announcements.length / pageSize);
-const latestId = announcements.length > 0 ? announcements[0].announcement_id : null;
 
 function renderPage() {
   const start = currentPage * pageSize;
@@ -541,13 +540,14 @@ function renderPage() {
   const tbody = document.getElementById('ann-body');
   tbody.innerHTML = '';
   slice.forEach(a => {
-    const isLatest = a.announcement_id === latestId;
-    const badge = isLatest
+    // FIX: Use actual is_active field from database, not position in array
+    const isActive = a.is_active === 't' || a.is_active === true;
+    const badge = isActive
       ? '<span class="badge bg-success">Active</span>'
       : '<span class="badge bg-secondary">Inactive</span>';
-    const btnLabel = isLatest ? 'Unpost' : 'Repost';
-    const btnClass = isLatest ? 'danger' : 'success';
-    const toggleValue = isLatest ? 0 : 1;
+    const btnLabel = isActive ? 'Unpost' : 'Repost';
+    const btnClass = isActive ? 'danger' : 'success';
+    const toggleValue = isActive ? 0 : 1;
     const tr = document.createElement('tr');
     // Event summary formatting
     let eventCell = '';
@@ -569,7 +569,7 @@ function renderPage() {
         <div class="full-text">${escapeHtml(a.remarks)}</div>
         ${needsToggle ? '<span class="remarks-toggle">Show more</span>' : ''}
       </div>`;
-    tr.classList.toggle('active-ann', isLatest);
+    tr.classList.toggle('active-ann', isActive);
     tr.innerHTML = `
       <td><strong>${escapeHtml(a.title)}</strong>${imgThumb}</td>
       <td>${remarksHtml}</td>

@@ -16,7 +16,9 @@ require_once __DIR__ . '/../../services/AuditLogger.php';
 $logs = [];
 $totalLogs = 0;
 $page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
-$perPage = 50;
+// Allow user to select rows per page (10, 15, 25, 50)
+$perPage = isset($_GET['per_page']) ? intval($_GET['per_page']) : 15;
+$perPage = in_array($perPage, [10, 15, 25, 50]) ? $perPage : 15; // Validate
 $offset = ($page - 1) * $perPage;
 
 // Filter parameters
@@ -447,6 +449,17 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
                             <i class="bi bi-info-circle me-1"></i>
                             Showing <?= number_format(count($logs)) ?> of <?= number_format($totalLogs) ?> events
                         </span>
+                        
+                        <!-- Rows per page selector -->
+                        <div class="d-inline-flex align-items-center gap-2 ms-3">
+                            <label class="text-muted small mb-0">Rows:</label>
+                            <select name="per_page" class="form-select form-select-sm" style="width: 80px;" onchange="this.form.submit()">
+                                <option value="10" <?= $perPage === 10 ? 'selected' : '' ?>>10</option>
+                                <option value="15" <?= $perPage === 15 ? 'selected' : '' ?>>15</option>
+                                <option value="25" <?= $perPage === 25 ? 'selected' : '' ?>>25</option>
+                                <option value="50" <?= $perPage === 50 ? 'selected' : '' ?>>50</option>
+                            </select>
+                        </div>
                     </div>
                 </form>
             </div>
