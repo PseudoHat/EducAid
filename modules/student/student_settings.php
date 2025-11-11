@@ -1299,71 +1299,101 @@ unset($_SESSION['profile_flash'], $_SESSION['profile_flash_type']);
 
             <!-- Notification Preferences (email-only) -->
             <div class="settings-content-section" id="notifications">
-              <h2 class="section-title">Notification Preferences</h2>
-              <p class="section-description">Choose how you receive notifications by email.</p>
+              <h2 class="section-title">Email Notification Preferences</h2>
+              <p class="section-description">Control how you receive email notifications about your scholarship application.</p>
               <div class="settings-section">
                 <div class="settings-section-body">
                   <div class="setting-item">
                     <div class="setting-info">
-                      <div class="setting-label">Email Delivery</div>
-                      <div class="setting-description">Select immediate emails or a once-daily digest.</div>
-                      <div class="d-flex align-items-center gap-2 mt-1">
-                        <div class="form-check form-switch">
-                          <input class="form-check-input" type="checkbox" id="prefEmailEnabled">
-                          <label class="form-check-label" for="prefEmailEnabled">Enable email notifications</label>
+                      <div class="setting-label">Email Delivery Frequency</div>
+                      <div class="setting-description">Choose when to receive email notifications.</div>
+                      <div class="mt-3">
+                        <div class="form-check mb-2">
+                          <input class="form-check-input" type="radio" name="emailFrequency" id="freqImmediate" value="immediate" checked>
+                          <label class="form-check-label" for="freqImmediate">
+                            <strong>Immediate</strong> <span class="badge bg-success">Recommended</span>
+                            <small class="d-block text-muted ms-4">Get emails as updates happen in real-time</small>
+                          </label>
                         </div>
-                        <select id="prefEmailFrequency" class="form-select form-select-sm" style="width:auto;">
-                          <option value="immediate">Immediate</option>
-                          <option value="daily">Daily digest</option>
-                        </select>
+                        <div class="form-check">
+                          <input class="form-check-input" type="radio" name="emailFrequency" id="freqDaily" value="daily">
+                          <label class="form-check-label" for="freqDaily">
+                            <strong>Daily Digest</strong>
+                            <small class="d-block text-muted ms-4">Receive one email per day summarizing all updates</small>
+                          </label>
+                        </div>
+                      </div>
+
+                      <!-- Critical Notifications Alert -->
+                      <div class="alert alert-warning mt-3 mb-0" role="alert">
+                        <div class="d-flex">
+                          <i class="bi bi-exclamation-triangle-fill me-2 flex-shrink-0"></i>
+                          <div>
+                            <strong>Important:</strong> Critical alerts (document rejections, errors, warnings) 
+                            are <strong>always sent immediately</strong> regardless of your preference to ensure 
+                            you don't miss important application updates.
+                          </div>
+                        </div>
                       </div>
                     </div>
                     <div class="setting-actions">
-                      <button id="saveNotifPrefsBtn" class="btn btn-setting btn-setting-primary"><i class="bi bi-save me-1"></i>Save</button>
+                      <button id="saveNotifPrefsBtn" class="btn btn-setting btn-setting-primary">
+                        <i class="bi bi-save me-1"></i>Save Preferences
+                      </button>
                     </div>
                   </div>
 
-                  <div class="setting-item">
+                  <!-- Information about notification types -->
+                  <div class="setting-item border-0 pb-0">
                     <div class="setting-info">
-                      <div class="setting-label">Types to email</div>
-                      <div class="setting-description">Toggle which notification types should be emailed to you.</div>
-                      <div class="row mt-2 g-2">
+                      <div class="setting-label">What You'll Receive</div>
+                      <div class="setting-description">You will receive email notifications for all of the following:</div>
+                      <div class="row mt-3 g-3">
                         <div class="col-12 col-md-6">
-                          <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="email_announcement">
-                            <label class="form-check-label" for="email_announcement">Announcements</label>
-                          </div>
-                          <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="email_document">
-                            <label class="form-check-label" for="email_document">Documents</label>
-                          </div>
-                          <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="email_schedule">
-                            <label class="form-check-label" for="email_schedule">Schedule</label>
-                          </div>
-                          <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="email_system">
-                            <label class="form-check-label" for="email_system">System</label>
+                          <div class="d-flex align-items-start">
+                            <i class="bi bi-check-circle-fill text-success me-2 mt-1"></i>
+                            <div>
+                              <strong>Document Updates</strong>
+                              <small class="d-block text-muted">Approvals, rejections, and re-upload requests</small>
+                            </div>
                           </div>
                         </div>
                         <div class="col-12 col-md-6">
-                          <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="email_warning">
-                            <label class="form-check-label" for="email_warning">Warnings</label>
-                          </div>
-                          <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="email_error">
-                            <label class="form-check-label" for="email_error">Errors / Rejections</label>
-                          </div>
-                          <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="email_success">
-                            <label class="form-check-label" for="email_success">Success / Approvals</label>
-                          </div>
-                          <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="email_info">
-                            <label class="form-check-label" for="email_info">General Info</label>
+                          <div class="d-flex align-items-start">
+                            <i class="bi bi-check-circle-fill text-success me-2 mt-1"></i>
+                            <div>
+                              <strong>Application Status</strong>
+                              <small class="d-block text-muted">Verification and approval notifications</small>
+                            </div>
                           </div>
                         </div>
+                        <div class="col-12 col-md-6">
+                          <div class="d-flex align-items-start">
+                            <i class="bi bi-check-circle-fill text-success me-2 mt-1"></i>
+                            <div>
+                              <strong>Announcements</strong>
+                              <small class="d-block text-muted">Important system-wide messages and updates</small>
+                            </div>
+                          </div>
+                        </div>
+                        <div class="col-12 col-md-6">
+                          <div class="d-flex align-items-start">
+                            <i class="bi bi-check-circle-fill text-success me-2 mt-1"></i>
+                            <div>
+                              <strong>Schedule Changes</strong>
+                              <small class="d-block text-muted">Distribution schedules and deadline reminders</small>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <!-- Bell icon reminder -->
+                      <div class="alert alert-info mt-3 mb-0" role="alert">
+                        <i class="bi bi-bell-fill me-2"></i>
+                        <small>
+                          <strong>Reminder:</strong> You'll always see notifications in the bell icon 
+                          (<i class="bi bi-bell"></i>) at the top of the page, regardless of email settings.
+                        </small>
                       </div>
                     </div>
                   </div>
@@ -1775,16 +1805,11 @@ unset($_SESSION['profile_flash'], $_SESSION['profile_flash_type']);
       fetchStatus();
     });
 
-    // Notification Preferences: load and save
+    // Notification Preferences: load and save (simplified - frequency only)
     document.addEventListener('DOMContentLoaded', function() {
-      const enableEl = document.getElementById('prefEmailEnabled');
-      const freqEl = document.getElementById('prefEmailFrequency');
+      const freqImmediate = document.getElementById('freqImmediate');
+      const freqDaily = document.getElementById('freqDaily');
       const saveBtn = document.getElementById('saveNotifPrefsBtn');
-      const typeIds = [
-        'email_announcement','email_document','email_schedule','email_warning',
-        'email_error','email_success','email_system','email_info'
-      ];
-      const typeInputs = Object.fromEntries(typeIds.map(id => [id, document.getElementById(id)]));
 
       async function loadPrefs() {
         try {
@@ -1792,19 +1817,29 @@ unset($_SESSION['profile_flash'], $_SESSION['profile_flash_type']);
           const data = await res.json();
           if (!data.success) return;
           const p = data.preferences;
-          enableEl.checked = !!p.email_enabled;
-          freqEl.value = p.email_frequency === 'daily' ? 'daily' : 'immediate';
-          typeIds.forEach(id => { if (id in typeInputs && id in p) typeInputs[id].checked = !!p[id]; });
-        } catch (e) { /* noop */ }
+          // Set frequency radio buttons
+          if (p.email_frequency === 'daily') {
+            freqDaily.checked = true;
+          } else {
+            freqImmediate.checked = true;
+          }
+        } catch (e) { 
+          // Default to immediate if fetch fails
+          freqImmediate.checked = true;
+        }
       }
 
       async function savePrefs() {
+        const frequency = freqDaily.checked ? 'daily' : 'immediate';
         const payload = {
-          email_enabled: enableEl.checked,
-          email_frequency: freqEl.value
+          email_enabled: true, // Always enabled
+          email_frequency: frequency
         };
-        typeIds.forEach(id => payload[id] = !!typeInputs[id].checked);
-        saveBtn.disabled = true; const original = saveBtn.innerHTML; saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving…';
+        
+        saveBtn.disabled = true; 
+        const original = saveBtn.innerHTML; 
+        saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving…';
+        
         try {
           const res = await fetch('../../api/student/save_notification_preferences.php', {
             method: 'POST',
@@ -1814,13 +1849,20 @@ unset($_SESSION['profile_flash'], $_SESSION['profile_flash_type']);
           });
           const out = await res.json();
           // Lightweight feedback via alert() to avoid extra toasts framework
-          alert(out.success ? 'Preferences saved.' : 'Failed to save preferences.');
+          if (out.success) {
+            alert('Email notification preferences saved successfully!');
+          } else {
+            alert('Failed to save preferences. Please try again.');
+          }
         } catch (e) {
-          alert('Failed to save preferences.');
-        } finally { saveBtn.disabled = false; saveBtn.innerHTML = original; }
+          alert('Failed to save preferences. Please check your connection and try again.');
+        } finally { 
+          saveBtn.disabled = false; 
+          saveBtn.innerHTML = original; 
+        }
       }
 
-      if (enableEl && freqEl && saveBtn) {
+      if (freqImmediate && freqDaily && saveBtn) {
         loadPrefs();
         saveBtn.addEventListener('click', savePrefs);
       }

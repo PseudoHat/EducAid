@@ -273,24 +273,38 @@ function sendSystemAnnouncement($connection, $title, $message, $action_url = nul
 
 /**
  * Internal: Decide whether to send an email now based on student preferences.
- * Email-only: if email is enabled, type is enabled, and frequency is immediate => send immediately.
+ * 
+ * CRITICAL TYPES (error, warning) are ALWAYS sent immediately to ensure students
+ * don't miss document rejections or urgent issues.
+ * 
+ * NON-CRITICAL types respect the frequency preference (immediate or daily digest).
  */
 function student_handle_email_delivery($connection, $student_id, $title, $message, $type, $action_url) {
     // Fetch or initialize preferences
     $pref = student_get_or_create_email_prefs($connection, $student_id);
-    if (!$pref || !$pref['email_enabled']) return;
+    if (!$pref) return;
 
-    // Type-specific check
-    $typeKey = 'email_' . strtolower(preg_replace('/[^a-zA-Z0-9_]+/', '', $type));
-    if (isset($pref[$typeKey]) && $pref[$typeKey] === 'f') { // 'f' from PG boolean
-        return;
-    }
+    // Email is always enabled in the new system, no need to check email_enabled
+    // Type-specific preferences are ignored - all types are sent
 
-    if (($pref['email_frequency'] ?? 'immediate') === 'immediate') {
-        // Immediate email
+    // Define critical notification types that MUST be sent immediately
+    $critical_types = ['error', 'warning'];
+    
+    if (in_array(strtolower($type), $critical_types)) {
+        // CRITICAL: Always send immediately regardless of preference
         require_once __DIR__ . '/../services/StudentEmailNotificationService.php';
         $svc = new StudentEmailNotificationService($connection);
         $svc->sendImmediateEmail($student_id, $title, $message, $type, $action_url);
+    } else {
+        // NON-CRITICAL: Respect frequency preference
+        if (($pref['email_frequency'] ?? 'immediate') === 'immediate') {
+            // Send immediately
+            require_once __DIR__ . '/../services/StudentEmailNotificationService.php';
+            $svc = new StudentEmailNotificationService($connection);
+            $svc->sendImmediateEmail($student_id, $title, $message, $type, $action_url);
+        }
+        // If frequency is 'daily', notification will be queued for daily digest
+        // (Daily digest implementation would go here if needed)
     }
 }
 

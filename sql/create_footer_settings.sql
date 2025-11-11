@@ -1,3 +1,4 @@
+-- Active: 1762796816401@@shortline.proxy.rlwy.net@26026@railway@public
 -- Basic footer theme table
 CREATE TABLE IF NOT EXISTS footer_settings (
     footer_id        SERIAL PRIMARY KEY,
