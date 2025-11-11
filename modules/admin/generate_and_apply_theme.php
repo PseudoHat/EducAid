@@ -90,6 +90,14 @@ error_log("THEME GEN: Secondary color: " . $municipality['secondary_color']);
 try {
     error_log("THEME GEN: Starting theme generation...");
     
+    // Check if required classes exist
+    if (!class_exists('ThemeGeneratorService')) {
+        throw new Exception('ThemeGeneratorService class not found');
+    }
+    if (!class_exists('FooterThemeService')) {
+        throw new Exception('FooterThemeService class not found');
+    }
+    
     $generator = new ThemeGeneratorService($connection);
     $result = $generator->generateAndApplyTheme(
         $municipalityId,
