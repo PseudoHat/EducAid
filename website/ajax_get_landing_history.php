@@ -19,7 +19,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 // CSRF Protection
 $token = $_POST['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
-if (!CSRFProtection::validateToken('cms_content', $token)) respond(false, 'Security validation failed. Please refresh the page.');
+if (!CSRFProtection::validateToken('cms_content', $token, false)) respond(false, 'Security validation failed. Please refresh the page.');
 
 $is_super_admin = false;
 if (isset($_SESSION['admin_id']) && function_exists('getCurrentAdminRole')) {

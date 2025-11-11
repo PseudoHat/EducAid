@@ -9,9 +9,9 @@ require_once __DIR__ . '/../includes/CSRFProtection.php';
 @include_once __DIR__ . '/../includes/permissions.php';
 function out($ok,$msg=''){echo json_encode(['success'=>$ok,'message'=>$msg]);exit;}
 if($_SERVER['REQUEST_METHOD']!=='POST') out(false,'Invalid method');
-// CSRF Protection
+// CSRF Protection - don't consume token to allow multiple operations
 $token = $_POST['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
-if (!CSRFProtection::validateToken('cms_content', $token)) out(false, 'Security validation failed. Please refresh the page.');
+if (!CSRFProtection::validateToken('cms_content', $token, false)) out(false, 'Security validation failed. Please refresh the page.');
 $is_super_admin=false; if(isset($_SESSION['admin_id']) && function_exists('getCurrentAdminRole')){ $role=@getCurrentAdminRole($connection); if($role==='super_admin') $is_super_admin=true; }
 if(!$is_super_admin) out(false,'Unauthorized');
   $existing=@pg_query($connection,"SELECT block_key, html, text_color, bg_color FROM requirements_content_blocks WHERE municipality_id=1"); $blocks=[]; if($existing){ while($r=pg_fetch_assoc($existing)) $blocks[]=$r; }

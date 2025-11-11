@@ -23,7 +23,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
 
 // CSRF Protection
 $token = $_POST['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
-if (!CSRFProtection::validateToken('cms_content', $token)) {
+if (!CSRFProtection::validateToken('cms_content', $token, false)) {
     resp_contact(false, 'Security validation failed. Please refresh the page.');
 }
 

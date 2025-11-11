@@ -25,8 +25,9 @@ class CSRFProtection {
         $token = bin2hex(random_bytes(32));
         $existing[] = $token;
 
-        // Keep only the last 5 tokens to prevent unbounded growth
-        $existing = array_slice($existing, -5);
+        // Keep only the last 10 tokens to prevent unbounded growth
+        // Increased from 5 to support multiple tabs and rapid edits
+        $existing = array_slice($existing, -10);
         $_SESSION[self::$session_key][$form_name] = $existing;
 
         // Debug logging (truncate token for safety)

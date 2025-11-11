@@ -94,6 +94,14 @@ body.lp-editing [data-aos] {
   min-height: 20px;
 }
 
+/* Hide outlines when toggled off */
+body.lp-hide-outlines [data-lp-key][contenteditable="true"],
+body.lp-hide-outlines .editable-block,
+body.lp-hide-outlines .editable-navbar-item {
+  outline: none !important;
+  animation: none !important;
+}
+
 [data-lp-key][contenteditable="true"]:hover,
 .editable-block:hover {
   outline-color: #991b1b !important;

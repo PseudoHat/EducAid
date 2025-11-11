@@ -198,9 +198,14 @@ if (!$toolbar_config['exit_url']) {
 <div id="lp-edit-toolbar" class="lp-edit-toolbar shadow-sm">
     <div class="lp-toolbar-header mb-2">
         <strong class="small mb-0 lp-toolbar-title"><?php echo htmlspecialchars($toolbar_config['page_title']); ?></strong>
-        <button id="lp-lock-toggle" type="button" class="lp-lock-toggle" data-locked="0" aria-label="Lock toolbar" title="Lock toolbar">
-            <i class="bi bi-lock-fill"></i>
-        </button>
+        <div class="d-flex gap-1">
+            <button id="lp-help-btn" type="button" class="lp-help-btn" aria-label="Help" title="How to use this editor">
+                <i class="bi bi-question-circle-fill"></i>
+            </button>
+            <button id="lp-lock-toggle" type="button" class="lp-lock-toggle" data-locked="0" aria-label="Lock toolbar" title="Lock toolbar">
+                <i class="bi bi-lock-fill"></i>
+            </button>
+        </div>
     </div>
     
     <div class="mb-2">
@@ -614,5 +619,81 @@ if (!$toolbar_config['exit_url']) {
         applyState(defaultState());
         saveState();
     });
+
+    // Help button functionality
+    const helpBtn = document.getElementById('lp-help-btn');
+    if (helpBtn) {
+        helpBtn.addEventListener('click', () => {
+            const helpModal = new bootstrap.Modal(document.getElementById('lp-help-modal'));
+            helpModal.show();
+        });
+    }
 })();
 </script>
+
+<!-- Help Modal -->
+<div class="modal fade" id="lp-help-modal" tabindex="-1" aria-labelledby="lp-help-modal-label" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="lp-help-modal-label">
+                    <i class="bi bi-question-circle-fill me-2"></i>CMS Editor Help
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <h6 class="text-primary mb-3"><i class="bi bi-info-circle me-2"></i>Getting Started</h6>
+                <ul class="mb-4">
+                    <li><strong>Click any blue outlined element</strong> to select it for editing</li>
+                    <li>The selected element will be highlighted in <span class="text-success">green</span></li>
+                    <li>Use the text editor in the toolbar to modify the content</li>
+                    <li>Changes are saved to your browser until you click Save or Save All</li>
+                </ul>
+
+                <h6 class="text-primary mb-3"><i class="bi bi-palette me-2"></i>Styling Options</h6>
+                <ul class="mb-4">
+                    <li><strong>Text Color:</strong> Changes the color of the text in the selected element</li>
+                    <li><strong>Background Color:</strong> Changes the background color of the selected element</li>
+                    <li><strong>Hide Boxes:</strong> Toggles the blue outlines on/off for a cleaner view</li>
+                </ul>
+
+                <h6 class="text-primary mb-3"><i class="bi bi-tools me-2"></i>Block Controls</h6>
+                <ul class="mb-4">
+                    <li><strong>Reset Block:</strong> Restores the currently selected element to its original content (before any edits)</li>
+                    <li><strong>Hide Boxes:</strong> Toggles visibility of the blue edit outlines around all editable elements</li>
+                </ul>
+
+                <h6 class="text-primary mb-3"><i class="bi bi-floppy me-2"></i>Page Actions</h6>
+                <ul class="mb-4">
+                    <li><strong>Dashboard:</strong> Returns to the admin dashboard without saving</li>
+                    <li><strong>Save:</strong> Saves only the currently selected blocks you've edited</li>
+                    <li><strong>Save All:</strong> Saves all changes you've made on this page</li>
+                    <li><strong>Reset All:</strong> <span class="text-danger fw-bold">Deletes all custom content</span> and restores page to default (use with caution!)</li>
+                    <li><strong>History:</strong> View past changes and see when each edit was made</li>
+                    <li><strong>Exit:</strong> Returns to viewing the public page without saving</li>
+                </ul>
+
+                <h6 class="text-primary mb-3"><i class="bi bi-clock-history me-2"></i>History & Rollback</h6>
+                <ul class="mb-4">
+                    <li>Click <strong>History</strong> to view all previous versions of content</li>
+                    <li>Each history entry shows the date, time, and who made the change</li>
+                    <li>Use <strong>Rollback</strong> to restore a specific previous version</li>
+                    <li>Rollback creates a new history entry (you can undo a rollback)</li>
+                </ul>
+
+                <h6 class="text-primary mb-3"><i class="bi bi-lightbulb me-2"></i>Tips</h6>
+                <ul class="mb-0">
+                    <li>Changes are <strong>not permanent</strong> until you click Save or Save All</li>
+                    <li>You can <strong>drag the toolbar</strong> by its header to reposition it</li>
+                    <li><strong>Double-click the toolbar header</strong> to reset its position</li>
+                    <li>Use <strong>Reset Block</strong> if you want to undo changes to just one element</li>
+                    <li>The <strong>lock icon</strong> toggles whether the toolbar can be moved</li>
+                    <li>Always <strong>test your changes</strong> by viewing the public page before closing the editor</li>
+                </ul>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Got It!</button>
+            </div>
+        </div>
+    </div>
+</div>
