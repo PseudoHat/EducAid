@@ -152,58 +152,41 @@ $isCMSActive = in_array($current, $cmsFiles, true);
       echo $ma_html;
     ?>
 
-  <!-- Potential Household Matches -->
+  <!-- Household Blocked Registrations -->
     <?php
-      // Ensure $matches_count is defined and compute server-side if DB is available.
-      $matches_count = 0;
-      if (!isset($connection) && is_readable(__DIR__ . '/../../config/database.php')) {
-        include_once __DIR__ . '/../../config/database.php';
-      }
+      // Count active blocks (not overridden)
+      $blocked_count = 0;
       if (isset($connection)) {
-        // Count surname groups where household_verified is FALSE or NULL (unresolved households)
-        $countRes = @pg_query($connection, "
-          SELECT COUNT(*) AS c 
-          FROM (
-            SELECT LOWER(last_name) 
-            FROM students 
-            WHERE (household_verified IS NULL OR household_verified = FALSE)
-              AND is_archived = FALSE
-            GROUP BY LOWER(last_name) 
-            HAVING COUNT(*) > 1
-          ) t
-        ");
+        $countRes = @pg_query($connection, "SELECT COUNT(*) FROM household_block_attempts WHERE admin_override = FALSE");
         if ($countRes) {
-          $matches_count = (int) pg_fetch_result($countRes, 0, 'c');
+          $blocked_count = (int) pg_fetch_result($countRes, 0, 0);
           pg_free_result($countRes);
         }
       }
 
-      if ($matches_count > 0) {
-      $badge = ['text' => (string)$matches_count, 'class' => ($matches_count > 9 ? 'bg-danger' : 'bg-warning'), 'id' => 'phm-badge'];
-    } else {
-      // always render an element so JS can update it later
-      $badge = ['text' => '', 'class' => 'bg-transparent', 'id' => 'phm-badge'];
-    }
+      if ($blocked_count > 0) {
+        $badge = ['text' => (string)$blocked_count, 'class' => 'bg-danger', 'id' => 'hb-badge'];
+      } else {
+        $badge = ['text' => '', 'class' => 'bg-transparent', 'id' => 'hb-badge'];
+      }
 
-    // Render a custom menu item so we can display a shorter visible label while keeping
-    // a descriptive tooltip for hover and screen readers.
-    $phm_href = 'household_duplicates.php';
-    $phm_active = is_active('household_duplicates.php', $current);
-    $visibleLabel = 'Household Duplicates';
-    $tooltipLabel = 'Resolve Household Duplicate Registrations';
-    $badgeClass = $badge['class'];
-    $badgeText = $badge['text'];
-    $badgeIdAttr = ' id="' . htmlspecialchars($badge['id']) . '"';
+      $hb_href = 'household_blocked_registrations.php';
+      $hb_active = is_active('household_blocked_registrations.php', $current);
+      $visibleLabel = 'Blocked Registrations';
+      $tooltipLabel = 'View and Manage Household Blocked Registrations';
+      $badgeClass = $badge['class'];
+      $badgeText = $badge['text'];
+      $badgeIdAttr = ' id="' . htmlspecialchars($badge['id']) . '"';
 
-    $phmHtml  = '<li class="nav-item ' . $phm_active . '">';
-    $phmHtml .=   '<a href="' . $phm_href . '" title="' . htmlspecialchars($tooltipLabel) . '" data-bs-toggle="tooltip" data-bs-placement="right" aria-describedby="' . htmlspecialchars($badge['id']) . '">';
-    $phmHtml .=     '<i class="bi bi-people-fill icon" aria-hidden="true"></i>';
-    $phmHtml .=     '<span class="links_name">' . htmlspecialchars($visibleLabel) . '</span>';
-    $phmHtml .=     '<span' . $badgeIdAttr . ' class="badge ' . $badgeClass . '" role="status" aria-live="polite" aria-label="' . htmlspecialchars(($matches_count>0? $matches_count . ' unresolved household groups' : '')) . '">' . htmlspecialchars($badgeText) . '</span>';
-    $phmHtml .=   '</a>';
-    $phmHtml .= '</li>';
-    echo $phmHtml;
-  ?>
+      $hbHtml  = '<li class="nav-item ' . $hb_active . '">';
+      $hbHtml .=   '<a href="' . $hb_href . '" title="' . htmlspecialchars($tooltipLabel) . '" data-bs-toggle="tooltip" data-bs-placement="right" aria-describedby="' . htmlspecialchars($badge['id']) . '">';
+      $hbHtml .=     '<i class="bi bi-shield-x icon" aria-hidden="true"></i>';
+      $hbHtml .=     '<span class="links_name">' . htmlspecialchars($visibleLabel) . '</span>';
+      $hbHtml .=     '<span' . $badgeIdAttr . ' class="badge ' . $badgeClass . '" role="status" aria-live="polite" aria-label="' . htmlspecialchars(($blocked_count>0? $blocked_count . ' blocked registrations' : '')) . '">' . htmlspecialchars($badgeText) . '</span>';
+      $hbHtml .=   '</a>';
+      $hbHtml .= '</li>';
+      echo $hbHtml;
+    ?>
 
     <!-- My Profile -->
     <?= menu_link('admin_profile.php', 'bi bi-person-circle', 'My Profile', is_active('admin_profile.php', $current)); ?>

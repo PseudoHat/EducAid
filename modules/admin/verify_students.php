@@ -82,6 +82,7 @@ function fetch_students($connection, $status, $sort, $barangayFilter, $searchSur
   $query = "
     SELECT s.student_id, s.first_name, s.middle_name, s.last_name, s.mobile, s.email,
          b.name AS barangay, s.payroll_no, s.student_id as display_student_id,
+         s.mothers_maiden_name, s.admin_review_required,
          (
          SELECT unique_id FROM qr_codes q2
          WHERE q2.student_id = s.student_id AND q2.payroll_number = s.payroll_no
@@ -440,15 +441,25 @@ while ($row = pg_fetch_assoc($barangayResult)) {
                       $barangay = htmlspecialchars($row['barangay'] ?? '');
                       $payroll  = htmlspecialchars((string)($row['payroll_no'] ?? ''));
                       $unique_id = $row['unique_id'];
+                      $mothers_maiden = htmlspecialchars($row['mothers_maiden_name'] ?? '');
+                      $admin_review_required = ($row['admin_review_required'] ?? false) == 't';
                       
                       // Check if QR code exists (don't display the actual QR image for security)
                       $has_qr = !empty($payroll) && !empty($unique_id);
                   ?>
-                      <tr onclick="showStudentOptions('<?= $id ?>', '<?= htmlspecialchars($name, ENT_QUOTES) ?>', '<?= htmlspecialchars($email, ENT_QUOTES) ?>', '<?= htmlspecialchars($barangay, ENT_QUOTES) ?>')" style="cursor: pointer;" title="Click for options">
+                      <tr onclick="showStudentOptions('<?= $id ?>', '<?= htmlspecialchars($name, ENT_QUOTES) ?>', '<?= htmlspecialchars($email, ENT_QUOTES) ?>', '<?= htmlspecialchars($barangay, ENT_QUOTES) ?>')" style="cursor: pointer; <?= $admin_review_required ? 'background-color: #fff3cd;' : '' ?>" title="Click for options">
                         <td onclick="event.stopPropagation();">
                           <input type="checkbox" name="selected_actives[]" value="<?= $id ?>" <?= $isFinalized ? 'disabled' : '' ?> />
                         </td>
-                        <td><?= $name ?></td>
+                        <td>
+                          <?= $name ?>
+                          <?php if ($admin_review_required): ?>
+                            <span class="badge bg-warning text-dark ms-2" data-bs-toggle="tooltip" data-bs-placement="right" 
+                                  title="Requires Admin Review: Mother's maiden name matches surname">
+                              <i class="bi bi-exclamation-triangle-fill"></i> Review
+                            </span>
+                          <?php endif; ?>
+                        </td>
                         <td><?= $email ?></td>
                         <td><?= $mobile ?></td>
                         <td><?= $barangay ?></td>
