@@ -719,7 +719,10 @@ if (empty($preview_text_color)) {
                   <input type="text" class="form-control" id="system_name" name="system_name" 
                          value="<?= htmlspecialchars($current_settings['system_name']) ?>" 
                          placeholder="EducAid">
-                  <div class="form-text">Name of the system/application.</div>
+                  <div class="form-text">
+                    <i class="bi bi-info-circle"></i> Name of the system/application. 
+                    <strong>Displayed in the website navigation bar as the brand name.</strong>
+                  </div>
                 </div>
                 
                 <div class="mb-0">
@@ -727,7 +730,10 @@ if (empty($preview_text_color)) {
                   <input type="text" class="form-control" id="municipality_name" name="municipality_name" 
                          value="<?= htmlspecialchars($current_settings['municipality_name']) ?>" 
                          placeholder="City of General Trias">
-                  <div class="form-text">Name of the municipality or local government unit.</div>
+                  <div class="form-text">
+                    <i class="bi bi-info-circle"></i> Name of the municipality or local government unit. 
+                    <strong>Displayed in the website navigation bar after the system name (format: System Name • Municipality Name).</strong>
+                  </div>
                 </div>
               </div>
               
