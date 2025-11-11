@@ -108,24 +108,44 @@
           const recs=d.records||[];
           if(!recs.length){ listEl.innerHTML='<div class="alert alert-info small">No edit history found</div>'; return; }
           
-          // Group by user
-          const byUser={};
+          // Group by user and date
+          const byUserDate={};
           recs.forEach(r=>{
             const user=r.admin_username||'System';
-            if(!byUser[user]) byUser[user]={username:user,edits:[],blocks:new Set(),actions:{}};
-            byUser[user].edits.push(r);
-            byUser[user].blocks.add(r.block_key);
-            byUser[user].actions[r.action_type]=(byUser[user].actions[r.action_type]||0)+1;
+            const dateTime=r.created_at.split(' ');
+            const date=dateTime[0]; // YYYY-MM-DD
+            const key=`${user}|${date}`;
+            if(!byUserDate[key]) byUserDate[key]={username:user,date:date,edits:[],blocks:new Set(),actions:{}};
+            byUserDate[key].edits.push(r);
+            byUserDate[key].blocks.add(r.block_key);
+            byUserDate[key].actions[r.action_type]=(byUserDate[key].actions[r.action_type]||0)+1;
           });
+          
+          // Sort by most recent first
+          const sortedGroups=Object.values(byUserDate).sort((a,b)=>b.edits[0].created_at.localeCompare(a.edits[0].created_at));
+          
+          // Format date nicely
+          const formatDate=(dateStr)=>{
+            const d=new Date(dateStr);
+            const today=new Date();
+            const yesterday=new Date(today);
+            yesterday.setDate(yesterday.getDate()-1);
+            if(d.toDateString()===today.toDateString()) return 'Today';
+            if(d.toDateString()===yesterday.toDateString()) return 'Yesterday';
+            return d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+          };
           
           // Build accordion
           listEl.innerHTML='';
           let idx=0;
-          Object.values(byUser).forEach(userData=>{
+          sortedGroups.forEach(userData=>{
             const totalEdits=userData.edits.length;
             const uniqueBlocks=userData.blocks.size;
             const actionSummary=Object.entries(userData.actions).map(([action,count])=>`${count} ${action}`).join(', ');
-            const latestEdit=userData.edits[0].created_at;
+            const dateFormatted=formatDate(userData.date);
+            const firstTime=userData.edits[0].created_at.split(' ')[1].slice(0,5);
+            const lastTime=userData.edits[userData.edits.length-1].created_at.split(' ')[1].slice(0,5);
+            const timeRange=userData.edits.length>1?`${lastTime} - ${firstTime}`:`${firstTime}`;
             
             const accordionItem=document.createElement('div');
             accordionItem.className='accordion-item';
@@ -138,7 +158,7 @@
                       <span class="badge bg-primary">${totalEdits} ${totalEdits===1?'edit':'edits'}</span>
                     </div>
                     <small class="text-muted d-block mt-1">
-                      Edited ${uniqueBlocks} ${uniqueBlocks===1?'block':'blocks'} • ${actionSummary} • Last: ${esc(latestEdit)}
+                      <i class="bi bi-calendar-event me-1"></i>${dateFormatted} <i class="bi bi-clock ms-2 me-1"></i>${timeRange} • ${uniqueBlocks} ${uniqueBlocks===1?'block':'blocks'} • ${actionSummary}
                     </small>
                   </div>
                 </button>

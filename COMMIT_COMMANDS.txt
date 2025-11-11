@@ -1,6 +1,6 @@
 git add includes/website/edit_toolbar.php assets/js/website/content_editor.js assets/css/content_editor.css website/ajax_get_landing_history.php website/ajax_get_about_history.php
 
-git commit -m "feat: Add CMS help modal and redesign history as user summary accordion
+git commit -m "feat: Add CMS help modal and redesign history as user+date accordion
 
 Editor Improvements:
 - Add help button with comprehensive usage guide modal
@@ -9,11 +9,11 @@ Editor Improvements:
 - Rename 'Block Controls' to 'View Controls'
 
 History Modal Redesign:
-- Redesign as user-grouped accordion instead of long list
-- Show summary stats per user (edits, blocks, actions, timestamp)
+- Group edits by user AND date (separate accordion per day)
+- Show time range, blocks edited, and action summary per session
 - Remove rollback/preview features (safer, simpler)
 - Add admin username and change summaries to backend
-- Auto-expand first user section for convenience
+- Sort by most recent first, auto-expand latest session
 
 Bug Fixes:
 - Add missing History modal CSS (was invisible)

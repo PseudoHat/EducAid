@@ -110,10 +110,12 @@ if (!$toolbar_config['exit_url']) {
     margin: 0;
 }
 .lp-toolbar-actions {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
     gap: 0.5rem;
+}
+.lp-toolbar-actions .w-100 {
+    grid-column: 1 / -1;
 }
 .lp-lock-toggle {
     position: absolute;
