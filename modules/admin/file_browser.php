@@ -411,12 +411,25 @@ $pageTitle = 'Railway Volume Browser';
         }
         
         .breadcrumb-path {
-            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-            padding: 16px 20px;
-            border-radius: 10px;
-            margin-bottom: 24px;
-            border: 1px solid #dee2e6;
+            background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+            padding: 20px 24px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            border: 1px solid #e0e0e0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
             overflow-x: auto;
+            position: relative;
+        }
+        
+        .breadcrumb-path::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 50%, #667eea 100%);
+            border-radius: 12px 12px 0 0;
         }
         
         .breadcrumb {
@@ -429,45 +442,125 @@ $pageTitle = 'Railway Volume Browser';
         
         .breadcrumb-item {
             white-space: nowrap;
+            font-size: 0.95rem;
         }
         
         .breadcrumb-item a {
-            color: #0d6efd;
+            color: #667eea;
             text-decoration: none;
-            font-weight: 500;
+            font-weight: 600;
+            padding: 6px 12px;
+            border-radius: 6px;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
         }
         
         .breadcrumb-item a:hover {
-            text-decoration: underline;
+            background: rgba(102, 126, 234, 0.1);
+            color: #764ba2;
+            transform: translateY(-1px);
+        }
+        
+        .breadcrumb-item.active {
+            color: #495057;
+            font-weight: 600;
         }
         
         .stats-card {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            padding: 16px 20px;
-            border-radius: 10px;
-            margin-bottom: 20px;
+            padding: 24px 28px;
+            border-radius: 12px;
+            margin-bottom: 24px;
             display: flex;
             align-items: center;
-            gap: 16px;
+            gap: 20px;
+            box-shadow: 0 4px 20px rgba(102, 126, 234, 0.3);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .stats-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+            animation: shimmer 3s infinite;
+        }
+        
+        @keyframes shimmer {
+            0%, 100% { transform: translate(0, 0); }
+            50% { transform: translate(-30%, -30%); }
         }
         
         .stats-card i {
-            font-size: 2.5rem;
-            opacity: 0.9;
+            font-size: 3rem;
+            opacity: 0.95;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
+            position: relative;
+            z-index: 1;
         }
         
         .stats-content {
             flex: 1;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .stats-content > div {
+            animation: fadeInUp 0.5s ease backwards;
+        }
+        
+        .stats-content > div:nth-child(1) { animation-delay: 0.1s; }
+        .stats-content > div:nth-child(2) { animation-delay: 0.15s; }
+        .stats-content > div:nth-child(3) { animation-delay: 0.2s; }
+        .stats-content > div:nth-child(4) { animation-delay: 0.25s; }
+        
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
         
         .stats-content small {
-            opacity: 0.9;
-            font-size: 0.85rem;
+            opacity: 0.95;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 500;
         }
         
         .stats-content strong {
-            font-size: 1.1rem;
+            font-size: 1.4rem;
+            font-weight: 700;
+            display: block;
+            margin-top: 4px;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        }
+        
+        .stats-content .btn-light {
+            background: rgba(255,255,255,0.2);
+            border: 1px solid rgba(255,255,255,0.3);
+            color: white;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            backdrop-filter: blur(10px);
+        }
+        
+        .stats-content .btn-light:hover {
+            background: rgba(255,255,255,0.3);
+            border-color: rgba(255,255,255,0.5);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
         }
         
         .file-list-header {
@@ -582,34 +675,62 @@ $pageTitle = 'Railway Volume Browser';
             }
             
             .breadcrumb-path {
-                padding: 12px 16px;
+                padding: 16px 18px;
                 margin-bottom: 16px;
+            }
+            
+            .breadcrumb-path::before {
+                height: 2px;
             }
             
             .breadcrumb {
                 font-size: 0.85rem;
             }
             
+            .breadcrumb-item a {
+                padding: 4px 8px;
+                font-size: 0.85rem;
+            }
+            
             .stats-card {
                 flex-direction: row;
-                padding: 12px 16px;
+                padding: 20px 18px;
             }
             
             .stats-card i {
-                font-size: 2rem;
+                font-size: 2.2rem;
             }
             
             .stats-content .d-flex {
                 flex-direction: column !important;
-                gap: 8px !important;
+                gap: 12px !important;
+            }
+            
+            .stats-content > div > div {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 8px 12px;
+                background: rgba(255,255,255,0.1);
+                border-radius: 8px;
+                backdrop-filter: blur(5px);
             }
             
             .stats-content small {
                 font-size: 0.75rem;
+                display: inline !important;
+                margin-bottom: 0 !important;
             }
             
             .stats-content strong {
-                font-size: 1rem;
+                font-size: 1.1rem;
+                display: inline !important;
+                margin-top: 0 !important;
+            }
+            
+            .stats-content .btn-light {
+                width: 100%;
+                justify-content: center;
             }
             
             .file-list-header {
