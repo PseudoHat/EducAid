@@ -735,13 +735,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['forgot_action'])) {
 // NOTE: Set RECAPTCHA_V2_SITE_KEY and RECAPTCHA_V2_SECRET_KEY in your environment or .env for production.
 // If only RECAPTCHA_SITE_KEY/SECRET are set (v3), the v2 site key will fall back to RECAPTCHA_SITE_KEY.
 $recaptcha_v2_site_key = getenv('RECAPTCHA_V2_SITE_KEY') ?: (defined('RECAPTCHA_SITE_KEY') ? RECAPTCHA_SITE_KEY : '');
+
+// SEO Configuration
+require_once __DIR__ . '/includes/seo_helpers.php';
+$seoData = getSEOData('login');
+$pageTitle = $seoData['title'];
+$pageDescription = $seoData['description'];
+$pageKeywords = $seoData['keywords'];
+$pageImage = 'https://www.educ-aid.site' . $seoData['image'];
+$pageUrl = 'https://www.educ-aid.site/unified_login.php';
+$pageType = $seoData['type'];
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EducAid - Login</title>
+    <?php include __DIR__ . '/includes/seo_head.php'; ?>
+    
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Poppins:wght@400;600&display=swap" rel="stylesheet">
     <link href="assets/css/bootstrap-icons.css" rel="stylesheet">
     <link href="assets/css/universal.css" rel="stylesheet">

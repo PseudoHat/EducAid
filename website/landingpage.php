@@ -10,7 +10,7 @@ if (session_status() === PHP_SESSION_NONE) {
 require_once __DIR__ . '/../includes/CSRFProtection.php';
 
 $IS_EDIT_SUPER_ADMIN = false;
-// Detect super admin attempting to edit (bypass captcha gate)
+// Detect super admin attempting to edit
 if (isset($_GET['edit']) && $_GET['edit'] == '1' && isset($_SESSION['admin_id'])) {
   @include_once __DIR__ . '/../config/database.php';
   @include_once __DIR__ . '/../includes/permissions.php';
@@ -22,24 +22,9 @@ if (isset($_GET['edit']) && $_GET['edit'] == '1' && isset($_SESSION['admin_id'])
   }
 }
 
-if (!$IS_EDIT_SUPER_ADMIN) {
-  // Standard public captcha verification flow
-  if (!isset($_SESSION['captcha_verified']) || $_SESSION['captcha_verified'] !== true) {
-      header('Location: security_verification.php');
-      exit;
-  }
-  $verificationTime = $_SESSION['captcha_verified_time'] ?? 0;
-  $expirationTime = 24 * 60 * 60; // 24 hours
-  if (time() - $verificationTime > $expirationTime) {
-      unset($_SESSION['captcha_verified'], $_SESSION['captcha_verified_time']);
-      header('Location: security_verification.php');
-      exit;
-  }
-} else {
-  // Ensure DB available for downstream usage
-  if (!isset($connection)) {
-    @include_once __DIR__ . '/../config/database.php';
-  }
+// Ensure DB available for usage
+if (!isset($connection)) {
+  @include_once __DIR__ . '/../config/database.php';
 }
 
 // Include reCAPTCHA v2 configuration
@@ -102,14 +87,22 @@ function lp_block($key, $defaultHtml){
 function lp_block_style($key){
   global $LP_SAVED_BLOCKS; if(!isset($LP_SAVED_BLOCKS[$key])) return '';
   $r = $LP_SAVED_BLOCKS[$key]; $s=[]; if(!empty($r['text_color'])) $s[]='color:'.$r['text_color']; if(!empty($r['bg_color'])) $s[]='background-color:'.$r['bg_color']; return $s? ' style="'.implode(';',$s).'"':''; }
+
+// SEO Configuration
+require_once __DIR__ . '/../includes/seo_helpers.php';
+$seoData = getSEOData('landing');
+$pageTitle = $seoData['title'];
+$pageDescription = $seoData['description'];
+$pageKeywords = $seoData['keywords'];
+$pageImage = 'https://www.educ-aid.site' . $seoData['image'];
+$pageUrl = 'https://www.educ-aid.site/website/landingpage.php';
+$pageType = $seoData['type'];
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, user-scalable=yes" />
-  <title><?php echo strip_tags(lp_block('page_title','EducAid – City of General Trias')); ?></title>
-  <meta name="description" content="Educational Assistance Management System for the City of General Trias" />
+  <?php include __DIR__ . '/../includes/seo_head.php'; ?>
+  
   <?php if ($IS_EDIT_MODE): ?>
   <meta name="csrf-token" content="<?php echo CSRFProtection::generateToken('cms_content'); ?>" />
   <?php endif; ?>

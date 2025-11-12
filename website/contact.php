@@ -1,6 +1,8 @@
 <?php
 // Dedicated Contact & Helpdesk page
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 // Check for Edit Mode (Super Admin only)
 $IS_EDIT_MODE = false;
@@ -27,21 +29,6 @@ if (!isset($connection)) {
     require_once '../config/database.php';
 }
 require_once '../includes/website/contact_content_helper.php';
-
-// Skip verification gate if in edit mode
-if (!$IS_EDIT_MODE) {
-    // Reuse the same verification gate as landing page (optional - remove if you want it public)
-    if (!isset($_SESSION['captcha_verified']) || $_SESSION['captcha_verified'] !== true) {
-        header('Location: security_verification.php');
-        exit;
-    }
-    $verificationTime = $_SESSION['captcha_verified_time'] ?? 0;
-    if (time() - $verificationTime > 24*60*60) { // 24h expiry
-        unset($_SESSION['captcha_verified'], $_SESSION['captcha_verified_time']);
-        header('Location: security_verification.php');
-        exit;
-    }
-}
 
 // (Optional) Mailer integration could be added later. For now: log inquiries.
 
@@ -84,14 +71,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_inquiry'])) {
 }
 
 function esc($v){ return htmlspecialchars($v ?? '', ENT_QUOTES, 'UTF-8'); }
+
+// SEO Configuration
+require_once __DIR__ . '/../includes/seo_helpers.php';
+$seoData = getSEOData('contact');
+$pageTitle = $seoData['title'];
+$pageDescription = $seoData['description'];
+$pageKeywords = $seoData['keywords'];
+$pageImage = 'https://www.educ-aid.site' . $seoData['image'];
+$pageUrl = 'https://www.educ-aid.site/website/contact.php';
+$pageType = $seoData['type'];
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Contact • EducAid – City of General Trias</title>
-  <meta name="description" content="Official contact & helpdesk page for EducAid – City of General Trias" />
+  <?php include __DIR__ . '/../includes/seo_head.php'; ?>
+  
   <?php if ($IS_EDIT_MODE): ?>
   <meta name="csrf-token" content="<?php echo CSRFProtection::generateToken('cms_content'); ?>" />
   <?php endif; ?>

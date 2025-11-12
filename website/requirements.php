@@ -14,14 +14,22 @@ if (isset($_SESSION['admin_id']) && function_exists('getCurrentAdminRole')) {
 if ($is_super_admin && isset($_GET['edit']) && $_GET['edit'] == '1') { $IS_EDIT_MODE = true; }
 // Load dedicated requirements page content helper (separate storage)
 @include_once __DIR__ . '/../includes/website/requirements_content_helper.php';
+
+// SEO Configuration
+require_once __DIR__ . '/../includes/seo_helpers.php';
+$seoData = getSEOData('requirements');
+$pageTitle = $seoData['title'];
+$pageDescription = $seoData['description'];
+$pageKeywords = $seoData['keywords'];
+$pageImage = 'https://www.educ-aid.site' . $seoData['image'];
+$pageUrl = 'https://www.educ-aid.site/website/requirements.php';
+$pageType = $seoData['type'];
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title><?php echo strip_tags(req_block('req_page_title','Requirements – EducAid City of General Trias')); ?></title>
-  <meta name="description" content="<?php echo htmlspecialchars(strip_tags(req_block('req_page_meta_desc','Complete list of requirements and documents needed for EducAid educational assistance application'))); ?>" />
+  <?php include __DIR__ . '/../includes/seo_head.php'; ?>
+  
   <?php if ($IS_EDIT_MODE): ?>
   <meta name="csrf-token" content="<?php echo CSRFProtection::generateToken('cms_content'); ?>" />
   <?php endif; ?>

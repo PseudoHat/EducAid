@@ -10,7 +10,9 @@ error_reporting(0);
 ini_set('display_errors', 0);
 ob_start();
 
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 // Clear any output that might have been generated
 ob_clean();

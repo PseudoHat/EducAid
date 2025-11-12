@@ -22,21 +22,18 @@ if (isset($_GET['edit']) && ($_GET['edit'] === 'true' || $_GET['edit'] == '1')) 
   }
 }
 
-if (!$IS_EDIT_MODE) {
-    if (!isset($_SESSION['captcha_verified']) || $_SESSION['captcha_verified'] !== true) {
-        header('Location: security_verification.php');
-        exit;
-    }
-  $verificationTime = $_SESSION['captcha_verified_time'] ?? 0;
-  if (time() - $verificationTime > 24 * 60 * 60) {
-    unset($_SESSION['captcha_verified'], $_SESSION['captcha_verified_time']);
-    header('Location: security_verification.php');
-    exit;
-  }
-}
-
 // Load announcements content helper
 require_once __DIR__ . '/../includes/website/announcements_content_helper.php';
+
+// SEO Configuration
+require_once __DIR__ . '/../includes/seo_helpers.php';
+$seoData = getSEOData('announcements');
+$pageTitle = $seoData['title'];
+$pageDescription = $seoData['description'];
+$pageKeywords = $seoData['keywords'];
+$pageImage = 'https://www.educ-aid.site' . $seoData['image'];
+$pageUrl = 'https://www.educ-aid.site/website/announcements.php';
+$pageType = $seoData['type'];
 
 // Optional deep-link id
 $requested_id = isset($_GET['id']) && ctype_digit($_GET['id']) ? (int)$_GET['id'] : null;
@@ -82,9 +79,8 @@ $custom_nav_links = [
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Announcements – EducAid</title>
+<?php include __DIR__ . '/../includes/seo_head.php'; ?>
+
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
 <link href="../assets/css/bootstrap.min.css" rel="stylesheet" />
 <link href="../assets/css/bootstrap-icons.css" rel="stylesheet" />

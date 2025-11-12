@@ -822,15 +822,24 @@ $isAjaxRequest = isset($_POST['sendOtp']) || isset($_POST['verifyOtp']) ||
                  isset($_POST['check_school_student_id']) ||
                  (isset($_POST['action']) && in_array($_POST['action'], ['check_full_duplicate', 'check_email_duplicate', 'check_mobile_duplicate', 'check_name_duplicate', 'check_household_lastname', 'check_household_duplicate', 'update_block_contact']));
 
+// SEO Configuration
+require_once __DIR__ . '/../../includes/seo_helpers.php';
+$seoData = getSEOData('register');
+$pageTitle = $seoData['title'];
+$pageDescription = $seoData['description'];
+$pageKeywords = $seoData['keywords'];
+$pageImage = 'https://www.educ-aid.site' . $seoData['image'];
+$pageUrl = 'https://www.educ-aid.site/modules/student/student_register.php';
+$pageType = $seoData['type'];
+
 // Only output HTML for non-AJAX requests
 if (!$isAjaxRequest) {
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>EducAid – Register</title>
+    <?php include __DIR__ . '/../../includes/seo_head.php'; ?>
+    
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
     <link href="../../assets/css/bootstrap-icons.css" rel="stylesheet" />
     <link href="../../assets/css/universal.css" rel="stylesheet" />
