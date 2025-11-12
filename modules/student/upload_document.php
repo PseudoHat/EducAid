@@ -35,6 +35,11 @@ $student_query = pg_query_params($connection,
             s.current_year_level,
             s.is_graduating,
             s.status_academic_year,
+            s.admin_review_required,
+            s.university_id,
+            s.year_level_id,
+            s.mothers_maiden_name,
+            s.school_student_id,
             b.name as barangay_name,
             u.name as university_name,
             yl.name as year_level_name
@@ -51,6 +56,18 @@ if (!$student_query || pg_num_rows($student_query) === 0) {
 }
 
 $student = pg_fetch_assoc($student_query);
+
+// PRIORITY: Check if student is migrated (has admin_review_required flag) FIRST
+$is_migrated = isset($student['admin_review_required']) && ($student['admin_review_required'] === 't' || $student['admin_review_required'] === true);
+
+// Check if migrated student needs to complete their profile (missing required credentials)
+// This takes PRIORITY over regular year level updates
+$needs_university_selection = $is_migrated && (
+    empty($student['university_id']) || 
+    empty($student['year_level_id']) || 
+    empty($student['mothers_maiden_name']) || 
+    empty($student['school_student_id'])
+);
 
 // Get current active academic year from distribution config (not just signup_slots)
 $current_academic_year = null;
@@ -75,21 +92,23 @@ if (!$current_academic_year) {
 // They need to update if:
 // 1. They don't have year level data at all, OR
 // 2. There's an active distribution and their status_academic_year doesn't match the current one
+// BUT: Migrated students with incomplete profiles are handled separately above
 $has_year_level_credentials = !empty($student['current_year_level']) && 
                                !empty($student['status_academic_year']) && 
                                $student['is_graduating'] !== null &&
                                (!$current_academic_year || $student['status_academic_year'] === $current_academic_year);
 
 // Store year level update requirement in variable (don't redirect, show modal instead)
-$needs_year_level_update = !$has_year_level_credentials;
+// Only set this if NOT a migrated student needing profile completion
+$needs_year_level_update = !$needs_university_selection && !$has_year_level_credentials;
 $year_level_update_message = '';
 $force_update = isset($_GET['force_update']) && $_GET['force_update'] == '1';
 
-// Check if migrated student needs to select university/year level/mother's maiden name/school student ID
-// Note: $is_migrated is already defined earlier in the file
-$needs_university_selection = $is_migrated && (empty($student['university_id']) || empty($student['year_level_id']) || empty($student['mothers_maiden_name']) || empty($student['school_student_id']));
-
-if ($needs_year_level_update) {
+// Set appropriate message based on what's needed
+if ($needs_university_selection) {
+    // PRIORITY: Migrated student profile completion
+    $year_level_update_message = "Welcome! As a migrated student, please complete your profile by providing your university, mother's maiden name, school ID, and current year level information.";
+} elseif ($needs_year_level_update) {
     if ($force_update) {
         $year_level_update_message = "You must update your year level before accessing other pages. Please provide your current information below.";
     } elseif ($current_academic_year && !empty($student['status_academic_year']) && $student['status_academic_year'] !== $current_academic_year) {
@@ -97,18 +116,14 @@ if ($needs_year_level_update) {
     } else {
         $year_level_update_message = "Please provide your current year level and graduation status to continue.";
     }
-} elseif ($needs_university_selection) {
-    $year_level_update_message = "Welcome! As a migrated student, please confirm your university and current academic information to continue.";
 }
 
 // PostgreSQL returns 'f'/'t' strings for booleans
 $needs_upload = ($student['needs_upload'] === 't' || $student['needs_upload'] === true);
 $student_status = $student['status'] ?? 'applicant';
 
-// Check if student is migrated (has admin_review_required flag)
-$is_migrated = isset($student['admin_review_required']) && ($student['admin_review_required'] === 't' || $student['admin_review_required'] === true);
-
 // IMPORTANT: Migrated students ALWAYS need to upload documents (treat them like re-upload mode)
+// Note: $is_migrated is already defined near the top of the file
 if ($is_migrated) {
     $needs_upload = true;
 }
@@ -258,6 +273,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_year_level']))
         $mothers_maiden_name = isset($_POST['mothers_maiden_name']) ? trim($_POST['mothers_maiden_name']) : null;
         $school_student_id = isset($_POST['school_student_id']) ? trim($_POST['school_student_id']) : null;
         
+        // Password update for migrated students (required)
+        $new_password = isset($_POST['new_password']) ? trim($_POST['new_password']) : null;
+        $confirm_password = isset($_POST['confirm_password']) ? trim($_POST['confirm_password']) : null;
+        
         if (empty($year_level) || empty($academic_year)) {
             echo json_encode(['success' => false, 'message' => 'Please fill in all required fields.']);
             exit;
@@ -265,13 +284,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_year_level']))
         
         // Check if this is a migrated student needing university selection
         $student_check_query = pg_query_params($connection,
-            "SELECT status, university_id, year_level_id, mothers_maiden_name, school_student_id FROM students WHERE student_id = $1",
+            "SELECT status, university_id, year_level_id, mothers_maiden_name, school_student_id, admin_review_required FROM students WHERE student_id = $1",
             [$student_id]
         );
         $student_check = pg_fetch_assoc($student_check_query);
         
-        // If migrated student without university, require university_id, mothers_maiden_name, and school_student_id
-        if ($student_check['status'] === 'migrated' && empty($student_check['university_id'])) {
+        // Check if migrated student (admin_review_required = TRUE)
+        $is_migrated_student = ($student_check['admin_review_required'] === 't' || $student_check['admin_review_required'] === true);
+        
+        // If migrated student without university, require all fields including password
+        if ($is_migrated_student && empty($student_check['university_id'])) {
             if (empty($university_id)) {
                 echo json_encode(['success' => false, 'message' => 'Please select your university.']);
                 exit;
@@ -282,6 +304,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_year_level']))
             }
             if (empty($school_student_id)) {
                 echo json_encode(['success' => false, 'message' => 'Please enter your school student ID.']);
+                exit;
+            }
+            
+            // Validate password for migrated students
+            if (empty($new_password)) {
+                echo json_encode(['success' => false, 'message' => 'Please create a new password.']);
+                exit;
+            }
+            if (strlen($new_password) < 8) {
+                echo json_encode(['success' => false, 'message' => 'Password must be at least 8 characters long.']);
+                exit;
+            }
+            if ($new_password !== $confirm_password) {
+                echo json_encode(['success' => false, 'message' => 'Passwords do not match.']);
                 exit;
             }
         }
@@ -737,7 +773,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_year_level']))
         }
         
         // Update student year level credentials
-        // For migrated students, also update university_id, year_level_id, mothers_maiden_name, and school_student_id
+        // For migrated students, also update university_id, year_level_id, mothers_maiden_name, school_student_id, AND password
         if (!empty($university_id)) {
             // Get year_level_id from year level name
             $yl_query = pg_query_params($connection,
@@ -747,27 +783,61 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_year_level']))
             $yl_row = pg_fetch_assoc($yl_query);
             $year_level_id = $yl_row ? intval($yl_row['year_level_id']) : null;
             
-            $update_query = "UPDATE students 
-                            SET current_year_level = $1,
-                                is_graduating = $2,
-                                last_status_update = NOW(),
-                                status_academic_year = $3,
-                                university_id = $4,
-                                year_level_id = $5,
-                                mothers_maiden_name = $6,
-                                school_student_id = $7
-                            WHERE student_id = $8";
+            // Hash the new password if provided
+            $hashed_password = null;
+            if (!empty($new_password)) {
+                $hashed_password = password_hash($new_password, PASSWORD_BCRYPT);
+            }
             
-            $update_result = pg_query_params($connection, $update_query, [
-                $year_level,
-                $is_graduating ? 'true' : 'false',
-                $academic_year,
-                $university_id,
-                $year_level_id,
-                $mothers_maiden_name,
-                $school_student_id,
-                $student_id
-            ]);
+            // Update query with password if migrated student
+            if ($is_migrated_student && !empty($hashed_password)) {
+                $update_query = "UPDATE students 
+                                SET current_year_level = $1,
+                                    is_graduating = $2,
+                                    last_status_update = NOW(),
+                                    status_academic_year = $3,
+                                    university_id = $4,
+                                    year_level_id = $5,
+                                    mothers_maiden_name = $6,
+                                    school_student_id = $7,
+                                    password = $8
+                                WHERE student_id = $9";
+                
+                $update_result = pg_query_params($connection, $update_query, [
+                    $year_level,
+                    $is_graduating ? 'true' : 'false',
+                    $academic_year,
+                    $university_id,
+                    $year_level_id,
+                    $mothers_maiden_name,
+                    $school_student_id,
+                    $hashed_password,
+                    $student_id
+                ]);
+            } else {
+                // Regular update without password change
+                $update_query = "UPDATE students 
+                                SET current_year_level = $1,
+                                    is_graduating = $2,
+                                    last_status_update = NOW(),
+                                    status_academic_year = $3,
+                                    university_id = $4,
+                                    year_level_id = $5,
+                                    mothers_maiden_name = $6,
+                                    school_student_id = $7
+                                WHERE student_id = $8";
+                
+                $update_result = pg_query_params($connection, $update_query, [
+                    $year_level,
+                    $is_graduating ? 'true' : 'false',
+                    $academic_year,
+                    $university_id,
+                    $year_level_id,
+                    $mothers_maiden_name,
+                    $school_student_id,
+                    $student_id
+                ]);
+            }
         } else {
             $update_query = "UPDATE students 
                             SET current_year_level = $1,
@@ -2827,6 +2897,53 @@ $page_title = 'Upload Documents';
                                 </div>
                             </div>
                         </div>
+                        
+                        <!-- New Password (Migrated Students Only) -->
+                        <div class="mb-4">
+                            <label class="form-label fw-bold mb-3" style="color: #1f2937; font-size: 1rem;">
+                                <i class="bi bi-shield-lock me-2" style="color: #667eea;"></i> New Password <span class="text-danger">*</span>
+                            </label>
+                            <div class="position-relative">
+                                <input type="password" class="form-control form-control-lg" id="newPassword" name="new_password" 
+                                       required 
+                                       minlength="8"
+                                       placeholder="Create a new secure password"
+                                       style="border-radius: 12px; border: 2px solid #e5e7eb; padding: 14px 48px 14px 18px; font-size: 1rem; transition: all 0.2s;">
+                                <button type="button" class="btn btn-link position-absolute" id="toggleNewPassword" 
+                                        style="right: 8px; top: 50%; transform: translateY(-50%); padding: 4px 8px; color: #6b7280;">
+                                    <i class="bi bi-eye" id="newPasswordIcon"></i>
+                                </button>
+                            </div>
+                            <div class="mt-2" style="background: #fef2f2; border-left: 3px solid #dc2626; padding: 12px 16px; border-radius: 8px;">
+                                <div class="d-flex align-items-start">
+                                    <i class="bi bi-exclamation-triangle me-2 flex-shrink-0" style="color: #dc2626; font-size: 18px; margin-top: 2px;"></i>
+                                    <small style="color: #991b1b; line-height: 1.5;">
+                                        <strong>Required:</strong> You are currently using a temporary generated password. Please create a new secure password (minimum 8 characters).
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Confirm Password -->
+                        <div class="mb-4">
+                            <label class="form-label fw-bold mb-3" style="color: #1f2937; font-size: 1rem;">
+                                <i class="bi bi-shield-check me-2" style="color: #667eea;"></i> Confirm Password <span class="text-danger">*</span>
+                            </label>
+                            <div class="position-relative">
+                                <input type="password" class="form-control form-control-lg" id="confirmPassword" name="confirm_password" 
+                                       required 
+                                       minlength="8"
+                                       placeholder="Re-enter your new password"
+                                       style="border-radius: 12px; border: 2px solid #e5e7eb; padding: 14px 48px 14px 18px; font-size: 1rem; transition: all 0.2s;">
+                                <button type="button" class="btn btn-link position-absolute" id="toggleConfirmPassword" 
+                                        style="right: 8px; top: 50%; transform: translateY(-50%); padding: 4px 8px; color: #6b7280;">
+                                    <i class="bi bi-eye" id="confirmPasswordIcon"></i>
+                                </button>
+                            </div>
+                            <div class="mt-2" id="passwordMatchMessage" style="display: none;">
+                                <!-- Password match indicator will appear here -->
+                            </div>
+                        </div>
                         <?php endif; ?>
                         
                         <!-- Enhanced Year Level Select -->
@@ -2997,12 +3114,108 @@ $page_title = 'Upload Documents';
         });
         <?php endif; ?>
         
+        // Password validation for migrated students
+        document.addEventListener('DOMContentLoaded', function() {
+            const newPasswordInput = document.getElementById('newPassword');
+            const confirmPasswordInput = document.getElementById('confirmPassword');
+            const passwordMatchMessage = document.getElementById('passwordMatchMessage');
+            const toggleNewPasswordBtn = document.getElementById('toggleNewPassword');
+            const toggleConfirmPasswordBtn = document.getElementById('toggleConfirmPassword');
+            const newPasswordIcon = document.getElementById('newPasswordIcon');
+            const confirmPasswordIcon = document.getElementById('confirmPasswordIcon');
+            
+            // Toggle password visibility for new password
+            if (toggleNewPasswordBtn) {
+                toggleNewPasswordBtn.addEventListener('click', function() {
+                    const type = newPasswordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+                    newPasswordInput.setAttribute('type', type);
+                    newPasswordIcon.classList.toggle('bi-eye');
+                    newPasswordIcon.classList.toggle('bi-eye-slash');
+                });
+            }
+            
+            // Toggle password visibility for confirm password
+            if (toggleConfirmPasswordBtn) {
+                toggleConfirmPasswordBtn.addEventListener('click', function() {
+                    const type = confirmPasswordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+                    confirmPasswordInput.setAttribute('type', type);
+                    confirmPasswordIcon.classList.toggle('bi-eye');
+                    confirmPasswordIcon.classList.toggle('bi-eye-slash');
+                });
+            }
+            
+            // Real-time password match validation
+            function checkPasswordMatch() {
+                if (!confirmPasswordInput || !newPasswordInput) return;
+                
+                const newPassword = newPasswordInput.value;
+                const confirmPassword = confirmPasswordInput.value;
+                
+                if (confirmPassword.length === 0) {
+                    passwordMatchMessage.style.display = 'none';
+                    return;
+                }
+                
+                passwordMatchMessage.style.display = 'block';
+                
+                if (newPassword === confirmPassword) {
+                    passwordMatchMessage.innerHTML = `
+                        <div style="background: #d1fae5; border-left: 3px solid #10b981; padding: 12px 16px; border-radius: 8px;">
+                            <div class="d-flex align-items-start">
+                                <i class="bi bi-check-circle-fill me-2 flex-shrink-0" style="color: #059669; font-size: 18px; margin-top: 2px;"></i>
+                                <small style="color: #065f46; line-height: 1.5;">
+                                    Passwords match!
+                                </small>
+                            </div>
+                        </div>
+                    `;
+                    confirmPasswordInput.style.borderColor = '#10b981';
+                } else {
+                    passwordMatchMessage.innerHTML = `
+                        <div style="background: #fee2e2; border-left: 3px solid #ef4444; padding: 12px 16px; border-radius: 8px;">
+                            <div class="d-flex align-items-start">
+                                <i class="bi bi-x-circle-fill me-2 flex-shrink-0" style="color: #dc2626; font-size: 18px; margin-top: 2px;"></i>
+                                <small style="color: #991b1b; line-height: 1.5;">
+                                    Passwords do not match
+                                </small>
+                            </div>
+                        </div>
+                    `;
+                    confirmPasswordInput.style.borderColor = '#ef4444';
+                }
+            }
+            
+            if (confirmPasswordInput) {
+                confirmPasswordInput.addEventListener('input', checkPasswordMatch);
+                confirmPasswordInput.addEventListener('blur', checkPasswordMatch);
+            }
+            if (newPasswordInput) {
+                newPasswordInput.addEventListener('input', checkPasswordMatch);
+            }
+        });
+        
         // Handle year level update form submission
         document.addEventListener('DOMContentLoaded', function() {
             const form = document.getElementById('yearLevelUpdateForm');
             if (form) {
                 form.addEventListener('submit', async function(e) {
                     e.preventDefault();
+                    
+                    // Validate passwords match for migrated students
+                    const newPasswordInput = document.getElementById('newPassword');
+                    const confirmPasswordInput = document.getElementById('confirmPassword');
+                    
+                    if (newPasswordInput && confirmPasswordInput) {
+                        if (newPasswordInput.value !== confirmPasswordInput.value) {
+                            alert('Passwords do not match. Please check and try again.');
+                            return;
+                        }
+                        
+                        if (newPasswordInput.value.length < 8) {
+                            alert('Password must be at least 8 characters long.');
+                            return;
+                        }
+                    }
                     
                     const formData = new FormData(form);
                     const submitBtn = form.querySelector('button[type="submit"]');
