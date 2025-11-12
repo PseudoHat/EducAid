@@ -85,6 +85,10 @@ $needs_year_level_update = !$has_year_level_credentials;
 $year_level_update_message = '';
 $force_update = isset($_GET['force_update']) && $_GET['force_update'] == '1';
 
+// Check if student is migrated and needs to select university/year level/mother's maiden name/school student ID
+$is_migrated = ($student_status === 'migrated');
+$needs_university_selection = $is_migrated && (empty($student['university_id']) || empty($student['year_level_id']) || empty($student['mothers_maiden_name']) || empty($student['school_student_id']));
+
 if ($needs_year_level_update) {
     if ($force_update) {
         $year_level_update_message = "You must update your year level before accessing other pages. Please provide your current information below.";
@@ -93,6 +97,8 @@ if ($needs_year_level_update) {
     } else {
         $year_level_update_message = "Please provide your current year level and graduation status to continue.";
     }
+} elseif ($needs_university_selection) {
+    $year_level_update_message = "Welcome! As a migrated student, please confirm your university and current academic information to continue.";
 }
 
 // PostgreSQL returns 'f'/'t' strings for booleans
@@ -239,9 +245,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_year_level']))
         $is_graduating = isset($_POST['is_graduating']) ? ($_POST['is_graduating'] === '1') : false;
         $academic_year = $_POST['academic_year'] ?? '';
         
+        // For migrated students, also require university_id, mothers_maiden_name, and school_student_id
+        $university_id = isset($_POST['university_id']) ? intval($_POST['university_id']) : null;
+        $mothers_maiden_name = isset($_POST['mothers_maiden_name']) ? trim($_POST['mothers_maiden_name']) : null;
+        $school_student_id = isset($_POST['school_student_id']) ? trim($_POST['school_student_id']) : null;
+        
         if (empty($year_level) || empty($academic_year)) {
             echo json_encode(['success' => false, 'message' => 'Please fill in all required fields.']);
             exit;
+        }
+        
+        // Check if this is a migrated student needing university selection
+        $student_check_query = pg_query_params($connection,
+            "SELECT status, university_id, year_level_id, mothers_maiden_name, school_student_id FROM students WHERE student_id = $1",
+            [$student_id]
+        );
+        $student_check = pg_fetch_assoc($student_check_query);
+        
+        // If migrated student without university, require university_id, mothers_maiden_name, and school_student_id
+        if ($student_check['status'] === 'migrated' && empty($student_check['university_id'])) {
+            if (empty($university_id)) {
+                echo json_encode(['success' => false, 'message' => 'Please select your university.']);
+                exit;
+            }
+            if (empty($mothers_maiden_name)) {
+                echo json_encode(['success' => false, 'message' => 'Please enter your mother\'s maiden name.']);
+                exit;
+            }
+            if (empty($school_student_id)) {
+                echo json_encode(['success' => false, 'message' => 'Please enter your school student ID.']);
+                exit;
+            }
         }
         
         // Get student's current year level info for validation
@@ -695,19 +729,52 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_year_level']))
         }
         
         // Update student year level credentials
-        $update_query = "UPDATE students 
-                        SET current_year_level = $1,
-                            is_graduating = $2,
-                            last_status_update = NOW(),
-                            status_academic_year = $3
-                        WHERE student_id = $4";
-        
-        $update_result = pg_query_params($connection, $update_query, [
-            $year_level,
-            $is_graduating ? 'true' : 'false',
-            $academic_year,
-            $student_id
-        ]);
+        // For migrated students, also update university_id, year_level_id, mothers_maiden_name, and school_student_id
+        if (!empty($university_id)) {
+            // Get year_level_id from year level name
+            $yl_query = pg_query_params($connection,
+                "SELECT year_level_id FROM year_levels WHERE name = $1",
+                [$year_level]
+            );
+            $yl_row = pg_fetch_assoc($yl_query);
+            $year_level_id = $yl_row ? intval($yl_row['year_level_id']) : null;
+            
+            $update_query = "UPDATE students 
+                            SET current_year_level = $1,
+                                is_graduating = $2,
+                                last_status_update = NOW(),
+                                status_academic_year = $3,
+                                university_id = $4,
+                                year_level_id = $5,
+                                mothers_maiden_name = $6,
+                                school_student_id = $7
+                            WHERE student_id = $8";
+            
+            $update_result = pg_query_params($connection, $update_query, [
+                $year_level,
+                $is_graduating ? 'true' : 'false',
+                $academic_year,
+                $university_id,
+                $year_level_id,
+                $mothers_maiden_name,
+                $school_student_id,
+                $student_id
+            ]);
+        } else {
+            $update_query = "UPDATE students 
+                            SET current_year_level = $1,
+                                is_graduating = $2,
+                                last_status_update = NOW(),
+                                status_academic_year = $3
+                            WHERE student_id = $4";
+            
+            $update_result = pg_query_params($connection, $update_query, [
+                $year_level,
+                $is_graduating ? 'true' : 'false',
+                $academic_year,
+                $student_id
+            ]);
+        }
         
         if ($update_result) {
             // Log the change in student_status_history
@@ -2637,6 +2704,72 @@ $page_title = 'Upload Documents';
                     <?php endif; ?>
                     
                     <form id="yearLevelUpdateForm">
+                        <?php if ($needs_university_selection): ?>
+                        <!-- University Selection for Migrated Students -->
+                        <div class="mb-4">
+                            <label class="form-label fw-bold mb-3" style="color: #1f2937; font-size: 1rem;">
+                                <i class="bi bi-building me-2" style="color: #667eea;"></i> University <span class="text-danger">*</span>
+                            </label>
+                            <select class="form-select form-select-lg" name="university_id" required style="border-radius: 12px; border: 2px solid #e5e7eb; padding: 14px 18px; font-size: 1rem; transition: all 0.2s;">
+                                <option value="">-- Select Your University --</option>
+                                <?php
+                                $universities_query = pg_query($connection, "SELECT university_id, name FROM universities ORDER BY name");
+                                while ($univ = pg_fetch_assoc($universities_query)):
+                                ?>
+                                <option value="<?= $univ['university_id'] ?>"><?= htmlspecialchars($univ['name']) ?></option>
+                                <?php endwhile; ?>
+                            </select>
+                            <div class="mt-2" style="background: #e0f2fe; border-left: 3px solid #3b82f6; padding: 12px 16px; border-radius: 8px;">
+                                <div class="d-flex align-items-start">
+                                    <i class="bi bi-info-circle me-2 flex-shrink-0" style="color: #1e40af; font-size: 18px; margin-top: 2px;"></i>
+                                    <small style="color: #1e3a8a; line-height: 1.5;">
+                                        Please select the university where you are currently enrolled
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Mother's Maiden Name -->
+                        <div class="mb-4">
+                            <label class="form-label fw-bold mb-3" style="color: #1f2937; font-size: 1rem;">
+                                <i class="bi bi-person-heart me-2" style="color: #667eea;"></i> Mother's Maiden Name <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" class="form-control form-control-lg" name="mothers_maiden_name" 
+                                   value="<?= htmlspecialchars($student['mothers_maiden_name'] ?? '') ?>" 
+                                   required 
+                                   placeholder="Enter mother's surname before marriage"
+                                   style="border-radius: 12px; border: 2px solid #e5e7eb; padding: 14px 18px; font-size: 1rem; transition: all 0.2s;">
+                            <div class="mt-2" style="background: #f3e8ff; border-left: 3px solid #9333ea; padding: 12px 16px; border-radius: 8px;">
+                                <div class="d-flex align-items-start">
+                                    <i class="bi bi-info-circle me-2 flex-shrink-0" style="color: #7e22ce; font-size: 18px; margin-top: 2px;"></i>
+                                    <small style="color: #581c87; line-height: 1.5;">
+                                        This helps prevent duplicate household registrations within your barangay
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- School Student ID -->
+                        <div class="mb-4">
+                            <label class="form-label fw-bold mb-3" style="color: #1f2937; font-size: 1rem;">
+                                <i class="bi bi-card-text me-2" style="color: #667eea;"></i> School Student ID <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" class="form-control form-control-lg" name="school_student_id" 
+                                   value="<?= htmlspecialchars($student['school_student_id'] ?? '') ?>" 
+                                   required 
+                                   placeholder="Enter your school-issued student ID number"
+                                   style="border-radius: 12px; border: 2px solid #e5e7eb; padding: 14px 18px; font-size: 1rem; transition: all 0.2s;">
+                            <div class="mt-2" style="background: #fef3c7; border-left: 3px solid #f59e0b; padding: 12px 16px; border-radius: 8px;">
+                                <div class="d-flex align-items-start">
+                                    <i class="bi bi-info-circle me-2 flex-shrink-0" style="color: #d97706; font-size: 18px; margin-top: 2px;"></i>
+                                    <small style="color: #78350f; line-height: 1.5;">
+                                        This is the student ID number issued by your university (e.g., 2020-12345)
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                        <?php endif; ?>
+                        
                         <!-- Enhanced Year Level Select -->
                         <div class="mb-4">
                             <label class="form-label fw-bold mb-3" style="color: #1f2937; font-size: 1rem;">
@@ -2701,8 +2834,9 @@ $page_title = 'Upload Documents';
                         </div>
                         
                         <style>
-                            /* Enhanced select styling */
-                            .form-select:focus {
+                            /* Enhanced select and input styling */
+                            .form-select:focus,
+                            .form-control:focus {
                                 border-color: #667eea !important;
                                 box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1) !important;
                             }

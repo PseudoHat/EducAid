@@ -238,8 +238,8 @@ function send_migration_email($toEmail, $toName, $passwordPlain) {
 $migration_preview = $_SESSION['migration_preview'] ?? null;
 $migration_result = $_SESSION['migration_result'] ?? null;
 
-// Generate CSRF token for CSV migration
-$csrfMigrationToken = CSRFProtection::generateToken('csv_migration');
+// Do NOT generate CSRF token for CSV migration here - it will be fetched via AJAX when modal opens
+$csrfMigrationToken = ''; // Will be populated by AJAX fetch
 
 // Generate CSRF tokens for applicant approval flows
 // Note: reject_documents token is NOT generated here—it's fetched via AJAX when the modal opens
@@ -265,6 +265,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['clear_migration'])) {
     exit;
 }
 
+// AUTO-CLEANUP: Clear stale migration preview on normal page load (not POST)
+// This prevents the modal from auto-opening on every page visit
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && empty($_GET['clear_migration']) && !empty($_SESSION['migration_preview'])) {
+    // Check if the preview is from a previous session (older than 5 minutes)
+    $previewTime = $_SESSION['migration_preview_time'] ?? 0;
+    if ((time() - $previewTime) > 300) { // 5 minutes
+        error_log("Auto-clearing stale migration preview (older than 5 minutes)");
+        unset($_SESSION['migration_preview']);
+        unset($_SESSION['migration_preview_time']);
+    }
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['migration_action'])) {
     // CSRF Protection - validate token first
     $token = $_POST['csrf_token'] ?? '';
@@ -275,6 +287,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['migration_action'])) 
     }
     
     if ($_POST['migration_action'] === 'preview' && isset($_FILES['csv_file'])) {
+        // CRITICAL: Prevent migration if an active distribution is open
+        $activeDistributionCheck = pg_query($connection, 
+            "SELECT COUNT(*) as count FROM signup_slots WHERE is_active = TRUE"
+        );
+        if ($activeDistributionCheck) {
+            $activeDistCount = pg_fetch_assoc($activeDistributionCheck)['count'];
+            if ($activeDistCount > 0) {
+                $_SESSION['migration_result'] = [
+                    'inserted' => 0,
+                    'errors' => [
+                        'Migration blocked: An active distribution is currently open.',
+                        'Old students cannot be migrated while a distribution is active to prevent conflicts.',
+                        'Please close the current distribution slot before migrating old student records.'
+                    ],
+                    'status' => 'error'
+                ];
+                header('Location: ' . $_SERVER['PHP_SELF']);
+                exit;
+            }
+        }
         $municipality_id = intval($adminMunicipalityId ?? 0);
         if (!$municipality_id) { $municipality_id = intval($_POST['municipality_id'] ?? 0); }
         $csv = $_FILES['csv_file'];
@@ -298,48 +330,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['migration_action'])) 
                     'age' => ['age','years','yrs','yr','edad'],
                     'bdate' => ['birthdate','birth date','bday','date of birth','dob','birthday','birth day'],
                     'sex' => ['sex','gender','sexo'],
-                    'civil_status' => ['civil status','marital status','status','civil','marital'],
-                    'religion' => ['religion','religious affiliation','faith'],
-                    'citizenship' => ['citizenship','nationality','citizen'],
                     
                     // Contact Information
                     'email'=>['email','e-mail','email address','e mail','correo'],
                     'mobile'=>['mobile','contact number','phone','number','contact','cellphone','cp number','mobile number','phone number','contact no','contact #','cell','cell phone'],
-                    'telephone'=>['telephone','tel','landline','phone','tel no','telephone number'],
                     
                     // Address Fields
                     'barangay_name'=>['barangay','brgy','bgry','bgy','village','barangay name','baranggay'],
-                    'house_number'=>['house number','house no','house #','street number','house','bldg no'],
-                    'street'=>['street','street name','st','calle'],
-                    'subdivision'=>['subdivision','subd','village','sitio'],
-                    'city'=>['city','municipality','town','ciudad'],
-                    'province'=>['province','provincia'],
-                    'zip_code'=>['zip','zip code','postal code','postal','zipcode'],
                     
                     // Academic Information
                     'university_name'=>['university','school','college','univ','institution','campus','university name','school name'],
                     'course'=>['course','program','degree','major','course name','program name'],
                     'year_level_name'=>['year level','year','level','yr level','grade','year lvl','grade level'],
-                    'semester'=>['semester','sem','term','period'],
                     'school_student_id'=>['school id','student id','school student id','student number','id number','id no','school number'],
-                    'gwa'=>['gwa','general weighted average','weighted average','average','grade','general average'],
                     
                     // Scholarship Information
-                    'scholarship_type'=>['scholarship type','type of scholarship','scholarship','type','scholar type'],
                     'application_date'=>['application date','date applied','apply date','registration date','reg date'],
                     'first_registered_academic_year'=>['first registered','first year','initial year','first academic year','year registered'],
+                    'previous_academic_year'=>['previous academic year','last academic year','previous year','last year','ay before'],
+                    'previous_year_level'=>['previous year level','last year level','previous level','last level','old year level'],
                     
                     // Parent/Guardian Information
-                    'father_name'=>['father name','father','father\'s name','fathers name','parent father'],
-                    'father_occupation'=>['father occupation','father work','father job','father\'s occupation'],
-                    'mother_name'=>['mother name','mother','mother\'s name','mothers name','parent mother'],
-                    'mother_occupation'=>['mother occupation','mother work','mother job','mother\'s occupation'],
-                    'guardian_name'=>['guardian name','guardian','guardian\'s name'],
-                    'guardian_relationship'=>['guardian relationship','relationship','relation to guardian'],
-                    
-                    // Financial Information
-                    'family_income'=>['family income','income','monthly income','annual income','household income'],
-                    'siblings_in_college'=>['siblings in college','siblings','college siblings','number of siblings'],
+                    'mothers_maiden_name'=>['mothers maiden name','mother maiden name','mothers maiden','maiden name','mother\'s maiden name'],
                 ];
                 
                 $normalizeHeader = function($s){ 
@@ -411,48 +423,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['migration_action'])) 
                     $ageVal = $get('age');
                     $bdateVal = $get('bdate');
                     $gender = $get('sex');
-                    $civilStatus = $get('civil_status');
-                    $religion = $get('religion');
-                    $citizenship = $get('citizenship');
                     
                     // Contact
                     $email = trim($get('email'));
                     $mobile = preg_replace('/[^0-9]/','', $get('mobile'));
-                    $telephone = $get('telephone');
                     
                     // Address
                     $barangayName = $get('barangay_name');
-                    $houseNumber = $get('house_number');
-                    $street = $get('street');
-                    $subdivision = $get('subdivision');
-                    $city = $get('city');
-                    $province = $get('province');
-                    $zipCode = $get('zip_code');
                     
                     // Academic
                     $universityName = $get('university_name');
                     $course = $get('course');
                     $yearLevelName = $get('year_level_name');
-                    $semester = $get('semester');
                     $schoolStudentId = $get('school_student_id');
-                    $gwa = $get('gwa');
                     
                     // Scholarship
-                    $scholarshipType = $get('scholarship_type');
                     $applicationDate = $get('application_date');
                     $firstRegisteredYear = $get('first_registered_academic_year');
+                    $previousAcademicYear = $get('previous_academic_year');
+                    $previousYearLevel = $get('previous_year_level');
                     
                     // Parents/Guardian
-                    $fatherName = $get('father_name');
-                    $fatherOccupation = $get('father_occupation');
-                    $motherName = $get('mother_name');
-                    $motherOccupation = $get('mother_occupation');
-                    $guardianName = $get('guardian_name');
-                    $guardianRelationship = $get('guardian_relationship');
-                    
-                    // Financial
-                    $familyIncome = $get('family_income');
-                    $siblingsInCollege = $get('siblings_in_college');
+                    $mothersMaidenName = $get('mothers_maiden_name');
 
                     // Normalize mobile number
                     if (strlen($mobile) === 10) $mobile = '0' . $mobile;
@@ -471,48 +463,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['migration_action'])) 
                         'extension_name'=>$ext,
                         'bdate'=>$bdate, 
                         'sex'=>$sex,
-                        'civil_status'=>$civilStatus,
-                        'religion'=>$religion,
-                        'citizenship'=>$citizenship ?: 'Filipino', // Default to Filipino
                         
                         // Contact
                         'email'=>$email, 
                         'mobile'=>$mobile,
-                        'telephone'=>$telephone,
                         
                         // Address
                         'barangay_name'=>$barangayName,
-                        'house_number'=>$houseNumber,
-                        'street'=>$street,
-                        'subdivision'=>$subdivision,
-                        'city'=>$city,
-                        'province'=>$province,
-                        'zip_code'=>$zipCode,
                         
                         // Academic
                         'university_name'=>$universityName,
                         'course'=>$course,
                         'year_level_name'=>$yearLevelName,
-                        'semester'=>$semester,
                         'school_student_id'=>$schoolStudentId,
-                        'gwa'=>$gwa,
                         
                         // Scholarship
-                        'scholarship_type'=>$scholarshipType,
                         'application_date'=>$applicationDate,
                         'first_registered_academic_year'=>$firstRegisteredYear,
+                        'previous_academic_year'=>$previousAcademicYear,
+                        'previous_year_level'=>$previousYearLevel,
                         
                         // Parents
-                        'father_name'=>$fatherName,
-                        'father_occupation'=>$fatherOccupation,
-                        'mother_name'=>$motherName,
-                        'mother_occupation'=>$motherOccupation,
-                        'guardian_name'=>$guardianName,
-                        'guardian_relationship'=>$guardianRelationship,
-                        
-                        // Financial
-                        'family_income'=>$familyIncome,
-                        'siblings_in_college'=>$siblingsInCollege,
+                        'mothers_maiden_name'=>$mothersMaidenName,
                         
                         'municipality_id'=>$municipality_id,
                         'include'=>true,
@@ -542,11 +514,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['migration_action'])) 
                 if (empty($r['first_name'])) $conflicts[] = 'First name is required';
                 if (!$r['bdate']) $conflicts[] = 'Birthdate missing/invalid';
                 if (!$r['sex']) $conflicts[] = 'Gender unknown';
-                if (!$uni) $conflicts[] = 'University not recognized: ' . htmlspecialchars($r['university_name']);
-                if (!$yl) $conflicts[] = 'Year level unknown: ' . htmlspecialchars($r['year_level_name']);
+                // Note: University and Year Level are now entered by student on first login
                 if (!$brgy) $conflicts[] = 'Barangay not found: ' . htmlspecialchars($r['barangay_name']);
                 if (!filter_var($r['email'], FILTER_VALIDATE_EMAIL)) $conflicts[] = 'Invalid email format';
                 if (empty($r['mobile'])) $conflicts[] = 'Mobile number is required';
+                
+                // CRITICAL: For old student migration, require previous academic year and year level
+                if (empty($r['previous_academic_year'])) $conflicts[] = 'Previous Academic Year is required (e.g., "2023-2024")';
+                if (empty($r['previous_year_level'])) $conflicts[] = 'Previous Year Level is required (e.g., "3rd Year")';
                 
                 // Duplicate checks
                 if (!empty($r['email'])) {
@@ -572,6 +547,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['migration_action'])) 
                 'rows'=>$preview,
                 'detected_headers'=>$detectedHeaders ?? []
             ];
+            $_SESSION['migration_preview_time'] = time(); // Timestamp for auto-cleanup
             
             // Redirect to avoid form re-submission warnings (PRG pattern)
             header('Location: ' . $_SERVER['PHP_SELF']);
@@ -587,6 +563,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['migration_action'])) 
         }
     } // end preview action
     if ($_POST['migration_action'] === 'confirm') {
+        // CRITICAL: Double-check that no distribution is active before confirming
+        $activeDistributionCheck = pg_query($connection, 
+            "SELECT COUNT(*) as count FROM signup_slots WHERE is_active = TRUE"
+        );
+        if ($activeDistributionCheck) {
+            $activeDistCount = pg_fetch_assoc($activeDistributionCheck)['count'];
+            if ($activeDistCount > 0) {
+                $_SESSION['migration_result'] = [
+                    'inserted' => 0,
+                    'errors' => [
+                        'Migration blocked: An active distribution is currently open.',
+                        'The migration was canceled because a distribution slot was activated.',
+                        'Please close the current distribution before migrating old student records.'
+                    ],
+                    'status' => 'error'
+                ];
+                // Clear preview to prevent retry
+                unset($_SESSION['migration_preview']);
+                header('Location: ' . $_SERVER['PHP_SELF']);
+                exit;
+            }
+        }
+        
         if (!isset($_SESSION['migration_preview'])) {
             // Preview missing – likely session loss; set a clear result so UI shows error
             $_SESSION['migration_result'] = ['inserted'=>0, 'errors'=>['Migration preview expired or session lost. Please re-upload the CSV and try again.'], 'status'=>'error'];
@@ -628,81 +627,79 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['migration_action'])) 
             }
             foreach ($preview['rows'] as $idx => $row) {
                 if (!isset($selected[(string)$idx])) continue; // not selected
-                $r = $row['row']; $uni = $row['university']; $yl = $row['year_level']; $brgy = $row['barangay'];
-                if (!$r['bdate'] || !$r['sex'] || !$uni || !$yl || !$brgy || !filter_var($r['email'], FILTER_VALIDATE_EMAIL)) { $errors[] = "Row #$idx has unresolved fields"; continue; }
+                $r = $row['row']; $brgy = $row['barangay'];
+                
+                // Validation: Only barangay is required to map now (university and year level selected by student)
+                if (!$r['bdate'] || !$r['sex'] || !$brgy || !filter_var($r['email'], FILTER_VALIDATE_EMAIL)) { 
+                    $errors[] = "Row #$idx has unresolved required fields"; 
+                    continue; 
+                }
                 
                 // generate password
                 $plain = rand_password_12(); $hashed = password_hash($plain, PASSWORD_DEFAULT);
                 
-                // student id
-                $stud_id = generateUniqueStudentId_admin($connection, $yl['year_level_id']);
+                // student id - use a temporary year level for ID generation (will be updated by student)
+                // Generate with year_level_id = 1 as placeholder
+                $stud_id = generateUniqueStudentId_admin($connection, 1);
                 if (!$stud_id) { $errors[] = "Row #$idx could not generate student id"; continue; }
                 
                 // Prepare application date
                 $appDate = !empty($r['application_date']) ? $r['application_date'] : null;
                 if ($appDate === null) $appDate = date('Y-m-d');
                 
-                // insert with all available fields
+                // Validate required migration fields
+                if (empty($r['previous_academic_year']) || empty($r['previous_year_level'])) {
+                    $errors[] = "Row #$idx: Previous academic year and year level are required for migration";
+                    continue;
+                }
+                
+                // insert with all available fields - STATUS SET TO 'migrated', needs_document_upload = TRUE
+                // NOTE: university_id and year_level_id are set to NULL - student will select on first login
                 $insert = pg_query_params($connection, "
                     INSERT INTO students (
                         student_id, municipality_id, 
                         first_name, middle_name, last_name, extension_name, 
-                        email, mobile, telephone, password, 
-                        sex, civil_status, religion, citizenship,
-                        bdate, 
-                        house_number, street, subdivision, city, province, zip_code,
+                        email, mobile, password, 
+                        sex, bdate, 
                         barangay_id, university_id, year_level_id, 
-                        course, semester, school_student_id, gwa,
-                        scholarship_type, first_registered_academic_year,
-                        father_name, father_occupation, 
-                        mother_name, mother_occupation,
-                        guardian_name, guardian_relationship,
-                        family_income, siblings_in_college,
-                        status, payroll_no, qr_code, has_received, application_date, slot_id
+                        course, school_student_id,
+                        first_registered_academic_year,
+                        previous_academic_year, previous_year_level,
+                        mothers_maiden_name,
+                        status, payroll_no, has_received, application_date, slot_id,
+                        needs_document_upload, status_academic_year, current_year_level, is_graduating
                     ) VALUES (
                         $1, $2, 
                         $3, $4, $5, $6, 
-                        $7, $8, $9, $10, 
-                        $11, $12, $13, $14,
-                        $15, 
-                        $16, $17, $18, $19, $20, $21,
-                        $22, $23, $24, 
-                        $25, $26, $27, $28,
-                        $29, $30,
-                        $31, $32,
-                        $33, $34,
-                        $35, $36,
-                        $37, $38,
-                        'applicant', 0, 0, FALSE, $39, $40
+                        $7, $8, $9, 
+                        $10, $11, 
+                        $12, NULL, NULL,
+                        $13, $14,
+                        $15,
+                        $16, $17,
+                        $18,
+                        'migrated', 0, FALSE, $19, $20,
+                        TRUE, NULL, NULL, NULL
                     )", [
                     // $1-$2: IDs
                     $stud_id, $municipality_id, 
                     // $3-$6: Name
                     $r['first_name'], $r['middle_name'], $r['last_name'], $r['extension_name'], 
-                    // $7-$10: Contact & Password
-                    $r['email'], $r['mobile'], $r['telephone'] ?: null, $hashed, 
-                    // $11-$14: Personal Info
-                    $r['sex'], $r['civil_status'] ?: null, $r['religion'] ?: null, $r['citizenship'] ?: 'Filipino',
-                    // $15: Birthdate
-                    $r['bdate'], 
-                    // $16-$21: Address
-                    $r['house_number'] ?: null, $r['street'] ?: null, $r['subdivision'] ?: null, 
-                    $r['city'] ?: null, $r['province'] ?: null, $r['zip_code'] ?: null,
-                    // $22-$24: Location IDs
-                    $brgy['barangay_id'], $uni['university_id'], $yl['year_level_id'], 
-                    // $25-$28: Academic Details
-                    $r['course'] ?: null, $r['semester'] ?: null, $r['school_student_id'] ?: null, $r['gwa'] ?: null,
-                    // $29-$30: Scholarship
-                    $r['scholarship_type'] ?: null, $r['first_registered_academic_year'] ?: null,
-                    // $31-$32: Father
-                    $r['father_name'] ?: null, $r['father_occupation'] ?: null,
-                    // $33-$34: Mother
-                    $r['mother_name'] ?: null, $r['mother_occupation'] ?: null,
-                    // $35-$36: Guardian
-                    $r['guardian_name'] ?: null, $r['guardian_relationship'] ?: null,
-                    // $37-$38: Financial
-                    $r['family_income'] ?: null, $r['siblings_in_college'] ?: null,
-                    // $39-$40: Application & Slot
+                    // $7-$9: Contact & Password
+                    $r['email'], $r['mobile'], $hashed, 
+                    // $10-$11: Personal Info
+                    $r['sex'], $r['bdate'], 
+                    // $12: Barangay (university_id and year_level_id are NULL - student will select)
+                    $brgy['barangay_id'],
+                    // $13-$14: Academic Details (optional/null - collected on first login)
+                    $r['course'] ?: null, null,
+                    // $15: First Registered Year
+                    $r['first_registered_academic_year'] ?: null,
+                    // $16-$17: Previous credentials (REQUIRED for migrated students)
+                    $r['previous_academic_year'], $r['previous_year_level'],
+                    // $18: Mother's Maiden Name (NULL - student will provide on first login)
+                    null,
+                    // $19-$20: Application & Slot
                     $appDate, null
                 ]);
                 
@@ -2537,20 +2534,50 @@ if ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '' === 'XMLHttpRequest' || (isset($_GET
         <div class="modal-content">
                     <div class="modal-header">
                         <div>
-                            <h5 class="modal-title mb-0"><i class="bi bi-upload me-2"></i>CSV Migration</h5>
-                            <small class="text-muted">Upload your CSV with headers in the first row, review conflicts, select rows, then confirm to migrate.</small>
+                            <h5 class="modal-title mb-0"><i class="bi bi-upload me-2"></i>CSV Migration - Old Students</h5>
+                            <small class="text-muted">Upload old student records with their previous academic credentials.</small>
                         </div>
                         <div class="d-flex gap-2 align-items-center ms-auto">
-                            <a href="../../assets/templates/student_migration_template.csv" download class="btn btn-sm btn-outline-primary" title="Download CSV Template">
+                            <a href="../../assets/uploads/templates/migration_template_old_students.csv" download class="btn btn-sm btn-outline-primary" title="Download CSV Template">
                                 <i class="bi bi-download me-1"></i>Download Template
                             </a>
                             <form method="POST" class="" id="migrationCancelForm">
                                 <input type="hidden" name="migration_action" value="cancel">
+                                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfMigrationToken) ?>">
                             </form>
                             <button class="btn-close" data-bs-dismiss="modal" aria-label="Close" id="migrationCloseBtn"></button>
                         </div>
                     </div>
             <div class="modal-body">
+                <!-- Distribution Warning Alert -->
+                <div class="alert alert-warning mb-3">
+                    <div class="d-flex align-items-start">
+                        <i class="bi bi-exclamation-triangle-fill me-2 mt-1"></i>
+                        <div>
+                            <strong>Important: Distribution Must Be Closed</strong>
+                            <p class="mb-1 mt-2">Old student migration is <strong>blocked when a distribution is active</strong> to prevent data conflicts.</p>
+                            <p class="mb-0"><small>Please ensure all distribution slots are closed before proceeding with migration.</small></p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Migration Requirements Alert -->
+                <div class="alert alert-info mb-3">
+                    <div class="d-flex align-items-start">
+                        <i class="bi bi-info-circle me-2 mt-1"></i>
+                        <div>
+                            <strong>Required Fields for Old Students</strong>
+                            <ul class="mb-0 mt-2 small">
+                                <li><strong>Previous Academic Year</strong> - Format: "2023-2024" (REQUIRED)</li>
+                                <li><strong>Previous Year Level</strong> - Format: "3rd Year" (REQUIRED)</li>
+                                <li>Basic info: Name, Email, Mobile, Birthdate, Gender</li>
+                                <li>Location: Barangay, University, Year Level</li>
+                            </ul>
+                            <p class="mb-0 mt-2"><small class="text-muted">Migrated students will have status "migrated" and must update their current credentials on first login.</small></p>
+                        </div>
+                    </div>
+                </div>
+        
         <?php /* Migration result is now shown via JS alert after reload; avoid unsetting here to prevent race */ ?>
 
             <form method="POST" enctype="multipart/form-data" class="mb-3" id="migrationUploadForm">
@@ -2563,10 +2590,10 @@ if ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '' === 'XMLHttpRequest' || (isset($_GET
                                                     <div class="form-text">
                                                         <strong>Required:</strong> First row must be headers<br>
                                                         <small class="text-muted">
-                                                            Supported headers: Last Name, First Name, Middle Name, Extension, Birthdate, Age, Sex/Gender, 
-                                                            Email, Mobile, Telephone, Barangay, University, Year Level, Course, Semester, School ID, GWA, 
-                                                            Civil Status, Religion, Citizenship, Address (House No, Street, Subdivision, City, Province, Zip), 
-                                                            Parents (Father Name/Occupation, Mother Name/Occupation, Guardian), Financial (Family Income, Siblings in College), etc.
+                                                            <strong>NEW REQUIRED:</strong> Previous Academic Year, Previous Year Level<br>
+                                                            Other supported headers: Last Name, First Name, Middle Name, Extension Name, Birthdate, Age, Sex/Gender, 
+                                                            Email, Mobile, Barangay, University, Year Level, Course, School Student ID, 
+                                                            First Registered Academic Year, Mother's Maiden Name
                                                         </small>
                                                     </div>
                                                     <div id="csvFilename" class="small text-muted mt-1" aria-live="polite"></div>
@@ -3293,13 +3320,167 @@ document.addEventListener('DOMContentLoaded', function() {
     setTimeout(attachModalRefreshListeners, 200);
     
     setTimeout(updateTableData, 300);
-    // Auto-open migration modal if preview/result exists
-    <?php if (!empty($_SESSION['migration_preview']) || !empty($_SESSION['migration_result'])): ?>
+    
+    // CRITICAL: Global backdrop cleanup on page load
+    // Remove any stale backdrops that might exist from previous page state
+    setTimeout(() => {
+        const staleBackdrops = document.querySelectorAll('.modal-backdrop');
+        if (staleBackdrops.length > 0) {
+            console.log('Found', staleBackdrops.length, 'stale backdrop(s) on page load - removing all');
+            staleBackdrops.forEach(bd => bd.remove());
+        }
+        // Also remove modal-open class from body if no modals are actually open
+        const openModals = document.querySelectorAll('.modal.show');
+        if (openModals.length === 0 && document.body.classList.contains('modal-open')) {
+            console.log('Removing modal-open class from body - no modals open');
+            document.body.classList.remove('modal-open');
+            document.body.style.overflow = '';
+            document.body.style.paddingRight = '';
+        }
+    }, 100);
+    
+    // Fetch fresh CSRF token for migration modal IMMEDIATELY on page load
+    // This ensures the token is ready when the modal opens
     const migrationModalEl = document.getElementById('migrationModal');
-    if (migrationModalEl) {
-        const modal = new bootstrap.Modal(migrationModalEl);
-        modal.show();
+    let migrationTokenReady = false;
+
+    async function refreshMigrationToken(context = 'manual') {
+        if (!migrationModalEl) { return null; }
+        console.log(`[${context}] Fetching CSRF token for migration modal`);
+        try {
+            const response = await fetch('get_csrf_token.php?action=csv_migration', { credentials: 'same-origin' });
+            const data = await response.json();
+            if (data.success && data.token) {
+                const tokenInputs = migrationModalEl.querySelectorAll('input[name="csrf_token"]');
+                tokenInputs.forEach(input => {
+                    input.value = data.token;
+                });
+                migrationTokenReady = true;
+                console.log('Migration CSRF token updated:', data.token.substring(0, 20) + '...');
+                return data.token;
+            }
+            console.error('Failed to refresh migration CSRF token:', data);
+            throw new Error('Token endpoint did not return a token');
+        } catch (error) {
+            console.error('Error fetching migration CSRF token:', error);
+            throw error;
+        }
     }
+
+    if (migrationModalEl) {
+        // Fetch token immediately
+        refreshMigrationToken('initial');
+
+        // Also refresh token every time modal is shown (in case page was idle and token expired)
+        migrationModalEl.addEventListener('show.bs.modal', function() {
+            refreshMigrationToken('modal-open');
+        });
+
+        // Intercept form submission to ensure token is ready
+        const uploadForm = document.getElementById('migrationUploadForm');
+        if (uploadForm) {
+            uploadForm.addEventListener('submit', function(e) {
+                const tokenInput = uploadForm.querySelector('input[name="csrf_token"]');
+                console.log('Form submission intercepted');
+                console.log('Token input found:', !!tokenInput);
+                console.log('Token value:', tokenInput ? tokenInput.value.substring(0, 20) + '...' : 'N/A');
+                
+                if (!tokenInput || !tokenInput.value || tokenInput.value.trim() === '' || !migrationTokenReady) {
+                    e.preventDefault();
+                    alert('Security token not ready. Please wait a moment and try again.');
+                    console.error('Form submission blocked - CSRF token not ready');
+                    return false;
+                }
+                console.log('Form submitting with token:', tokenInput.value.substring(0, 20) + '...');
+                // Allow form to submit normally (will cause page reload)
+            });
+        } else {
+            console.error('Migration upload form not found!');
+        }
+    } else {
+        console.error('Migration modal element not found during init!');
+    }
+    
+    // Auto-open migration modal ONLY if preview exists (not just error results)
+    <?php if (!empty($_SESSION['migration_preview'])): ?>
+    console.log('Migration preview detected - attempting to open modal');
+    console.log('Preview exists:', true);
+    
+    // Wait a bit longer for page to fully settle before opening modal
+    setTimeout(() => {
+        const migrationModalForOpen = document.getElementById('migrationModal');
+        if (migrationModalForOpen) {
+            console.log('Migration modal element found, opening modal...');
+            
+            // CRITICAL FIX: Aggressive backdrop cleanup before opening
+            const existingBackdrops = document.querySelectorAll('.modal-backdrop');
+            if (existingBackdrops.length > 0) {
+                console.log('Removing', existingBackdrops.length, 'existing backdrop(s) before opening migration modal');
+                existingBackdrops.forEach(backdrop => backdrop.remove());
+            }
+            
+            // Reset body classes
+            document.body.classList.remove('modal-open');
+            document.body.style.overflow = '';
+            document.body.style.paddingRight = '';
+            
+            // Check if modal is already open
+            if (migrationModalForOpen.classList.contains('show')) {
+                console.log('Modal already open, skipping show()');
+            } else {
+                // Get or create Bootstrap modal instance
+                let modal = bootstrap.Modal.getInstance(migrationModalForOpen);
+                if (!modal) {
+                    modal = new bootstrap.Modal(migrationModalForOpen);
+                    console.log('Created new Bootstrap modal instance');
+                } else {
+                    console.log('Using existing Bootstrap modal instance');
+                }
+                
+                // Listen for modal shown event to insert alert AFTER modal is fully visible
+                migrationModalForOpen.addEventListener('shown.bs.modal', function onModalShown() {
+                    console.log('Modal fully shown - checking for pending migration result');
+                    if (window.pendingMigrationResult) {
+                        console.log('Showing pending migration alert:', window.pendingMigrationResult);
+                        showMigrationAlert(window.pendingMigrationResult);
+                        window.pendingMigrationResult = null;
+                    }
+                    
+                    // Final backdrop check after modal is shown
+                    setTimeout(() => {
+                        const backdrops = document.querySelectorAll('.modal-backdrop');
+                        console.log('After modal shown - Number of backdrops:', backdrops.length);
+                        if (backdrops.length > 1) {
+                            console.warn('Multiple backdrops detected! Removing extras...');
+                            // Keep only the last backdrop (newest) and ensure it's behind the modal
+                            for (let i = 0; i < backdrops.length - 1; i++) {
+                                backdrops[i].remove();
+                                console.log('Removed extra backdrop', i);
+                            }
+                            // Ensure remaining backdrop has correct z-index
+                            const lastBackdrop = backdrops[backdrops.length - 1];
+                            if (lastBackdrop) {
+                                const modalZIndex = parseInt(window.getComputedStyle(migrationModalForOpen).zIndex) || 1055;
+                                lastBackdrop.style.zIndex = (modalZIndex - 5).toString();
+                                console.log('Set backdrop z-index to', lastBackdrop.style.zIndex, '(modal z-index:', modalZIndex, ')');
+                            }
+                        } else if (backdrops.length === 1) {
+                            // Ensure single backdrop is behind modal
+                            const backdrop = backdrops[0];
+                            const modalZIndex = parseInt(window.getComputedStyle(migrationModalForOpen).zIndex) || 1055;
+                            backdrop.style.zIndex = (modalZIndex - 5).toString();
+                            console.log('Single backdrop z-index set to', backdrop.style.zIndex);
+                        }
+                    }, 100);
+                }, { once: true });
+                
+                modal.show();
+                console.log('Modal.show() called');
+            }
+        } else {
+            console.error('Migration modal element not found!');
+        }
+    }, 200); // Delay opening to ensure page is fully loaded
     <?php endif; ?>
 
     // Migration UI helpers
@@ -3361,25 +3542,51 @@ document.addEventListener('DOMContentLoaded', function() {
         if (scrollConflictsBtn) scrollConflictsBtn.addEventListener('click', () => smoothScrollTo(scrollWrap.scrollWidth));
     }
 
-    // Cancel migration on modal close with confirmation
+    // Cancel migration on modal close with confirmation guard
     const migrationModalEl2 = document.getElementById('migrationModal');
     let _isSubmittingMigration = false;
+    let _migrationCloseConfirmed = false;
+    let _migrationProgrammaticHide = false;
     // Note: Form submission is now handled by password confirmation modal
     if (migrationModalEl2) {
         migrationModalEl2.addEventListener('hide.bs.modal', function (e) {
             if (_isSubmittingMigration) { return; }
-            // If there is a preview in session, confirm cancel
-            <?php if (!empty($_SESSION['migration_preview'])): ?>
-            const ok = confirm('Closing will cancel the migration preview. Continue?');
-            if (!ok) { e.preventDefault(); return; }
-            // Post cancel to clear preview
-            const form = document.getElementById('migrationCancelForm');
-            if (form) {
-                fetch(window.location.pathname, { method: 'POST', body: new FormData(form) })
-                    .then(() => { /* cleared */ })
-                    .catch(() => { /* ignore */ });
+
+            if (_migrationProgrammaticHide) {
+                _migrationProgrammaticHide = false;
+                return;
             }
-            <?php endif; ?>
+
+            if (_migrationCloseConfirmed) {
+                // Reset flag so future closes will still prompt
+                _migrationCloseConfirmed = false;
+                return;
+            }
+
+            const hasPreviewData = !!document.querySelector('.migration-preview');
+            if (!hasPreviewData) { return; }
+
+            const trigger = e.relatedTarget;
+            const triggeredByCloseButton = trigger && trigger.id === 'migrationCloseBtn';
+            const triggeredByDismissControl = trigger && trigger.getAttribute && trigger.getAttribute('data-bs-dismiss') === 'modal';
+            const triggeredByBackdropOrKey = !trigger;
+
+            if (triggeredByCloseButton || triggeredByDismissControl || triggeredByBackdropOrKey) {
+                if (!window.confirm('Closing will discard the uploaded CSV preview. Clear it so you can upload a new file?')) {
+                    e.preventDefault();
+                    e.stopImmediatePropagation();
+                    return;
+                }
+
+                _migrationCloseConfirmed = true;
+                console.log('Migration modal close confirmed - clearing session');
+                submitMigrationCancel({ reloadOnFailure: true });
+            }
+        });
+
+        migrationModalEl2.addEventListener('hidden.bs.modal', function () {
+            _migrationCloseConfirmed = false;
+            _migrationProgrammaticHide = false;
         });
     }
 
@@ -3404,7 +3611,19 @@ document.addEventListener('DOMContentLoaded', function() {
     <?php if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_SESSION['migration_result'])): ?>
         const result = <?= json_encode($_SESSION['migration_result']) ?>;
         console.log('Migration result found:', result);
-        showMigrationAlert(result);
+        
+        // Check if there's also a preview - if so, modal will auto-open and show the alert
+        // If no preview, show the alert on the main page immediately
+        <?php if (!empty($_SESSION['migration_preview'])): ?>
+            // Modal will auto-open, save result to show inside modal
+            console.log('Preview exists - alert will show inside modal');
+            window.pendingMigrationResult = result;
+        <?php else: ?>
+            // No preview - show alert on main page immediately
+            console.log('No preview - showing alert on main page');
+            showMigrationAlert(result);
+        <?php endif; ?>
+        
         <?php unset($_SESSION['migration_result']); ?>
     <?php endif; ?>
 
@@ -3609,11 +3828,15 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>
         `;
         
-        // Insert after header
-        const header = document.querySelector('.section-header');
-        if (header && header.parentNode) {
-            header.parentNode.insertBefore(alertContainer, header.nextSibling);
-            console.log('Migration alert inserted successfully');
+        // Try to insert inside migration modal first (if modal is open), fallback to main page header
+        const migrationModal = document.getElementById('migrationModal');
+        const isModalOpen = migrationModal && migrationModal.classList.contains('show');
+        const modalBody = migrationModal ? migrationModal.querySelector('.modal-body') : null;
+        
+        if (isModalOpen && modalBody && modalBody.firstChild) {
+            // Insert at the top of modal body
+            modalBody.insertBefore(alertContainer, modalBody.firstChild);
+            console.log('Migration alert inserted in modal body');
             
             // Auto dismiss after 10 seconds for success
             if (result.status === 'success') {
@@ -3624,28 +3847,84 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 }, 10000);
                 
-                // Clear the migration session and close modal after showing success
+                        // Clear the migration session and close modal after showing success
                 setTimeout(() => {
-                    clearMigrationSession();
-                    const migrationModal = document.getElementById('migrationModal');
+                    submitMigrationCancel({ silent: true, reloadOnFailure: true });
                     if (migrationModal && bootstrap.Modal.getInstance(migrationModal)) {
+                        _migrationProgrammaticHide = true;
                         bootstrap.Modal.getInstance(migrationModal).hide();
                     }
                 }, 3000);
             }
         } else {
-            console.error('Header element not found for alert insertion');
+            // Modal not open - Insert after main page header
+            const header = document.querySelector('.section-header');
+            if (header && header.parentNode) {
+                header.parentNode.insertBefore(alertContainer, header.nextSibling);
+                console.log('Migration alert inserted after main page header');
+                
+                // Auto dismiss errors after 15 seconds on main page
+                if (result.status !== 'success') {
+                    setTimeout(() => {
+                        const alert = alertContainer.querySelector('.alert');
+                        if (alert) {
+                            bootstrap.Alert.getOrCreateInstance(alert).close();
+                        }
+                    }, 15000);
+                }
+            } else {
+                console.error('Could not find insertion point for alert (neither modal body nor page header)');
+            }
         }
     }
 
-    function clearMigrationSession() {
-        // Clear migration session on server
-        fetch(window.location.href + '?clear_migration=1', {
-            method: 'GET'
-        }).then(() => {
-            console.log('Migration session cleared');
-        }).catch(error => {
-            console.error('Error clearing migration session:', error);
+    function submitMigrationCancel(options = {}) {
+        const { silent = false, reloadOnFailure = false, retrying = false } = options;
+        const form = document.getElementById('migrationCancelForm');
+        if (!form) { return; }
+
+        const tokenInput = form.querySelector('input[name="csrf_token"]');
+        if ((!tokenInput || !tokenInput.value) && !retrying) {
+            console.warn('Cancel CSRF token missing - attempting refresh before retry');
+            refreshMigrationToken('cancel-refresh').then(() => {
+                submitMigrationCancel({ silent, reloadOnFailure, retrying: true });
+            }).catch(err => {
+                console.error('Token refresh failed for cancel action:', err);
+                if (reloadOnFailure) {
+                    if (typeof form.requestSubmit === 'function') {
+                        form.requestSubmit();
+                    } else {
+                        form.submit();
+                    }
+                }
+            });
+            return;
+        }
+
+        const formData = new FormData(form);
+
+        fetch(window.location.pathname, {
+            method: 'POST',
+            body: formData,
+            credentials: 'same-origin',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        }).then(response => {
+            if (!response.ok && response.status !== 204) {
+                throw new Error(`Cancel request failed with status ${response.status}`);
+            }
+            if (!silent) {
+                console.log('Migration session cleared via cancel form');
+            }
+        }).catch(err => {
+            console.error('Cancel form error:', err);
+            if (reloadOnFailure) {
+                // Fallback to standard form submission to guarantee cleanup
+                if (typeof form.requestSubmit === 'function') {
+                    form.requestSubmit();
+                } else {
+                    form.submit();
+                }
+            }
         });
     }
 });
