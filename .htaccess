@@ -56,17 +56,28 @@ RewriteRule ^(.*)$ https://www.educ-aid.site/$1 [L,R=301]
     Header set Referrer-Policy "strict-origin-when-cross-origin"
 </IfModule>
 
-# Content Security Policy - Upgrade insecure requests
+# Content Security Policy (CSP) - Comprehensive XSS Protection
 <IfModule mod_headers.c>
-    Header set Content-Security-Policy "upgrade-insecure-requests"
+    Header set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.google.com https://www.gstatic.com https://cdn.jsdelivr.net https://fonts.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; img-src 'self' data: https: blob:; font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net data:; connect-src 'self' https://www.google.com; frame-src 'self' https://www.google.com; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests;"
+</IfModule>
+
+# Permissions Policy (Feature Policy)
+<IfModule mod_headers.c>
+    Header set Permissions-Policy "geolocation=(), microphone=(), camera=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=()"
 </IfModule>
 
 # ----------------------------------------
 # File Access Protection
 # ----------------------------------------
 
-# Deny access to sensitive files
-<FilesMatch "\.(env|log|sql|md|json|lock|yml|yaml|ini|bak|old|tmp)$">
+# Allow legitimate security scanners and bots
+SetEnvIfNoCase User-Agent "Mozilla/5.0 (compatible; SecurityHeaders" allowed_scanner
+SetEnvIfNoCase User-Agent "Googlebot" allowed_scanner
+SetEnvIfNoCase User-Agent "Bingbot" allowed_scanner
+SetEnvIfNoCase User-Agent "curl" allowed_scanner
+
+# Deny access to sensitive files (excluding .md for documentation)
+<FilesMatch "\.(env|log|sql|json|lock|yml|yaml|ini|bak|old|tmp)$">
     Order allow,deny
     Deny from all
 </FilesMatch>
@@ -77,10 +88,11 @@ RewriteRule ^(.*)$ https://www.educ-aid.site/$1 [L,R=301]
     Deny from all
 </Files>
 
-# Block access to hidden files
-<FilesMatch "^\.">
-    Order allow,deny
+# Block access to hidden files (except for security scanners)
+<FilesMatch "^\.(?!well-known)">
+    Order deny,allow
     Deny from all
+    Allow from env=allowed_scanner
 </FilesMatch>
 
 # ----------------------------------------
