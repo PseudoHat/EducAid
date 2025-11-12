@@ -119,7 +119,7 @@ if (!function_exists('student_menu_link')) {
 
     <!-- Logout at bottom -->
     <li class="nav-item logout mt-2 pt-1">
-      <a href="../../unified_login.php?logout=true" onclick="return confirmLogout();" class="logout-link">
+      <a href="#" data-bs-toggle="modal" data-bs-target="#logoutModal" class="logout-link">
         <i class="bi bi-box-arrow-right icon"></i>
         <span class="links_name">Logout</span>
       </a>
@@ -129,11 +129,44 @@ if (!function_exists('student_menu_link')) {
 
 <div class="sidebar-backdrop d-none" id="sidebar-backdrop"></div>
 
-<script>
-function confirmLogout() {
-  return confirm('Are you sure you want to logout?\n\nThis will clear all your session data and return you to the login page.');
-}
-</script>
+<!-- Logout Confirmation Modal -->
+<div class="modal fade" id="logoutModal" tabindex="-1" aria-labelledby="logoutModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="border-radius: 16px; border: none; box-shadow: 0 10px 40px rgba(0,0,0,0.2);">
+      <div class="modal-header border-0" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 24px 28px; border-radius: 16px 16px 0 0;">
+        <div class="d-flex align-items-center gap-3">
+          <div style="width: 48px; height: 48px; background: rgba(255,255,255,0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(10px);">
+            <i class="bi bi-box-arrow-right" style="font-size: 24px;"></i>
+          </div>
+          <div>
+            <h5 class="modal-title mb-0" id="logoutModalLabel" style="font-weight: 700; font-size: 1.25rem;">Logout Confirmation</h5>
+            <small style="opacity: 0.9;">Are you sure you want to logout?</small>
+          </div>
+        </div>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" style="padding: 28px;">
+        <div class="d-flex align-items-start gap-3 mb-3">
+          <div style="width: 40px; height: 40px; background: #fef3c7; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+            <i class="bi bi-exclamation-triangle-fill" style="color: #f59e0b; font-size: 20px;"></i>
+          </div>
+          <div>
+            <p class="mb-2" style="color: #1f2937; font-weight: 500;">You will be logged out of your student account.</p>
+            <p class="mb-0" style="color: #6b7280; font-size: 0.9rem;">You will need to log in again to access your dashboard and documents.</p>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer border-0" style="padding: 0 28px 24px; gap: 12px;">
+        <button type="button" class="btn btn-light" data-bs-dismiss="modal" style="border-radius: 10px; padding: 10px 20px; font-weight: 600; border: 2px solid #e5e7eb;">
+          <i class="bi bi-x-circle me-1"></i> Cancel
+        </button>
+        <a href="logout.php" class="btn" style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; border: none; border-radius: 10px; padding: 10px 20px; font-weight: 600;">
+          <i class="bi bi-box-arrow-right me-1"></i> Yes, Logout
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
 
 <style>
 <?php

@@ -34,14 +34,24 @@ if (!isset($connection)) {
 
 $studentId = $_SESSION['student_id'];
 
-// Get student's year level status
-$student_info_query = "SELECT current_year_level, is_graduating, status_academic_year FROM students WHERE student_id = $1";
+// Get student's year level status and migration status
+$student_info_query = "SELECT current_year_level, is_graduating, status_academic_year, admin_review_required, university_id, mothers_maiden_name, school_student_id FROM students WHERE student_id = $1";
 $student_info_result = pg_query_params($connection, $student_info_query, [$studentId]);
 $student_info = pg_fetch_assoc($student_info_result);
 
 if (!$student_info) {
     return; // Student not found, let page handle
 }
+
+// Check if this is a migrated student
+$is_migrated = ($student_info['admin_review_required'] === 't' || $student_info['admin_review_required'] === true);
+
+// Check if migrated student needs to complete their profile (missing required credentials)
+$needs_migrated_profile_completion = $is_migrated && (
+    empty($student_info['university_id']) || 
+    empty($student_info['mothers_maiden_name']) || 
+    empty($student_info['school_student_id'])
+);
 
 // Get current active academic year
 $current_academic_year = null;
@@ -64,9 +74,11 @@ if (!$current_academic_year) {
 
 // Check if student needs to update their year level credentials
 // They need to update if:
-// 1. They don't have year level data at all, OR
-// 2. There's an active distribution and their status_academic_year doesn't match the current one
-$needs_year_level_update = empty($student_info['current_year_level']) || 
+// 1. They are a migrated student who hasn't completed their profile (PRIORITY), OR
+// 2. They don't have year level data at all, OR
+// 3. There's an active distribution and their status_academic_year doesn't match the current one
+$needs_year_level_update = $needs_migrated_profile_completion ||
+                           empty($student_info['current_year_level']) || 
                            empty($student_info['status_academic_year']) || 
                            $student_info['is_graduating'] === null ||
                            ($current_academic_year && $student_info['status_academic_year'] !== $current_academic_year);
@@ -76,6 +88,11 @@ $needs_year_level_update = empty($student_info['current_year_level']) ||
 if ($needs_year_level_update) {
     // Store the page they were trying to access
     $_SESSION['return_after_year_update'] = $_SERVER['REQUEST_URI'];
+    
+    // If migrated student needs profile completion, set a flag so the correct modal shows
+    if ($needs_migrated_profile_completion) {
+        $_SESSION['needs_migrated_profile_completion'] = true;
+    }
     
     // Redirect to upload document page (modal will auto-show)
     header("Location: upload_document.php?force_update=1");

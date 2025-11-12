@@ -43,6 +43,6 @@ unset($_SESSION['forgot_otp_email']);
 unset($_SESSION['forgot_otp_role']);
 unset($_SESSION['forgot_otp_verified']);
 
-header("Location: ../../unified_login.php");
+header("Location: ../../unified_login.php?logout=success");
 exit;
 ?>

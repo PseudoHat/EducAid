@@ -50,9 +50,6 @@ unset($_SESSION['workflow_status']);
 unset($_SESSION['temp_admin_action']);
 unset($_SESSION['schedule_creation']);
 
-// Add a logout success message
-$_SESSION['logout_message'] = 'You have been successfully logged out.';
-
-header("Location: ../../unified_login.php");
+header("Location: ../../unified_login.php?logout=success");
 exit;
 ?>
