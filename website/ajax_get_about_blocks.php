@@ -1,4 +1,7 @@
 <?php
+ob_start();
+error_reporting(E_ALL & ~E_NOTICE & ~E_WARNING);
+ini_set('display_errors', '0');
 // Return current about page blocks for given keys (used to refresh after save / rollback)
 header('Content-Type: application/json');
 if (session_status() === PHP_SESSION_NONE) {

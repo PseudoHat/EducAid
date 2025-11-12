@@ -1,4 +1,7 @@
 <?php
+ob_start();
+error_reporting(E_ALL & ~E_NOTICE & ~E_WARNING);
+ini_set('display_errors', '0');
 // Rollback a requirements page block to a previous version (super admin only)
 if (session_status() === PHP_SESSION_NONE) {
     session_start();

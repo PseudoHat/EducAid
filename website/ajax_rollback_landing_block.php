@@ -1,4 +1,7 @@
 <?php
+ob_start();
+error_reporting(E_ALL & ~E_NOTICE & ~E_WARNING);
+ini_set('display_errors', '0');
 // Apply a historical audit entry's content to the current landing_content_blocks (rollback action)
 if (session_status() === PHP_SESSION_NONE) {
     session_start();

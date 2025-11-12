@@ -5,7 +5,15 @@
  * Super Admin only
  */
 
+// Suppress all output before JSON response
+error_reporting(0);
+ini_set('display_errors', 0);
+ob_start();
+
 session_start();
+
+// Clear any output that might have been generated
+ob_clean();
 header('Content-Type: application/json');
 
 require_once __DIR__ . '/../config/database.php';
@@ -13,6 +21,8 @@ require_once __DIR__ . '/../includes/CSRFProtection.php';
 @include_once __DIR__ . '/../includes/permissions.php';
 
 function resp_contact($ok, $msg = '', $extra = []) {
+  if (ob_get_level() > 0) ob_clean();
+  header('Content-Type: application/json');
     echo json_encode(array_merge(['success' => $ok, 'message' => $msg], $extra));
     exit;
 }

@@ -1,4 +1,7 @@
 <?php
+ob_start();
+error_reporting(E_ALL & ~E_NOTICE & ~E_WARNING);
+ini_set('display_errors', '0');
 /**
  * AJAX Reset Contact Content
  * Resets specific block or all blocks to default
