@@ -16,6 +16,15 @@ if (!isset($_SESSION['admin_username'])) {
 
 include __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../includes/CSRFProtection.php';
+require_once __DIR__ . '/../../services/AuditLogger.php';
+
+// Initialize audit logger
+$auditLogger = new AuditLogger($connection);
+
+// PHPMailer for sending email notifications
+use PHPMailer\PHPMailer\PHPMailer;
+use PHPMailer\PHPMailer\Exception;
+require __DIR__ . '/../../phpmailer/vendor/autoload.php';
 
 // Helper function for JSON response
 function json_response($data) {
@@ -41,6 +50,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $token = $_POST['csrf_token'] ?? '';
     if (!CSRFProtection::validateToken('household_blocks', $token)) {
         json_response(['success' => false, 'message' => 'Security validation failed']);
+    }
+    
+    // Bulk delete attempts
+    if (isset($_POST['action']) && $_POST['action'] === 'bulk_delete') {
+        $attemptIds = $_POST['attempt_ids'] ?? [];
+        
+        if (empty($attemptIds) || !is_array($attemptIds)) {
+            json_response(['success' => false, 'message' => 'No records selected']);
+        }
+        
+        // Sanitize IDs
+        $attemptIds = array_map('intval', $attemptIds);
+        $attemptIds = array_filter($attemptIds, function($id) { return $id > 0; });
+        
+        if (empty($attemptIds)) {
+            json_response(['success' => false, 'message' => 'Invalid selection']);
+        }
+        
+        // Delete the selected attempts
+        $placeholders = implode(',', array_map(function($i) { return '$' . ($i + 1); }, array_keys($attemptIds)));
+        $deleteQuery = "DELETE FROM household_block_attempts WHERE attempt_id IN ($placeholders)";
+        
+        $result = pg_query_params($connection, $deleteQuery, array_values($attemptIds));
+        
+        if ($result) {
+            $deletedCount = pg_affected_rows($result);
+            json_response([
+                'success' => true,
+                'message' => "Successfully deleted $deletedCount record(s)"
+            ]);
+        } else {
+            json_response(['success' => false, 'message' => 'Database error: ' . pg_last_error($connection)]);
+        }
     }
     
     // Override and allow registration
@@ -77,19 +119,179 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         if ($result) {
             // Get attempt details for email
-            $detailsQuery = "SELECT attempted_email, attempted_first_name FROM household_block_attempts WHERE attempt_id = $1";
+            $detailsQuery = "SELECT attempted_email, attempted_first_name, attempted_last_name FROM household_block_attempts WHERE attempt_id = $1";
             $detailsResult = pg_query_params($connection, $detailsQuery, [$attemptId]);
             $details = pg_fetch_assoc($detailsResult);
             
-            // Generate bypass URL
-            $bypassUrl = 'https://' . $_SERVER['HTTP_HOST'] . '/modules/student/student_register.php?bypass_token=' . $bypassToken;
+            // Generate bypass URL - supports both localhost and production
+            $appUrl = getenv('APP_URL');
+            if (empty($appUrl)) {
+                // Fallback: Auto-detect protocol and host for localhost
+                $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+                $host = $_SERVER['HTTP_HOST'];
+                $appUrl = $protocol . '://' . $host;
+            }
+            $bypassUrl = rtrim($appUrl, '/') . '/modules/student/student_register.php?bypass_token=' . $bypassToken;
+            
+            $studentEmail = $details['attempted_email'] ?? '';
+            $studentFirstName = $details['attempted_first_name'] ?? 'Student';
+            $studentFullName = trim(($details['attempted_first_name'] ?? '') . ' ' . ($details['attempted_last_name'] ?? ''));
+            $emailSent = false;
+            $emailError = null;
+            
+            // Send email notification if email address is available
+            if (!empty($studentEmail) && filter_var($studentEmail, FILTER_VALIDATE_EMAIL)) {
+                try {
+                    $mail = new PHPMailer(true);
+                    
+                    // SMTP configuration
+                    $mail->isSMTP();
+                    $mail->Host       = getenv('SMTP_HOST') ?: 'smtp.gmail.com';
+                    $mail->SMTPAuth   = true;
+                    $mail->Username   = getenv('SMTP_USERNAME') ?: 'example@email.test';
+                    $mail->Password   = getenv('SMTP_PASSWORD') ?: '';
+                    $encryption       = getenv('SMTP_ENCRYPTION') ?: 'tls';
+                    
+                    if (strtolower($encryption) === 'ssl') {
+                        $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
+                    } else {
+                        $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+                    }
+                    $mail->Port = (int)(getenv('SMTP_PORT') ?: 587);
+                    
+                    // From address
+                    $fromEmail = getenv('SMTP_FROM_EMAIL') ?: ($mail->Username ?: 'no-reply@educaid.local');
+                    $fromName  = getenv('SMTP_FROM_NAME')  ?: 'EducAid Registration System';
+                    $mail->setFrom($fromEmail, $fromName);
+                    
+                    // To address
+                    $mail->addAddress($studentEmail, $studentFullName);
+                    
+                    // Email content
+                    $mail->isHTML(true);
+                    $mail->Subject = 'EducAid Registration - Override Approved';
+                    
+                    $expiresAtFormatted = date('F j, Y \a\t g:i A', strtotime($expiresAt));
+                    
+                    $mail->Body = "
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <style>
+                            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                            .header { background: linear-gradient(135deg, #2e7d32 0%, #1b5e20 100%); color: white; padding: 20px; border-radius: 8px 8px 0 0; text-align: center; }
+                            .content { background: #f8f9fa; padding: 30px; border-radius: 0 0 8px 8px; }
+                            .button { display: inline-block; background: linear-gradient(135deg, #2e7d32 0%, #1b5e20 100%); color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; margin: 20px 0; font-weight: bold; }
+                            .warning { background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0; border-radius: 4px; }
+                            .info-box { background: white; border: 2px solid #e0e0e0; padding: 15px; border-radius: 6px; margin: 15px 0; }
+                            .footer { text-align: center; color: #666; font-size: 12px; margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; }
+                        </style>
+                    </head>
+                    <body>
+                        <div class='container'>
+                            <div class='header'>
+                                <h2 style='margin: 0;'>🎓 EducAid Registration</h2>
+                                <p style='margin: 5px 0 0 0;'>Override Approved</p>
+                            </div>
+                            <div class='content'>
+                                <p>Dear <strong>{$studentFirstName}</strong>,</p>
+                                
+                                <p>Great news! Your registration request has been <strong>approved by an administrator</strong>.</p>
+                                
+                                <div class='info-box'>
+                                    <p><strong>📋 What This Means:</strong></p>
+                                    <p>Your registration was initially blocked by our household duplicate prevention system. However, after reviewing your case, an administrator has approved your registration to proceed.</p>
+                                </div>
+                                
+                                <p><strong>To complete your registration, please click the button below:</strong></p>
+                                
+                                <div style='text-align: center;'>
+                                    <a href='{$bypassUrl}' class='button'>Continue Registration</a>
+                                </div>
+                                
+                                <div class='warning'>
+                                    <strong>⚠️ Important:</strong>
+                                    <ul style='margin: 10px 0 0 0; padding-left: 20px;'>
+                                        <li>This link is <strong>one-time use only</strong> and will expire on <strong>{$expiresAtFormatted}</strong></li>
+                                        <li>If the link expires, you'll need to contact the administrator again</li>
+                                        <li>Please complete your registration as soon as possible</li>
+                                    </ul>
+                                </div>
+                                
+                                <div class='info-box'>
+                                    <p><strong>Override Reason:</strong></p>
+                                    <p style='font-style: italic; color: #555;'>\"{$reason}\"</p>
+                                </div>
+                                
+                                <p>If you did not request this registration or if you have any questions, please contact the EducAid administration office.</p>
+                            </div>
+                            <div class='footer'>
+                                <p>This is an automated message from the EducAid Registration System.</p>
+                                <p>Please do not reply to this email.</p>
+                            </div>
+                        </div>
+                    </body>
+                    </html>
+                    ";
+                    
+                    $mail->AltBody = "Dear {$studentFirstName},\n\n"
+                        . "Great news! Your registration request has been approved by an administrator.\n\n"
+                        . "Your registration was initially blocked by our household duplicate prevention system. However, after reviewing your case, an administrator has approved your registration to proceed.\n\n"
+                        . "To complete your registration, please visit this link:\n{$bypassUrl}\n\n"
+                        . "IMPORTANT:\n"
+                        . "- This link is one-time use only and will expire on {$expiresAtFormatted}\n"
+                        . "- If the link expires, you'll need to contact the administrator again\n"
+                        . "- Please complete your registration as soon as possible\n\n"
+                        . "Override Reason: \"{$reason}\"\n\n"
+                        . "If you did not request this registration or if you have any questions, please contact the EducAid administration office.\n\n"
+                        . "This is an automated message from the EducAid Registration System.\n"
+                        . "Please do not reply to this email.";
+                    
+                    $mail->send();
+                    $emailSent = true;
+                    
+                    error_log("Override email sent successfully to: {$studentEmail} for attempt ID: {$attemptId}");
+                    
+                } catch (Exception $e) {
+                    $emailError = $e->getMessage();
+                    error_log("Failed to send override email to {$studentEmail}: " . $e->getMessage());
+                    error_log("PHPMailer Error Info: {$mail->ErrorInfo}");
+                }
+            }
+            
+            // Log audit trail: Admin approved household override
+            $auditLogger->logEvent(
+                'household_override_approved',
+                'household_management',
+                "Admin approved household duplicate override for {$details['attempted_first_name']} {$details['attempted_last_name']}",
+                [
+                    'user_id' => $adminId,
+                    'user_type' => 'admin',
+                    'username' => $_SESSION['admin_username'] ?? 'Unknown Admin',
+                    'status' => 'success',
+                    'affected_table' => 'household_block_attempts',
+                    'affected_record_id' => $attemptId,
+                    'metadata' => [
+                        'attempt_id' => $attemptId,
+                        'student_name' => $details['attempted_first_name'] . ' ' . $details['attempted_last_name'],
+                        'student_email' => $studentEmail,
+                        'override_reason' => $reason,
+                        'bypass_token_expires_at' => $expiresAt,
+                        'email_sent' => $emailSent,
+                        'email_address' => $studentEmail
+                    ]
+                ]
+            );
             
             json_response([
                 'success' => true,
                 'message' => 'Override approved successfully',
                 'bypass_url' => $bypassUrl,
                 'expires_at' => $expiresAt,
-                'email' => $details['attempted_email'] ?? ''
+                'email' => $studentEmail,
+                'email_sent' => $emailSent,
+                'email_error' => $emailError
             ]);
         } else {
             json_response(['success' => false, 'message' => 'Database error']);
@@ -750,12 +952,19 @@ while ($row = pg_fetch_assoc($barangaysResult)) {
 
                 <!-- Blocked Attempts Table -->
                 <div class="card">
-                    <div class="card-header">
-                        <h5>
-                            <i class="bi bi-table"></i>
-                            Blocked Registration Attempts
-                            <span class="badge bg-danger ms-2"><?= count($records) ?> Records</span>
-                        </h5>
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <div>
+                            <h5 class="mb-0">
+                                <i class="bi bi-table"></i>
+                                Blocked Registration Attempts
+                                <span class="badge bg-danger ms-2"><?= count($records) ?> Records</span>
+                            </h5>
+                        </div>
+                        <div>
+                            <button id="bulkDeleteBtn" class="btn btn-danger btn-sm" style="display: none;" onclick="confirmBulkDelete()">
+                                <i class="bi bi-trash-fill me-1"></i>Delete Selected (<span id="selectedCount">0</span>)
+                            </button>
+                        </div>
                     </div>
                     <div class="card-body">
                         <?php if (empty($records)): ?>
@@ -767,9 +976,12 @@ while ($row = pg_fetch_assoc($barangaysResult)) {
                                 <table class="table table-hover">
                                     <thead>
                                         <tr>
+                                            <th style="width: 40px;">
+                                                <input type="checkbox" id="selectAll" class="form-check-input" onchange="toggleSelectAll(this)">
+                                            </th>
                                             <th><i class="bi bi-clock me-1"></i>Date/Time</th>
                                             <th><i class="bi bi-person me-1"></i>Attempted Student</th>
-                                            <th><i class="bi bi-person-heart me-1"></i>Mother's Maiden Name</th>
+                                            <th><i class="bi bi-person-heart me-1"></i>Mother's Full Name</th>
                                             <th><i class="bi bi-geo-alt me-1"></i>Barangay</th>
                                             <th><i class="bi bi-shield-check me-1"></i>Blocked By (Existing)</th>
                                             <th><i class="bi bi-diagram-3 me-1"></i>Match Type</th>
@@ -781,13 +993,37 @@ while ($row = pg_fetch_assoc($barangaysResult)) {
                                         <?php foreach ($records as $record): ?>
                                             <tr>
                                                 <td>
+                                                    <input type="checkbox" class="form-check-input record-checkbox" 
+                                                           value="<?= $record['attempt_id'] ?>" 
+                                                           onchange="updateBulkDeleteButton()">
+                                                </td>
+                                                <td>
                                                     <div class="fw-semibold"><?= date('M d, Y', strtotime($record['blocked_at'])) ?></div>
                                                     <small class="text-muted"><?= date('h:i A', strtotime($record['blocked_at'])) ?></small>
                                                 </td>
                                                 <td>
                                                     <div class="fw-bold"><?= htmlspecialchars($record['attempted_first_name'] . ' ' . $record['attempted_last_name']) ?></div>
-                                                    <small class="text-muted d-block"><i class="bi bi-envelope me-1"></i><?= htmlspecialchars($record['attempted_email']) ?></small>
-                                                    <small class="text-muted"><i class="bi bi-telephone me-1"></i><?= htmlspecialchars($record['attempted_mobile']) ?></small>
+                                                    <small class="text-muted d-block">
+                                                        <i class="bi bi-envelope me-1"></i><?= htmlspecialchars($record['attempted_email'] ?? 'N/A') ?>
+                                                    </small>
+                                                    <small class="text-muted">
+                                                        <i class="bi bi-telephone me-1"></i><?= htmlspecialchars($record['attempted_mobile'] ?? 'N/A') ?>
+                                                    </small>
+                                                    <?php if (!empty($record['attempted_email']) || !empty($record['attempted_mobile'])): ?>
+                                                        <div class="mt-1">
+                                                            <span class="badge bg-info" style="font-size: 0.7rem;">
+                                                                <i class="bi bi-inbox-fill me-1"></i>Contact Provided
+                                                            </span>
+                                                        </div>
+                                                    <?php endif; ?>
+                                                    <?php if (!empty($record['override_reason'])): ?>
+                                                        <div class="mt-1">
+                                                            <small class="text-muted" title="<?= htmlspecialchars($record['override_reason']) ?>">
+                                                                <i class="bi bi-chat-left-quote me-1"></i>
+                                                                <?= htmlspecialchars(substr($record['override_reason'], 0, 30)) . (strlen($record['override_reason']) > 30 ? '...' : '') ?>
+                                                            </small>
+                                                        </div>
+                                                    <?php endif; ?>
                                                 </td>
                                                 <td class="fw-semibold"><?= htmlspecialchars($record['mothers_maiden_name_entered']) ?></td>
                                                 <td>
@@ -834,7 +1070,8 @@ while ($row = pg_fetch_assoc($barangaysResult)) {
                                                 </td>
                                                 <td>
                                                     <?php if ($record['admin_override'] != 't'): ?>
-                                                        <button class="btn btn-sm btn-warning" 
+                                                        <button class="btn btn-sm btn-warning override-btn" 
+                                                                id="override-btn-<?= $record['attempt_id'] ?>"
                                                                 onclick="showOverrideModal(<?= $record['attempt_id'] ?>, '<?= htmlspecialchars($record['attempted_first_name'] . ' ' . $record['attempted_last_name'], ENT_QUOTES) ?>')">
                                                             <i class="bi bi-unlock-fill me-1"></i>Override
                                                         </button>
@@ -891,7 +1128,121 @@ while ($row = pg_fetch_assoc($barangaysResult)) {
     <script>
         const csrfToken = '<?= CSRFProtection::generateToken('household_blocks') ?>';
 
+        // Toggle select all checkboxes
+        function toggleSelectAll(checkbox) {
+            const checkboxes = document.querySelectorAll('.record-checkbox');
+            checkboxes.forEach(cb => {
+                cb.checked = checkbox.checked;
+            });
+            updateBulkDeleteButton();
+        }
+
+        // Update bulk delete button visibility and count
+        function updateBulkDeleteButton() {
+            const checkboxes = document.querySelectorAll('.record-checkbox:checked');
+            const bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
+            const selectedCount = document.getElementById('selectedCount');
+            
+            if (checkboxes.length > 0) {
+                bulkDeleteBtn.style.display = 'inline-block';
+                selectedCount.textContent = checkboxes.length;
+            } else {
+                bulkDeleteBtn.style.display = 'none';
+                document.getElementById('selectAll').checked = false;
+            }
+        }
+
+        // Confirm and process bulk delete
+        async function confirmBulkDelete() {
+            const checkboxes = document.querySelectorAll('.record-checkbox:checked');
+            const selectedIds = Array.from(checkboxes).map(cb => cb.value);
+            
+            if (selectedIds.length === 0) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'No Selection',
+                    text: 'Please select at least one record to delete'
+                });
+                return;
+            }
+
+            const result = await Swal.fire({
+                title: 'Delete Selected Records?',
+                html: `
+                    <div class="text-start">
+                        <p>You are about to permanently delete <strong>${selectedIds.length}</strong> blocked attempt record(s).</p>
+                        <p class="text-danger"><i class="bi bi-exclamation-triangle me-2"></i><strong>This action cannot be undone!</strong></p>
+                        <p class="text-muted">These records will be removed from the database and will no longer appear in this log.</p>
+                    </div>
+                `,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'Yes, Delete',
+                confirmButtonColor: '#dc3545',
+                cancelButtonText: 'Cancel'
+            });
+
+            if (result.isConfirmed) {
+                await processBulkDelete(selectedIds);
+            }
+        }
+
+        // Process bulk delete
+        async function processBulkDelete(attemptIds) {
+            try {
+                const formData = new FormData();
+                formData.append('action', 'bulk_delete');
+                formData.append('csrf_token', csrfToken);
+                attemptIds.forEach(id => {
+                    formData.append('attempt_ids[]', id);
+                });
+
+                const response = await fetch('household_blocked_registrations.php', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    await Swal.fire({
+                        icon: 'success',
+                        title: 'Deleted Successfully',
+                        text: data.message,
+                        timer: 2000,
+                        showConfirmButton: false
+                    });
+                    location.reload();
+                } else {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Error',
+                        text: data.message || 'Failed to delete records'
+                    });
+                }
+            } catch (error) {
+                console.error('Bulk delete error:', error);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: 'An error occurred while deleting records'
+                });
+            }
+        }
+
         function showOverrideModal(attemptId, studentName) {
+            // Check if button is already disabled (override already in progress or completed)
+            const overrideButton = document.getElementById('override-btn-' + attemptId);
+            if (overrideButton && overrideButton.disabled) {
+                console.log('⚠️ Override button already disabled for attempt ID:', attemptId);
+                return; // Prevent showing modal if button is disabled
+            }
+            
+            // Temporarily disable the button while modal is open
+            if (overrideButton) {
+                overrideButton.disabled = true;
+            }
+            
             Swal.fire({
                 title: 'Override Household Block',
                 html: `
@@ -918,11 +1269,25 @@ while ($row = pg_fetch_assoc($barangaysResult)) {
             }).then((result) => {
                 if (result.isConfirmed) {
                     processOverride(attemptId, result.value);
+                } else {
+                    // Re-enable button if user cancels
+                    if (overrideButton) {
+                        overrideButton.disabled = false;
+                    }
                 }
             });
         }
 
         async function processOverride(attemptId, reason) {
+            // Disable the confirm button and show loading state
+            const swalConfirmButton = Swal.getConfirmButton();
+            const originalButtonText = swalConfirmButton.innerHTML;
+            
+            if (swalConfirmButton) {
+                swalConfirmButton.disabled = true;
+                swalConfirmButton.innerHTML = '<i class="spinner-border spinner-border-sm me-2"></i>Processing...';
+            }
+            
             try {
                 const formData = new FormData();
                 formData.append('action', 'override');
@@ -938,6 +1303,47 @@ while ($row = pg_fetch_assoc($barangaysResult)) {
                 const data = await response.json();
 
                 if (data.success) {
+                    // Immediately disable the override button in the table
+                    const overrideButton = document.getElementById('override-btn-' + attemptId);
+                    if (overrideButton) {
+                        overrideButton.disabled = true;
+                        overrideButton.classList.remove('btn-warning');
+                        overrideButton.classList.add('btn-secondary');
+                        overrideButton.innerHTML = '<i class="bi bi-check-lg me-1"></i>Resolved';
+                        console.log('✅ Override button disabled for attempt ID:', attemptId);
+                    }
+                    
+                    // Build email status message
+                    let emailStatusHtml = '';
+                    if (data.email && data.email !== 'N/A') {
+                        if (data.email_sent) {
+                            emailStatusHtml = `
+                                <div class="alert alert-success mt-3">
+                                    <i class="bi bi-check-circle-fill me-2"></i>
+                                    <strong>Email Notification Sent!</strong><br>
+                                    <small>The student has been notified at <strong>${data.email}</strong> with instructions to complete their registration.</small>
+                                </div>
+                            `;
+                        } else if (data.email_error) {
+                            emailStatusHtml = `
+                                <div class="alert alert-warning mt-3">
+                                    <i class="bi bi-exclamation-triangle me-2"></i>
+                                    <strong>Email Failed to Send</strong><br>
+                                    <small>Please manually share the bypass URL with the student at <strong>${data.email}</strong></small><br>
+                                    <small class="text-muted">Error: ${data.email_error}</small>
+                                </div>
+                            `;
+                        }
+                    } else {
+                        emailStatusHtml = `
+                            <div class="alert alert-warning mt-3">
+                                <i class="bi bi-info-circle me-2"></i>
+                                <strong>No Email Address Provided</strong><br>
+                                <small>Please manually share the bypass URL with the student.</small>
+                            </div>
+                        `;
+                    }
+                    
                     await Swal.fire({
                         icon: 'success',
                         title: 'Override Approved',
@@ -950,19 +1356,31 @@ while ($row = pg_fetch_assoc($barangaysResult)) {
                                            onclick="this.select()">
                                 </div>
                                 <p><small class="text-muted">
-                                    <i class="bi bi-clock me-1"></i>Expires: ${new Date(data.expires_at).toLocaleString()}<br>
-                                    <i class="bi bi-envelope me-1"></i>Send to: ${data.email}
+                                    <i class="bi bi-clock me-1"></i>Expires: ${new Date(data.expires_at).toLocaleString()}
                                 </small></p>
+                                ${emailStatusHtml}
                                 <p class="text-warning"><small>
                                     <i class="bi bi-exclamation-triangle me-1"></i>
                                     This link can only be used once and expires in 24 hours.
                                 </small></p>
                             </div>
                         `,
-                        confirmButtonText: 'OK'
+                        confirmButtonText: 'OK',
+                        width: '600px'
                     });
                     location.reload();
                 } else {
+                    // Re-enable button on error
+                    const overrideButton = document.getElementById('override-btn-' + attemptId);
+                    if (overrideButton) {
+                        overrideButton.disabled = false;
+                    }
+                    
+                    if (swalConfirmButton) {
+                        swalConfirmButton.disabled = false;
+                        swalConfirmButton.innerHTML = originalButtonText;
+                    }
+                    
                     Swal.fire({
                         icon: 'error',
                         title: 'Error',
@@ -970,6 +1388,17 @@ while ($row = pg_fetch_assoc($barangaysResult)) {
                     });
                 }
             } catch (error) {
+                // Re-enable button on exception
+                const overrideButton = document.getElementById('override-btn-' + attemptId);
+                if (overrideButton) {
+                    overrideButton.disabled = false;
+                }
+                
+                if (swalConfirmButton) {
+                    swalConfirmButton.disabled = false;
+                    swalConfirmButton.innerHTML = originalButtonText;
+                }
+                
                 Swal.fire({
                     icon: 'error',
                     title: 'Error',

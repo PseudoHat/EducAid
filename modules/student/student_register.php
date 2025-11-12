@@ -2,9 +2,10 @@
 // Suppress all output and errors for AJAX requests
 if (isset($_POST['processIdPictureOcr']) || isset($_POST['processGradesOcr']) || 
     isset($_POST['processOcr']) || isset($_POST['processLetterOcr']) || isset($_POST['processCertificateOcr']) ||
-    (isset($_POST['action']) && in_array($_POST['action'], ['check_full_duplicate', 'check_email_duplicate', 'check_mobile_duplicate', 'check_name_duplicate', 'check_household_lastname', 'check_household_duplicate']))) {
+    (isset($_POST['action']) && in_array($_POST['action'], ['check_full_duplicate', 'check_email_duplicate', 'check_mobile_duplicate', 'check_name_duplicate', 'check_household_lastname', 'check_household_duplicate', 'update_block_contact']))) {
     @ini_set('display_errors', '0');
-    error_reporting(0);
+    // DON'T disable error_reporting for household checks - we need error_log() to work
+    // error_reporting(0);
     if (!ob_get_level()) ob_start();
 }
 
@@ -14,14 +15,186 @@ require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../config/recaptcha_config.php';
 // Include FilePathConfig for centralized path management
 require_once __DIR__ . '/../../config/FilePathConfig.php';
+// Include AuditLogger for audit trail
+require_once __DIR__ . '/../../services/AuditLogger.php';
 
 // Make connection variable available in this scope
 global $connection;
+
+// Initialize audit logger
+$auditLogger = new AuditLogger($connection);
 
 // Start session if not already started
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
+
+// ============================================================
+// BYPASS TOKEN VALIDATION & DATA PRE-FILL
+// ============================================================
+// Check if user is accessing via bypass token (admin override)
+if (isset($_GET['bypass_token']) && !empty($_GET['bypass_token'])) {
+    $bypassToken = trim($_GET['bypass_token']);
+    
+    // Validate the bypass token and check if student already registered
+    $tokenQuery = "SELECT 
+        hba.attempt_id,
+        hba.attempted_first_name,
+        hba.attempted_last_name,
+        hba.attempted_email,
+        hba.attempted_mobile,
+        hba.mothers_maiden_name_entered,
+        hba.barangay_entered,
+        hba.bypass_token_used,
+        hba.bypass_token_used_at,
+        hba.bypass_token_expires_at,
+        hba.admin_override,
+        b.barangay_id,
+        s.student_id as registered_student_id,
+        s.first_name as registered_first_name,
+        s.last_name as registered_last_name
+    FROM household_block_attempts hba
+    LEFT JOIN barangays b ON LOWER(b.name) = LOWER(hba.barangay_entered)
+    LEFT JOIN students s ON LOWER(s.first_name) = LOWER(hba.attempted_first_name) 
+        AND LOWER(s.last_name) = LOWER(hba.attempted_last_name)
+        AND LOWER(s.email) = LOWER(hba.attempted_email)
+    WHERE hba.bypass_token = $1
+    LIMIT 1";
+    
+    $tokenResult = pg_query_params($connection, $tokenQuery, [$bypassToken]);
+    
+    if ($tokenResult && pg_num_rows($tokenResult) > 0) {
+        $tokenData = pg_fetch_assoc($tokenResult);
+        
+        // Check if token is valid
+        $tokenExpired = strtotime($tokenData['bypass_token_expires_at']) < time();
+        $tokenUsed = $tokenData['bypass_token_used'] === 't';
+        $tokenOverridden = $tokenData['admin_override'] === 't';
+        $studentAlreadyRegistered = !empty($tokenData['registered_student_id']);
+        
+        if ($tokenUsed || $studentAlreadyRegistered) {
+            // Token already used OR student already registered successfully
+            $usedAtFormatted = $tokenData['bypass_token_used_at'] 
+                ? date('F j, Y \a\t g:i A', strtotime($tokenData['bypass_token_used_at']))
+                : 'Unknown';
+            
+            if ($studentAlreadyRegistered) {
+                $_SESSION['bypass_error'] = 'Registration already completed! You have successfully registered as: ' 
+                    . $tokenData['registered_first_name'] . ' ' . $tokenData['registered_last_name'] 
+                    . ' (ID: ' . $tokenData['registered_student_id'] . '). '
+                    . 'You can now login using your credentials. This bypass link can no longer be used.';
+            } else {
+                $_SESSION['bypass_error'] = 'This bypass link has already been used on ' . $usedAtFormatted 
+                    . ' and cannot be used again. If you need assistance, please contact the administrator.';
+            }
+            
+            error_log("⚠️ Bypass token reuse attempt - Token: " . substr($bypassToken, 0, 8) . "..., Used: " . ($tokenUsed ? 'Yes' : 'No') . ", Student Registered: " . ($studentAlreadyRegistered ? 'Yes (ID: ' . $tokenData['registered_student_id'] . ')' : 'No'));
+            
+            // Log audit trail: Attempted to reuse bypass token
+            $auditLogger->logEvent(
+                'household_bypass_reuse_attempt',
+                'household_management',
+                "Attempted to reuse bypass token for: {$tokenData['attempted_first_name']} {$tokenData['attempted_last_name']}",
+                [
+                    'user_id' => $tokenData['registered_student_id'],
+                    'user_type' => 'student',
+                    'username' => $tokenData['attempted_email'] ?? 'N/A',
+                    'status' => 'warning',
+                    'affected_table' => 'household_block_attempts',
+                    'affected_record_id' => $tokenData['attempt_id'],
+                    'metadata' => [
+                        'attempt_id' => $tokenData['attempt_id'],
+                        'student_name' => $tokenData['attempted_first_name'] . ' ' . $tokenData['attempted_last_name'],
+                        'token_used' => $tokenUsed,
+                        'student_already_registered' => $studentAlreadyRegistered,
+                        'registered_student_id' => $tokenData['registered_student_id'],
+                        'bypass_token' => substr($bypassToken, 0, 8) . '...'
+                    ]
+                ]
+            );
+            
+            header("Location: student_register.php");
+            exit;
+        } elseif ($tokenExpired) {
+            // Token expired
+            $_SESSION['bypass_error'] = 'This bypass link has expired. Please contact the administrator for a new one.';
+            header("Location: student_register.php");
+            exit;
+        } elseif (!$tokenOverridden) {
+            // Token not approved
+            $_SESSION['bypass_error'] = 'This bypass link is not valid.';
+            header("Location: student_register.php");
+            exit;
+        } else {
+            // Token is valid! Set bypass flag and pre-fill data
+            $_SESSION['household_bypass_active'] = true;
+            $_SESSION['household_bypass_token'] = $bypassToken;
+            $_SESSION['household_bypass_attempt_id'] = $tokenData['attempt_id'];
+            
+            // Pre-fill student data from blocked attempt
+            // Mark it as "fresh" so it only displays once
+            $_SESSION['prefill_data'] = [
+                'first_name' => $tokenData['attempted_first_name'],
+                'last_name' => $tokenData['attempted_last_name'],
+                'email' => $tokenData['attempted_email'],
+                'mobile' => $tokenData['attempted_mobile'],
+                'mothers_maiden_name' => $tokenData['mothers_maiden_name_entered'],
+                'barangay_id' => $tokenData['barangay_id'],
+                'barangay_name' => $tokenData['barangay_entered']
+            ];
+            $_SESSION['prefill_fresh'] = true; // Flag to indicate this is a fresh prefill
+            
+            $_SESSION['bypass_success'] = 'Your registration has been approved! You may now continue with your registration.';
+            
+            error_log("✅ Bypass token validated for: " . $tokenData['attempted_first_name'] . " " . $tokenData['attempted_last_name']);
+            
+            // Log audit trail: Student accessed bypass link
+            $auditLogger->logEvent(
+                'household_bypass_accessed',
+                'household_management',
+                "Student accessed bypass link: {$tokenData['attempted_first_name']} {$tokenData['attempted_last_name']}",
+                [
+                    'user_id' => null,
+                    'user_type' => 'student',
+                    'username' => $tokenData['attempted_email'] ?? 'N/A',
+                    'status' => 'success',
+                    'affected_table' => 'household_block_attempts',
+                    'affected_record_id' => $tokenData['attempt_id'],
+                    'metadata' => [
+                        'attempt_id' => $tokenData['attempt_id'],
+                        'student_name' => $tokenData['attempted_first_name'] . ' ' . $tokenData['attempted_last_name'],
+                        'student_email' => $tokenData['attempted_email'],
+                        'bypass_token' => substr($bypassToken, 0, 8) . '...' // Log partial token for security
+                    ]
+                ]
+            );
+            
+            // Redirect to clean URL (remove token from address bar)
+            header("Location: student_register.php");
+            exit;
+        }
+    } else {
+        // Token not found
+        $_SESSION['bypass_error'] = 'Invalid bypass link. Please check the link or contact the administrator.';
+        header("Location: student_register.php");
+        exit;
+    }
+} else {
+    // NO BYPASS TOKEN: This is normal registration access
+    // Clear any existing bypass flags to prevent leakage from previous sessions
+    // BUT ONLY FOR GET REQUESTS (actual page loads), NOT for AJAX POST requests
+    // AND NOT if bypass was just activated (check for bypass_success message)
+    if ($_SERVER['REQUEST_METHOD'] === 'GET' && 
+        isset($_SESSION['household_bypass_active']) && 
+        !isset($_SESSION['bypass_success'])) {
+        // Only clear if this is NOT the redirect after successful token validation
+        unset($_SESSION['household_bypass_active']);
+        unset($_SESSION['household_bypass_token']);
+        unset($_SESSION['household_bypass_attempt_id']);
+        error_log("🧹 Cleared old bypass flags for normal registration access (GET request)");
+    }
+}
+// ============================================================
 
 // Database connection is validated in database.php (will die if connection fails)
 // The $connection variable is available globally after include
@@ -647,7 +820,7 @@ $isAjaxRequest = isset($_POST['sendOtp']) || isset($_POST['verifyOtp']) ||
                  isset($_POST['processCertificateOcr']) || isset($_POST['processGradesOcr']) ||
                  isset($_POST['cleanup_temp']) || isset($_POST['check_existing']) || isset($_POST['test_db']) ||
                  isset($_POST['check_school_student_id']) ||
-                 (isset($_POST['action']) && in_array($_POST['action'], ['check_full_duplicate', 'check_email_duplicate', 'check_mobile_duplicate', 'check_name_duplicate', 'check_household_lastname', 'check_household_duplicate']));
+                 (isset($_POST['action']) && in_array($_POST['action'], ['check_full_duplicate', 'check_email_duplicate', 'check_mobile_duplicate', 'check_name_duplicate', 'check_household_lastname', 'check_household_duplicate', 'update_block_contact']));
 
 // Only output HTML for non-AJAX requests
 if (!$isAjaxRequest) {
@@ -1065,12 +1238,20 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['action']) && $_POST['
 // NEW: Check Household Duplicate (Surname + Maiden Name + Barangay)
 // ============================================================
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['action']) && $_POST['action'] === 'check_household_duplicate') {
+    // Check if bypass is active (admin approved override)
+    if (isset($_SESSION['household_bypass_active']) && $_SESSION['household_bypass_active'] === true) {
+        error_log("✅ BYPASS ACTIVE: Household check skipped - Admin override for attempt ID: " . ($_SESSION['household_bypass_attempt_id'] ?? 'unknown'));
+        json_response(['status' => 'bypassed', 'message' => 'Household check bypassed (admin approved override)']);
+    }
+    
     $lastName = trim($_POST['last_name'] ?? '');
     $mothersMaidenName = trim($_POST['mothers_maiden_name'] ?? '');
     $barangayId = intval($_POST['barangay_id'] ?? 0);
     
+    error_log("🏠 Household check - Last: $lastName, Maiden: $mothersMaidenName, Barangay ID: $barangayId");
+    
     if (empty($lastName) || empty($mothersMaidenName) || $barangayId === 0) {
-        json_response(['household_exists' => false]);
+        json_response(['status' => 'success']); // Missing fields = allow (shouldn't happen with frontend validation)
     }
     
     try {
@@ -1079,14 +1260,17 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['action']) && $_POST['
         $barangayResult = pg_query_params($connection, $barangayQuery, [$barangayId]);
         
         if (!$barangayResult || pg_num_rows($barangayResult) === 0) {
-            json_response(['household_exists' => false, 'error' => 'Invalid barangay']);
+            error_log("❌ Invalid barangay ID: $barangayId");
+            json_response(['status' => 'success', 'error' => 'Invalid barangay']); // Allow on error
         }
         
         $barangayRow = pg_fetch_assoc($barangayResult);
         $barangayName = $barangayRow['name'];
         
+        error_log("🔍 Checking in barangay: $barangayName");
+        
         // Check for EXACT match first (hard block)
-        $exactQuery = "SELECT student_id, first_name, last_name, created_at
+        $exactQuery = "SELECT student_id, first_name, last_name
                        FROM students 
                        WHERE LOWER(last_name) = LOWER($1) 
                          AND LOWER(mothers_maiden_name) = LOWER($2)
@@ -1099,20 +1283,51 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['action']) && $_POST['
         if ($exactResult && pg_num_rows($exactResult) > 0) {
             $row = pg_fetch_assoc($exactResult);
             
+            error_log("🚫 EXACT MATCH FOUND - BLOCKING: " . $row['student_id']);
+            
+            // Get attempted student's information from POST (email/mobile may not be available yet)
+            $attemptedFirstName = trim($_POST['first_name'] ?? 'Unknown');
+            $attemptedEmail = trim($_POST['email'] ?? '');
+            $attemptedMobile = trim($_POST['mobile'] ?? '');
+            $ipAddress = $_SERVER['REMOTE_ADDR'] ?? null;
+            $userAgent = $_SERVER['HTTP_USER_AGENT'] ?? null;
+            
+            // Use NULL for empty email/mobile since they're on later steps
+            $attemptedEmail = !empty($attemptedEmail) ? $attemptedEmail : null;
+            $attemptedMobile = !empty($attemptedMobile) ? $attemptedMobile : null;
+            
+            // Log to household_block_attempts table with available data
+            $logQuery = "INSERT INTO household_block_attempts 
+                         (attempted_first_name, attempted_last_name, attempted_email, attempted_mobile,
+                          mothers_maiden_name_entered, barangay_entered, blocked_by_student_id,
+                          ip_address, user_agent, match_type, similarity_score, blocked_at)
+                         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())";
+            
+            pg_query_params($connection, $logQuery, [
+                $attemptedFirstName,
+                $lastName,
+                $attemptedEmail,      // NULL if not provided yet
+                $attemptedMobile,     // NULL if not provided yet
+                $mothersMaidenName,
+                $barangayName,
+                $row['student_id'],   // The existing student who caused the block
+                $ipAddress,
+                $userAgent,
+                'exact',              // match_type
+                1.00                  // similarity_score (exact match = 100%)
+            ]);
+            
+            // Get the attempt_id of the just-inserted record
+            $attemptIdQuery = "SELECT currval(pg_get_serial_sequence('household_block_attempts', 'attempt_id')) as attempt_id";
+            $attemptIdResult = pg_query($connection, $attemptIdQuery);
+            $attemptId = pg_fetch_result($attemptIdResult, 0, 'attempt_id');
+            
             json_response([
-                'household_exists' => true,
-                'match_type' => 'exact',
-                'existing_student' => [
-                    'student_id' => $row['student_id'],
-                    'first_name' => $row['first_name'],
-                    'last_name' => $row['last_name'],
-                    'registered_date' => $row['created_at']
-                ],
-                'household_info' => [
-                    'surname' => $lastName,
-                    'mothers_maiden_name' => $mothersMaidenName,
-                    'barangay' => $barangayName
-                ]
+                'status' => 'blocked',
+                'student_id' => $row['student_id'],
+                'student_name' => $row['first_name'] . ' ' . $row['last_name'],
+                'message' => 'A student from your household is already registered',
+                'attempt_id' => $attemptId
             ]);
         }
         
@@ -1132,31 +1347,71 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['action']) && $_POST['
         
         if ($fuzzyResult && pg_num_rows($fuzzyResult) > 0) {
             $row = pg_fetch_assoc($fuzzyResult);
+            $similarityPercentage = round(floatval($row['match_score']) * 100, 0);
+            
+            error_log("⚠️ FUZZY MATCH FOUND - WARNING: " . $row['student_id'] . " (Similarity: $similarityPercentage%)");
             
             json_response([
-                'household_exists' => true,
-                'match_type' => 'fuzzy',
-                'similarity_score' => round(floatval($row['match_score']), 2),
-                'existing_student' => [
-                    'first_name' => $row['first_name'],
-                    'last_name' => $row['last_name']
-                ],
-                'household_info' => [
-                    'surname' => $lastName,
-                    'mothers_maiden_name_database' => $row['mothers_maiden_name'],
-                    'mothers_maiden_name_entered' => $mothersMaidenName,
-                    'barangay' => $barangayName
-                ],
-                'message' => "Did you mean '{$row['mothers_maiden_name']}'? We found a similar household."
+                'status' => 'warning',
+                'student_id' => $row['student_id'],
+                'student_name' => $row['first_name'] . ' ' . $row['last_name'],
+                'similarity_percentage' => $similarityPercentage . '%',
+                'message' => "Similar household found (Mother's maiden: {$row['mothers_maiden_name']})"
             ]);
         }
         
         // No match found - allow registration
-        json_response(['household_exists' => false]);
+        error_log("✅ No household match - clear to proceed");
+        json_response(['status' => 'success']);
         
     } catch (Exception $e) {
-        error_log("Error checking household duplicate: " . $e->getMessage());
-        json_response(['household_exists' => false, 'error' => 'Database error']);
+        error_log("❌ Error checking household duplicate: " . $e->getMessage());
+        json_response(['status' => 'success', 'error' => 'Database error']); // Fail-open on error
+    }
+}
+
+// --- Update Blocked Attempt Contact Information ---
+if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['action']) && $_POST['action'] === 'update_block_contact') {
+    $attemptId = intval($_POST['attempt_id'] ?? 0);
+    $email = trim($_POST['email'] ?? '');
+    $mobile = trim($_POST['mobile'] ?? '');
+    $reason = trim($_POST['reason'] ?? '');
+    
+    if ($attemptId === 0) {
+        json_response(['success' => false, 'message' => 'Invalid attempt ID']);
+    }
+    
+    // Convert empty strings to NULL
+    $email = !empty($email) ? $email : null;
+    $mobile = !empty($mobile) ? $mobile : null;
+    $reason = !empty($reason) ? $reason : null;
+    
+    // Update the household_block_attempts record with contact information
+    $updateQuery = "UPDATE household_block_attempts 
+                    SET attempted_email = COALESCE($1, attempted_email),
+                        attempted_mobile = COALESCE($2, attempted_mobile),
+                        override_reason = COALESCE($3, override_reason)
+                    WHERE attempt_id = $4";
+    
+    $result = pg_query_params($connection, $updateQuery, [
+        $email,
+        $mobile,
+        $reason,
+        $attemptId
+    ]);
+    
+    if ($result) {
+        error_log("✅ Updated contact info for attempt ID: $attemptId");
+        json_response([
+            'success' => true,
+            'message' => 'Contact information updated successfully'
+        ]);
+    } else {
+        error_log("❌ Failed to update contact info for attempt ID: $attemptId - " . pg_last_error($connection));
+        json_response([
+            'success' => false,
+            'message' => 'Database error: ' . pg_last_error($connection)
+        ]);
     }
 }
 
@@ -5600,6 +5855,51 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['register'])) {
             }
         }
 
+        // Mark bypass token as used if applicable
+        if (isset($_SESSION['household_bypass_token']) && isset($_SESSION['household_bypass_attempt_id'])) {
+            $markUsedQuery = "UPDATE household_block_attempts 
+                              SET bypass_token_used = TRUE, 
+                                  bypass_token_used_at = NOW()
+                              WHERE attempt_id = $1 AND bypass_token = $2";
+            $markUsedResult = pg_query_params($connection, $markUsedQuery, [
+                $_SESSION['household_bypass_attempt_id'],
+                $_SESSION['household_bypass_token']
+            ]);
+            
+            if ($markUsedResult) {
+                error_log("✅ Bypass token marked as used for attempt ID: " . $_SESSION['household_bypass_attempt_id']);
+                
+                // Log audit trail: Student successfully registered with bypass
+                $auditLogger->logEvent(
+                    'household_bypass_registration_complete',
+                    'household_management',
+                    "Student completed registration with bypass token: {$firstName} {$lastName}",
+                    [
+                        'user_id' => $studentId,
+                        'user_type' => 'student',
+                        'username' => $email,
+                        'status' => 'success',
+                        'affected_table' => 'students',
+                        'affected_record_id' => $studentId,
+                        'metadata' => [
+                            'attempt_id' => $_SESSION['household_bypass_attempt_id'],
+                            'student_id' => $studentId,
+                            'student_name' => $firstName . ' ' . $lastName,
+                            'student_email' => $email,
+                            'university_id' => $universityId,
+                            'bypass_token_used' => true
+                        ]
+                    ]
+                );
+            }
+            
+            // Clear bypass session data
+            unset($_SESSION['household_bypass_active']);
+            unset($_SESSION['household_bypass_token']);
+            unset($_SESSION['household_bypass_attempt_id']);
+            unset($_SESSION['prefill_data']);
+        }
+
         unset($_SESSION['otp_verified']);
 
         echo "<script>alert('Registration submitted successfully! Your application is under review. You will receive an email notification once approved.'); window.location.href = '../../unified_login.php';</script>";
@@ -5623,6 +5923,35 @@ if (!$isAjaxRequest) {
             <h4 class="mb-4 text-center text-primary">
                 <i class="bi bi-person-plus-fill me-2"></i>Register for EducAid
             </h4>
+            
+            <?php if (isset($_SESSION['bypass_success'])): ?>
+                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                    <i class="bi bi-check-circle-fill me-2"></i>
+                    <strong>Override Approved!</strong><br>
+                    <?= htmlspecialchars($_SESSION['bypass_success']) ?>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+                <?php unset($_SESSION['bypass_success']); ?>
+            <?php endif; ?>
+            
+            <?php if (isset($_SESSION['bypass_error'])): ?>
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <i class="bi bi-x-circle-fill me-2"></i>
+                    <strong>Bypass Link Error:</strong><br>
+                    <?= htmlspecialchars($_SESSION['bypass_error']) ?>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+                <?php unset($_SESSION['bypass_error']); ?>
+            <?php endif; ?>
+            
+            <?php if (isset($_SESSION['household_bypass_active']) && $_SESSION['household_bypass_active'] === true): ?>
+                <div class="alert alert-info" role="alert" style="border-left: 4px solid #0dcaf0;">
+                    <i class="bi bi-shield-check me-2"></i>
+                    <strong>Bypass Mode Active</strong><br>
+                    <small>You are registering with administrator approval. Household validation is disabled for your account.</small>
+                </div>
+            <?php endif; ?>
+            
             <div class="step-indicator mb-4 text-center">
                 <span class="step active" id="step-indicator-1">1</span>
                 <span class="step" id="step-indicator-2">2</span>
@@ -5680,19 +6009,19 @@ if (!$isAjaxRequest) {
                         <small class="form-text text-muted">Select suffix if applicable (Jr., Sr., I, II, etc.)</small>
                     </div>
                     
-                    <!-- Mother's Maiden Name Field (Household Prevention) -->
+                    <!-- Mother's Full Name Field (Household Prevention) -->
                     <div class="mb-3">
                         <label class="form-label">
-                            Mother's Maiden Name (Before Marriage) <span class="text-danger">*</span>
+                            Mother's Full Name <span class="text-danger">*</span>
                             <i class="bi bi-info-circle ms-1" data-bs-toggle="tooltip" data-bs-placement="right" 
                                title="This helps us identify if another student from your household is already registered. Only one student per household can receive assistance."></i>
                         </label>
                         <input type="text" class="form-control" name="mothers_maiden_name" id="mothersMaidenNameInput" 
-                               placeholder="e.g., Reyes, Garcia, Santos" 
+                               placeholder="e.g., Maria Dela Cruz, Ana Santos" 
                                pattern="[A-Za-z\s\-]+" 
                                maxlength="100"
                                required />
-                        <small class="form-text text-muted">Enter your mother's last name before she got married</small>
+                        <small class="form-text text-muted">Enter your mother's complete name (first and last name)</small>
                         
                         <!-- Loading Spinner for Household Check -->
                         <div id="householdCheckSpinner" class="mt-2" style="display:none;">
@@ -6584,20 +6913,29 @@ function closeNameDuplicateModal() {
 }
 
 // Check household confirmation before proceeding from Step 1
+let householdCheckInProgress = false; // Prevent double-submissions
+let lastHouseholdCheckTime = 0; // Timestamp of last check
+
 async function checkHouseholdBeforeProceeding() {
+    const now = Date.now();
     console.log('🏠 NEW: Checking household duplicate prevention...');
+    console.log('🔍 householdCheckInProgress flag:', householdCheckInProgress);
+    console.log('⏱️ Time since last check:', now - lastHouseholdCheckTime, 'ms');
     
-    // NEW SYSTEM: Check if household block is active
+    // Prevent double-clicking within 2 seconds
+    if (householdCheckInProgress || (now - lastHouseholdCheckTime < 2000)) {
+        console.log('⏳ Household check already in progress or too soon - skipping duplicate request');
+        return true; // Block progression while check is running
+    }
+    
+    // Update timestamp
+    lastHouseholdCheckTime = now;
+    
+    // Check if household block is already active
     if (householdBlockActive) {
         console.log('❌ Household block is active - cannot proceed');
         
-        Swal.fire({
-            icon: 'error',
-            title: 'Cannot Proceed',
-            text: 'A student from your household is already registered. Please see the error message above for details.',
-            confirmButtonText: 'OK',
-            confirmButtonColor: '#dc3545'
-        });
+        alert('❌ Cannot Proceed\n\nA student from your household is already registered. Please see the error message above for details.');
         
         return true; // Block progression
     }
@@ -6605,30 +6943,271 @@ async function checkHouseholdBeforeProceeding() {
     // Check if all required fields are filled for household check
     const lastNameInput = document.getElementById('lastNameInput');
     const mothersMaidenNameInput = document.getElementById('mothersMaidenNameInput');
+    const barangaySelect = document.querySelector('select[name="barangay_id"]'); // Step 2 field
     
-    if (!lastNameInput || !mothersMaidenNameInput) {
+    if (!lastNameInput || !mothersMaidenNameInput || !barangaySelect) {
         console.log('⚠️ Household check inputs not found');
+        console.log('Last Name:', lastNameInput ? 'Found' : 'Missing');
+        console.log('Maiden Name:', mothersMaidenNameInput ? 'Found' : 'Missing');
+        console.log('Barangay:', barangaySelect ? 'Found' : 'Missing');
         return false; // Allow progression (shouldn't happen)
     }
     
     const lastName = lastNameInput.value.trim();
     const maidenName = mothersMaidenNameInput.value.trim();
+    const barangayId = parseInt(barangaySelect.value);
     
-    if (!lastName || !maidenName) {
-        console.log('❌ Required fields not filled');
+    console.log('🔍 Household check values:', { lastName, maidenName, barangayId });
+    
+    if (!lastName || !maidenName || !barangayId) {
+        console.log('❌ Required fields not filled for household check');
         
-        Swal.fire({
-            icon: 'warning',
-            title: 'Required Information',
-            text: 'Please fill in all required fields, including your mother\'s maiden name.',
-            confirmButtonText: 'OK'
-        });
+        alert('⚠️ Required Information\n\nPlease fill in all required fields, including your mother\'s full name and barangay.');
         
         return true; // Block progression
     }
     
-    console.log('✅ Household check passed - no blocks active');
-    return false; // Allow progression
+    // CRITICAL: Perform the actual household duplicate check now
+    console.log('🔍 Performing household duplicate check before proceeding...');
+    
+    // Set flag to prevent double-submissions
+    householdCheckInProgress = true;
+    
+    // Get first name from Step 1
+    const firstNameInput = document.getElementById('firstNameInput');
+    const firstName = firstNameInput ? firstNameInput.value.trim() : '';
+    
+    try {
+        const formData = new FormData();
+        formData.append('action', 'check_household_duplicate');
+        formData.append('first_name', firstName); // Include first name from Step 1
+        formData.append('last_name', lastName);
+        formData.append('mothers_maiden_name', maidenName);
+        formData.append('barangay_id', barangayId);
+        
+        const response = await fetch('student_register.php', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const data = await response.json();
+        console.log('🏠 Household check response:', data);
+        
+        if (data.status === 'bypassed') {
+            // BYPASS ACTIVE - Admin override, skip all checks
+            householdCheckPassed = true;
+            householdBlockActive = false;
+            householdCheckInProgress = false;
+            
+            console.log('✅ BYPASS: Household check skipped - Admin approved override');
+            return false; // Allow progression
+            
+        } else if (data.status === 'blocked') {
+            // EXACT MATCH - BLOCK registration
+            householdBlockActive = true;
+            householdCheckPassed = false;
+            
+            householdCheckInProgress = false; // Clear flag before returning
+            
+            // Show modal with contact information option
+            showHouseholdBlockedModal(data.student_id, data.student_name, data.attempt_id);
+            
+            return true; // Block progression
+            
+        } else if (data.status === 'warning') {
+            // FUZZY MATCH - Show warning but allow to proceed
+            console.log('⚠️ Fuzzy household match detected - showing warning');
+            
+            const userConfirmed = confirm('⚠️ Possible Household Match\n\n' +
+                                         'We found a similar student record:\n\n' +
+                                         'Student ID: ' + data.student_id + '\n' +
+                                         'Name: ' + data.student_name + '\n' +
+                                         'Similarity: ' + data.similarity_percentage + '\n\n' +
+                                         'Are you sure this is a DIFFERENT household?\n\n' +
+                                         'Click OK to continue, Cancel to go back.');
+            
+            householdCheckInProgress = false; // Clear flag before returning
+            
+            if (!userConfirmed) {
+                return true; // Block progression - user clicked "Cancel"
+            }
+            
+            // User confirmed different household - allow progression
+            householdCheckPassed = true;
+            householdBlockActive = false;
+            console.log('✅ User confirmed different household');
+            return false; // Allow progression
+            
+        } else {
+            // NO MATCH - Clear progression
+            householdCheckPassed = true;
+            householdBlockActive = false;
+            console.log('✅ No household match - clear to proceed');
+            
+            householdCheckInProgress = false; // Clear flag before returning
+            return false; // Allow progression
+        }
+        
+    } catch (error) {
+        console.error('❌ Error checking household duplicate:', error);
+        
+        householdCheckInProgress = false; // Clear flag on error
+        
+        // On error, show warning but allow progression (fail-open for UX)
+        alert('⚠️ Check Failed\n\nCould not verify household registration. Please ensure all information is correct.');
+        
+        return false; // Allow progression on error
+    }
+}
+
+// Show household blocked modal with contact information
+function showHouseholdBlockedModal(existingStudentId, existingStudentName, attemptId) {
+    const modalHtml = `
+        <div class="modal fade" id="householdBlockedModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content border-danger">
+                    <div class="modal-header bg-danger text-white">
+                        <h5 class="modal-title">
+                            <i class="bi bi-shield-x me-2"></i>
+                            Household Already Registered
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="alert alert-danger mb-3">
+                            <i class="bi bi-exclamation-triangle me-2"></i>
+                            <strong>Registration Blocked</strong>
+                        </div>
+                        
+                        <p>A student from your household is already registered in the system:</p>
+                        
+                        <div class="card bg-light mb-3">
+                            <div class="card-body">
+                                <p class="mb-1"><strong>Student ID:</strong> ${existingStudentId}</p>
+                                <p class="mb-0"><strong>Name:</strong> ${existingStudentName}</p>
+                            </div>
+                        </div>
+                        
+                        <p class="text-muted">
+                            <small>This system prevents multiple students from the same household from registering to ensure fair distribution.</small>
+                        </p>
+                        
+                        <hr>
+                        
+                        <h6 class="mb-3"><i class="bi bi-envelope-paper me-2"></i>Request Override</h6>
+                        <p class="text-muted small mb-3">
+                            If you believe this is an error or have a valid reason for registration, please provide your contact information below. 
+                            The admin will review your request.
+                        </p>
+                        
+                        <div class="mb-3">
+                            <label for="blockedContactEmail" class="form-label">
+                                <i class="bi bi-envelope me-1"></i>Email Address <span class="text-muted">(Optional)</span>
+                            </label>
+                            <input type="email" class="form-control" id="blockedContactEmail" 
+                                   placeholder="your.email@example.com">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="blockedContactMobile" class="form-label">
+                                <i class="bi bi-phone me-1"></i>Mobile Number <span class="text-muted">(Optional)</span>
+                            </label>
+                            <input type="tel" class="form-control" id="blockedContactMobile" 
+                                   placeholder="09XX XXX XXXX"
+                                   maxlength="11"
+                                   pattern="09[0-9]{9}"
+                                   oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 11)">
+                            <small class="text-muted">Format: 09XXXXXXXXX (11 digits)</small>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="blockedContactReason" class="form-label">
+                                <i class="bi bi-chat-left-text me-1"></i>Reason for Override Request <span class="text-muted">(Optional)</span>
+                            </label>
+                            <textarea class="form-control" id="blockedContactReason" rows="3" 
+                                      placeholder="e.g., Different household, sibling at different address, etc."></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                            <i class="bi bi-x-circle me-1"></i>Close
+                        </button>
+                        <button type="button" class="btn btn-primary" onclick="submitOverrideRequest(${attemptId})">
+                            <i class="bi bi-send me-1"></i>Submit Request
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Remove existing modal if any
+    const existingModal = document.getElementById('householdBlockedModal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+    
+    // Add modal to page
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('householdBlockedModal'));
+    modal.show();
+}
+
+// Submit override request with contact information
+async function submitOverrideRequest(attemptId) {
+    const email = document.getElementById('blockedContactEmail').value.trim();
+    const mobile = document.getElementById('blockedContactMobile').value.trim();
+    const reason = document.getElementById('blockedContactReason').value.trim();
+    
+    // At least one contact method should be provided
+    if (!email && !mobile) {
+        alert('Please provide at least one contact method (email or mobile number) so the admin can reach you.');
+        return;
+    }
+    
+    // Validate mobile number format if provided
+    if (mobile && !/^09[0-9]{9}$/.test(mobile)) {
+        alert('❌ Invalid Mobile Number\n\nPlease enter a valid Philippine mobile number.\nFormat: 09XXXXXXXXX (11 digits starting with 09)');
+        return;
+    }
+    
+    // Validate email format if provided
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        alert('❌ Invalid Email Address\n\nPlease enter a valid email address.');
+        return;
+    }
+    
+    try {
+        const formData = new FormData();
+        formData.append('action', 'update_block_contact');
+        formData.append('attempt_id', attemptId);
+        formData.append('email', email);
+        formData.append('mobile', mobile);
+        formData.append('reason', reason);
+        
+        const response = await fetch('student_register.php', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // Close the modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('householdBlockedModal'));
+            modal.hide();
+            
+            // Show success message
+            alert('✅ Request Submitted\n\nYour override request has been submitted to the admin. They will review your request and contact you if approved.\n\nThank you for your patience.');
+        } else {
+            alert('❌ Error\n\n' + (data.message || 'Failed to submit request. Please try again.'));
+        }
+    } catch (error) {
+        console.error('Error submitting override request:', error);
+        alert('❌ Error\n\nFailed to submit request. Please check your internet connection and try again.');
+    }
 }
 
 // Show household confirmation modal
@@ -6835,18 +7414,38 @@ async function nextStep() {
     
     if (currentStep >= 10) return; // Allow navigation through all 10 steps
     
-    // Special check for Step 1: Check for duplicate names AND household confirmation before proceeding
+    // Special check for Step 1: Check for duplicate names before proceeding
     if (currentStep === 1) {
         // First check for duplicate names (blocks if duplicate)
         const isNameDuplicate = await checkNameBeforeProceeding();
         if (isNameDuplicate) {
             return; // Stop here if duplicate name found
         }
+    }
+    
+    // Special check for Step 2: Check household duplicate (after barangay is selected)
+    if (currentStep === 2) {
+        console.log('🏠 Step 2 complete - checking household duplicate...');
         
-        // Then check for household confirmation (blocks if same household)
+        // Disable next button to prevent double-clicks
+        const nextBtn = document.querySelector('.btn-next');
+        const originalBtnText = nextBtn ? nextBtn.innerHTML : '';
+        if (nextBtn) {
+            nextBtn.disabled = true;
+            nextBtn.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Checking...';
+        }
+        
+        // Check household: Surname + Mother's Maiden Name + Barangay
         const householdBlocked = await checkHouseholdBeforeProceeding();
+        
+        // Re-enable next button
+        if (nextBtn) {
+            nextBtn.disabled = false;
+            nextBtn.innerHTML = originalBtnText;
+        }
+        
         if (householdBlocked) {
-            return; // Stop here if same household
+            return; // Stop here if same household detected
         }
     }
     
@@ -8460,6 +9059,9 @@ let householdBlockActive = false;
 let sameAsSurnameAttempts = 0;
 let householdCheckDebounceTimer = null;
 
+// NOTE: Validation removed - now asking for mother's FULL NAME instead of just maiden surname
+// No need to check if full name matches student surname (impossible scenario)
+/*
 // Check if mother's maiden name matches student's surname
 function setupMothersMaidenNameValidation() {
     const lastNameInput = document.getElementById('lastNameInput');
@@ -8555,6 +9157,7 @@ function setupMothersMaidenNameValidation() {
         triggerHouseholdCheck();
     });
 }
+*/
 
 // Trigger household duplicate check (debounced)
 function triggerHouseholdCheck() {
@@ -9933,6 +10536,93 @@ document.getElementById('processGradesOcrBtn').addEventListener('click', async f
 <!-- Terms and Conditions Modal Functionality -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // ============================================================
+    // BYPASS MODE STATUS CHECK
+    // ============================================================
+    <?php if (isset($_SESSION['household_bypass_active']) && $_SESSION['household_bypass_active'] === true): ?>
+        console.log('🔓 BYPASS MODE ACTIVE - Admin approved override');
+        console.log('   Bypass Token:', '<?= $_SESSION['household_bypass_token'] ?? 'N/A' ?>');
+        console.log('   Attempt ID:', <?= $_SESSION['household_bypass_attempt_id'] ?? 'N/A' ?>);
+        console.log('   Household validation will be SKIPPED');
+    <?php else: ?>
+        console.log('🔒 NORMAL MODE - Household validation ACTIVE');
+    <?php endif; ?>
+    // ============================================================
+    
+    // ============================================================
+    // PRE-FILL FORM DATA (from bypass token / admin override)
+    // ============================================================
+    <?php if (isset($_SESSION['prefill_data']) && isset($_SESSION['prefill_fresh']) && $_SESSION['prefill_fresh'] === true): ?>
+        const prefillData = <?= json_encode($_SESSION['prefill_data']) ?>;
+        console.log('✅ Pre-fill data available:', prefillData);
+        
+        // Pre-fill text inputs
+        if (prefillData.first_name) {
+            const firstNameInput = document.querySelector('input[name="first_name"]');
+            if (firstNameInput) {
+                firstNameInput.value = prefillData.first_name;
+                console.log('✓ Pre-filled first_name:', prefillData.first_name);
+            }
+        }
+        
+        if (prefillData.last_name) {
+            const lastNameInput = document.querySelector('input[name="last_name"]');
+            if (lastNameInput) {
+                lastNameInput.value = prefillData.last_name;
+                console.log('✓ Pre-filled last_name:', prefillData.last_name);
+            }
+        }
+        
+        if (prefillData.email) {
+            const emailInput = document.querySelector('input[name="email"]');
+            if (emailInput) {
+                emailInput.value = prefillData.email;
+                console.log('✓ Pre-filled email:', prefillData.email);
+            }
+        }
+        
+        if (prefillData.mobile) {
+            const mobileInput = document.querySelector('input[name="mobile"]');
+            if (mobileInput) {
+                mobileInput.value = prefillData.mobile;
+                console.log('✓ Pre-filled mobile:', prefillData.mobile);
+            }
+        }
+        
+        if (prefillData.mothers_maiden_name) {
+            const motherNameInput = document.querySelector('input[name="mothers_maiden_name"]');
+            if (motherNameInput) {
+                motherNameInput.value = prefillData.mothers_maiden_name;
+                console.log('✓ Pre-filled mothers_maiden_name:', prefillData.mothers_maiden_name);
+            }
+        }
+        
+        // Pre-fill barangay select
+        if (prefillData.barangay_id) {
+            setTimeout(() => {
+                const barangaySelect = document.querySelector('select[name="barangay_id"]');
+                if (barangaySelect) {
+                    barangaySelect.value = prefillData.barangay_id;
+                    console.log('✓ Pre-filled barangay_id:', prefillData.barangay_id);
+                    // Trigger change event in case there are any listeners
+                    barangaySelect.dispatchEvent(new Event('change'));
+                }
+            }, 100); // Small delay to ensure select is populated
+        }
+        
+        console.log('🎯 Form pre-filled successfully! Student can now proceed with registration.');
+        
+        <?php 
+        // IMPORTANT: Clear prefill flags immediately after displaying the form
+        // This ensures the data only appears once and doesn't persist on page reload
+        unset($_SESSION['prefill_data']);
+        unset($_SESSION['prefill_fresh']);
+        ?>
+    <?php else: ?>
+        console.log('ℹ️ No prefill data available (normal registration flow)');
+    <?php endif; ?>
+    // ============================================================
+    
     // Terms and Conditions modal functionality
     setupTermsAndConditions();
     
