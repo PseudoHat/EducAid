@@ -9,21 +9,15 @@ RewriteEngine On
 # ----------------------------------------
 # HTTPS Redirect (Force SSL)
 # ----------------------------------------
-# Redirect all HTTP traffic to HTTPS
+# Step 1: Redirect HTTP to HTTPS (without www change)
+# This ensures HSTS is recorded for the apex domain
 RewriteCond %{HTTPS} off
 RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 
-# Alternative: Redirect if not using standard HTTPS port
-# (Useful if behind a proxy like Cloudflare)
-RewriteCond %{HTTP:X-Forwarded-Proto} !https
-RewriteCond %{HTTPS} off
-RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
-
-# ----------------------------------------
-# WWW Redirect
-# ----------------------------------------
-# Redirect non-www to www
-RewriteCond %{HTTP_HOST} ^educ-aid\.site [NC]
+# Step 2: Redirect non-www to www (only after HTTPS)
+# This happens after HTTPS is established
+RewriteCond %{HTTPS} on
+RewriteCond %{HTTP_HOST} ^educ-aid\.site$ [NC]
 RewriteRule ^(.*)$ https://www.educ-aid.site/$1 [L,R=301]
 
 # ----------------------------------------
@@ -32,8 +26,9 @@ RewriteRule ^(.*)$ https://www.educ-aid.site/$1 [L,R=301]
 
 # HTTP Strict Transport Security (HSTS)
 # Tell browsers to always use HTTPS for 1 year
+# Include preload directive for HSTS preload list
 <IfModule mod_headers.c>
-    Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" env=HTTPS
+    Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
 </IfModule>
 
 # X-Content-Type-Options - Prevent MIME type sniffing
