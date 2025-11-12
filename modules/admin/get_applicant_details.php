@@ -32,9 +32,9 @@ if (!isset($_GET['student_id'])) {
 
 $student_id = trim($_GET['student_id']);
 
-// Fetch student data (including needs_document_upload to determine student type)
+// Fetch student data (including needs_document_upload and admin_review_required to determine student type)
 $student_query = pg_query_params($connection, 
-    "SELECT student_id, first_name, last_name, status, needs_document_upload FROM students WHERE student_id = $1", 
+    "SELECT student_id, first_name, last_name, status, needs_document_upload, admin_review_required FROM students WHERE student_id = $1", 
     [$student_id]);
 
 if (!$student_query || pg_num_rows($student_query) === 0) {
@@ -45,12 +45,20 @@ if (!$student_query || pg_num_rows($student_query) === 0) {
 
 $student = pg_fetch_assoc($student_query);
 
-// Determine student type based on needs_document_upload flag
-// If needs_document_upload = true, they are an existing student who needs to reupload
-// If needs_document_upload = false, they are a new registration who uploaded during registration
-$student_type = ($student['needs_document_upload'] === 't' || $student['needs_document_upload'] === true) 
-    ? 'existing_student' 
-    : 'new_registration';
+// Determine student type based on needs_document_upload flag and admin_review_required flag
+// Check if student is migrated (has admin_review_required flag)
+$is_migrated = isset($student['admin_review_required']) && ($student['admin_review_required'] === 't' || $student['admin_review_required'] === true);
+
+// If needs_document_upload = true AND admin_review_required = true -> Migrated student
+// If needs_document_upload = true AND admin_review_required = false -> Re-upload (existing student)
+// If needs_document_upload = false -> New registration
+if ($is_migrated) {
+    $student_type = 'migrated';
+} elseif ($student['needs_document_upload'] === 't' || $student['needs_document_upload'] === true) {
+    $student_type = 'reupload';
+} else {
+    $student_type = 'new_registration';
+}
 
 // Map document type codes to folder names and display labels
 $doc_type_config = [

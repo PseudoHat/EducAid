@@ -461,13 +461,15 @@ if (isset($_POST['login_action']) && $_POST['login_action'] === 'verify_otp') {
         $_SESSION['student_id'] = $pending['user_id'];
         $_SESSION['student_username'] = $pending['name'];
         
-        // Get the previous login time before updating (for display purposes)
+        // Get the previous login time and migration status before updating
         $prev_login_result = pg_query_params($connection,
-            "SELECT last_login FROM students WHERE student_id = $1",
+            "SELECT last_login, admin_review_required, status FROM students WHERE student_id = $1",
             [$pending['user_id']]
         );
         $prev_login = pg_fetch_assoc($prev_login_result);
         $_SESSION['previous_login'] = $prev_login['last_login'] ?? null;
+        
+        $is_migrated = !empty($prev_login['admin_review_required']) && $prev_login['admin_review_required'];
         
         // Update last_login timestamp for student
         pg_query_params($connection, 
@@ -477,6 +479,35 @@ if (isset($_POST['login_action']) && $_POST['login_action'] === 'verify_otp') {
         
         // Log successful student login
         $auditLogger->logLogin($pending['user_id'], 'student', $pending['name']);
+        
+        // If migrated student, add additional audit log entry
+        if ($is_migrated) {
+            $migrated_audit_query = "INSERT INTO audit_logs 
+                                    (user_id, user_type, username, event_type, event_category, 
+                                     action_description, status, ip_address, user_agent, 
+                                     request_method, metadata, created_at)
+                                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())";
+            
+            $metadata = json_encode([
+                'is_migrated_student' => true,
+                'student_status' => $prev_login['status'] ?? 'applicant',
+                'first_login_after_migration' => empty($prev_login['last_login'])
+            ]);
+            
+            pg_query_params($connection, $migrated_audit_query, [
+                $pending['user_id'],
+                'student',
+                $pending['name'],
+                'migrated_student_login',
+                'authentication',
+                "Migrated student successfully logged in",
+                'success',
+                $_SERVER['REMOTE_ADDR'] ?? null,
+                $_SERVER['HTTP_USER_AGENT'] ?? null,
+                'POST',
+                $metadata
+            ]);
+        }
         
         // Track session for login history
         $sessionManager->logLogin($pending['user_id'], session_id(), 'otp');

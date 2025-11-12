@@ -238,6 +238,26 @@ function send_migration_email($toEmail, $toName, $passwordPlain) {
 $migration_preview = $_SESSION['migration_preview'] ?? null;
 $migration_result = $_SESSION['migration_result'] ?? null;
 
+// Check if there's an active distribution (required for migration)
+// Check both signup_slots (is_active=TRUE) AND config table (current_academic_year set)
+$hasActiveDistribution = false;
+
+// First check signup_slots
+$activeDistributionQuery = pg_query($connection, "SELECT COUNT(*) as count FROM signup_slots WHERE is_active = TRUE");
+if ($activeDistributionQuery && pg_num_rows($activeDistributionQuery) > 0) {
+    $distRow = pg_fetch_assoc($activeDistributionQuery);
+    $hasActiveDistribution = intval($distRow['count']) > 0;
+}
+
+// If not found in signup_slots, also check config table for current_academic_year
+if (!$hasActiveDistribution) {
+    $configQuery = pg_query($connection, "SELECT value FROM config WHERE key = 'current_academic_year' AND value IS NOT NULL AND value != ''");
+    if ($configQuery && pg_num_rows($configQuery) > 0) {
+        $configRow = pg_fetch_assoc($configQuery);
+        $hasActiveDistribution = !empty($configRow['value']);
+    }
+}
+
 // Do NOT generate CSRF token for CSV migration here - it will be fetched via AJAX when modal opens
 $csrfMigrationToken = ''; // Will be populated by AJAX fetch
 
@@ -287,25 +307,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['migration_action'])) 
     }
     
     if ($_POST['migration_action'] === 'preview' && isset($_FILES['csv_file'])) {
-        // CRITICAL: Prevent migration if an active distribution is open
+        // CRITICAL: Require an active distribution for migration
+        // This ensures migrated students are placed into the current academic year context
+        // Check both signup_slots AND config table
         $activeDistributionCheck = pg_query($connection, 
-            "SELECT COUNT(*) as count FROM signup_slots WHERE is_active = TRUE"
+            "SELECT COUNT(*) as count, academic_year FROM signup_slots WHERE is_active = TRUE GROUP BY academic_year"
         );
-        if ($activeDistributionCheck) {
-            $activeDistCount = pg_fetch_assoc($activeDistributionCheck)['count'];
-            if ($activeDistCount > 0) {
-                $_SESSION['migration_result'] = [
-                    'inserted' => 0,
-                    'errors' => [
-                        'Migration blocked: An active distribution is currently open.',
-                        'Old students cannot be migrated while a distribution is active to prevent conflicts.',
-                        'Please close the current distribution slot before migrating old student records.'
-                    ],
-                    'status' => 'error'
-                ];
-                header('Location: ' . $_SERVER['PHP_SELF']);
-                exit;
+        $activeDistCount = 0;
+        $currentAcademicYear = null;
+        if ($activeDistributionCheck && pg_num_rows($activeDistributionCheck) > 0) {
+            $distRow = pg_fetch_assoc($activeDistributionCheck);
+            $activeDistCount = intval($distRow['count']);
+            $currentAcademicYear = $distRow['academic_year'];
+        }
+        
+        // If not found in signup_slots, also check config table
+        if ($activeDistCount === 0) {
+            $configQuery = pg_query($connection, "SELECT value FROM config WHERE key = 'current_academic_year' AND value IS NOT NULL AND value != ''");
+            if ($configQuery && pg_num_rows($configQuery) > 0) {
+                $configRow = pg_fetch_assoc($configQuery);
+                $currentAcademicYear = $configRow['value'];
+                $activeDistCount = 1; // Set to 1 to indicate we found an active academic year
             }
+        }
+        
+        if ($activeDistCount === 0) {
+            $_SESSION['migration_result'] = [
+                'inserted' => 0,
+                'errors' => [
+                    'Migration blocked: No active distribution is currently open.',
+                    'Old students can only be migrated when there is an active distribution.',
+                    'This ensures they are properly placed into the current academic year context.',
+                    'Please activate a distribution slot before migrating old student records.'
+                ],
+                'status' => 'error'
+            ];
+            header('Location: ' . $_SERVER['PHP_SELF']);
+            exit;
         }
         $municipality_id = intval($adminMunicipalityId ?? 0);
         if (!$municipality_id) { $municipality_id = intval($_POST['municipality_id'] ?? 0); }
@@ -519,9 +557,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['migration_action'])) 
                 if (!filter_var($r['email'], FILTER_VALIDATE_EMAIL)) $conflicts[] = 'Invalid email format';
                 if (empty($r['mobile'])) $conflicts[] = 'Mobile number is required';
                 
-                // CRITICAL: For old student migration, require previous academic year and year level
-                if (empty($r['previous_academic_year'])) $conflicts[] = 'Previous Academic Year is required (e.g., "2023-2024")';
-                if (empty($r['previous_year_level'])) $conflicts[] = 'Previous Year Level is required (e.g., "3rd Year")';
+                // NOTE: Previous academic year and year level are optional - students will provide on first login
+                // (These fields may not exist in the database schema yet)
                 
                 // Duplicate checks
                 if (!empty($r['email'])) {
@@ -545,7 +582,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['migration_action'])) 
             $_SESSION['migration_preview'] = [
                 'municipality_id'=>$municipality_id, 
                 'rows'=>$preview,
-                'detected_headers'=>$detectedHeaders ?? []
+                'detected_headers'=>$detectedHeaders ?? [],
+                'academic_year'=>$currentAcademicYear // Store for use during confirm action
             ];
             $_SESSION['migration_preview_time'] = time(); // Timestamp for auto-cleanup
             
@@ -563,27 +601,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['migration_action'])) 
         }
     } // end preview action
     if ($_POST['migration_action'] === 'confirm') {
-        // CRITICAL: Double-check that no distribution is active before confirming
+        // CRITICAL: Double-check that an active distribution exists before confirming
+        // Check both signup_slots AND config table
         $activeDistributionCheck = pg_query($connection, 
             "SELECT COUNT(*) as count FROM signup_slots WHERE is_active = TRUE"
         );
+        $activeDistCount = 0;
         if ($activeDistributionCheck) {
-            $activeDistCount = pg_fetch_assoc($activeDistributionCheck)['count'];
-            if ($activeDistCount > 0) {
-                $_SESSION['migration_result'] = [
-                    'inserted' => 0,
-                    'errors' => [
-                        'Migration blocked: An active distribution is currently open.',
-                        'The migration was canceled because a distribution slot was activated.',
-                        'Please close the current distribution before migrating old student records.'
-                    ],
-                    'status' => 'error'
-                ];
-                // Clear preview to prevent retry
-                unset($_SESSION['migration_preview']);
-                header('Location: ' . $_SERVER['PHP_SELF']);
-                exit;
+            $distRow = pg_fetch_assoc($activeDistributionCheck);
+            $activeDistCount = intval($distRow['count']);
+        }
+        
+        // If not found in signup_slots, also check config table
+        if ($activeDistCount === 0) {
+            $configQuery = pg_query($connection, "SELECT value FROM config WHERE key = 'current_academic_year' AND value IS NOT NULL AND value != ''");
+            if ($configQuery && pg_num_rows($configQuery) > 0) {
+                $activeDistCount = 1; // Set to 1 to indicate we found an active academic year
             }
+        }
+        
+        if ($activeDistCount === 0) {
+            $_SESSION['migration_result'] = [
+                'inserted' => 0,
+                'errors' => [
+                    'Migration blocked: No active distribution is currently open.',
+                    'The migration was canceled because no distribution is active.',
+                    'Please activate a distribution slot before migrating old student records.'
+                ],
+                'status' => 'error'
+            ];
+            // Clear preview to prevent retry
+            unset($_SESSION['migration_preview']);
+            header('Location: ' . $_SERVER['PHP_SELF']);
+            exit;
         }
         
         if (!isset($_SESSION['migration_preview'])) {
@@ -620,10 +670,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['migration_action'])) 
                 } else {
             $preview = $_SESSION['migration_preview'];
             $municipality_id = intval($preview['municipality_id']);
+            $academic_year_for_migration = $preview['academic_year'] ?? null; // Retrieve stored academic year
             $inserted = 0; $errors = [];
             // Debug: log session and selection size
             if (function_exists('error_log')) {
-                error_log('[MIGRATION] Confirm started: session ok, selected=' . count($selected) . ', muni=' . $municipality_id);
+                error_log('[MIGRATION] Confirm started: session ok, selected=' . count($selected) . ', muni=' . $municipality_id . ', academic_year=' . $academic_year_for_migration);
             }
             foreach ($preview['rows'] as $idx => $row) {
                 if (!isset($selected[(string)$idx])) continue; // not selected
@@ -647,14 +698,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['migration_action'])) 
                 $appDate = !empty($r['application_date']) ? $r['application_date'] : null;
                 if ($appDate === null) $appDate = date('Y-m-d');
                 
-                // Validate required migration fields
-                if (empty($r['previous_academic_year']) || empty($r['previous_year_level'])) {
-                    $errors[] = "Row #$idx: Previous academic year and year level are required for migration";
-                    continue;
-                }
+                // NOTE: Migrated students get status='applicant' but with admin_review_required=TRUE
+                // This allows them to show as "migrated" in the UI while maintaining workflow compatibility
+                // Students will provide academic credentials on first login
                 
-                // insert with all available fields - STATUS SET TO 'migrated', needs_document_upload = TRUE
+                // insert with all available fields - STATUS = 'applicant', admin_review_required = TRUE (for "migrated" display)
                 // NOTE: university_id and year_level_id are set to NULL - student will select on first login
+                // status_academic_year is set to the current academic year from the active distribution
                 $insert = pg_query_params($connection, "
                     INSERT INTO students (
                         student_id, municipality_id, 
@@ -664,10 +714,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['migration_action'])) 
                         barangay_id, university_id, year_level_id, 
                         course, school_student_id,
                         first_registered_academic_year,
-                        previous_academic_year, previous_year_level,
                         mothers_maiden_name,
-                        status, payroll_no, has_received, application_date, slot_id,
-                        needs_document_upload, status_academic_year, current_year_level, is_graduating
+                        status, status_academic_year, application_date, slot_id,
+                        needs_document_upload, admin_review_required
                     ) VALUES (
                         $1, $2, 
                         $3, $4, $5, $6, 
@@ -676,10 +725,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['migration_action'])) 
                         $12, NULL, NULL,
                         $13, $14,
                         $15,
-                        $16, $17,
-                        $18,
-                        'migrated', 0, FALSE, $19, $20,
-                        TRUE, NULL, NULL, NULL
+                        $16,
+                        'applicant', $17, $18, NULL,
+                        TRUE, TRUE
                     )", [
                     // $1-$2: IDs
                     $stud_id, $municipality_id, 
@@ -695,12 +743,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['migration_action'])) 
                     $r['course'] ?: null, null,
                     // $15: First Registered Year
                     $r['first_registered_academic_year'] ?: null,
-                    // $16-$17: Previous credentials (REQUIRED for migrated students)
-                    $r['previous_academic_year'], $r['previous_year_level'],
-                    // $18: Mother's Maiden Name (NULL - student will provide on first login)
+                    // $16: Mother's Maiden Name (NULL - student will provide on first login)
                     null,
-                    // $19-$20: Application & Slot
-                    $appDate, null
+                    // $17: Status Academic Year (from active distribution)
+                    $academic_year_for_migration,
+                    // $18: Application Date
+                    $appDate
                 ]);
                 
                 if ($insert) {
@@ -1008,15 +1056,31 @@ function render_table($applicants, $connection) {
                 $isComplete = check_documents($connection, $student_id);
                 
                 // Determine applicant type
-                // NULL or FALSE = New registrant (from registration system)
-                // TRUE = Existing student requiring re-upload
+                // admin_review_required = TRUE = Migrated student (from CSV import)
+                // needs_document_upload = TRUE = Existing student requiring re-upload
+                // NULL/FALSE = New registrant (from registration system)
                 // PostgreSQL returns 'f'/'t' strings, not PHP booleans
+                $is_migrated = isset($applicant['admin_review_required']) ? 
+                              ($applicant['admin_review_required'] === 't' || $applicant['admin_review_required'] === true) : false;
                 $needs_upload = isset($applicant['needs_document_upload']) ? 
                                ($applicant['needs_document_upload'] === 't' || $applicant['needs_document_upload'] === true) : false;
-                $applicant_type = $needs_upload ? 're-upload' : 'new';
-                $type_label = $needs_upload ? 'Re-upload' : 'New Registration';
-                $type_icon = $needs_upload ? 'arrow-repeat' : 'person-plus';
-                $type_color = $needs_upload ? 'bg-warning' : 'bg-info';
+                
+                if ($is_migrated) {
+                    $applicant_type = 'migrated';
+                    $type_label = 'Migrated';
+                    $type_icon = 'download';
+                    $type_color = 'bg-purple';
+                } elseif ($needs_upload) {
+                    $applicant_type = 're-upload';
+                    $type_label = 'Re-upload';
+                    $type_icon = 'arrow-repeat';
+                    $type_color = 'bg-warning';
+                } else {
+                    $applicant_type = 'new';
+                    $type_label = 'New Registration';
+                    $type_icon = 'person-plus';
+                    $type_color = 'bg-info';
+                }
                 ?>
                 <tr>
                     <td data-label="Name">
@@ -1053,7 +1117,11 @@ function render_table($applicants, $connection) {
                         <?php endif; ?>
                     </td>
                     <td data-label="Type">
-                        <span class="badge <?= $type_color ?> text-white" title="<?= $needs_upload ? 'Existing student required to re-upload documents' : 'New applicant from registration system' ?>">
+                        <?php
+                        $tooltip = $is_migrated ? 'Migrated student from CSV import - needs to complete profile on first login' : 
+                                   ($needs_upload ? 'Existing student required to re-upload documents' : 'New applicant from registration system');
+                        ?>
+                        <span class="badge <?= $type_color ?> text-white" title="<?= $tooltip ?>">
                             <i class="bi bi-<?= $type_icon ?>"></i> <?= $type_label ?>
                         </span>
                     </td>
@@ -2240,9 +2308,15 @@ if ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '' === 'XMLHttpRequest' || (isset($_GET
             Manage Applicants
         </h2>
         <div class="d-flex align-items-center gap-2">
-            <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#migrationModal">
-                <i class="bi bi-upload me-1"></i> Migrate from CSV
-            </button>
+            <?php if ($hasActiveDistribution): ?>
+                <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#migrationModal">
+                    <i class="bi bi-upload me-1"></i> Migrate from CSV
+                </button>
+            <?php else: ?>
+                <button class="btn btn-outline-secondary btn-sm" disabled title="Migration requires an active distribution">
+                    <i class="bi bi-upload me-1"></i> Migrate from CSV <span class="badge bg-warning text-dark ms-1">No Active Distribution</span>
+                </button>
+            <?php endif; ?>
             <span class="badge bg-info fs-6"><?php echo $totalApplicants; ?> Total Applicants</span>
         </div>
     </div>
@@ -2289,9 +2363,15 @@ if ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '' === 'XMLHttpRequest' || (isset($_GET
                     <p class="text-muted mb-0">Review and manage student applicants in the system.</p>
                 </div>
                 <div class="text-end d-flex gap-2 align-items-center">
-                    <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#migrationModal">
-                        <i class="bi bi-upload me-1"></i> Migrate from CSV
-                    </button>
+                    <?php if ($hasActiveDistribution): ?>
+                        <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#migrationModal">
+                            <i class="bi bi-upload me-1"></i> Migrate from CSV
+                        </button>
+                    <?php else: ?>
+                        <button class="btn btn-outline-secondary btn-sm" disabled title="Migration requires an active distribution">
+                            <i class="bi bi-upload me-1"></i> Migrate from CSV <span class="badge bg-warning text-dark ms-1">No Active Distribution</span>
+                        </button>
+                    <?php endif; ?>
                     <span class="badge bg-info fs-6"><?php echo $totalApplicants; ?> Applicants</span>
                 </div>
             </div>
@@ -2549,14 +2629,14 @@ if ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '' === 'XMLHttpRequest' || (isset($_GET
                         </div>
                     </div>
             <div class="modal-body">
-                <!-- Distribution Warning Alert -->
+                <!-- Distribution Requirement Alert -->
                 <div class="alert alert-warning mb-3">
                     <div class="d-flex align-items-start">
                         <i class="bi bi-exclamation-triangle-fill me-2 mt-1"></i>
                         <div>
-                            <strong>Important: Distribution Must Be Closed</strong>
-                            <p class="mb-1 mt-2">Old student migration is <strong>blocked when a distribution is active</strong> to prevent data conflicts.</p>
-                            <p class="mb-0"><small>Please ensure all distribution slots are closed before proceeding with migration.</small></p>
+                            <strong>Important: Active Distribution Required</strong>
+                            <p class="mb-1 mt-2">Old student migration <strong>requires an active distribution</strong> to ensure students are properly placed into the current academic year.</p>
+                            <p class="mb-0"><small>Please ensure a distribution slot is active before proceeding with migration. Migrated students will be assigned to the active academic year.</small></p>
                         </div>
                     </div>
                 </div>
@@ -2568,12 +2648,11 @@ if ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '' === 'XMLHttpRequest' || (isset($_GET
                         <div>
                             <strong>Required Fields for Old Students</strong>
                             <ul class="mb-0 mt-2 small">
-                                <li><strong>Previous Academic Year</strong> - Format: "2023-2024" (REQUIRED)</li>
-                                <li><strong>Previous Year Level</strong> - Format: "3rd Year" (REQUIRED)</li>
                                 <li>Basic info: Name, Email, Mobile, Birthdate, Gender</li>
-                                <li>Location: Barangay, University, Year Level</li>
+                                <li>Location: Barangay</li>
+                                <li><strong>Optional:</strong> University, Year Level, Course, Previous Academic Year, Previous Year Level</li>
                             </ul>
-                            <p class="mb-0 mt-2"><small class="text-muted">Migrated students will have status "migrated" and must update their current credentials on first login.</small></p>
+                            <p class="mb-0 mt-2"><small class="text-muted">Migrated students will have status "applicant" with a "Migrated" badge and must update their current credentials on first login.</small></p>
                         </div>
                     </div>
                 </div>
@@ -2590,10 +2669,9 @@ if ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '' === 'XMLHttpRequest' || (isset($_GET
                                                     <div class="form-text">
                                                         <strong>Required:</strong> First row must be headers<br>
                                                         <small class="text-muted">
-                                                            <strong>NEW REQUIRED:</strong> Previous Academic Year, Previous Year Level<br>
-                                                            Other supported headers: Last Name, First Name, Middle Name, Extension Name, Birthdate, Age, Sex/Gender, 
-                                                            Email, Mobile, Barangay, University, Year Level, Course, School Student ID, 
-                                                            First Registered Academic Year, Mother's Maiden Name
+                                                            <strong>Required headers:</strong> Last Name, First Name, Birthdate, Sex/Gender, Email, Mobile, Barangay<br>
+                                                            <strong>Optional headers:</strong> Middle Name, Extension Name, University, Year Level, Course, School Student ID, 
+                                                            First Registered Academic Year, Previous Academic Year, Previous Year Level, Mother's Maiden Name
                                                         </small>
                                                     </div>
                                                     <div id="csvFilename" class="small text-muted mt-1" aria-live="polite"></div>
@@ -2829,16 +2907,27 @@ function renderDocumentsHTML(data) {
     
     let html = '';
     
-    // Student type badge
-    if (student.type === 'existing_student') {
+    // Student type badge with descriptions for all 4 states
+    if (student.type === 'migrated') {
+        html += `<div class="alert alert-info mb-3" style="background: linear-gradient(135deg, #a78bfa 0%, #8b5cf6 100%); color: white; border: none;">
+            <i class="bi bi-upload"></i> 
+            <strong>Migrated Student:</strong> This is an old student who was migrated to the system. They need to upload their documents to complete their profile.
+        </div>`;
+    } else if (student.type === 'reupload') {
         html += `<div class="alert alert-warning mb-3">
-            <i class="bi bi-info-circle"></i> 
-            <strong>Re-upload Required:</strong> This student is an existing applicant who needs to upload/re-upload their documents via the Upload Documents tab.
+            <i class="bi bi-arrow-repeat"></i> 
+            <strong>Re-upload Required:</strong> This student has finished at least one distribution cycle, or their documents were rejected. They need to upload/re-upload documents via the Upload Documents tab.
+        </div>`;
+    } else if (student.type === 'new_registration') {
+        html += `<div class="alert alert-success mb-3">
+            <i class="bi bi-check-circle"></i> 
+            <strong>New Registration:</strong> This student just registered through the online system and submitted documents during registration. Documents are read-only unless rejected by admin.
         </div>`;
     } else {
+        // Fallback for unknown types
         html += `<div class="alert alert-info mb-3">
-            <i class="bi bi-check-circle"></i> 
-            <strong>New Registration:</strong> This student registered through the online registration system and submitted documents during registration.
+            <i class="bi bi-info-circle"></i> 
+            <strong>Student Documents</strong>
         </div>`;
     }
     
@@ -3930,6 +4019,16 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 <style>
+/* Custom badge colors for applicant types */
+.bg-purple {
+    background-color: #7c3aed !important;
+    color: white !important;
+}
+
+.badge.bg-purple {
+    background-color: #7c3aed !important;
+}
+
 /* ------------------ Mobile Responsiveness Enhancements ------------------ */
 @media (max-width: 575.98px) {
     .modal-dialog { margin: 8px auto; }
@@ -4174,33 +4273,195 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 
 /* Migration preview responsive table */
-.migration-preview .preview-table thead { position: sticky; top: 0; z-index: 1; }
-@media (max-width: 768px) {
-    .migration-preview .preview-table thead { display: none; }
-    .migration-preview .preview-table tbody tr { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; padding: 10px; border-bottom: 1px solid #eee; }
-    .migration-preview .preview-table tbody td { display: flex; justify-content: space-between; align-items: center; border: none !important; padding: 4px 0; }
-    .migration-preview .preview-table tbody td::before { content: attr(data-label); font-weight: 600; color: #1182FF; margin-right: 8px; }
-    .migration-preview .preview-table tbody td[data-label="Select"] { grid-column: 1 / -1; justify-content: flex-start; }
-    .migration-preview .preview-table tbody td[data-label="Conflicts"] { grid-column: 1 / -1; }
+.migration-preview { 
+    overflow-x: auto; 
+    max-height: 500px;
+    overflow-y: auto;
+    background: #fff;
+    border: 1px solid #dee2e6 !important;
 }
-.sticky-confirm { position: sticky; bottom: 0; background: #fff; border-top: 1px solid #eee; }
 
-/* Horizontal scroll improvements for preview table */
-.migration-preview { overflow-x: auto; }
-.migration-preview .preview-table { min-width: 1100px; }
-.migration-preview .preview-table th, .migration-preview .preview-table td { white-space: nowrap; }
-.migration-preview .preview-table thead th { position: sticky; top: 0; background: #f8fbff; }
-.migration-preview .preview-table td[data-label="Select"],
-.migration-preview .preview-table th:first-child { position: sticky; left: 0; background: #fff; z-index: 2; }
-.migration-preview .preview-table td[data-label="Conflicts"],
-.migration-preview .preview-table th:last-child { position: sticky; right: 0; background: #fff; z-index: 2; }
+.migration-preview .preview-table { 
+    min-width: 1100px;
+    margin-bottom: 0;
+}
 
-/* Hide scroll controls on small screens and improve wrapping */
+.migration-preview .preview-table thead th { 
+    position: sticky; 
+    top: 0; 
+    background: #e7f1ff;
+    z-index: 3;
+    border-bottom: 2px solid #1182FF;
+    font-weight: 600;
+    padding: 12px 8px;
+    white-space: nowrap;
+    color: #0d47a1;
+}
+
+.migration-preview .preview-table tbody tr {
+    background: #fff;
+}
+
+.migration-preview .preview-table tbody tr:hover {
+    background: #f8f9fa;
+}
+
+.migration-preview .preview-table tbody tr.table-warning {
+    background: #fff3cd;
+}
+
+.migration-preview .preview-table tbody tr.table-warning:hover {
+    background: #ffecb5;
+}
+
+.migration-preview .preview-table th, 
+.migration-preview .preview-table td { 
+    white-space: nowrap;
+    padding: 10px 8px;
+    border: 1px solid #dee2e6;
+    vertical-align: middle;
+}
+
+.migration-preview .preview-table td {
+    color: #212529;
+    font-size: 0.9rem;
+}
+
+/* Sticky first column (Select) */
+.migration-preview .preview-table th:first-child,
+.migration-preview .preview-table td[data-label="Select"] { 
+    position: sticky; 
+    left: 0; 
+    background: #e7f1ff;
+    z-index: 2;
+    box-shadow: 2px 0 4px rgba(0,0,0,0.1);
+}
+
+.migration-preview .preview-table tbody tr:hover td[data-label="Select"] {
+    background: #d4e7ff;
+}
+
+.migration-preview .preview-table tbody tr.table-warning td[data-label="Select"] {
+    background: #ffe69c;
+}
+
+.migration-preview .preview-table tbody tr.table-warning:hover td[data-label="Select"] {
+    background: #ffd966;
+}
+
+/* Sticky last column (Conflicts) */
+.migration-preview .preview-table th:last-child,
+.migration-preview .preview-table td[data-label="Conflicts"] { 
+    position: sticky; 
+    right: 0; 
+    background: #fff;
+    z-index: 2;
+    box-shadow: -2px 0 4px rgba(0,0,0,0.1);
+    max-width: 250px;
+    white-space: normal;
+}
+
+.migration-preview .preview-table tbody tr:hover td[data-label="Conflicts"] {
+    background: #f8f9fa;
+}
+
+.migration-preview .preview-table tbody tr.table-warning td[data-label="Conflicts"] {
+    background: #fff3cd;
+}
+
+.migration-preview .preview-table tbody tr.table-warning:hover td[data-label="Conflicts"] {
+    background: #ffecb5;
+}
+
+.migration-preview .preview-table td[data-label="Conflicts"] ul {
+    font-size: 0.85rem;
+    line-height: 1.4;
+}
+
+/* Responsive design for mobile */
 @media (max-width: 768px) {
-    .preview-scroll-controls { display: none; }
-    .migration-preview .preview-table { min-width: 100%; }
-    .migration-preview .preview-table th, .migration-preview .preview-table td { white-space: normal; }
-    .migration-preview .preview-table thead th { position: static; }
+    .migration-preview { 
+        max-height: none;
+        border: none !important;
+    }
+    
+    .migration-preview .preview-table { 
+        min-width: 100%;
+    }
+    
+    .migration-preview .preview-table thead { 
+        display: none; 
+    }
+    
+    .migration-preview .preview-table tbody tr { 
+        display: grid; 
+        grid-template-columns: 1fr 1fr; 
+        gap: 6px 12px; 
+        padding: 12px; 
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        margin-bottom: 12px;
+        background: #fff;
+    }
+    
+    .migration-preview .preview-table tbody tr.table-warning {
+        background: #fff3cd;
+        border-color: #ffc107;
+    }
+    
+    .migration-preview .preview-table tbody td { 
+        display: flex; 
+        justify-content: space-between; 
+        align-items: center; 
+        border: none !important; 
+        padding: 6px 0;
+        position: static !important;
+        box-shadow: none !important;
+        background: transparent !important;
+        white-space: normal;
+    }
+    
+    .migration-preview .preview-table tbody td::before { 
+        content: attr(data-label); 
+        font-weight: 600; 
+        color: #1182FF; 
+        margin-right: 8px;
+        flex-shrink: 0;
+    }
+    
+    .migration-preview .preview-table tbody td[data-label="Select"] { 
+        grid-column: 1 / -1; 
+        justify-content: flex-start;
+        border-bottom: 1px solid #dee2e6 !important;
+        padding-bottom: 8px !important;
+        margin-bottom: 4px;
+    }
+    
+    .migration-preview .preview-table tbody td[data-label="Conflicts"] { 
+        grid-column: 1 / -1;
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .migration-preview .preview-table tbody td[data-label="Conflicts"]::before {
+        margin-bottom: 4px;
+    }
+}
+
+.sticky-confirm { 
+    position: sticky; 
+    bottom: 0; 
+    background: #fff; 
+    border-top: 1px solid #eee;
+    padding: 12px 0;
+    z-index: 10;
+}
+
+/* Hide scroll controls on small screens */
+@media (max-width: 768px) {
+    .preview-scroll-controls { 
+        display: none; 
+    }
 }
 </style>
 

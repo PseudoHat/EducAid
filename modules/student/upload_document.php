@@ -85,8 +85,8 @@ $needs_year_level_update = !$has_year_level_credentials;
 $year_level_update_message = '';
 $force_update = isset($_GET['force_update']) && $_GET['force_update'] == '1';
 
-// Check if student is migrated and needs to select university/year level/mother's maiden name/school student ID
-$is_migrated = ($student_status === 'migrated');
+// Check if migrated student needs to select university/year level/mother's maiden name/school student ID
+// Note: $is_migrated is already defined earlier in the file
 $needs_university_selection = $is_migrated && (empty($student['university_id']) || empty($student['year_level_id']) || empty($student['mothers_maiden_name']) || empty($student['school_student_id']));
 
 if ($needs_year_level_update) {
@@ -105,6 +105,14 @@ if ($needs_year_level_update) {
 $needs_upload = ($student['needs_upload'] === 't' || $student['needs_upload'] === true);
 $student_status = $student['status'] ?? 'applicant';
 
+// Check if student is migrated (has admin_review_required flag)
+$is_migrated = isset($student['admin_review_required']) && ($student['admin_review_required'] === 't' || $student['admin_review_required'] === true);
+
+// IMPORTANT: Migrated students ALWAYS need to upload documents (treat them like re-upload mode)
+if ($is_migrated) {
+    $needs_upload = true;
+}
+
 // TESTING MODE: Allow re-upload if ?test_reupload=1 is in URL (REMOVE IN PRODUCTION)
 $test_mode = isset($_GET['test_reupload']) && $_GET['test_reupload'] == '1';
 if ($test_mode) {
@@ -112,13 +120,13 @@ if ($test_mode) {
 }
 
 // Only allow uploads if:
-// 1. Student needs upload (needs_document_upload = true) AND
+// 1. Student needs upload (needs_document_upload = true OR is migrated) AND
 // 2. Student is NOT active (active students are approved and in read-only mode) AND
 // 3. Student is NOT given (students who received aid are in read-only mode)
 $can_upload = $needs_upload && $student_status !== 'active' && $student_status !== 'given' && !$test_mode;
 
-// Student is in read-only mode if they're a new registrant OR they're already active OR they have received aid
-$is_new_registrant = !$needs_upload || $student_status === 'active' || $student_status === 'given';
+// Student is in read-only mode if they're a new registrant (not migrated) OR they're already active OR they have received aid
+$is_new_registrant = (!$needs_upload && !$is_migrated) || $student_status === 'active' || $student_status === 'given';
 
 // Get list of documents that need re-upload (if any)
 $documents_to_reupload = [];
@@ -794,6 +802,48 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_year_level']))
                 $academic_year,
                 $note
             ]);
+            
+            // If migrated student is completing their profile (university_id present), add audit log
+            if (!empty($university_id) && !empty($current_info['admin_review_required']) && $current_info['admin_review_required']) {
+                $audit_query = "INSERT INTO audit_logs 
+                               (user_id, user_type, username, event_type, event_category, 
+                                action_description, status, ip_address, user_agent, 
+                                request_method, affected_table, affected_record_id, 
+                                new_values, metadata, created_at)
+                               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW())";
+                
+                $new_values = json_encode([
+                    'university_id' => $university_id,
+                    'year_level_id' => $year_level_id,
+                    'current_year_level' => $year_level,
+                    'is_graduating' => $is_graduating,
+                    'mothers_maiden_name' => $mothers_maiden_name,
+                    'school_student_id' => $school_student_id
+                ]);
+                
+                $metadata = json_encode([
+                    'migration_completion' => true,
+                    'academic_year' => $academic_year,
+                    'previous_year_level' => $current_info['current_year_level'] ?? null
+                ]);
+                
+                pg_query_params($connection, $audit_query, [
+                    $student_id,
+                    'student',
+                    $student_id, // username = student_id
+                    'profile_completion',
+                    'migrated_student',
+                    "Migrated student completed profile setup: Selected university, year level, and provided credentials",
+                    'success',
+                    $_SERVER['REMOTE_ADDR'] ?? null,
+                    $_SERVER['HTTP_USER_AGENT'] ?? null,
+                    'POST',
+                    'students',
+                    $student_id,
+                    $new_values,
+                    $metadata
+                ]);
+            }
             
             // If student marked themselves as graduating, notify admin
             if ($is_graduating) {
@@ -2061,14 +2111,19 @@ $page_title = 'Upload Documents';
             </div>
             <?php endif; ?>
             
-            <!-- Re-upload Banner (Existing Students) -->
+            <!-- Re-upload Banner (Existing Students and Migrated Students) -->
             <?php if ($can_upload && !$test_mode): ?>
             <div class="reupload-banner">
                 <div class="banner-content">
-                    <i class="bi bi-arrow-repeat"></i>
+                    <i class="bi bi-<?= $is_migrated ? 'upload' : 'arrow-repeat' ?>"></i>
                     <div>
+                        <?php if ($is_migrated): ?>
+                        <h5>Welcome, Migrated Student! - Document Upload Required</h5>
+                        <p>As a migrated student, you need to upload your documents to complete your profile. Please upload all required documents below. Your uploads will be saved and sent to the admin for verification.</p>
+                        <?php else: ?>
                         <h5>Document Re-upload Required</h5>
                         <p>Please upload the required documents below. Your uploads will be saved directly to permanent storage and sent to the admin for immediate review.</p>
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>
@@ -2645,14 +2700,18 @@ $page_title = 'Upload Documents';
                             </div>
                             <div>
                                 <h5 class="modal-title mb-0" style="font-size: 1.4rem; font-weight: 700; text-shadow: 0 2px 4px rgba(0,0,0,0.2);">
-                                    <?php if ($current_academic_year): ?>
+                                    <?php if ($needs_university_selection): ?>
+                                        Complete Your Profile
+                                    <?php elseif ($current_academic_year): ?>
                                         Update Year Level
                                     <?php else: ?>
                                         Update Your Year Level
                                     <?php endif; ?>
                                 </h5>
-                                <?php if ($current_academic_year): ?>
-                                <p class="mb-0 mt-1" style="font-size: 0.9rem; opacity: 0.95;">Academic Year <?= htmlspecialchars($current_academic_year) ?></p>
+                                <?php if ($needs_university_selection && !empty($student['status_academic_year'])): ?>
+                                    <p class="mb-0 mt-1" style="font-size: 0.9rem; opacity: 0.95;">You were registered for Academic Year <?= htmlspecialchars($student['status_academic_year']) ?></p>
+                                <?php elseif ($current_academic_year): ?>
+                                    <p class="mb-0 mt-1" style="font-size: 0.9rem; opacity: 0.95;">Academic Year <?= htmlspecialchars($current_academic_year) ?></p>
                                 <?php endif; ?>
                             </div>
                         </div>
@@ -2930,8 +2989,8 @@ $page_title = 'Upload Documents';
         sessionStorage.setItem('return_after_year_update', <?= json_encode($_SESSION['return_after_year_update']) ?>);
         <?php endif; ?>
         
-        // Show year level update modal on page load if needed
-        <?php if ($needs_year_level_update): ?>
+        // Show year level update modal on page load if needed (for year level updates OR migrated student university selection)
+        <?php if ($needs_year_level_update || $needs_university_selection): ?>
         document.addEventListener('DOMContentLoaded', function() {
             const yearLevelModal = new bootstrap.Modal(document.getElementById('yearLevelUpdateModal'));
             yearLevelModal.show();
