@@ -14,9 +14,32 @@ if (isset($custom_nav_links)) {
   $nav_links = $custom_nav_links;
 }
 
+// Fetch system_name and municipality_name from theme_settings
+$navbar_system_name = 'EducAid'; // fallback
+$navbar_municipality_name_from_theme = 'City of General Trias'; // fallback
+
+if (isset($connection)) {
+    $theme_result = pg_query_params(
+        $connection,
+        "SELECT system_name, municipality_name FROM theme_settings WHERE municipality_id = $1 AND is_active = TRUE LIMIT 1",
+        [1] // Default municipality_id
+    );
+    
+    if ($theme_result && pg_num_rows($theme_result) > 0) {
+        $theme_data = pg_fetch_assoc($theme_result);
+        if (!empty($theme_data['system_name'])) {
+            $navbar_system_name = $theme_data['system_name'];
+        }
+        if (!empty($theme_data['municipality_name'])) {
+            $navbar_municipality_name_from_theme = $theme_data['municipality_name'];
+        }
+        pg_free_result($theme_result);
+    }
+}
+
 // Brand configuration (single editable text block; logo image is static, not inline editable)
 $brand_config = [
-  'name' => 'EducAid • City of General Trias',
+  'name' => $navbar_system_name . ' • ' . $navbar_municipality_name_from_theme,
   'href' => '#',
   'logo' => 'assets/images/educaid-logo.png', // fallback logo path
   'hide_educaid_logo' => false, // whether to hide the EducAid logo

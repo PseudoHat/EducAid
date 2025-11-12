@@ -176,6 +176,7 @@ class FooterSettings {
         const textColor = document.getElementById('footer_text_color')?.value || '#cbd5e1';
         const headingColor = document.getElementById('footer_heading_color')?.value || '#ffffff';
         const linkColor = document.getElementById('footer_link_color')?.value || '#e2e8f0';
+        const hoverColor = document.getElementById('footer_link_hover_color')?.value || '#fbbf24';
         const dividerColor = document.getElementById('footer_divider_color')?.value || '#fbbf24';
 
         preview.style.background = bgColor;

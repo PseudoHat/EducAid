@@ -1259,18 +1259,38 @@ document.getElementById('confirmGenerateThemeBtn')?.addEventListener('click', as
                 modal.hide();
             }
             
+            // Apply theme live by reloading CSS files
+            const timestamp = new Date().getTime();
+            
+            // Reload sidebar theme CSS
+            let sidebarLink = document.querySelector('link[href*="sidebar_theme.css"]');
+            if (sidebarLink) {
+                const newHref = sidebarLink.href.split('?')[0] + '?v=' + timestamp;
+                sidebarLink.href = newHref;
+            }
+            
+            // Reload topbar theme CSS
+            let topbarLink = document.querySelector('link[href*="topbar_theme.css"]');
+            if (topbarLink) {
+                const newHref = topbarLink.href.split('?')[0] + '?v=' + timestamp;
+                topbarLink.href = newHref;
+            }
+            
+            // Reload footer theme CSS
+            let footerLink = document.querySelector('link[href*="footer_theme.css"]');
+            if (footerLink) {
+                const newHref = footerLink.href.split('?')[0] + '?v=' + timestamp;
+                footerLink.href = newHref;
+            }
+            
             // Show success message
-            alert('✅ Theme generated successfully!\n\n' +
+            alert('✅ Theme generated and applied successfully!\n\n' +
                   `• ${result.data.colors_applied || 19} colors applied\n` +
                   '• Sidebar theme updated\n' +
                   '• Topbar theme updated\n' +
                   '• Footer theme updated\n\n' +
-                  'Refresh the page to see changes.');
+                  'Changes applied live! No page refresh needed.');
             
-            // Reload page after 1 second
-            setTimeout(() => {
-                location.reload();
-            }, 1000);
         } else {
             throw new Error(result.message || 'Failed to generate theme');
         }
