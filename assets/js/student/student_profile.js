@@ -237,3 +237,140 @@
         return false;
       }
     };
+
+    // Toggle password visibility function
+    function togglePasswordVisibility(inputId, iconId) {
+      const input = document.getElementById(inputId);
+      const icon = document.getElementById(iconId);
+      
+      if (input && icon) {
+        if (input.type === 'password') {
+          input.type = 'text';
+          icon.classList.remove('bi-eye');
+          icon.classList.add('bi-eye-slash');
+        } else {
+          input.type = 'password';
+          icon.classList.remove('bi-eye-slash');
+          icon.classList.add('bi-eye');
+        }
+      }
+    }
+
+    // Make togglePasswordVisibility available globally
+    window.togglePasswordVisibility = togglePasswordVisibility;
+
+    // Password strength indicator
+    function checkPasswordStrength(password) {
+      let strength = 0;
+      const feedback = [];
+
+      if (password.length >= 12) strength += 25;
+      else feedback.push('At least 12 characters');
+
+      if (/[a-z]/.test(password) && /[A-Z]/.test(password)) strength += 25;
+      else feedback.push('Mix of uppercase and lowercase');
+
+      if (/\d/.test(password)) strength += 25;
+      else feedback.push('Include numbers');
+
+      if (/[^a-zA-Z0-9]/.test(password)) strength += 25;
+      else feedback.push('Include special characters');
+
+      return { strength, feedback };
+    }
+
+    // Initialize password strength indicator
+    function initPasswordStrength() {
+      const newPwdInput = document.getElementById('newPwdInput');
+      
+      if (!newPwdInput) {
+        console.log('Password input not found');
+        return;
+      }
+
+      // Check if strength indicator already exists
+      const existingBar = document.querySelector('.password-strength-bar');
+      if (existingBar) {
+        console.log('Strength indicator already exists');
+        return;
+      }
+      
+      // Create strength indicator elements
+      const strengthBar = document.createElement('div');
+      strengthBar.className = 'password-strength-bar mt-2';
+      strengthBar.style.cssText = 'height: 4px; background: #e0e0e0; border-radius: 2px; overflow: hidden;';
+      
+      const strengthFill = document.createElement('div');
+      strengthFill.className = 'password-strength-fill';
+      strengthFill.style.cssText = 'height: 100%; width: 0%; transition: all 0.3s ease; border-radius: 2px;';
+      strengthBar.appendChild(strengthFill);
+      
+      const strengthText = document.createElement('div');
+      strengthText.className = 'password-strength-text mt-1';
+      strengthText.style.cssText = 'font-size: 0.875rem; color: #666;';
+      
+      // Insert after the input's parent div
+      const inputGroup = newPwdInput.closest('.input-group');
+      const parentDiv = inputGroup ? inputGroup.parentElement : newPwdInput.parentElement;
+      
+      if (parentDiv) {
+        // Find the error span if it exists
+        const errorSpan = parentDiv.querySelector('#newPwdError');
+        if (errorSpan) {
+          parentDiv.insertBefore(strengthBar, errorSpan.nextSibling);
+          parentDiv.insertBefore(strengthText, strengthBar.nextSibling);
+        } else {
+          parentDiv.appendChild(strengthBar);
+          parentDiv.appendChild(strengthText);
+        }
+        console.log('Strength indicator added to DOM');
+      }
+      
+      // Update strength on input
+      newPwdInput.addEventListener('input', function() {
+        const password = this.value;
+        
+        if (password.length === 0) {
+          strengthFill.style.width = '0%';
+          strengthText.textContent = '';
+          return;
+        }
+        
+        const result = checkPasswordStrength(password);
+        const strength = result.strength;
+        
+        // Update bar width and color
+        strengthFill.style.width = strength + '%';
+        
+        if (strength <= 25) {
+          strengthFill.style.background = '#dc3545';
+          strengthText.innerHTML = '<span style="color: #dc3545;">Weak</span> - ' + result.feedback.join(', ');
+        } else if (strength <= 50) {
+          strengthFill.style.background = '#ffc107';
+          strengthText.innerHTML = '<span style="color: #ffc107;">Fair</span> - ' + result.feedback.join(', ');
+        } else if (strength <= 75) {
+          strengthFill.style.background = '#17a2b8';
+          strengthText.innerHTML = '<span style="color: #17a2b8;">Good</span> - ' + result.feedback.join(', ');
+        } else {
+          strengthFill.style.background = '#28a745';
+          strengthText.innerHTML = '<span style="color: #28a745;">Strong</span> - Password meets all requirements';
+        }
+      });
+      
+      console.log('Password strength listener attached');
+    }
+
+    // Initialize on page load
+    document.addEventListener('DOMContentLoaded', function() {
+      console.log('DOM loaded, initializing password strength');
+      initPasswordStrength();
+      
+      // Also initialize when the password modal is shown
+      const passwordModal = document.getElementById('passwordModal');
+      if (passwordModal) {
+        passwordModal.addEventListener('shown.bs.modal', function() {
+          console.log('Password modal shown, re-initializing strength indicator');
+          initPasswordStrength();
+        });
+      }
+    });
