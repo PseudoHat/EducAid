@@ -1,0 +1,97 @@
+# robots.txt for EducAid Scholarship System
+# Domain: www.educ-aid.site
+# Last Updated: November 13, 2025
+
+# Allow all search engines to crawl the entire site
+User-agent: *
+Allow: /
+
+# Sitemap location
+Sitemap: https://www.educ-aid.site/sitemap.xml
+
+# Crawl-delay to be respectful of server resources
+Crawl-delay: 1
+
+# Allow specific important pages
+Allow: /website/
+Allow: /unified_login.php
+Allow: /modules/student/student_register.php
+
+# Disallow sensitive areas
+Disallow: /admin/
+Disallow: /modules/admin/
+Disallow: /config/
+Disallow: /includes/
+Disallow: /vendor/
+Disallow: /uploads/
+Disallow: /student_documents/
+Disallow: /logs/
+Disallow: /tools/
+Disallow: /temp/
+Disallow: /.git/
+Disallow: /.env
+
+# Disallow AJAX endpoints (no value for SEO)
+Disallow: /ajax_*.php
+Disallow: /website/ajax_*.php
+Disallow: /chatbot/
+
+# Disallow diagnostic and utility files
+Disallow: /diagnose_*.php
+Disallow: /check_*.php
+Disallow: /install_*.php
+Disallow: /setup_*.php
+Disallow: /test_*.php
+Disallow: /debug_*.php
+Disallow: /delete_*.php
+Disallow: /cleanup_*.php
+Disallow: /apply_*.php
+Disallow: /fix_*.php
+Disallow: /reset_*.php
+
+# Disallow session and temporary files
+Disallow: /*?session=
+Disallow: /*?token=
+Disallow: /*?edit=
+Disallow: /*?municipality_id=
+
+# Allow common bots
+User-agent: Googlebot
+Allow: /
+
+User-agent: Googlebot-Image
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+User-agent: Slurp
+Allow: /
+
+User-agent: DuckDuckBot
+Allow: /
+
+User-agent: Baiduspider
+Allow: /
+
+User-agent: YandexBot
+Allow: /
+
+# Block bad bots and scrapers
+User-agent: AhrefsBot
+Disallow: /
+
+User-agent: SemrushBot
+Disallow: /
+
+User-agent: MJ12bot
+Disallow: /
+
+User-agent: DotBot
+Disallow: /
+
+User-agent: BLEXBot
+Disallow: /
+
+User-agent: PetalBot
+Disallow: /
