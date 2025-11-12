@@ -616,6 +616,45 @@ while ($row = pg_fetch_assoc($barangaysResult)) {
         .table-responsive {
             border-radius: 8px;
             overflow: hidden;
+            position: relative;
+        }
+        
+        /* Mobile table scroll indicator */
+        .table-responsive::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            width: 30px;
+            background: linear-gradient(to left, rgba(255,255,255,0.9), transparent);
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        
+        @media (max-width: 767.98px) {
+            .table-responsive::after {
+                opacity: 1;
+            }
+            
+            .table-responsive::-webkit-scrollbar {
+                height: 8px;
+            }
+            
+            .table-responsive::-webkit-scrollbar-track {
+                background: #f1f1f1;
+                border-radius: 10px;
+            }
+            
+            .table-responsive::-webkit-scrollbar-thumb {
+                background: #888;
+                border-radius: 10px;
+            }
+            
+            .table-responsive::-webkit-scrollbar-thumb:hover {
+                background: #555;
+            }
         }
         
         .table {
@@ -796,7 +835,9 @@ while ($row = pg_fetch_assoc($barangaysResult)) {
             padding: 0.65rem 1.5rem !important;
         }
         
-        /* Responsive */
+        /* Responsive Design - Mobile First */
+        
+        /* Tablets and below (991px) */
         @media (max-width: 991.98px) {
             .stats-card h3 {
                 font-size: 1.5rem;
@@ -804,6 +845,277 @@ while ($row = pg_fetch_assoc($barangaysResult)) {
             
             h1 {
                 font-size: 1.5rem;
+            }
+            
+            .stats-card .stat-icon {
+                width: 50px;
+                height: 50px;
+                font-size: 1.4rem;
+            }
+            
+            .container-fluid {
+                padding-left: 1rem;
+                padding-right: 1rem;
+            }
+        }
+        
+        /* Mobile devices (767px and below) */
+        @media (max-width: 767.98px) {
+            /* Page Header */
+            .d-flex.justify-content-between.align-items-center.mb-4 {
+                flex-direction: column;
+                align-items: flex-start !important;
+                gap: 1rem;
+            }
+            
+            h1 {
+                font-size: 1.3rem;
+            }
+            
+            h1 i {
+                font-size: 1.3rem;
+            }
+            
+            .text-muted {
+                font-size: 0.9rem;
+            }
+            
+            /* Back button full width on mobile */
+            .btn.btn-outline-secondary {
+                width: 100%;
+                justify-content: center;
+            }
+            
+            /* Statistics Cards - 2 columns layout on mobile */
+            .stats-card {
+                margin-bottom: 0;
+            }
+            
+            .stats-card h3 {
+                font-size: 1.8rem;
+            }
+            
+            .stats-card .card-body {
+                padding: 1.25rem;
+            }
+            
+            .stats-card .text-muted {
+                font-size: 0.8rem !important;
+            }
+            
+            .stats-card .stat-icon {
+                width: 45px;
+                height: 45px;
+                font-size: 1.3rem;
+            }
+            
+            /* Filter form - Stack vertically */
+            .card-body .row.g-3 > div {
+                width: 100% !important;
+                max-width: 100%;
+            }
+            
+            .col-md-3.d-flex.align-items-end.gap-2 {
+                flex-direction: column;
+                align-items: stretch !important;
+            }
+            
+            .col-md-3.d-flex.align-items-end.gap-2 .btn {
+                width: 100%;
+            }
+            
+            /* Card Headers */
+            .card-header h5 {
+                font-size: 1rem;
+            }
+            
+            /* Table - Enable horizontal scroll */
+            .table-responsive {
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+            
+            .table {
+                min-width: 800px; /* Prevent table from being too cramped */
+            }
+            
+            .table thead th {
+                font-size: 0.75rem;
+                padding: 0.75rem 0.5rem;
+                white-space: nowrap;
+            }
+            
+            .table tbody td {
+                font-size: 0.85rem;
+                padding: 0.75rem 0.5rem;
+            }
+            
+            /* Action buttons in table */
+            .btn-sm {
+                padding: 0.35rem 0.75rem;
+                font-size: 0.8rem;
+            }
+            
+            /* Badges */
+            .badge {
+                font-size: 0.7rem;
+                padding: 0.35rem 0.65rem;
+            }
+            
+            /* Pagination */
+            .pagination {
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+            
+            .page-item .page-link {
+                padding: 0.4rem 0.75rem;
+                font-size: 0.85rem;
+            }
+            
+            /* Bulk delete button */
+            #bulkDeleteBtn {
+                font-size: 0.85rem;
+                padding: 0.5rem 1rem;
+            }
+            
+            /* SweetAlert2 Mobile */
+            .swal2-popup {
+                width: 90% !important;
+                padding: 1.5rem !important;
+            }
+            
+            .swal2-title {
+                font-size: 1.3rem !important;
+            }
+            
+            .swal2-html-container {
+                font-size: 0.9rem !important;
+            }
+            
+            /* Container padding */
+            .container-fluid {
+                padding: 0.75rem;
+            }
+            
+            .home-section .container-fluid.py-4 {
+                padding-top: 1rem !important;
+                padding-bottom: 1rem !important;
+            }
+        }
+        
+        /* Small mobile devices (575px and below) */
+        @media (max-width: 575.98px) {
+            h1 {
+                font-size: 1.1rem;
+            }
+            
+            h1 i {
+                font-size: 1.1rem;
+            }
+            
+            .stats-card h3 {
+                font-size: 1.5rem;
+            }
+            
+            .stats-card .stat-icon {
+                width: 45px;
+                height: 45px;
+                font-size: 1.2rem;
+            }
+            
+            .card-header h5 {
+                font-size: 0.9rem;
+            }
+            
+            .table {
+                min-width: 700px;
+            }
+            
+            .table thead th,
+            .table tbody td {
+                font-size: 0.75rem;
+                padding: 0.5rem 0.4rem;
+            }
+            
+            .btn-sm {
+                padding: 0.3rem 0.6rem;
+                font-size: 0.75rem;
+            }
+            
+            .badge {
+                font-size: 0.65rem;
+                padding: 0.3rem 0.5rem;
+            }
+            
+            /* Alert messages */
+            .alert {
+                font-size: 0.85rem;
+                padding: 0.75rem 1rem;
+            }
+            
+            /* Form controls */
+            .form-label {
+                font-size: 0.85rem;
+                margin-bottom: 0.25rem;
+            }
+            
+            .form-control,
+            .form-select {
+                font-size: 0.9rem;
+                padding: 0.5rem 0.75rem;
+            }
+            
+            .btn {
+                font-size: 0.85rem;
+                padding: 0.5rem 1rem;
+            }
+        }
+        
+        /* Landscape mobile optimization */
+        @media (max-width: 767.98px) and (orientation: landscape) {
+            .stats-card .card-body {
+                padding: 1rem;
+            }
+            
+            .stats-card h3 {
+                font-size: 1.3rem;
+            }
+            
+            .home-section .container-fluid.py-4 {
+                padding-top: 0.75rem !important;
+                padding-bottom: 0.75rem !important;
+            }
+        }
+        
+        /* Touch-friendly enhancements */
+        @media (hover: none) and (pointer: coarse) {
+            /* Increase touch targets */
+            .btn {
+                min-height: 44px;
+            }
+            
+            .form-control,
+            .form-select {
+                min-height: 44px;
+            }
+            
+            .page-link {
+                min-width: 44px;
+                min-height: 44px;
+            }
+            
+            /* Disable hover effects on touch devices */
+            .stats-card:hover {
+                transform: none;
+            }
+            
+            .btn:hover {
+                transform: none;
+            }
+            
+            .page-item .page-link:hover {
+                transform: none;
             }
         }
         
@@ -838,8 +1150,8 @@ while ($row = pg_fetch_assoc($barangaysResult)) {
                 </div>
 
                 <!-- Statistics Cards -->
-                <div class="row g-4 mb-4">
-                    <div class="col-md-3">
+                <div class="row g-3 g-md-4 mb-4">
+                    <div class="col-6 col-md-3">
                         <div class="card stats-card danger">
                             <div class="card-body">
                                 <div class="d-flex justify-content-between align-items-center">
@@ -854,7 +1166,7 @@ while ($row = pg_fetch_assoc($barangaysResult)) {
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-6 col-md-3">
                         <div class="card stats-card warning">
                             <div class="card-body">
                                 <div class="d-flex justify-content-between align-items-center">
@@ -869,7 +1181,7 @@ while ($row = pg_fetch_assoc($barangaysResult)) {
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-6 col-md-3">
                         <div class="card stats-card success">
                             <div class="card-body">
                                 <div class="d-flex justify-content-between align-items-center">
@@ -884,7 +1196,7 @@ while ($row = pg_fetch_assoc($barangaysResult)) {
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-6 col-md-3">
                         <div class="card stats-card info">
                             <div class="card-body">
                                 <div class="d-flex justify-content-between align-items-center">
@@ -911,7 +1223,7 @@ while ($row = pg_fetch_assoc($barangaysResult)) {
                     </div>
                     <div class="card-body">
                         <form method="GET" class="row g-3">
-                            <div class="col-md-3">
+                            <div class="col-12 col-md-3">
                                 <label class="form-label"><i class="bi bi-geo-alt me-1"></i>Barangay</label>
                                 <select name="barangay" class="form-select">
                                     <option value="">All Barangays</option>
@@ -922,7 +1234,7 @@ while ($row = pg_fetch_assoc($barangaysResult)) {
                                     <?php endforeach; ?>
                                 </select>
                             </div>
-                            <div class="col-md-2">
+                            <div class="col-12 col-md-2">
                                 <label class="form-label"><i class="bi bi-toggle2-on me-1"></i>Status</label>
                                 <select name="override_status" class="form-select">
                                     <option value="">All</option>
@@ -930,20 +1242,22 @@ while ($row = pg_fetch_assoc($barangaysResult)) {
                                     <option value="overridden" <?= $overrideFilter === 'overridden' ? 'selected' : '' ?>>Overridden</option>
                                 </select>
                             </div>
-                            <div class="col-md-2">
+                            <div class="col-12 col-sm-6 col-md-2">
                                 <label class="form-label"><i class="bi bi-calendar-date me-1"></i>Date From</label>
                                 <input type="date" name="date_from" class="form-control" value="<?= htmlspecialchars($dateFrom) ?>">
                             </div>
-                            <div class="col-md-2">
+                            <div class="col-12 col-sm-6 col-md-2">
                                 <label class="form-label"><i class="bi bi-calendar-check me-1"></i>Date To</label>
                                 <input type="date" name="date_to" class="form-control" value="<?= htmlspecialchars($dateTo) ?>">
                             </div>
-                            <div class="col-md-3 d-flex align-items-end gap-2">
+                            <div class="col-12 col-md-3 d-flex flex-column flex-sm-row align-items-stretch align-items-sm-end gap-2">
                                 <button type="submit" class="btn btn-primary flex-grow-1">
                                     <i class="bi bi-funnel me-1"></i>Apply Filters
                                 </button>
-                                <a href="household_blocked_registrations.php" class="btn btn-outline-secondary">
-                                    <i class="bi bi-x-circle"></i>
+                                <a href="household_blocked_registrations.php" class="btn btn-outline-secondary" title="Clear Filters">
+                                    <i class="bi bi-x-circle me-1 d-sm-none"></i>
+                                    <span class="d-none d-sm-inline"><i class="bi bi-x-circle"></i></span>
+                                    <span class="d-sm-none">Clear</span>
                                 </a>
                             </div>
                         </form>
@@ -952,7 +1266,7 @@ while ($row = pg_fetch_assoc($barangaysResult)) {
 
                 <!-- Blocked Attempts Table -->
                 <div class="card">
-                    <div class="card-header d-flex justify-content-between align-items-center">
+                    <div class="card-header d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3">
                         <div>
                             <h5 class="mb-0">
                                 <i class="bi bi-table"></i>
@@ -962,7 +1276,7 @@ while ($row = pg_fetch_assoc($barangaysResult)) {
                         </div>
                         <div>
                             <button id="bulkDeleteBtn" class="btn btn-danger btn-sm" style="display: none;" onclick="confirmBulkDelete()">
-                                <i class="bi bi-trash-fill me-1"></i>Delete Selected (<span id="selectedCount">0</span>)
+                                <i class="bi bi-trash-fill me-1"></i><span class="d-none d-sm-inline">Delete Selected (</span><span class="d-sm-none">Delete (</span><span id="selectedCount">0</span>)
                             </button>
                         </div>
                     </div>
@@ -972,7 +1286,11 @@ while ($row = pg_fetch_assoc($barangaysResult)) {
                                 <i class="bi bi-info-circle me-2"></i>No blocked registration attempts found matching your criteria.
                             </div>
                         <?php else: ?>
-                            <div class="table-responsive">
+                            <!-- Mobile scroll hint -->
+                            <div class="alert alert-info d-md-none mb-3">
+                                <small><i class="bi bi-arrow-left-right me-1"></i>Swipe left/right to view all columns</small>
+                            </div>
+                            <div class="table-responsive"
                                 <table class="table table-hover">
                                     <thead>
                                         <tr>
