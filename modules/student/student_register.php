@@ -6089,16 +6089,16 @@ if (!$isAjaxRequest) {
                     <!-- Mother's Full Name Field (Household Prevention) -->
                     <div class="mb-3">
                         <label class="form-label">
-                            Mother's Full Name <span class="text-danger">*</span>
+                            Mother's Full Maiden Name <span class="text-danger">*</span>
                             <i class="bi bi-info-circle ms-1" data-bs-toggle="tooltip" data-bs-placement="right" 
                                title="This helps us identify if another student from your household is already registered. Only one student per household can receive assistance."></i>
                         </label>
-                        <input type="text" class="form-control" name="mothers_maiden_name" id="mothersMaidenNameInput" 
-                               placeholder="e.g., Maria Dela Cruz, Ana Santos" 
+                        <input type="text" class="form-control" name="mothers_fullname" id="mothersMaidenNameInput" 
+                               placeholder="e.g., Maria Cruz Santos, Ana Rose Reyes" 
                                pattern="[A-Za-z\s\-]+" 
                                maxlength="100"
                                required />
-                        <small class="form-text text-muted">Enter your mother's complete name (first and last name)</small>
+                        <small class="form-text text-muted">Enter your mother's complete maiden name (first, middle, and last name)</small>
                         
                         <!-- Loading Spinner for Household Check -->
                         <div id="householdCheckSpinner" class="mt-2" style="display:none;">
