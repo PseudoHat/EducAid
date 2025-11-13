@@ -1,5 +1,20 @@
 // assets/js/admin/sidebar_toggle.js
 
+// Apply initial sidebar state before DOMContentLoaded to prevent flash
+(function() {
+  function isMobile() {
+    return window.innerWidth <= 768;
+  }
+  
+  // Set initial state as early as possible
+  if (!isMobile()) {
+    const state = localStorage.getItem("adminSidebarState");
+    if (state === "closed") {
+      document.documentElement.classList.add('sidebar-closed-initial');
+    }
+  }
+})();
+
 document.addEventListener("DOMContentLoaded", function () {
   // Prevent double-binding
   if (window.__ADMIN_SIDEBAR_BOUND) return;
