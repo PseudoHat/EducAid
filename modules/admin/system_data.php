@@ -1,5 +1,7 @@
 <?php
 include __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../../services/AuditLogger.php';
+
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -8,6 +10,9 @@ if (!isset($_SESSION['admin_username'])) {
     header("Location: ../../unified_login.php");
     exit;
 }
+
+// Initialize AuditLogger
+$auditLogger = new AuditLogger($connection);
 
 // Check if current admin is super_admin
 $current_admin_role = 'super_admin'; // Default for backward compatibility
@@ -25,21 +30,115 @@ if ($current_admin_role !== 'super_admin') {
 
 // Handle form submissions
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Debug logging
+    error_log("POST received: " . print_r($_POST, true));
+    
     // Add University
     if (isset($_POST['add_university'])) {
         $name = trim($_POST['university_name']);
         $code = trim(strtoupper($_POST['university_code']));
         
+        error_log("Adding university: $name ($code)");
+        
         if (!empty($name) && !empty($code)) {
-            $insertQuery = "INSERT INTO universities (name, code) VALUES ($1, $2)";
+            $insertQuery = "INSERT INTO universities (name, code) VALUES ($1, $2) RETURNING university_id";
             $result = pg_query_params($connection, $insertQuery, [$name, $code]);
             
             if ($result) {
+                $new_university = pg_fetch_assoc($result);
+                $university_id = $new_university['university_id'];
+                
+                error_log("University added successfully with ID: $university_id");
+                
                 $notification_msg = "New university added: " . $name . " (" . $code . ")";
                 pg_query_params($connection, "INSERT INTO admin_notifications (message) VALUES ($1)", [$notification_msg]);
+                
+                // Audit Trail
+                $auditLogger->logEvent(
+                    'university_added',
+                    'system_data',
+                    "Added new university: {$name} ({$code})",
+                    [
+                        'user_id' => $_SESSION['admin_id'] ?? null,
+                        'user_type' => 'admin',
+                        'username' => $_SESSION['admin_username'] ?? 'Unknown',
+                        'affected_table' => 'universities',
+                        'affected_record_id' => $university_id,
+                        'new_values' => [
+                            'university_id' => $university_id,
+                            'name' => $name,
+                            'code' => $code
+                        ],
+                        'metadata' => [
+                            'action' => 'add',
+                            'admin_role' => $current_admin_role
+                        ]
+                    ]
+                );
+                
                 $success = "University added successfully!";
+                
+                // Redirect to prevent form resubmission
+                header("Location: " . $_SERVER['PHP_SELF'] . "?success=university_added");
+                exit;
             } else {
-                $error = "Failed to add university. Code may already exist.";
+                $db_error = pg_last_error($connection);
+                error_log("Failed to add university: $db_error");
+                $error = "Failed to add university. Code may already exist. Error: " . $db_error;
+            }
+        } else {
+            $error = "Please fill in all required fields.";
+        }
+    }
+    
+    // Edit University
+    if (isset($_POST['edit_university'])) {
+        $university_id = intval($_POST['university_id']);
+        $name = trim($_POST['university_name']);
+        $code = trim(strtoupper($_POST['university_code']));
+        
+        if (!empty($name) && !empty($code)) {
+            // Get old values for audit
+            $oldQuery = "SELECT name, code FROM universities WHERE university_id = $1";
+            $oldResult = pg_query_params($connection, $oldQuery, [$university_id]);
+            $oldValues = pg_fetch_assoc($oldResult);
+            
+            $updateQuery = "UPDATE universities SET name = $1, code = $2 WHERE university_id = $3";
+            $result = pg_query_params($connection, $updateQuery, [$name, $code, $university_id]);
+            
+            if ($result) {
+                $notification_msg = "University updated: " . $name . " (" . $code . ")";
+                pg_query_params($connection, "INSERT INTO admin_notifications (message) VALUES ($1)", [$notification_msg]);
+                
+                // Audit Trail
+                $auditLogger->logEvent(
+                    'university_updated',
+                    'system_data',
+                    "Updated university (ID: {$university_id}): {$oldValues['name']} → {$name}",
+                    [
+                        'user_id' => $_SESSION['admin_id'] ?? null,
+                        'user_type' => 'admin',
+                        'username' => $_SESSION['admin_username'] ?? 'Unknown',
+                        'affected_table' => 'universities',
+                        'affected_record_id' => $university_id,
+                        'old_values' => [
+                            'name' => $oldValues['name'],
+                            'code' => $oldValues['code']
+                        ],
+                        'new_values' => [
+                            'name' => $name,
+                            'code' => $code
+                        ],
+                        'metadata' => [
+                            'action' => 'edit',
+                            'admin_role' => $current_admin_role
+                        ]
+                    ]
+                );
+                
+                $success = "University updated successfully!";
+            } else {
+                $error = "Failed to update university. Code may already exist.";
             }
         }
     }
@@ -50,15 +149,91 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $municipality_id = 1; // Default municipality
         
         if (!empty($name)) {
-            $insertQuery = "INSERT INTO barangays (municipality_id, name) VALUES ($1, $2)";
+            $insertQuery = "INSERT INTO barangays (municipality_id, name) VALUES ($1, $2) RETURNING barangay_id";
             $result = pg_query_params($connection, $insertQuery, [$municipality_id, $name]);
             
             if ($result) {
+                $new_barangay = pg_fetch_assoc($result);
+                $barangay_id = $new_barangay['barangay_id'];
+                
                 $notification_msg = "New barangay added: " . $name;
                 pg_query_params($connection, "INSERT INTO admin_notifications (message) VALUES ($1)", [$notification_msg]);
+                
+                // Audit Trail
+                $auditLogger->logEvent(
+                    'barangay_added',
+                    'system_data',
+                    "Added new barangay: {$name}",
+                    [
+                        'user_id' => $_SESSION['admin_id'] ?? null,
+                        'user_type' => 'admin',
+                        'username' => $_SESSION['admin_username'] ?? 'Unknown',
+                        'affected_table' => 'barangays',
+                        'affected_record_id' => $barangay_id,
+                        'new_values' => [
+                            'barangay_id' => $barangay_id,
+                            'name' => $name,
+                            'municipality_id' => $municipality_id
+                        ],
+                        'metadata' => [
+                            'action' => 'add',
+                            'admin_role' => $current_admin_role
+                        ]
+                    ]
+                );
+                
                 $success = "Barangay added successfully!";
             } else {
                 $error = "Failed to add barangay.";
+            }
+        }
+    }
+    
+    // Edit Barangay
+    if (isset($_POST['edit_barangay'])) {
+        $barangay_id = intval($_POST['barangay_id']);
+        $name = trim($_POST['barangay_name']);
+        
+        if (!empty($name)) {
+            // Get old values for audit
+            $oldQuery = "SELECT name FROM barangays WHERE barangay_id = $1";
+            $oldResult = pg_query_params($connection, $oldQuery, [$barangay_id]);
+            $oldValues = pg_fetch_assoc($oldResult);
+            
+            $updateQuery = "UPDATE barangays SET name = $1 WHERE barangay_id = $2";
+            $result = pg_query_params($connection, $updateQuery, [$name, $barangay_id]);
+            
+            if ($result) {
+                $notification_msg = "Barangay updated: " . $name;
+                pg_query_params($connection, "INSERT INTO admin_notifications (message) VALUES ($1)", [$notification_msg]);
+                
+                // Audit Trail
+                $auditLogger->logEvent(
+                    'barangay_updated',
+                    'system_data',
+                    "Updated barangay (ID: {$barangay_id}): {$oldValues['name']} → {$name}",
+                    [
+                        'user_id' => $_SESSION['admin_id'] ?? null,
+                        'user_type' => 'admin',
+                        'username' => $_SESSION['admin_username'] ?? 'Unknown',
+                        'affected_table' => 'barangays',
+                        'affected_record_id' => $barangay_id,
+                        'old_values' => [
+                            'name' => $oldValues['name']
+                        ],
+                        'new_values' => [
+                            'name' => $name
+                        ],
+                        'metadata' => [
+                            'action' => 'edit',
+                            'admin_role' => $current_admin_role
+                        ]
+                    ]
+                );
+                
+                $success = "Barangay updated successfully!";
+            } else {
+                $error = "Failed to update barangay.";
             }
         }
     }
@@ -75,12 +250,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($checkData['count'] > 0) {
             $error = "Cannot delete university. It is currently assigned to " . $checkData['count'] . " student(s).";
         } else {
+            // Get university details for audit before deletion
+            $getQuery = "SELECT name, code FROM universities WHERE university_id = $1";
+            $getResult = pg_query_params($connection, $getQuery, [$university_id]);
+            $universityData = pg_fetch_assoc($getResult);
+            
             $deleteQuery = "DELETE FROM universities WHERE university_id = $1";
             $result = pg_query_params($connection, $deleteQuery, [$university_id]);
             
             if ($result) {
-                $notification_msg = "University deleted (ID: " . $university_id . ")";
+                $notification_msg = "University deleted: {$universityData['name']} (ID: {$university_id})";
                 pg_query_params($connection, "INSERT INTO admin_notifications (message) VALUES ($1)", [$notification_msg]);
+                
+                // Audit Trail
+                $auditLogger->logEvent(
+                    'university_deleted',
+                    'system_data',
+                    "Deleted university: {$universityData['name']} ({$universityData['code']})",
+                    [
+                        'user_id' => $_SESSION['admin_id'] ?? null,
+                        'user_type' => 'admin',
+                        'username' => $_SESSION['admin_username'] ?? 'Unknown',
+                        'affected_table' => 'universities',
+                        'affected_record_id' => $university_id,
+                        'old_values' => [
+                            'university_id' => $university_id,
+                            'name' => $universityData['name'],
+                            'code' => $universityData['code']
+                        ],
+                        'metadata' => [
+                            'action' => 'delete',
+                            'admin_role' => $current_admin_role,
+                            'reason' => 'No students assigned'
+                        ]
+                    ]
+                );
+                
                 $success = "University deleted successfully!";
             }
         }
@@ -98,12 +303,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($checkData['count'] > 0) {
             $error = "Cannot delete barangay. It is currently assigned to " . $checkData['count'] . " student(s).";
         } else {
+            // Get barangay details for audit before deletion
+            $getQuery = "SELECT name FROM barangays WHERE barangay_id = $1";
+            $getResult = pg_query_params($connection, $getQuery, [$barangay_id]);
+            $barangayData = pg_fetch_assoc($getResult);
+            
             $deleteQuery = "DELETE FROM barangays WHERE barangay_id = $1";
             $result = pg_query_params($connection, $deleteQuery, [$barangay_id]);
             
             if ($result) {
-                $notification_msg = "Barangay deleted (ID: " . $barangay_id . ")";
+                $notification_msg = "Barangay deleted: {$barangayData['name']} (ID: {$barangay_id})";
                 pg_query_params($connection, "INSERT INTO admin_notifications (message) VALUES ($1)", [$notification_msg]);
+                
+                // Audit Trail
+                $auditLogger->logEvent(
+                    'barangay_deleted',
+                    'system_data',
+                    "Deleted barangay: {$barangayData['name']}",
+                    [
+                        'user_id' => $_SESSION['admin_id'] ?? null,
+                        'user_type' => 'admin',
+                        'username' => $_SESSION['admin_username'] ?? 'Unknown',
+                        'affected_table' => 'barangays',
+                        'affected_record_id' => $barangay_id,
+                        'old_values' => [
+                            'barangay_id' => $barangay_id,
+                            'name' => $barangayData['name']
+                        ],
+                        'metadata' => [
+                            'action' => 'delete',
+                            'admin_role' => $current_admin_role,
+                            'reason' => 'No students assigned'
+                        ]
+                    ]
+                );
+                
                 $success = "Barangay deleted successfully!";
             }
         }
@@ -125,6 +359,34 @@ $yearLevels = pg_fetch_all($yearLevelsResult) ?: [];
 
 // Page title for shared admin header/topbar components
 $page_title = 'System Data Management';
+
+// Handle success messages from redirects
+if (isset($_GET['success'])) {
+    switch ($_GET['success']) {
+        case 'university_added':
+            $success = "University added successfully!";
+            break;
+        case 'university_updated':
+            $success = "University updated successfully!";
+            break;
+        case 'university_deleted':
+            $success = "University deleted successfully!";
+            break;
+        case 'barangay_added':
+            $success = "Barangay added successfully!";
+            break;
+        case 'barangay_updated':
+            $success = "Barangay updated successfully!";
+            break;
+        case 'barangay_deleted':
+            $success = "Barangay deleted successfully!";
+            break;
+    }
+}
+
+if (isset($_GET['error'])) {
+    $error = htmlspecialchars($_GET['error']);
+}
 ?>
 
 <!DOCTYPE html>
@@ -137,6 +399,7 @@ $page_title = 'System Data Management';
     <link rel="stylesheet" href="../../assets/css/bootstrap-icons.css" />
     <link rel="stylesheet" href="../../assets/css/admin/homepage.css" />
     <link rel="stylesheet" href="../../assets/css/admin/sidebar.css" />
+    <link rel="stylesheet" href="../../assets/css/admin/modern-ui.css" />
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet" />
 </head>
 <body>
@@ -164,7 +427,29 @@ $page_title = 'System Data Management';
                 <div class="modern-alert modern-alert-danger"><?= htmlspecialchars($error) ?></div>
             <?php endif; ?>
 
-            <!-- Universities List -->
+            <!-- Universities Management -->
+            <div class="modern-card mb-4">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-building me-2"></i>Universities Management</h5>
+                    <span class="badge bg-light text-dark"><?= count($universities) ?> universities</span>
+                </div>
+                <div class="card-body p-4">
+                    <!-- Controls Row -->
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addUniversityModal">
+                                <i class="bi bi-plus"></i> Add University
+                            </button>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="input-group">
+                                <input type="text" class="form-control" id="universitySearch" placeholder="Search universities...">
+                                <span class="input-group-text"><i class="bi bi-search"></i></span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Universities List -->
                     <div class="table-responsive">
                         <table class="table modern-table" id="universitiesTable">
                             <thead>
@@ -184,12 +469,15 @@ $page_title = 'System Data Management';
                                         <td><?= $university['student_count'] ?> students</td>
                                         <td><?= date('M d, Y', strtotime($university['created_at'])) ?></td>
                                         <td>
+                                            <button type="button" class="btn btn-sm btn-outline-primary me-1" onclick="showEditUniversityModal(<?= $university['university_id'] ?>, '<?= htmlspecialchars($university['name'], ENT_QUOTES) ?>', '<?= htmlspecialchars($university['code'], ENT_QUOTES) ?>')">
+                                                <i class="bi bi-pencil"></i> Edit
+                                            </button>
                                             <?php if ($university['student_count'] == 0): ?>
                                                 <button type="button" class="btn btn-sm btn-outline-danger" onclick="showDeleteUniversityModal(<?= $university['university_id'] ?>, '<?= htmlspecialchars($university['name'], ENT_QUOTES) ?>')">
                                                     <i class="bi bi-trash"></i> Delete
                                                 </button>
                                             <?php else: ?>
-                                                <span class="text-muted">Cannot delete (has students)</span>
+                                                <span class="text-muted small">(<?= $university['student_count'] ?> students)</span>
                                             <?php endif; ?>
                                         </td>
                                     </tr>
@@ -201,7 +489,7 @@ $page_title = 'System Data Management';
                     <!-- Pagination Controls -->
                     <div class="d-flex justify-content-between align-items-center mt-3">
                         <div>
-                            <select id="universitiesPerPage" class="form-select form-select modern-form-control-sm" style="width: auto;">
+                            <select id="universitiesPerPage" class="form-select form-select-sm" style="width: auto;">
                                 <option value="10">10 per page</option>
                                 <option value="25" selected>25 per page</option>
                                 <option value="50">50 per page</option>
@@ -217,6 +505,8 @@ $page_title = 'System Data Management';
                             </nav>
                         </div>
                     </div>
+                </div>
+            </div>
 
             <!-- Barangays Management (now inside same container to align with Universities) -->
             <div class="modern-card mb-4">
@@ -228,13 +518,13 @@ $page_title = 'System Data Management';
                     <!-- Controls Row -->
                     <div class="row mb-3">
                         <div class="col-md-6">
-                            <button type="button" class="modern-btn modern-btn-success" data-bs-toggle="modal" data-bs-target="#addBarangayModal">
+                            <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addBarangayModal">
                                 <i class="bi bi-plus"></i> Add Barangay
                             </button>
                         </div>
                         <div class="col-md-6">
                             <div class="input-group">
-                                <input type="text" class="modern-form-control" id="barangaySearch" placeholder="Search barangays...">
+                                <input type="text" class="form-control" id="barangaySearch" placeholder="Search barangays...">
                                 <span class="input-group-text"><i class="bi bi-search"></i></span>
                             </div>
                         </div>
@@ -256,12 +546,15 @@ $page_title = 'System Data Management';
                                         <td><?= htmlspecialchars($barangay['name']) ?></td>
                                         <td><?= $barangay['student_count'] ?> students</td>
                                         <td>
+                                            <button type="button" class="btn btn-sm btn-outline-primary me-1" onclick="showEditBarangayModal(<?= $barangay['barangay_id'] ?>, '<?= htmlspecialchars($barangay['name'], ENT_QUOTES) ?>')">
+                                                <i class="bi bi-pencil"></i> Edit
+                                            </button>
                                             <?php if ($barangay['student_count'] == 0): ?>
                                                 <button type="button" class="btn btn-sm btn-outline-danger" onclick="showDeleteBarangayModal(<?= $barangay['barangay_id'] ?>, '<?= htmlspecialchars($barangay['name'], ENT_QUOTES) ?>')">
                                                     <i class="bi bi-trash"></i> Delete
                                                 </button>
                                             <?php else: ?>
-                                                <span class="text-muted">Cannot delete (has students)</span>
+                                                <span class="text-muted small">(<?= $barangay['student_count'] ?> students)</span>
                                             <?php endif; ?>
                                         </td>
                                     </tr>
@@ -273,7 +566,7 @@ $page_title = 'System Data Management';
                     <!-- Pagination Controls -->
                     <div class="d-flex justify-content-between align-items-center mt-3">
                         <div>
-                            <select id="barangaysPerPage" class="form-select form-select modern-form-control-sm" style="width: auto;">
+                            <select id="barangaysPerPage" class="form-select form-select-sm" style="width: auto;">
                                 <option value="10">10 per page</option>
                                 <option value="25" selected>25 per page</option>
                                 <option value="50">50 per page</option>
@@ -336,19 +629,51 @@ $page_title = 'System Data Management';
             <form method="POST" id="addUniversityForm">
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label for="university_name" class="modern-form-label">University Name <span class="text-danger">*</span></label>
-                        <input type="text" class="modern-form-control" id="university_name" name="university_name" required>
+                        <label for="university_name" class="form-label">University Name <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="university_name" name="university_name" required>
                     </div>
                     <div class="mb-3">
-                        <label for="university_code" class="modern-form-label">University Code <span class="text-danger">*</span></label>
-                        <input type="text" class="modern-form-control" id="university_code" name="university_code" placeholder="e.g., UST" maxlength="10" required>
+                        <label for="university_code" class="form-label">University Code <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="university_code" name="university_code" placeholder="e.g., UST" maxlength="10" required>
                         <small class="text-muted">Short code/abbreviation for the university</small>
                     </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" name="add_university" class="modern-btn modern-btn-primary">
+                    <button type="submit" name="add_university" class="btn btn-primary">
                         <i class="bi bi-plus"></i> Add University
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit University Modal -->
+<div class="modal fade" id="editUniversityModal" tabindex="-1" aria-labelledby="editUniversityModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content modern-modal-content">
+            <div class="modal-header modern-modal-header">
+                <h5 class="modal-title" id="editUniversityModalLabel"><i class="bi bi-pencil me-2"></i>Edit University</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="POST" id="editUniversityForm">
+                <div class="modal-body">
+                    <input type="hidden" id="edit_university_id" name="university_id">
+                    <div class="mb-3">
+                        <label for="edit_university_name" class="form-label">University Name <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="edit_university_name" name="university_name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit_university_code" class="form-label">University Code <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="edit_university_code" name="university_code" placeholder="e.g., UST" maxlength="10" required>
+                        <small class="text-muted">Short code/abbreviation for the university</small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" name="edit_university" class="btn btn-primary">
+                        <i class="bi bi-save"></i> Save Changes
                     </button>
                 </div>
             </form>
@@ -367,14 +692,41 @@ $page_title = 'System Data Management';
             <form method="POST" id="addBarangayForm">
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label for="barangay_name" class="modern-form-label">Barangay Name <span class="text-danger">*</span></label>
-                        <input type="text" class="modern-form-control" id="barangay_name" name="barangay_name" required>
+                        <label for="barangay_name" class="form-label">Barangay Name <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="barangay_name" name="barangay_name" required>
                     </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" name="add_barangay" class="modern-btn modern-btn-success">
+                    <button type="submit" name="add_barangay" class="btn btn-success">
                         <i class="bi bi-plus"></i> Add Barangay
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Barangay Modal -->
+<div class="modal fade" id="editBarangayModal" tabindex="-1" aria-labelledby="editBarangayModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content modern-modal-content">
+            <div class="modal-header modern-modal-header">
+                <h5 class="modal-title" id="editBarangayModalLabel"><i class="bi bi-pencil me-2"></i>Edit Barangay</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="POST" id="editBarangayForm">
+                <div class="modal-body">
+                    <input type="hidden" id="edit_barangay_id" name="barangay_id">
+                    <div class="mb-3">
+                        <label for="edit_barangay_name" class="form-label">Barangay Name <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="edit_barangay_name" name="barangay_name" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" name="edit_barangay" class="btn btn-success">
+                        <i class="bi bi-save"></i> Save Changes
                     </button>
                 </div>
             </form>
@@ -442,6 +794,19 @@ $page_title = 'System Data Management';
 <script src="../../assets/js/admin/sidebar.js"></script>
 
 <script>
+// Debug form submission
+document.addEventListener('DOMContentLoaded', function() {
+    const addUniversityForm = document.getElementById('addUniversityForm');
+    
+    addUniversityForm.addEventListener('submit', function(e) {
+        console.log('Form submitted!');
+        console.log('Form data:', {
+            name: document.getElementById('university_name').value,
+            code: document.getElementById('university_code').value
+        });
+    });
+});
+
 // Pagination and Search functionality
 class TableManager {
     constructor(tableId, searchId, perPageId, paginationId, infoId) {
@@ -613,10 +978,41 @@ function showDeleteBarangayModal(barangayId, barangayName) {
     new bootstrap.Modal(document.getElementById('deleteBarangayModal')).show();
 }
 
+// Functions for edit modals
+function showEditUniversityModal(universityId, universityName, universityCode) {
+    document.getElementById('edit_university_id').value = universityId;
+    document.getElementById('edit_university_name').value = universityName;
+    document.getElementById('edit_university_code').value = universityCode;
+    new bootstrap.Modal(document.getElementById('editUniversityModal')).show();
+}
+
+function showEditBarangayModal(barangayId, barangayName) {
+    document.getElementById('edit_barangay_id').value = barangayId;
+    document.getElementById('edit_barangay_name').value = barangayName;
+    new bootstrap.Modal(document.getElementById('editBarangayModal')).show();
+}
+
 // Form validation
 document.getElementById('addUniversityForm').addEventListener('submit', function(e) {
     const name = document.getElementById('university_name').value.trim();
     const code = document.getElementById('university_code').value.trim();
+    
+    if (!name || !code) {
+        e.preventDefault();
+        alert('Please fill in all required fields.');
+        return false;
+    }
+    
+    if (code.length > 10) {
+        e.preventDefault();
+        alert('University code must be 10 characters or less.');
+        return false;
+    }
+});
+
+document.getElementById('editUniversityForm').addEventListener('submit', function(e) {
+    const name = document.getElementById('edit_university_name').value.trim();
+    const code = document.getElementById('edit_university_code').value.trim();
     
     if (!name || !code) {
         e.preventDefault();
@@ -641,13 +1037,31 @@ document.getElementById('addBarangayForm').addEventListener('submit', function(e
     }
 });
 
+document.getElementById('editBarangayForm').addEventListener('submit', function(e) {
+    const name = document.getElementById('edit_barangay_name').value.trim();
+    
+    if (!name) {
+        e.preventDefault();
+        alert('Please enter a barangay name.');
+        return false;
+    }
+});
+
 // Clear form when modal is closed
 document.getElementById('addUniversityModal').addEventListener('hidden.bs.modal', function () {
     document.getElementById('addUniversityForm').reset();
 });
 
+document.getElementById('editUniversityModal').addEventListener('hidden.bs.modal', function () {
+    document.getElementById('editUniversityForm').reset();
+});
+
 document.getElementById('addBarangayModal').addEventListener('hidden.bs.modal', function () {
     document.getElementById('addBarangayForm').reset();
+});
+
+document.getElementById('editBarangayModal').addEventListener('hidden.bs.modal', function () {
+    document.getElementById('editBarangayForm').reset();
 });
 </script>
 </body>
