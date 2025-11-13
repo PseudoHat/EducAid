@@ -248,10 +248,33 @@ if (isset($connection)) {
 
 $_SESSION['active_municipality_id'] = $municipality_id;
 
+// Check if this is an AJAX request (OCR, OTP processing, cleanup, or duplicate check)
+// Define this early so it can be used in page load tracking
+$isAjaxRequest = isset($_POST['sendOtp']) || isset($_POST['verifyOtp']) ||
+                 isset($_POST['processOcr']) || isset($_POST['processIdPictureOcr']) || isset($_POST['processLetterOcr']) ||
+                 isset($_POST['processCertificateOcr']) || isset($_POST['processGradesOcr']) ||
+                 isset($_POST['cleanup_temp']) || isset($_POST['check_existing']) || isset($_POST['test_db']) ||
+                 isset($_POST['check_school_student_id']) || isset($_POST['cleanup_session_files']) || isset($_POST['clear_registration_session']) ||
+                 (isset($_POST['action']) && in_array($_POST['action'], ['check_full_duplicate', 'check_email_duplicate', 'check_mobile_duplicate', 'check_name_duplicate', 'check_household_lastname', 'check_household_duplicate', 'update_block_contact']));
+
 // Initialize registration session tracking
 if (!isset($_SESSION['registration_session_id'])) {
     $_SESSION['registration_session_id'] = uniqid('reg_', true);
     $_SESSION['registration_start_time'] = time();
+    $_SESSION['page_load_count'] = 0; // Track page loads
+}
+
+// Track page loads to detect refreshes
+// Increment on every GET request (page load/refresh)
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && !$isAjaxRequest) {
+    $_SESSION['page_load_count'] = ($_SESSION['page_load_count'] ?? 0) + 1;
+    
+    // If this is a refresh (2nd+ page load) and NOT from a POST redirect,
+    // cleanup temp files from the current session
+    if ($_SESSION['page_load_count'] > 1 && !isset($_SESSION['registration_completed'])) {
+        // Set flag to trigger JavaScript cleanup on page load
+        $_SESSION['trigger_cleanup_on_load'] = true;
+    }
 }
 
 // Create session-specific prefix for file naming (prevents conflicts)
@@ -348,6 +371,41 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['cleanup_session_files
         ]);
     } catch (Exception $e) {
         echo json_encode(['status' => 'error', 'message' => 'Cleanup failed: ' . $e->getMessage()]);
+    }
+    exit;
+}
+
+// --- AJAX: Clear registration session completely (Start Fresh button) ---
+if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['clear_registration_session'])) {
+    while (ob_get_level() > 0) @ob_end_clean();
+    header('Content-Type: application/json');
+    
+    try {
+        // Clear all registration-related session variables
+        unset($_SESSION['registration_session_id']);
+        unset($_SESSION['registration_start_time']);
+        unset($_SESSION['page_load_count']);
+        unset($_SESSION['file_prefix']);
+        unset($_SESSION['uploaded_files']);
+        unset($_SESSION['temp_first_name']);
+        unset($_SESSION['temp_last_name']);
+        unset($_SESSION['otp_verified']);
+        unset($_SESSION['otp']);
+        unset($_SESSION['otp_email']);
+        unset($_SESSION['otp_timestamp']);
+        unset($_SESSION['household_bypass_active']);
+        unset($_SESSION['household_bypass_token']);
+        unset($_SESSION['household_bypass_attempt_id']);
+        unset($_SESSION['prefill_data']);
+        unset($_SESSION['trigger_cleanup_on_load']);
+        unset($_SESSION['registration_completed']);
+        
+        echo json_encode([
+            'status' => 'success',
+            'message' => 'Registration session cleared successfully'
+        ]);
+    } catch (Exception $e) {
+        echo json_encode(['status' => 'error', 'message' => 'Failed to clear session: ' . $e->getMessage()]);
     }
     exit;
 }
@@ -813,14 +871,6 @@ use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
 
 require __DIR__ . '/../../phpmailer/vendor/autoload.php';
-
-// Check if this is an AJAX request (OCR, OTP processing, cleanup, or duplicate check)
-$isAjaxRequest = isset($_POST['sendOtp']) || isset($_POST['verifyOtp']) ||
-                 isset($_POST['processOcr']) || isset($_POST['processIdPictureOcr']) || isset($_POST['processLetterOcr']) ||
-                 isset($_POST['processCertificateOcr']) || isset($_POST['processGradesOcr']) ||
-                 isset($_POST['cleanup_temp']) || isset($_POST['check_existing']) || isset($_POST['test_db']) ||
-                 isset($_POST['check_school_student_id']) ||
-                 (isset($_POST['action']) && in_array($_POST['action'], ['check_full_duplicate', 'check_email_duplicate', 'check_mobile_duplicate', 'check_name_duplicate', 'check_household_lastname', 'check_household_duplicate', 'update_block_contact']));
 
 // SEO Configuration
 require_once __DIR__ . '/../../includes/seo_helpers.php';
@@ -3908,7 +3958,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processGradesOcr'])) 
         // Save verification results for confidence calculation
         // Use session-based filename to prevent conflicts between multiple users
         $sessionPrefix = $_SESSION['file_prefix'] ?? 'session';
-        $confidenceFile = $uploadDir . $sessionPrefix . '_grades_confidence.json';
+        $confidenceFile = $uploadDir . DIRECTORY_SEPARATOR . $sessionPrefix . '_grades_confidence.json';
         @file_put_contents($confidenceFile, json_encode([
             'overall_confidence' => $verification['summary']['average_confidence'],
             'ocr_confidence' => $verification['summary']['average_confidence'],
@@ -5909,7 +5959,20 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['register'])) {
             unset($_SESSION['prefill_data']);
         }
 
+        // Clear OTP verification
         unset($_SESSION['otp_verified']);
+        
+        // Mark registration as completed (prevents cleanup on next visit)
+        $_SESSION['registration_completed'] = true;
+        
+        // Clear registration session data (files, prefixes, tracking)
+        unset($_SESSION['registration_session_id']);
+        unset($_SESSION['registration_start_time']);
+        unset($_SESSION['page_load_count']);
+        unset($_SESSION['file_prefix']);
+        unset($_SESSION['uploaded_files']);
+        unset($_SESSION['temp_first_name']);
+        unset($_SESSION['temp_last_name']);
 
         echo "<script>alert('Registration submitted successfully! Your application is under review. You will receive an email notification once approved.'); window.location.href = '../../unified_login.php';</script>";
         exit;
@@ -5929,9 +5992,14 @@ if (!$isAjaxRequest) {
 <!-- Main Registration Content -->
 <div class="container py-5">
         <div class="register-card mx-auto p-4 rounded shadow-sm bg-white" style="max-width: 600px;">
-            <h4 class="mb-4 text-center text-primary">
-                <i class="bi bi-person-plus-fill me-2"></i>Register for EducAid
-            </h4>
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h4 class="mb-0 text-primary">
+                    <i class="bi bi-person-plus-fill me-2"></i>Register for EducAid
+                </h4>
+                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="startFreshRegistration()" title="Clear all uploads and start over">
+                    <i class="bi bi-arrow-clockwise me-1"></i>Start Fresh
+                </button>
+            </div>
             
             <?php if (isset($_SESSION['bypass_success'])): ?>
                 <div class="alert alert-success alert-dismissible fade show" role="alert">
@@ -7817,6 +7885,230 @@ function validateSpecificField(field, value) {
                 error: 'Names can only contain letters, spaces, hyphens (-), and apostrophes (\')'
             };
         }
+        
+        // Additional gibberish/keyboard mashing checks for student names
+        const nameType = fieldName.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+        
+        // Must be at least 2 characters (except middle name which is optional)
+        if (value.trim().length < 2 && fieldName !== 'middle_name') {
+            return {
+                isValid: false,
+                error: `${nameType} must be at least 2 characters long`
+            };
+        }
+        
+        // Must contain at least one vowel (real names have vowels)
+        // EXCEPTION: Middle and last names can be 2-character consonant surnames (e.g., "Dy", "Ng", "Wu")
+        const isShortSurname = (fieldName === 'middle_name' || fieldName === 'last_name') && value.trim().length === 2;
+        if (!/[aeiouAEIOU]/.test(value) && !isShortSurname) {
+            return {
+                isValid: false,
+                error: `Please enter a valid ${nameType.toLowerCase()} (names typically contain vowels)`
+            };
+        }
+        
+        // Detect keyboard mashing patterns
+        // 1. Check for excessive repeated characters (e.g., "aaaa", "jjjj")
+        if (/(.)\1{3,}/.test(value.toLowerCase())) {
+            return {
+                isValid: false,
+                error: `Please enter a real ${nameType.toLowerCase()} (too many repeated characters detected)`
+            };
+        }
+        
+        // 2. Check for repeated 2-character patterns (e.g., "adadad", "asdasd")
+        // This catches things like "asdadawdasdad"
+        if (/(.{2})\1{2,}/.test(value.toLowerCase())) {
+            return {
+                isValid: false,
+                error: `Please enter a real ${nameType.toLowerCase()} (repeated pattern detected)`
+            };
+        }
+        
+        // 3. Check for repeated 3-character patterns (e.g., "abcabcabc")
+        if (/(.{3})\1{2,}/.test(value.toLowerCase())) {
+            return {
+                isValid: false,
+                error: `Please enter a real ${nameType.toLowerCase()} (repeated pattern detected)`
+            };
+        }
+        
+        // 4. Check for sequential keyboard patterns (horizontal rows)
+        const keyboardRows = [
+            'qwertyuiop',
+            'asdfghjkl',
+            'zxcvbnm',
+            'qazwsxedcrfvtgbyhnujmikolp' // vertical patterns
+        ];
+        
+        const lowerValue = value.toLowerCase().replace(/[^a-z]/g, '');
+        for (const row of keyboardRows) {
+            // Check for 4+ consecutive characters from same keyboard row
+            for (let i = 0; i < row.length - 3; i++) {
+                const pattern = row.substring(i, i + 4);
+                if (lowerValue.includes(pattern) || lowerValue.includes(pattern.split('').reverse().join(''))) {
+                    return {
+                        isValid: false,
+                        error: `Please enter a real ${nameType.toLowerCase()} (keyboard pattern detected)`
+                    };
+                }
+            }
+        }
+        
+        // 5. Check consonant-to-vowel ratio (real names have balanced ratios)
+        // EXCEPTION: Skip ratio check for 2-character surnames (e.g., "Dy", "Ng")
+        const consonants = (value.match(/[bcdfghjklmnpqrstvwxyzBCDFGHJKLMNPQRSTVWXYZ]/g) || []).length;
+        const vowels = (value.match(/[aeiouAEIOU]/g) || []).length;
+        if (consonants > 0 && vowels > 0 && !isShortSurname) {
+            const ratio = consonants / vowels;
+            // If ratio is > 5:1 for names, it's likely gibberish
+            if (ratio > 5) {
+                return {
+                    isValid: false,
+                    error: `Please enter a real ${nameType.toLowerCase()} (unusual letter pattern detected)`
+                };
+            }
+        }
+        
+        // 6. Check for single letters repeated with spaces (e.g., "a b c d")
+        const words = value.trim().split(/\s+/);
+        const singleLetterWords = words.filter(w => w.length === 1);
+        if (singleLetterWords.length >= 2) {
+            return {
+                isValid: false,
+                error: `Please enter a real ${nameType.toLowerCase()} (too many single-letter parts detected)`
+            };
+        }
+        
+        // 7. Check for low character diversity (names should use varied letters)
+        // Skip for 2-character surnames (e.g., "Dy", "Ng")
+        if (!isShortSurname && value.length >= 5) {
+            const uniqueChars = new Set(value.toLowerCase().replace(/[^a-z]/g, '').split('')).size;
+            const totalChars = value.replace(/[^a-z]/gi, '').length;
+            const diversityRatio = uniqueChars / totalChars;
+            
+            // If less than 40% unique characters, it's likely gibberish (e.g., "asdadawdasdad" has low diversity)
+            if (diversityRatio < 0.4) {
+                return {
+                    isValid: false,
+                    error: `Please enter a real ${nameType.toLowerCase()} (too many repeated letters detected)`
+                };
+            }
+        }
+    }
+    
+    // Mother's Full Maiden Name validation - prevent gibberish/keyboard mashing
+    if (fieldName === 'mothers_fullname') {
+        // Must contain only valid name characters
+        if (!/^[A-Za-z\s\-']+$/.test(value)) {
+            return {
+                isValid: false,
+                error: 'Mother\'s name can only contain letters, spaces, hyphens (-), and apostrophes (\')'
+            };
+        }
+        
+        // Split into words (must have at least 3 words - first, middle, and maiden surname)
+        const words = value.trim().split(/\s+/).filter(w => w.length > 0);
+        if (words.length < 3) {
+            return {
+                isValid: false,
+                error: 'Please enter mother\'s complete maiden name (at least first, middle, and last name)'
+            };
+        }
+        
+        // Each word must be at least 2 characters
+        for (const word of words) {
+            if (word.length < 2) {
+                return {
+                    isValid: false,
+                    error: 'Each part of the name must be at least 2 characters long'
+                };
+            }
+        }
+        
+        // Must contain at least one vowel (real names have vowels)
+        if (!/[aeiouAEIOU]/.test(value)) {
+            return {
+                isValid: false,
+                error: 'Please enter a valid name (names typically contain vowels)'
+            };
+        }
+        
+        // Detect keyboard mashing patterns
+        // 1. Check for excessive repeated characters (e.g., "aaaa", "jjjj")
+        if (/(.)\1{3,}/.test(value.toLowerCase())) {
+            return {
+                isValid: false,
+                error: 'Please enter a real name (too many repeated characters detected)'
+            };
+        }
+        
+        // 2. Check for repeated 2-character patterns (e.g., "adadad", "asdasd")
+        if (/(.{2})\1{2,}/.test(value.toLowerCase())) {
+            return {
+                isValid: false,
+                error: 'Please enter a real name (repeated pattern detected)'
+            };
+        }
+        
+        // 3. Check for repeated 3-character patterns (e.g., "abcabcabc")
+        if (/(.{3})\1{2,}/.test(value.toLowerCase())) {
+            return {
+                isValid: false,
+                error: 'Please enter a real name (repeated pattern detected)'
+            };
+        }
+        
+        // 4. Check for sequential keyboard patterns (horizontal rows)
+        const keyboardRows = [
+            'qwertyuiop',
+            'asdfghjkl',
+            'zxcvbnm',
+            'qazwsxedcrfvtgbyhnujmikolp' // vertical patterns
+        ];
+        
+        const lowerValue = value.toLowerCase().replace(/[^a-z]/g, '');
+        for (const row of keyboardRows) {
+            // Check for 4+ consecutive characters from same keyboard row
+            for (let i = 0; i < row.length - 3; i++) {
+                const pattern = row.substring(i, i + 4);
+                if (lowerValue.includes(pattern) || lowerValue.includes(pattern.split('').reverse().join(''))) {
+                    return {
+                        isValid: false,
+                        error: 'Please enter a real name (keyboard pattern detected)'
+                    };
+                }
+            }
+        }
+        
+        // 5. Check consonant-to-vowel ratio (real names have balanced ratios)
+        const consonants = (value.match(/[bcdfghjklmnpqrstvwxyzBCDFGHJKLMNPQRSTVWXYZ]/g) || []).length;
+        const vowels = (value.match(/[aeiouAEIOU]/g) || []).length;
+        if (consonants > 0 && vowels > 0) {
+            const ratio = consonants / vowels;
+            // If ratio is > 6:1, it's likely gibberish (e.g., "hsjkfhlnds" has ratio ~9:1)
+            if (ratio > 6) {
+                return {
+                    isValid: false,
+                    error: 'Please enter a real name (unusual letter pattern detected)'
+                };
+            }
+        }
+        
+        // 6. Check for low character diversity (names should use varied letters)
+        if (value.length >= 5) {
+            const uniqueChars = new Set(value.toLowerCase().replace(/[^a-z]/g, '').split('')).size;
+            const totalChars = value.replace(/[^a-z]/gi, '').length;
+            const diversityRatio = uniqueChars / totalChars;
+            
+            // If less than 40% unique characters, it's likely gibberish
+            if (diversityRatio < 0.4) {
+                return {
+                    isValid: false,
+                    error: 'Please enter a real name (too many repeated letters detected)'
+                };
+            }
+        }
     }
     
     // Date validation
@@ -9057,6 +9349,111 @@ function setupHouseholdWarning() {
     });
 }
 
+// Check student name fields for gibberish/keyboard mashing
+function setupStudentNameValidation() {
+    const nameFields = [
+        { input: document.querySelector('input[name="first_name"]'), label: 'First Name' },
+        { input: document.querySelector('input[name="middle_name"]'), label: 'Middle Name' },
+        { input: document.querySelector('input[name="last_name"]'), label: 'Last Name' }
+    ];
+    
+    nameFields.forEach(({ input, label }) => {
+        if (!input) return;
+        
+        // Create warning div if it doesn't exist
+        let warningDiv = input.parentElement.querySelector('.name-validation-warning');
+        if (!warningDiv) {
+            warningDiv = document.createElement('div');
+            warningDiv.className = 'name-validation-warning alert mt-2';
+            warningDiv.style.display = 'none';
+            input.parentElement.appendChild(warningDiv);
+        }
+        
+        input.addEventListener('blur', function() {
+            const value = this.value.trim();
+            
+            // Clear previous warnings
+            warningDiv.style.display = 'none';
+            this.classList.remove('is-invalid');
+            this.style.borderColor = '';
+            
+            // Middle name is optional, so skip validation if empty
+            if (!value && input.name === 'middle_name') return;
+            
+            if (!value) return; // Empty is handled by required validation
+            
+            // Validate using the same logic as validateSpecificField
+            const validation = validateSpecificField(this, value);
+            
+            if (!validation.isValid) {
+                warningDiv.textContent = '⚠️ ' + validation.error;
+                warningDiv.className = 'name-validation-warning alert alert-danger mt-2';
+                warningDiv.style.display = 'block';
+                this.classList.add('is-invalid');
+                this.style.borderColor = '#dc3545';
+                
+                // Also show notifier for immediate feedback
+                showNotifier(validation.error, 'error');
+            }
+        });
+        
+        // Clear validation on input
+        input.addEventListener('input', function() {
+            warningDiv.style.display = 'none';
+            this.classList.remove('is-invalid');
+            this.style.borderColor = '';
+        });
+    });
+}
+
+// Check mother's full name for gibberish/keyboard mashing
+function setupMothersFullNameValidation() {
+    const mothersFullNameInput = document.querySelector('input[name="mothers_fullname"]');
+    
+    if (!mothersFullNameInput) return;
+    
+    // Create warning div if it doesn't exist
+    let warningDiv = mothersFullNameInput.parentElement.querySelector('.mothers-name-warning');
+    if (!warningDiv) {
+        warningDiv = document.createElement('div');
+        warningDiv.className = 'mothers-name-warning alert mt-2';
+        warningDiv.style.display = 'none';
+        mothersFullNameInput.parentElement.appendChild(warningDiv);
+    }
+    
+    mothersFullNameInput.addEventListener('blur', function() {
+        const value = this.value.trim();
+        
+        // Clear previous warnings
+        warningDiv.style.display = 'none';
+        this.classList.remove('is-invalid');
+        this.style.borderColor = '';
+        
+        if (!value) return; // Empty is handled by required validation
+        
+        // Validate using the same logic as validateSpecificField
+        const validation = validateSpecificField(this, value);
+        
+        if (!validation.isValid) {
+            warningDiv.textContent = '⚠️ ' + validation.error;
+            warningDiv.className = 'mothers-name-warning alert alert-danger mt-2';
+            warningDiv.style.display = 'block';
+            this.classList.add('is-invalid');
+            this.style.borderColor = '#dc3545';
+            
+            // Also show notifier for immediate feedback
+            showNotifier(validation.error, 'error');
+        }
+    });
+    
+    // Clear validation on input
+    mothersFullNameInput.addEventListener('input', function() {
+        warningDiv.style.display = 'none';
+        this.classList.remove('is-invalid');
+        this.style.borderColor = '';
+    });
+}
+
 // ============================================================
 // HOUSEHOLD DUPLICATE PREVENTION SYSTEM
 // Using: Surname + Mother's Maiden Name + Barangay
@@ -9438,6 +9835,18 @@ function setupPasswordStrength() {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
+    // Auto-cleanup on page refresh (if triggered by PHP)
+    <?php if (isset($_SESSION['trigger_cleanup_on_load']) && $_SESSION['trigger_cleanup_on_load'] === true): ?>
+    console.log('🔄 Page refresh detected - cleaning up temp files...');
+    cleanupSessionFiles().then(() => {
+        console.log('✅ Temp files cleaned on refresh');
+    });
+    <?php 
+    // Clear the flag after triggering
+    unset($_SESSION['trigger_cleanup_on_load']); 
+    ?>
+    <?php endif; ?>
+    
     setupRealTimeValidation();
     setupFileUploadHandlers();
     setupOtpHandlers();
@@ -9446,6 +9855,8 @@ document.addEventListener('DOMContentLoaded', function() {
     setupMobileDuplicateCheck(); // Add mobile duplicate check
     setupNameDuplicateCheck(); // Add name duplicate check
     setupHouseholdWarning(); // Add household warning check (old system)
+    setupStudentNameValidation(); // NEW: Validate student name fields for gibberish
+    setupMothersFullNameValidation(); // NEW: Validate mother's full name for gibberish
     setupMothersMaidenNameValidation(); // NEW: Mother's maiden name validation
     setupBarangayHouseholdCheck(); // NEW: Barangay change triggers household check
     setupPasswordStrength();
@@ -9469,6 +9880,46 @@ document.addEventListener('DOMContentLoaded', function() {
 // ============================================
 // SESSION CLEANUP & FILE MANAGEMENT
 // ============================================
+
+// Start fresh registration - clear all data and reload
+async function startFreshRegistration() {
+    const confirmed = confirm('Are you sure you want to start fresh? This will:\n\n• Clear all uploaded files\n• Reset the registration form\n• Clear your progress\n\nThis action cannot be undone.');
+    
+    if (!confirmed) return;
+    
+    try {
+        // Show loading indicator
+        showNotifier('Clearing session data...', 'info');
+        
+        // Cleanup files
+        await cleanupSessionFiles();
+        
+        // Clear session via server (create a new endpoint for this)
+        const formData = new FormData();
+        formData.append('clear_registration_session', '1');
+        
+        const response = await fetch('student_register.php', {
+            method: 'POST',
+            body: formData
+        });
+        
+        if (response.ok) {
+            showNotifier('Session cleared! Reloading page...', 'success');
+            // Wait a bit then reload
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+        } else {
+            throw new Error('Failed to clear session');
+        }
+    } catch (error) {
+        console.error('Error clearing session:', error);
+        showNotifier('Failed to clear session completely, but files were removed. Please refresh the page.', 'warning');
+        setTimeout(() => {
+            window.location.reload();
+        }, 2000);
+    }
+}
 
 function setupSessionCleanup() {
     // Clean up old session files on page load

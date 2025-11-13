@@ -454,6 +454,7 @@ if (isset($_GET['error'])) {
                         <table class="table modern-table" id="universitiesTable">
                             <thead>
                                 <tr>
+                                    <th style="width: 50px;">#</th>
                                     <th>University Name</th>
                                     <th>Code</th>
                                     <th>Students</th>
@@ -462,8 +463,11 @@ if (isset($_GET['error'])) {
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php foreach ($universities as $university): ?>
+                                <?php 
+                                $displayNumber = 1;
+                                foreach ($universities as $university): ?>
                                     <tr>
+                                        <td><?= $displayNumber++ ?></td>
                                         <td><?= htmlspecialchars($university['name']) ?></td>
                                         <td><span class="modern-badge modern-badge-info"><?= htmlspecialchars($university['code']) ?></span></td>
                                         <td><?= $university['student_count'] ?> students</td>
@@ -535,14 +539,18 @@ if (isset($_GET['error'])) {
                         <table class="table modern-table" id="barangaysTable">
                             <thead>
                                 <tr>
+                                    <th style="width: 50px;">#</th>
                                     <th>Barangay Name</th>
                                     <th>Students</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php foreach ($barangays as $barangay): ?>
+                                <?php 
+                                $displayNumber = 1;
+                                foreach ($barangays as $barangay): ?>
                                     <tr>
+                                        <td><?= $displayNumber++ ?></td>
                                         <td><?= htmlspecialchars($barangay['name']) ?></td>
                                         <td><?= $barangay['student_count'] ?> students</td>
                                         <td>

@@ -929,25 +929,93 @@ while ($row = pg_fetch_assoc($barangaysResult)) {
                 font-size: 1rem;
             }
             
-            /* Table - Enable horizontal scroll */
+            /* Table - Mobile Card Style */
             .table-responsive {
-                overflow-x: auto;
-                -webkit-overflow-scrolling: touch;
+                border: none;
+                overflow: visible;
             }
             
-            .table {
-                min-width: 800px; /* Prevent table from being too cramped */
+            /* Hide table header on mobile */
+            .table thead {
+                display: none;
             }
             
-            .table thead th {
-                font-size: 0.75rem;
-                padding: 0.75rem 0.5rem;
-                white-space: nowrap;
+            /* Table body as card container */
+            .table tbody {
+                display: block;
             }
             
+            /* Each table row becomes a card */
+            .table tbody tr {
+                display: block;
+                background: white;
+                border: 2px solid #e2e8f0;
+                border-radius: 12px;
+                padding: 1rem;
+                margin-bottom: 1rem;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+                transition: all 0.3s ease;
+            }
+            
+            .table tbody tr:hover {
+                border-color: #2e7d32;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+                transform: translateY(-2px);
+            }
+            
+            /* Table cells become stacked rows */
             .table tbody td {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 0.65rem 0;
+                border-bottom: 1px solid #f8fafc;
                 font-size: 0.85rem;
-                padding: 0.75rem 0.5rem;
+            }
+            
+            .table tbody td:last-child {
+                border-bottom: none;
+            }
+            
+            /* Add labels using data attributes */
+            .table tbody td::before {
+                content: attr(data-label);
+                font-weight: 600;
+                color: #475569;
+                font-size: 0.85rem;
+                flex-shrink: 0;
+                margin-right: 1rem;
+            }
+            
+            /* Checkbox cell styling */
+            .table tbody td:first-child {
+                padding-top: 0;
+                margin-bottom: 0.5rem;
+                border-bottom: 2px solid #f1f5f9;
+            }
+            
+            .table tbody td:first-child::before {
+                content: "Select:";
+            }
+            
+            /* Actions cell at the bottom */
+            .table tbody td:last-child {
+                margin-top: 0.5rem;
+                padding-top: 0.75rem;
+                border-top: 2px solid #f1f5f9;
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+            
+            .table tbody td:last-child::before {
+                content: "Actions:";
+                width: 100%;
+                margin-bottom: 0.5rem;
+            }
+            
+            /* Actions buttons full width */
+            .table tbody td:last-child .btn {
+                width: 100%;
             }
             
             /* Action buttons in table */
@@ -1286,11 +1354,11 @@ while ($row = pg_fetch_assoc($barangaysResult)) {
                                 <i class="bi bi-info-circle me-2"></i>No blocked registration attempts found matching your criteria.
                             </div>
                         <?php else: ?>
-                            <!-- Mobile scroll hint -->
+                            <!-- Mobile layout hint -->
                             <div class="alert alert-info d-md-none mb-3">
-                                <small><i class="bi bi-arrow-left-right me-1"></i>Swipe left/right to view all columns</small>
+                                <small><i class="bi bi-card-list me-1"></i>Viewing in mobile-friendly card layout</small>
                             </div>
-                            <div class="table-responsive"
+                            <div class="table-responsive">
                                 <table class="table table-hover">
                                     <thead>
                                         <tr>
@@ -1310,16 +1378,16 @@ while ($row = pg_fetch_assoc($barangaysResult)) {
                                     <tbody>
                                         <?php foreach ($records as $record): ?>
                                             <tr>
-                                                <td>
+                                                <td data-label="Select">
                                                     <input type="checkbox" class="form-check-input record-checkbox" 
                                                            value="<?= $record['attempt_id'] ?>" 
                                                            onchange="updateBulkDeleteButton()">
                                                 </td>
-                                                <td>
+                                                <td data-label="Date/Time">
                                                     <div class="fw-semibold"><?= date('M d, Y', strtotime($record['blocked_at'])) ?></div>
                                                     <small class="text-muted"><?= date('h:i A', strtotime($record['blocked_at'])) ?></small>
                                                 </td>
-                                                <td>
+                                                <td data-label="Attempted Student">
                                                     <div class="fw-bold"><?= htmlspecialchars($record['attempted_first_name'] . ' ' . $record['attempted_last_name']) ?></div>
                                                     <small class="text-muted d-block">
                                                         <i class="bi bi-envelope me-1"></i><?= htmlspecialchars($record['attempted_email'] ?? 'N/A') ?>
@@ -1343,17 +1411,17 @@ while ($row = pg_fetch_assoc($barangaysResult)) {
                                                         </div>
                                                     <?php endif; ?>
                                                 </td>
-                                                <td class="fw-semibold"><?= htmlspecialchars($record['mothers_maiden_name_entered']) ?></td>
-                                                <td>
+                                                <td data-label="Mother's Name" class="fw-semibold"><?= htmlspecialchars($record['mothers_maiden_name_entered']) ?></td>
+                                                <td data-label="Barangay">
                                                     <span class="badge bg-secondary" style="font-size: 0.85rem;">
                                                         <?= htmlspecialchars($record['barangay_entered']) ?>
                                                     </span>
                                                 </td>
-                                                <td>
+                                                <td data-label="Blocked By (Existing)">
                                                     <div class="fw-bold text-primary"><?= htmlspecialchars($record['existing_first_name'] . ' ' . $record['existing_last_name']) ?></div>
                                                     <small class="text-muted"><i class="bi bi-hash me-1"></i><?= htmlspecialchars($record['existing_student_id']) ?></small>
                                                 </td>
-                                                <td>
+                                                <td data-label="Match Type">
                                                     <?php if ($record['match_type'] === 'exact'): ?>
                                                         <span class="badge bg-danger">
                                                             <i class="bi bi-exclamation-diamond-fill me-1"></i>Exact Match
@@ -1368,7 +1436,7 @@ while ($row = pg_fetch_assoc($barangaysResult)) {
                                                         </span>
                                                     <?php endif; ?>
                                                 </td>
-                                                <td>
+                                                <td data-label="Status">
                                                     <?php if ($record['admin_override'] == 't'): ?>
                                                         <span class="badge bg-success badge-override">
                                                             <i class="bi bi-check-circle-fill me-1"></i>Overridden
@@ -1386,7 +1454,7 @@ while ($row = pg_fetch_assoc($barangaysResult)) {
                                                         </span>
                                                     <?php endif; ?>
                                                 </td>
-                                                <td>
+                                                <td data-label="Actions">
                                                     <?php if ($record['admin_override'] != 't'): ?>
                                                         <button class="btn btn-sm btn-warning override-btn" 
                                                                 id="override-btn-<?= $record['attempt_id'] ?>"

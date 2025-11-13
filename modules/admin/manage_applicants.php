@@ -265,7 +265,6 @@ $csrfMigrationToken = ''; // Will be populated by AJAX fetch
 // Note: reject_documents token is NOT generated here—it's fetched via AJAX when the modal opens
 // to avoid rotation issues from the page auto-refresh mechanism.
 $csrfApproveApplicantToken = CSRFProtection::generateToken('approve_applicant');
-$csrfOverrideApplicantToken = CSRFProtection::generateToken('override_applicant');
 $csrfArchiveStudentToken = CSRFProtection::generateToken('archive_student');
 // For reject_documents, set empty placeholder - the actual token will be fetched via AJAX when modal opens
 $csrfRejectDocumentsToken = ''; // Will be populated by AJAX fetch
@@ -1181,25 +1180,21 @@ function render_table($applicants, $connection) {
                                         <a href="distribution_control.php" class="alert-link">Go to Distribution Control</a>
                                     </div>
                                 <?php else: ?>
-                                    <!-- Incomplete documents message - shown when documents are not complete -->
-                                    <span class="text-muted incomplete-message" style="display: <?= $isComplete ? 'none' : 'inline' ?>;">Incomplete documents</span>
-                                    
-                                    <!-- Verify button form - shown when documents are complete -->
-                                    <form method="POST" class="d-inline verify-form" style="display: <?= $isComplete ? 'inline' : 'none' ?>;" onsubmit="return confirm('Verify this student?');">
+                                    <!-- Verify button form - disabled when documents are incomplete -->
+                                    <form method="POST" class="d-inline verify-form" onsubmit="return confirm('Verify this student?');">
                                         <input type="hidden" name="student_id" value="<?= $student_id ?>">
                                         <input type="hidden" name="mark_verified" value="1">
                                         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfApproveApplicantToken) ?>">
-                                        <button class="btn btn-success btn-sm"><i class="bi bi-check-circle me-1"></i> Verify</button>
+                                        <button class="btn btn-success btn-sm" <?= !$isComplete ? 'disabled title="Please ensure all required documents are complete"' : '' ?>>
+                                            <i class="bi bi-check-circle me-1"></i> Verify
+                                        </button>
                                     </form>
                                     
-                                    <!-- Override Verify button - shown for super_admin when documents are incomplete -->
-                                    <?php if (!empty($_SESSION['admin_role']) && $_SESSION['admin_role'] === 'super_admin'): ?>
-                                    <form method="POST" class="d-inline ms-2 override-form" style="display: <?= $isComplete ? 'none' : 'inline' ?>;" onsubmit="return confirm('Override verification and mark this student as Active even without complete grades/documents?');">
-                                        <input type="hidden" name="student_id" value="<?= $student_id ?>">
-                                        <input type="hidden" name="mark_verified_override" value="1">
-                                        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfOverrideApplicantToken) ?>">
-                                        <button class="btn btn-warning btn-sm"><i class="bi bi-exclamation-triangle me-1"></i> Override Verify</button>
-                                    </form>
+                                    <?php if (!$isComplete): ?>
+                                    <!-- Incomplete documents message - shown when documents are not complete -->
+                                    <span class="text-muted incomplete-message ms-2">
+                                        <i class="bi bi-exclamation-circle me-1"></i>Incomplete documents
+                                    </span>
                                     <?php endif; ?>
                                     
                                     <!-- Reject Documents Button - opens modal for selective rejection -->
@@ -1269,8 +1264,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $applicantCsrfAction = null;
     if (!empty($_POST['mark_verified']) && isset($_POST['student_id'])) {
         $applicantCsrfAction = 'approve_applicant';
-    } elseif (!empty($_POST['mark_verified_override']) && isset($_POST['student_id'])) {
-        $applicantCsrfAction = 'override_applicant';
     } elseif (!empty($_POST['archive_student']) && isset($_POST['student_id'])) {
         $applicantCsrfAction = 'archive_student';
     } elseif (!empty($_POST['reject_documents']) && isset($_POST['student_id'])) {
@@ -1399,62 +1392,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             );
         }
         
-        // Redirect to refresh list
-        header('Location: ' . $_SERVER['PHP_SELF']);
-        exit;
-    }
-    // Override verify even if incomplete (super_admin only)
-    if (!empty($_POST['mark_verified_override']) && isset($_POST['student_id'])) {
-        // Check if approval is allowed
-        if (!$workflow_status['can_manage_applicants']) {
-            $_SESSION['error_message'] = "Cannot override approve applicants. Please start a distribution first.";
-            header('Location: ' . $_SERVER['PHP_SELF']);
-            exit;
-        }
-        
-        if (!empty($_SESSION['admin_role']) && $_SESSION['admin_role'] === 'super_admin') {
-            $sid = trim($_POST['student_id']);
-            // Get student name for notification
-            $studentQuery = pg_query_params($connection, "SELECT first_name, last_name FROM students WHERE student_id = $1", [$sid]);
-            $student = pg_fetch_assoc($studentQuery);
-
-            /** @phpstan-ignore-next-line */
-            pg_query_params($connection, 
-                "UPDATE students 
-                 SET status = 'active',
-                     needs_document_upload = FALSE,
-                     documents_to_reupload = NULL
-                 WHERE student_id = $1", 
-                [$sid]
-            );
-
-            // Move files from temp to permanent storage AND update documents table
-            require_once __DIR__ . '/../../services/UnifiedFileService.php';
-            $fileService = new UnifiedFileService($connection);
-            $fileMoveResult = $fileService->moveToPermStorage($sid, $_SESSION['admin_id']);
-            
-            if (!$fileMoveResult['success']) {
-                error_log("UnifiedFileService: Error moving files for student $sid (override): " . implode(', ', $fileMoveResult['errors'] ?? []));
-            }
-
-            // Add admin notification noting override
-            if ($student) {
-                $student_name = $student['first_name'] . ' ' . $student['last_name'];
-                $notification_msg = "OVERRIDE: Student promoted to active without complete grades/docs: " . $student_name . " (ID: " . $sid . ")";
-                pg_query_params($connection, "INSERT INTO admin_notifications (message) VALUES ($1)", [$notification_msg]);
-                
-                // Add student notification
-                createStudentNotification(
-                    $connection,
-                    $sid,
-                    'Application Approved!',
-                    'Your application has been approved. You are now an active student.',
-                    'success',
-                    'high',
-                    'student_dashboard.php'
-                );
-            }
-        }
         // Redirect to refresh list
         header('Location: ' . $_SERVER['PHP_SELF']);
         exit;
@@ -3190,55 +3127,45 @@ function refreshModalContent(modalEl, studentId, silent = false) {
 function updateModalFooterButtons(modalFooter, isComplete, studentId) {
     if (!modalFooter) return;
     
-    // Find the specific form elements using class names for reliable selection
+    // Find the verify button and incomplete message
     const verifyForm = modalFooter.querySelector('.verify-form');
-    const overrideForm = modalFooter.querySelector('.override-form');
+    const verifyBtn = verifyForm ? verifyForm.querySelector('button') : null;
     const incompleteSpan = modalFooter.querySelector('.incomplete-message');
     
     console.log('Updating footer buttons - Complete:', isComplete, 'Student:', studentId);
     console.log('Found elements:', {
         verifyForm: !!verifyForm,
-        overrideForm: !!overrideForm,
+        verifyBtn: !!verifyBtn,
         incompleteSpan: !!incompleteSpan
     });
     
     if (isComplete) {
-        // Documents are complete - show Verify button
-        if (verifyForm) {
-            verifyForm.style.display = 'inline';
-            console.log('✅ Showing Verify button');
+        // Documents are complete - enable Verify button
+        if (verifyBtn) {
+            verifyBtn.disabled = false;
+            verifyBtn.removeAttribute('title');
+            console.log('✅ Enabled Verify button');
         }
         
         // Hide "Incomplete documents" message
         if (incompleteSpan) {
             incompleteSpan.style.display = 'none';
-            console.log('✅ Hiding incomplete message');
-        }
-        
-        // Hide "Override Verify" button (only show for incomplete)
-        if (overrideForm) {
-            overrideForm.style.display = 'none';
-            console.log('✅ Hiding Override button');
+            console.log('✅ Hidden incomplete message');
         }
         
         console.log('✅ Documents complete - Verify button enabled for student:', studentId);
     } else {
-        // Documents are incomplete - hide Verify button
-        if (verifyForm) {
-            verifyForm.style.display = 'none';
-            console.log('⚠️ Hiding Verify button');
+        // Documents are incomplete - disable Verify button
+        if (verifyBtn) {
+            verifyBtn.disabled = true;
+            verifyBtn.setAttribute('title', 'Please ensure all required documents are complete');
+            console.log('⚠️ Disabled Verify button');
         }
         
         // Show "Incomplete documents" message
         if (incompleteSpan) {
             incompleteSpan.style.display = 'inline';
             console.log('⚠️ Showing incomplete message');
-        }
-        
-        // Show "Override Verify" button (for super admin, if it exists)
-        if (overrideForm) {
-            overrideForm.style.display = 'inline';
-            console.log('⚠️ Showing Override button');
         }
         
         console.log('⚠️ Documents incomplete - Verify button disabled for student:', studentId);
