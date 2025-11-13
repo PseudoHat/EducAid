@@ -168,6 +168,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         
                         // Delete database records
                         // Note: 'under_registration' students only have records in students and documents tables
+                        // and may have household_block_attempts references
+                        
+                        // First, nullify household_block_attempts references
+                        @pg_query_params($connection, 
+                            "UPDATE household_block_attempts SET blocked_by_student_id = NULL WHERE blocked_by_student_id = $1", 
+                            [$student_id]
+                        );
+                        
                         @pg_query_params($connection, "DELETE FROM documents WHERE student_id = $1", [$student_id]);
                         
                         // Delete the student record
@@ -413,7 +421,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // Note: Students with status 'under_registration' should ONLY have records in:
                 // - students table (main record)
                 // - documents table (uploaded verification documents)
+                // - household_block_attempts (if they blocked other registration attempts)
                 // They won't have records in distributions, qr_logs, grade_uploads, etc. since they haven't been approved yet
+                
+                // First, nullify or delete household_block_attempts references
+                // Option 1: Set blocked_by_student_id to NULL (preserve block history)
+                @pg_query_params($connection, 
+                    "UPDATE household_block_attempts SET blocked_by_student_id = NULL WHERE blocked_by_student_id = $1", 
+                    [$student_id]
+                );
+                
+                // Option 2 (alternative): Delete the block attempts entirely
+                // Uncomment this if you prefer to remove the block history when student is rejected
+                // @pg_query_params($connection, "DELETE FROM household_block_attempts WHERE blocked_by_student_id = $1", [$student_id]);
                 
                 // Delete uploaded documents
                 @pg_query_params($connection, "DELETE FROM documents WHERE student_id = $1", [$student_id]);
