@@ -630,8 +630,15 @@ while ($row = pg_fetch_assoc($barangaysResult)) {
                                                     </span>
                                                 </td>
                                                 <td data-label="Blocked By (Existing)">
-                                                    <div class="fw-bold text-primary"><?= htmlspecialchars($record['existing_first_name'] . ' ' . $record['existing_last_name']) ?></div>
-                                                    <small class="text-muted"><i class="bi bi-hash me-1"></i><?= htmlspecialchars($record['existing_student_id']) ?></small>
+                                                    <?php if (!empty($record['existing_student_id'])): ?>
+                                                        <div class="fw-bold text-primary"><?= htmlspecialchars($record['existing_first_name'] . ' ' . $record['existing_last_name']) ?></div>
+                                                        <small class="text-muted"><i class="bi bi-hash me-1"></i><?= htmlspecialchars($record['existing_student_id']) ?></small>
+                                                    <?php else: ?>
+                                                        <div class="text-muted fst-italic">
+                                                            <i class="bi bi-person-dash me-1"></i>Student Removed/Archived
+                                                        </div>
+                                                        <small class="text-muted">Original student no longer in system</small>
+                                                    <?php endif; ?>
                                                 </td>
                                                 <td data-label="Match Type">
                                                     <?php if ($record['match_type'] === 'exact'): ?>

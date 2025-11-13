@@ -83,6 +83,19 @@ class StudentArchivalService {
                 throw new Exception("Failed to archive student in database");
             }
             
+            // Handle household_block_attempts references (if student blocked other registrations)
+            // OPTION 1 (Default): Nullify references - preserves block history for audit trail
+            @pg_query_params($this->connection,
+                "UPDATE household_block_attempts SET blocked_by_student_id = NULL WHERE blocked_by_student_id = $1",
+                [$student_id]
+            );
+            
+            // OPTION 2 (Alternative): Delete orphaned attempts - uncomment if preferred
+            // @pg_query_params($this->connection,
+            //     "DELETE FROM household_block_attempts WHERE blocked_by_student_id = $1",
+            //     [$student_id]
+            // );
+            
             // Apply type-specific metadata updates
             $this->applyTypeSpecificUpdates($student_id, $archival_type, $metadata);
             

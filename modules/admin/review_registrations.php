@@ -170,11 +170,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         // Note: 'under_registration' students only have records in students and documents tables
                         // and may have household_block_attempts references
                         
-                        // First, nullify household_block_attempts references
+                        // OPTION 1 (Default): Nullify references - preserves block history for audit
                         @pg_query_params($connection, 
                             "UPDATE household_block_attempts SET blocked_by_student_id = NULL WHERE blocked_by_student_id = $1", 
                             [$student_id]
                         );
+                        
+                        // OPTION 2 (Alternative): Delete orphaned attempts - cleaner approach
+                        // Uncomment this instead of Option 1 to automatically clean up block attempts
+                        // This is useful when the blocked student is no longer relevant
+                        // @pg_query_params($connection, 
+                        //     "DELETE FROM household_block_attempts WHERE blocked_by_student_id = $1", 
+                        //     [$student_id]
+                        // );
                         
                         @pg_query_params($connection, "DELETE FROM documents WHERE student_id = $1", [$student_id]);
                         
@@ -424,16 +432,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // - household_block_attempts (if they blocked other registration attempts)
                 // They won't have records in distributions, qr_logs, grade_uploads, etc. since they haven't been approved yet
                 
-                // First, nullify or delete household_block_attempts references
-                // Option 1: Set blocked_by_student_id to NULL (preserve block history)
+                // OPTION 1 (Default): Nullify references - preserves block history for audit
                 @pg_query_params($connection, 
                     "UPDATE household_block_attempts SET blocked_by_student_id = NULL WHERE blocked_by_student_id = $1", 
                     [$student_id]
                 );
                 
-                // Option 2 (alternative): Delete the block attempts entirely
-                // Uncomment this if you prefer to remove the block history when student is rejected
-                // @pg_query_params($connection, "DELETE FROM household_block_attempts WHERE blocked_by_student_id = $1", [$student_id]);
+                // OPTION 2 (Alternative): Delete orphaned attempts - cleaner approach
+                // Uncomment this instead of Option 1 to automatically clean up block attempts
+                // This is useful when the blocked student is no longer relevant
+                // @pg_query_params($connection, 
+                //     "DELETE FROM household_block_attempts WHERE blocked_by_student_id = $1", 
+                //     [$student_id]
+                // );
                 
                 // Delete uploaded documents
                 @pg_query_params($connection, "DELETE FROM documents WHERE student_id = $1", [$student_id]);
