@@ -15,6 +15,16 @@
   --disabled-bg: #f3f4f6;
 }
 
+/* === PREVENT FOUC - Apply initial sidebar state === */
+html.sidebar-closed-initial #sidebar {
+  width: 70px;
+}
+
+html.sidebar-closed-initial .home-section {
+  margin-left: 70px;
+  width: calc(100% - 70px);
+}
+
 /* === SIDEBAR BASE (primary definition) === */
 .sidebar {
   position: fixed;

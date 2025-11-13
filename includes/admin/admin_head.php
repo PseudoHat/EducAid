@@ -20,6 +20,25 @@ if (!isset($page_title) || trim($page_title) === '') {
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title><?= htmlspecialchars($page_title) ?> - EducAid Admin</title>
+  
+  <!-- Prevent Flash of Unstyled Content (FOUC) -->
+  <style>
+    /* Hide body initially to prevent layout shift */
+    html { 
+      opacity: 0;
+      transition: opacity 0.1s ease-in;
+    }
+    html.ready { 
+      opacity: 1;
+    }
+    /* Ensure critical elements are positioned correctly from the start */
+    body {
+      margin: 0;
+      padding: 0;
+      overflow-x: hidden;
+    }
+  </style>
+  
   <link rel="stylesheet" href="../../assets/css/bootstrap.min.css" />
   <link rel="stylesheet" href="../../assets/css/bootstrap-icons.css" />
   <link rel="stylesheet" href="../../assets/css/admin/homepage.css" />
@@ -31,6 +50,19 @@ if (!isset($page_title) || trim($page_title) === '') {
   <!-- Admin JavaScript -->
   <script src="../../assets/js/admin/sidebar.js"></script>
   <script src="../../assets/js/admin/notification_bell.js"></script>
+  
+  <!-- Show page once CSS is loaded -->
+  <script>
+    // Mark HTML as ready once DOM is interactive (before images load)
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', function() {
+        document.documentElement.classList.add('ready');
+      });
+    } else {
+      // DOM already loaded
+      document.documentElement.classList.add('ready');
+    }
+  </script>
   
 <?php if (isset($GLOBALS['session_timeout_status']) && $GLOBALS['session_timeout_status']['status'] === 'active'): ?>
   <!-- Session Timeout Warning System -->
