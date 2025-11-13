@@ -1,6 +1,6 @@
 /* === GENERAL TRIAS COLOR PALETTE === */
 :root {
-  --admin-topbar-h: 44px;
+  --admin-topbar-h: 52px;
   --gt-blue: #1A70F0;
   --gt-sky: #57C3F0;
   --gt-cyan: #3BC5DC;
@@ -18,9 +18,9 @@
 /* === SIDEBAR BASE (primary definition) === */
 .sidebar {
   position: fixed;
-  top: var(--admin-topbar-h, 44px); /* ensure it sits BELOW fixed topbar */
+  top: var(--admin-topbar-h, 52px); /* ensure it sits BELOW fixed topbar */
   left: 0;
-  height: calc(100vh - var(--admin-topbar-h, 44px));
+  height: calc(100vh - var(--admin-topbar-h, 52px));
   width: 250px;
   background-color: #f9f9f9;
   padding: 20px 0;
@@ -76,6 +76,103 @@
   justify-content: center;
   padding-bottom: 20px;
   flex-shrink: 0; /* Don't shrink logo area */
+}
+
+/* === CLICKABLE PROFILE SECTION === */
+.sidebar-profile-link {
+  text-decoration: none;
+  color: inherit;
+  display: block;
+  transition: all 0.3s ease;
+  border-radius: 12px;
+  margin: 0 12px 20px 12px;
+  padding: 4px;
+}
+
+.sidebar-profile-link:hover {
+  background-color: rgba(59, 181, 74, 0.1); /* Light green hover */
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(59, 181, 74, 0.2);
+}
+
+.sidebar-profile-link:active {
+  transform: translateY(0);
+}
+
+.sidebar-profile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  cursor: pointer;
+}
+
+.sidebar-profile .avatar-circle {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--gt-green), var(--gt-lime));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 700;
+  font-size: 1.2rem;
+  flex-shrink: 0;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.sidebar-profile-link:hover .avatar-circle {
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(59, 181, 74, 0.4);
+}
+
+.sidebar-profile .profile-text {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  flex: 1;
+}
+
+.sidebar-profile .name {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--sidebar-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: color 0.3s ease;
+}
+
+.sidebar-profile-link:hover .name {
+  color: var(--gt-green);
+}
+
+.sidebar-profile .role {
+  font-size: 0.8rem;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Closed sidebar state - hide text but keep avatar */
+.sidebar.close .sidebar-profile-link {
+  margin: 0 8px 20px 8px;
+}
+
+.sidebar.close .sidebar-profile {
+  justify-content: center;
+  padding: 8px;
+}
+
+.sidebar.close .sidebar-profile .avatar-circle {
+  width: 42px;
+  height: 42px;
+  font-size: 1.1rem;
+}
+
+.sidebar.close .sidebar-profile .profile-text {
+  display: none;
 }
 
 /* Logo area */
@@ -253,4 +350,90 @@
     margin-left: 0 !important;
     width: 100% !important;
   }
+}
+
+/* ==========================
+   HIGH CONTRAST OVERRIDES
+   (when html.high-contrast is present)
+========================== */
+html.high-contrast .sidebar {
+  background-color: #000 !important;
+  box-shadow: none !important;
+}
+
+html.high-contrast .sidebar .logo-details .icon,
+html.high-contrast .sidebar .logo-details .logo_name {
+  color: #FFFF00 !important;
+}
+
+html.high-contrast .nav-item a {
+  background: #000 !important;
+  color: #FFFF00 !important;
+  border: 2px solid transparent !important;
+}
+
+html.high-contrast .nav-item a:hover,
+html.high-contrast .nav-item:hover > a,
+html.high-contrast .nav-item a:focus-visible {
+  background: #1a1a00 !important;
+  color: #FFFF00 !important;
+  border: 3px solid #FFFF00 !important;
+  border-left: 8px solid #FFFF00 !important;
+  font-weight: 900 !important;
+  transform: translateX(5px) !important;
+  outline: 3px solid #FFFF00 !important;
+  outline-offset: 2px !important;
+}
+
+html.high-contrast .nav-item.active a {
+  background: #1a1a00 !important;
+  color: #FFFF00 !important;
+  border: 3px solid #FFFF00 !important;
+  border-left: 8px solid #FFFF00 !important;
+  font-weight: 900 !important;
+}
+
+html.high-contrast .nav-item a .icon,
+html.high-contrast .nav-item.active a .icon {
+  color: #FFFF00 !important;
+}
+
+html.high-contrast .nav-item.active a::before {
+  background-color: #FFFF00 !important;
+}
+
+/* === HIGH CONTRAST - CLICKABLE PROFILE === */
+html.high-contrast .sidebar-profile-link {
+  border: 2px solid #FFFF00 !important;
+  background: #000 !important;
+}
+
+html.high-contrast .sidebar-profile-link:hover,
+html.high-contrast .sidebar-profile-link:focus-visible {
+  background: #1a1a00 !important;
+  border: 3px solid #FFFF00 !important;
+  box-shadow: 0 0 0 3px #FFFF00 !important;
+  outline: 3px solid #FFFF00 !important;
+  outline-offset: 2px !important;
+}
+
+html.high-contrast .sidebar-profile .avatar-circle {
+  background: #FFFF00 !important;
+  color: #000 !important;
+  border: 3px solid #FFFF00 !important;
+}
+
+html.high-contrast .sidebar-profile-link:hover .avatar-circle {
+  transform: scale(1.15) !important;
+  box-shadow: 0 0 20px #FFFF00 !important;
+}
+
+html.high-contrast .sidebar-profile .name,
+html.high-contrast .sidebar-profile .role {
+  color: #FFFF00 !important;
+}
+
+html.high-contrast .sidebar-profile-link:hover .name {
+  font-weight: 900 !important;
+  text-decoration: underline !important;
 }

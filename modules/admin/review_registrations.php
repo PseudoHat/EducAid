@@ -739,13 +739,27 @@ $yearLevels = pg_fetch_all(pg_query($connection, "SELECT year_level_id, name FRO
         .table-responsive {
             box-shadow: 0 0 10px rgba(0,0,0,0.1);
             border-radius: 8px;
-            overflow: hidden;
+            overflow-x: auto;
+            overflow-y: visible;
+            -webkit-overflow-scrolling: touch;
+        }
+        .table {
+            min-width: 1200px;
+            width: 100%;
         }
         .table thead th {
             background: #495057;
             color: white;
             border: none;
             font-weight: 600;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        .table th,
+        .table td {
+            white-space: nowrap;
+            min-width: 80px;
         }
         .table tbody tr:hover {
             background-color: #f8f9fa;
@@ -830,6 +844,71 @@ $yearLevels = pg_fetch_all(pg_query($connection, "SELECT year_level_id, name FRO
         .refresh-btn:hover {
             color: white;
             transform: translateY(-1px);
+        }
+        
+        /* ================================================
+           ZOOM & RESOLUTION FIXES
+           Handles browser zoom and high-DPI displays
+           ================================================ */
+        
+        /* Scrollbar styling */
+        .table-responsive::-webkit-scrollbar {
+            height: 10px;
+        }
+        .table-responsive::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 5px;
+        }
+        .table-responsive::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 5px;
+        }
+        .table-responsive::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+        
+        /* For desktop views at any zoom level */
+        @media (min-width: 992px) {
+            .table-responsive {
+                overflow-x: auto !important;
+                max-width: 100%;
+            }
+            .table {
+                min-width: 1400px !important;
+            }
+            .table th,
+            .table td {
+                min-width: 90px;
+            }
+            /* Name column */
+            .table th:nth-child(2),
+            .table td:nth-child(2) {
+                min-width: 200px;
+            }
+            /* Contact/Email columns */
+            .table th:nth-child(3),
+            .table td:nth-child(3),
+            .table th:nth-child(4),
+            .table td:nth-child(4) {
+                min-width: 150px;
+            }
+            /* Action column */
+            .table th:last-child,
+            .table td:last-child {
+                min-width: 160px;
+            }
+        }
+        
+        /* High-DPI displays */
+        @media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+            .table-responsive {
+                overflow-x: auto !important;
+            }
+        }
+        
+        /* Prevent container overflow */
+        .container-fluid {
+            overflow-x: hidden;
         }
     </style>
 </head>

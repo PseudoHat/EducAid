@@ -119,15 +119,18 @@ $isCMSActive = in_array($current, $cmsFiles, true);
 
 <!-- admin_sidebar.php -->
 <div class="sidebar admin-sidebar" id="sidebar">
-  <div class="sidebar-profile" role="region" aria-label="Signed in user">
-    <div class="avatar-circle" aria-hidden="true" title="<?= htmlspecialchars($admin_name) ?>">
-      <?php $initials = strtoupper(mb_substr($admin_name,0,1)); echo htmlspecialchars($initials); ?>
+  <!-- Clickable Profile Section - Links to Profile Page -->
+  <a href="admin_profile.php" class="sidebar-profile-link" role="region" aria-label="View Profile">
+    <div class="sidebar-profile">
+      <div class="avatar-circle" aria-hidden="true" title="<?= htmlspecialchars($admin_name) ?>">
+        <?php $initials = strtoupper(mb_substr($admin_name,0,1)); echo htmlspecialchars($initials); ?>
+      </div>
+      <div class="profile-text">
+        <span class="name" title="<?= htmlspecialchars($admin_name) ?>"><?= htmlspecialchars($admin_name) ?></span>
+        <span class="role" title="<?= htmlspecialchars($role_label) ?>"><?= htmlspecialchars($role_label) ?></span>
+      </div>
     </div>
-    <div class="profile-text">
-      <span class="name" title="<?= htmlspecialchars($admin_name) ?>"><?= htmlspecialchars($admin_name) ?></span>
-      <span class="role" title="<?= htmlspecialchars($role_label) ?>"><?= htmlspecialchars($role_label) ?></span>
-    </div>
-  </div>
+  </a>
 
   <ul class="nav-list flex-grow-1 d-flex flex-column">
 
