@@ -1069,6 +1069,23 @@ if (!$isAjaxRequest) {
         #householdWarning i {
             font-size: 1.1rem;
         }
+        
+        /* NUCLEAR FIX: Ensure navbar toggler is ALWAYS clickable */
+        @media (max-width: 991.98px) {
+            body.registration-page .navbar-toggler {
+                z-index: 9999 !important;
+                position: fixed !important;
+                right: 1rem !important;
+                top: calc(var(--topbar-height, 0px) + 0.5rem) !important;
+                pointer-events: auto !important;
+            }
+        }
+        
+        /* Ensure reCAPTCHA badge doesn't block navbar */
+        .grecaptcha-badge {
+            z-index: 1000 !important;
+            bottom: 14px !important;
+        }
         </style>
         <!-- reCAPTCHA v3 -->
         <script src="https://www.google.com/recaptcha/api.js?render=<?php echo RECAPTCHA_SITE_KEY; ?>" async defer></script>
