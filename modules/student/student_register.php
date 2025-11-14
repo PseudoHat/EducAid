@@ -908,9 +908,21 @@ if (!$isAjaxRequest) {
             font-family: "Manrope", sans-serif;
         }
 
+        /* CRITICAL: Ensure navbar and toggler are clickable */
         body.registration-page nav.navbar.fixed-header {
-            isolation: isolate;
-            contain: layout style;
+            z-index: 1050 !important;
+            position: fixed !important;
+        }
+        
+        body.registration-page .navbar-toggler {
+            z-index: 1051 !important;
+            position: relative !important;
+            pointer-events: auto !important;
+            cursor: pointer !important;
+        }
+        
+        body.registration-page .navbar-collapse {
+            z-index: 1050 !important;
         }
 
         body.registration-page .navbar .btn-outline-primary {
@@ -974,9 +986,13 @@ if (!$isAjaxRequest) {
             max-width: 640px; width: calc(100% - 32px);
             padding: 14px 24px; background-color: #f8d7da; color: #721c24;
             border-radius: 8px; display: none; box-shadow: 0 6px 16px -4px rgba(0,0,0,0.25), 0 2px 6px rgba(0,0,0,0.18);
-            z-index: 5000; /* Above nav/topbar and modals backdrop (Bootstrap modal backdrop is 1040, modal 1050) */
+            z-index: 1060; /* Above navbar (1050) but below modals (Bootstrap modal is 1055) */
             font-weight: 500; letter-spacing: .25px; backdrop-filter: blur(6px);
             animation: notifierSlide .35s ease-out;
+            pointer-events: none; /* Don't block clicks */
+        }
+        .notifier > * {
+            pointer-events: auto; /* But allow clicks on notifier content */
         }
         @keyframes notifierSlide { from { opacity: 0; transform: translate(-50%, -10px);} to { opacity: 1; transform: translate(-50%, 0);} }
         .notifier.success { background-color: #d4edda; color: #155724; }
