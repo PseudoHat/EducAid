@@ -348,6 +348,94 @@ h1.fw-bold, h2.fw-bold {
   }
 }
 
+/* Portrait mode specific optimizations */
+@media (max-width: 600px) and (orientation: portrait) {
+  body {
+    font-size: 14px;
+  }
+  
+  .table tr {
+    padding: 0.8rem;
+    margin-bottom: 1rem;
+  }
+  
+  .table td {
+    font-size: 0.875rem;
+    padding: 12px 7px 12px 40%;
+  }
+  
+  .table td::before {
+    font-size: 0.8rem;
+    width: 38%;
+  }
+  
+  /* Optimize action buttons for portrait */
+  .btn-info.btn-sm {
+    padding: 10px 16px;
+    font-size: 0.875rem;
+    border-radius: 0.4rem;
+  }
+  
+  /* Make badges more compact */
+  .badge-success, .badge-secondary {
+    font-size: 0.8rem;
+    padding: 3px 7px;
+  }
+  
+  /* Improve touch targets */
+  .table td:last-child {
+    padding-bottom: 15px;
+  }
+}
+
+/* Landscape mode on mobile - use more horizontal space */
+@media (max-width: 900px) and (orientation: landscape) {
+  .table-responsive {
+    max-height: 70vh;
+    overflow-y: auto;
+  }
+  
+  .table {
+    font-size: 0.85rem;
+  }
+  
+  .table th, .table td {
+    padding: 8px 10px;
+    font-size: 0.8rem;
+  }
+  
+  .section-header h2 {
+    font-size: 1.3rem;
+  }
+}
+
+/* Very small portrait screens (iPhone SE, etc.) */
+@media (max-width: 400px) and (orientation: portrait) {
+  .table td {
+    font-size: 0.8rem;
+    padding: 10px 5px 10px 38%;
+  }
+  
+  .table td::before {
+    font-size: 0.75rem;
+    left: 8px;
+    width: 36%;
+  }
+  
+  .section-header h2 {
+    font-size: 1.2rem;
+  }
+  
+  .filter-section {
+    padding: 12px;
+  }
+  
+  .btn-info.btn-sm {
+    font-size: 0.8rem;
+    padding: 8px 12px;
+  }
+}
+
 /* Blue emphasis for important/bold/section text */
 .text-primary-em, .fw-bold, b, strong {
   color: #1182FF !important;
@@ -359,6 +447,34 @@ h1.fw-bold, h2.fw-bold {
 }
 .table tbody tr.animated-row {
   animation: fadeInRow 0.5s;
+}
+
+/* Dynamic body classes for orientation detection */
+body.mobile-portrait .table td {
+  transition: all 0.3s ease;
+}
+
+body.mobile-landscape .table-responsive {
+  overflow-x: auto;
+}
+
+/* Touch feedback for mobile */
+@media (hover: none) and (pointer: coarse) {
+  .btn-info.btn-sm {
+    transition: transform 0.1s ease;
+  }
+  
+  .btn-info.btn-sm:active {
+    transform: scale(0.98);
+  }
+  
+  .table tr {
+    transition: background-color 0.2s ease;
+  }
+  
+  .table tr:active {
+    background-color: #f0f6ff;
+  }
 }
 .doc-preview {
   text-align: center;
