@@ -2762,7 +2762,7 @@ if ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '' === 'XMLHttpRequest' || (isset($_GET
 <!-- JS -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="../../assets/js/admin/sidebar.js"></script>
-<!-- Removed external manage_applicants.js include (404 caused script parse error) -->
+<script src="../../assets/js/admin/manage_applicants.js"></script>
 <script>
 // Image Zoom Functionality
 function openImageZoom(imageSrc, imageTitle) {
