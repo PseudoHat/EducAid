@@ -6848,6 +6848,46 @@ if (!$isAjaxRequest) {
     <!-- Bootstrap JavaScript -->
 <script src="../../assets/js/bootstrap.bundle.min.js"></script>
 
+<!-- Hamburger Menu Animation Script -->
+<script>
+(function() {
+  'use strict';
+  
+  // Wait for Bootstrap to be fully loaded
+  if (typeof bootstrap !== 'undefined') {
+    const navbarToggler = document.querySelector('.navbar-toggler');
+    const navbarCollapse = document.getElementById('nav');
+    
+    if (navbarToggler && navbarCollapse) {
+      console.log('✅ Hamburger menu initialized');
+      
+      // Listen for Bootstrap collapse events
+      navbarCollapse.addEventListener('show.bs.collapse', () => {
+        navbarToggler.classList.add('active');
+        console.log('Menu opening - X animation');
+      });
+      
+      navbarCollapse.addEventListener('hide.bs.collapse', () => {
+        navbarToggler.classList.remove('active');
+        console.log('Menu closing - hamburger animation');
+      });
+      
+      // Handle initial state if menu is already open
+      if (navbarCollapse.classList.contains('show')) {
+        navbarToggler.classList.add('active');
+      }
+    } else {
+      console.error('❌ Navbar elements not found:', {
+        toggler: !!navbarToggler,
+        collapse: !!navbarCollapse
+      });
+    }
+  } else {
+    console.error('❌ Bootstrap not loaded');
+  }
+})();
+</script>
+
 <!-- Immediate function definitions for onclick handlers -->
 <script>
 // Password visibility toggle function
