@@ -64,7 +64,9 @@ if (!function_exists('truncateMessage')) {
   <div class="container-fluid px-4">
     <div class="admin-header-content">
       <div class="admin-header-left d-flex align-items-center">
-        <div class="sidebar-toggle me-2"><i class="bi bi-list" id="menu-toggle" aria-label="Toggle Sidebar"></i></div>
+        <div class="sidebar-toggle me-2">
+            <i class="bi bi-list" id="menu-toggle" aria-label="Toggle Sidebar" role="button" tabindex="0"></i>
+        </div>
         <h5 class="mb-0 fw-semibold d-none d-md-inline text-success-emphasis">Dashboard</h5>
       </div>
       <div class="admin-header-actions">
@@ -159,7 +161,8 @@ $__hdr = educaid_get_header_theme($connection ?? null);
 .admin-icon-btn .bi{font-size:1.05rem;}
 .admin-icon-btn:hover{background:<?= htmlspecialchars($__hdr['header_hover_bg']) ?>;border-color:<?= htmlspecialchars($__hdr['header_hover_bg']) ?>;color:<?= htmlspecialchars($__hdr['header_hover_icon_color']) ?>;}
 .admin-icon-btn .badge{position:absolute;top:-6px;right:-6px;font-size:.55rem;}
-#menu-toggle{font-size:30px;cursor:pointer;color:<?= htmlspecialchars($__hdr['header_icon_color']) ?>;border-radius:8px;padding:4px 8px;transition:.2s;}#menu-toggle:hover{background:<?= htmlspecialchars($__hdr['header_hover_bg']) ?>;color:<?= htmlspecialchars($__hdr['header_hover_icon_color']) ?>;}
+#menu-toggle{font-size:30px;cursor:pointer;color:<?= htmlspecialchars($__hdr['header_icon_color']) ?>;border-radius:8px;padding:4px 8px;transition:.2s;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;touch-action:manipulation;}#menu-toggle:hover{background:<?= htmlspecialchars($__hdr['header_hover_bg']) ?>;color:<?= htmlspecialchars($__hdr['header_hover_icon_color']) ?>;}#menu-toggle:active{transform:scale(0.95);}
+.sidebar-toggle{display:inline-block;z-index:1070;position:relative;}
 .admin-main-header h5, .admin-main-header .dropdown-menu, .admin-main-header .admin-header-left span { color: <?= htmlspecialchars($__hdr['header_text_color']) ?>; }
 
 /* Enhanced notification dropdown styling */
