@@ -15,10 +15,22 @@ document.addEventListener("DOMContentLoaded", function() {
             // Adjust table container for better mobile experience
             const tableResponsive = document.querySelector('.table-responsive');
             if (tableResponsive && isPortrait) {
-                tableResponsive.style.maxHeight = '70vh';
+                tableResponsive.style.maxHeight = '65vh';
                 tableResponsive.style.overflowY = 'auto';
+                tableResponsive.style.overflowX = 'hidden';
             } else if (tableResponsive) {
                 tableResponsive.style.maxHeight = '';
+                tableResponsive.style.overflowX = 'auto';
+            }
+            
+            // Optimize table text for portrait mode
+            if (isPortrait) {
+                const tableCells = document.querySelectorAll('.table td');
+                tableCells.forEach(cell => {
+                    cell.style.whiteSpace = 'normal';
+                    cell.style.wordWrap = 'break-word';
+                    cell.style.overflowWrap = 'anywhere';
+                });
             }
         } else {
             body.classList.remove('mobile-portrait', 'mobile-landscape');
