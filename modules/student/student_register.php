@@ -6926,38 +6926,72 @@ if (!$isAjaxRequest) {
 (function() {
   'use strict';
   
-  // Wait for Bootstrap to be fully loaded
-  if (typeof bootstrap !== 'undefined') {
+  function initHamburgerMenu() {
     const navbarToggler = document.querySelector('.navbar-toggler');
     const navbarCollapse = document.getElementById('nav');
     
+    console.log('🔍 Hamburger Debug:', {
+      togglerFound: !!navbarToggler,
+      collapseFound: !!navbarCollapse,
+      bootstrapLoaded: typeof bootstrap !== 'undefined',
+      togglerVisible: navbarToggler ? window.getComputedStyle(navbarToggler).display : 'N/A',
+      togglerZIndex: navbarToggler ? window.getComputedStyle(navbarToggler).zIndex : 'N/A',
+      togglerPointerEvents: navbarToggler ? window.getComputedStyle(navbarToggler).pointerEvents : 'N/A'
+    });
+    
     if (navbarToggler && navbarCollapse) {
-      console.log('✅ Hamburger menu initialized');
+      console.log('✅ Hamburger menu elements found');
       
-      // Listen for Bootstrap collapse events
+      // FORCE click handler on toggler button directly
+      navbarToggler.addEventListener('click', function(e) {
+        console.log('🖱️ TOGGLER CLICKED!', e);
+        
+        // Manual toggle if Bootstrap isn't working
+        if (navbarCollapse.classList.contains('show')) {
+          navbarCollapse.classList.remove('show');
+          navbarToggler.classList.remove('active');
+          console.log('Manually closing menu');
+        } else {
+          navbarCollapse.classList.add('show');
+          navbarToggler.classList.add('active');
+          console.log('Manually opening menu');
+        }
+      }, true); // Use capture phase
+      
+      // Listen for Bootstrap collapse events (if Bootstrap is working)
       navbarCollapse.addEventListener('show.bs.collapse', () => {
         navbarToggler.classList.add('active');
-        console.log('Menu opening - X animation');
+        console.log('Bootstrap: Menu opening - X animation');
       });
       
       navbarCollapse.addEventListener('hide.bs.collapse', () => {
         navbarToggler.classList.remove('active');
-        console.log('Menu closing - hamburger animation');
+        console.log('Bootstrap: Menu closing - hamburger animation');
       });
       
       // Handle initial state if menu is already open
       if (navbarCollapse.classList.contains('show')) {
         navbarToggler.classList.add('active');
       }
+      
+      console.log('✅ Hamburger menu event listeners attached');
     } else {
       console.error('❌ Navbar elements not found:', {
         toggler: !!navbarToggler,
         collapse: !!navbarCollapse
       });
     }
-  } else {
-    console.error('❌ Bootstrap not loaded');
   }
+  
+  // Try to initialize immediately
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initHamburgerMenu);
+  } else {
+    initHamburgerMenu();
+  }
+  
+  // Also try after a delay to ensure everything is loaded
+  setTimeout(initHamburgerMenu, 500);
 })();
 </script>
 
