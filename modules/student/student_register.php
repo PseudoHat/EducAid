@@ -908,21 +908,28 @@ if (!$isAjaxRequest) {
             font-family: "Manrope", sans-serif;
         }
 
-        /* CRITICAL: Ensure navbar and toggler are clickable */
+        /* CRITICAL: Fix z-index stacking for clickable navbar */
+        body.registration-page .landing-topbar,
+        body.registration-page .student-topbar,
+        body.registration-page .topbar {
+            z-index: 1040 !important; /* Below navbar */
+        }
+        
         body.registration-page nav.navbar.fixed-header {
             z-index: 1050 !important;
             position: fixed !important;
         }
         
         body.registration-page .navbar-toggler {
-            z-index: 1051 !important;
+            z-index: 1052 !important;
             position: relative !important;
             pointer-events: auto !important;
             cursor: pointer !important;
+            touch-action: manipulation !important;
         }
         
         body.registration-page .navbar-collapse {
-            z-index: 1050 !important;
+            z-index: 1051 !important;
         }
 
         body.registration-page .navbar .btn-outline-primary {
