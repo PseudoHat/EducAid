@@ -908,61 +908,9 @@ if (!$isAjaxRequest) {
             font-family: "Manrope", sans-serif;
         }
 
-        /* CRITICAL: Fix z-index stacking for clickable navbar */
-        body.registration-page .landing-topbar,
-        body.registration-page .student-topbar,
-        body.registration-page .topbar {
-            z-index: 1040 !important; /* Below navbar */
-        }
-        
         body.registration-page nav.navbar.fixed-header {
-            z-index: 1050 !important;
-            position: fixed !important;
-            isolation: auto !important;
-        }
-        
-        body.registration-page .navbar-toggler {
-            z-index: 1052 !important;
-            position: relative !important;
-            pointer-events: auto !important;
-            cursor: pointer !important;
-            touch-action: manipulation !important;
-            display: block !important;
-            opacity: 1 !important;
-            visibility: visible !important;
-        }
-        
-        body.registration-page .navbar-collapse {
-            z-index: 1051 !important;
-        }
-        
-        /* Ensure no pseudo-elements are blocking */
-        body.registration-page .navbar-toggler::before,
-        body.registration-page .navbar-toggler::after {
-            pointer-events: none !important;
-        }
-        
-        body.registration-page .navbar-toggler-icon,
-        body.registration-page .navbar-toggler-icon::before,
-        body.registration-page .navbar-toggler-icon::after {
-            pointer-events: none !important;
-        }
-        
-        /* Make sure container doesn't block */
-        body.registration-page .navbar .container-fluid {
-            position: relative !important;
-            z-index: auto !important;
-        }
-        
-        /* Ensure navbar brand doesn't overflow and block toggler */
-        body.registration-page .navbar-brand {
-            z-index: auto !important;
-            pointer-events: auto !important;
-        }
-        
-        /* Critical: Make sure nothing in the navbar blocks the toggler */
-        body.registration-page nav.navbar.fixed-header > * {
-            pointer-events: auto !important;
+            isolation: isolate;
+            contain: layout style;
         }
 
         body.registration-page .navbar .btn-outline-primary {
@@ -1026,13 +974,9 @@ if (!$isAjaxRequest) {
             max-width: 640px; width: calc(100% - 32px);
             padding: 14px 24px; background-color: #f8d7da; color: #721c24;
             border-radius: 8px; display: none; box-shadow: 0 6px 16px -4px rgba(0,0,0,0.25), 0 2px 6px rgba(0,0,0,0.18);
-            z-index: 1060; /* Above navbar (1050) but below modals (Bootstrap modal is 1055) */
+            z-index: 5000; /* Above nav/topbar and modals backdrop (Bootstrap modal backdrop is 1040, modal 1050) */
             font-weight: 500; letter-spacing: .25px; backdrop-filter: blur(6px);
             animation: notifierSlide .35s ease-out;
-            pointer-events: none; /* Don't block clicks */
-        }
-        .notifier > * {
-            pointer-events: auto; /* But allow clicks on notifier content */
         }
         @keyframes notifierSlide { from { opacity: 0; transform: translate(-50%, -10px);} to { opacity: 1; transform: translate(-50%, 0);} }
         .notifier.success { background-color: #d4edda; color: #155724; }
@@ -1068,23 +1012,6 @@ if (!$isAjaxRequest) {
         #nameDuplicateWarning i,
         #householdWarning i {
             font-size: 1.1rem;
-        }
-        
-        /* NUCLEAR FIX: Ensure navbar toggler is ALWAYS clickable */
-        @media (max-width: 991.98px) {
-            body.registration-page .navbar-toggler {
-                z-index: 9999 !important;
-                position: fixed !important;
-                right: 1rem !important;
-                top: calc(var(--topbar-height, 0px) + 0.5rem) !important;
-                pointer-events: auto !important;
-            }
-        }
-        
-        /* Ensure reCAPTCHA badge doesn't block navbar */
-        .grecaptcha-badge {
-            z-index: 1000 !important;
-            bottom: 14px !important;
         }
         </style>
         <!-- reCAPTCHA v3 -->
@@ -6926,72 +6853,38 @@ if (!$isAjaxRequest) {
 (function() {
   'use strict';
   
-  function initHamburgerMenu() {
+  // Wait for Bootstrap to be fully loaded
+  if (typeof bootstrap !== 'undefined') {
     const navbarToggler = document.querySelector('.navbar-toggler');
     const navbarCollapse = document.getElementById('nav');
     
-    console.log('🔍 Hamburger Debug:', {
-      togglerFound: !!navbarToggler,
-      collapseFound: !!navbarCollapse,
-      bootstrapLoaded: typeof bootstrap !== 'undefined',
-      togglerVisible: navbarToggler ? window.getComputedStyle(navbarToggler).display : 'N/A',
-      togglerZIndex: navbarToggler ? window.getComputedStyle(navbarToggler).zIndex : 'N/A',
-      togglerPointerEvents: navbarToggler ? window.getComputedStyle(navbarToggler).pointerEvents : 'N/A'
-    });
-    
     if (navbarToggler && navbarCollapse) {
-      console.log('✅ Hamburger menu elements found');
+      console.log('✅ Hamburger menu initialized');
       
-      // FORCE click handler on toggler button directly
-      navbarToggler.addEventListener('click', function(e) {
-        console.log('🖱️ TOGGLER CLICKED!', e);
-        
-        // Manual toggle if Bootstrap isn't working
-        if (navbarCollapse.classList.contains('show')) {
-          navbarCollapse.classList.remove('show');
-          navbarToggler.classList.remove('active');
-          console.log('Manually closing menu');
-        } else {
-          navbarCollapse.classList.add('show');
-          navbarToggler.classList.add('active');
-          console.log('Manually opening menu');
-        }
-      }, true); // Use capture phase
-      
-      // Listen for Bootstrap collapse events (if Bootstrap is working)
+      // Listen for Bootstrap collapse events
       navbarCollapse.addEventListener('show.bs.collapse', () => {
         navbarToggler.classList.add('active');
-        console.log('Bootstrap: Menu opening - X animation');
+        console.log('Menu opening - X animation');
       });
       
       navbarCollapse.addEventListener('hide.bs.collapse', () => {
         navbarToggler.classList.remove('active');
-        console.log('Bootstrap: Menu closing - hamburger animation');
+        console.log('Menu closing - hamburger animation');
       });
       
       // Handle initial state if menu is already open
       if (navbarCollapse.classList.contains('show')) {
         navbarToggler.classList.add('active');
       }
-      
-      console.log('✅ Hamburger menu event listeners attached');
     } else {
       console.error('❌ Navbar elements not found:', {
         toggler: !!navbarToggler,
         collapse: !!navbarCollapse
       });
     }
-  }
-  
-  // Try to initialize immediately
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initHamburgerMenu);
   } else {
-    initHamburgerMenu();
+    console.error('❌ Bootstrap not loaded');
   }
-  
-  // Also try after a delay to ensure everything is loaded
-  setTimeout(initHamburgerMenu, 500);
 })();
 </script>
 
