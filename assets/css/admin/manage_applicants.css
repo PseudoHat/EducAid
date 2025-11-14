@@ -278,6 +278,28 @@ h1.fw-bold, h2.fw-bold {
   }
 }
 
+/* Tablet portrait mode (601px to 768px) */
+@media (min-width: 601px) and (max-width: 768px) and (orientation: portrait) {
+  .text-truncatable.truncated {
+    max-width: 180px;
+    color: #1182FF;
+    text-decoration: underline;
+    cursor: pointer;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  
+  .text-truncatable.truncated:hover {
+    color: #0869cc;
+  }
+  
+  .text-truncatable.expanded {
+    white-space: normal;
+    max-width: 100%;
+  }
+}
+
 /* Enhanced Mobile View */
 @media (max-width: 600px) {
   .card, .table-responsive { border-radius: 0.5rem; }
@@ -415,6 +437,57 @@ h1.fw-bold, h2.fw-bold {
     max-height: 65vh;
     overflow-y: auto;
   }
+  
+  /* Truncated text styles for Name, Contact, Email */
+  body.mobile-portrait .text-truncatable {
+    display: inline-block;
+    max-width: 100%;
+    position: relative;
+  }
+  
+  body.mobile-portrait .text-truncatable.truncated {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 150px;
+    color: #1182FF;
+    text-decoration: underline;
+    cursor: pointer;
+    transition: color 0.2s ease;
+  }
+  
+  body.mobile-portrait .text-truncatable.truncated:hover {
+    color: #0869cc;
+  }
+  
+  body.mobile-portrait .text-truncatable.truncated:active {
+    color: #065aa6;
+  }
+  
+  body.mobile-portrait .text-truncatable.expanded {
+    white-space: normal;
+    word-wrap: break-word;
+    max-width: 100%;
+    color: inherit;
+    text-decoration: none;
+    cursor: default;
+  }
+  
+  /* Add a small icon indicator for clickable text */
+  body.mobile-portrait .text-truncatable.truncated::after {
+    content: ' ⊕';
+    font-size: 0.9em;
+    color: #1182FF;
+    margin-left: 2px;
+  }
+  
+  body.mobile-portrait .text-truncatable.expanded::after {
+    content: ' ⊖';
+    font-size: 0.9em;
+    color: #666;
+    margin-left: 2px;
+    cursor: pointer;
+  }
 }
 
 /* Landscape mode on mobile - use more horizontal space */
@@ -473,6 +546,12 @@ h1.fw-bold, h2.fw-bold {
   body.mobile-portrait .badge-secondary {
     font-size: 0.7rem;
     padding: 2px 6px;
+  }
+  
+  /* Adjust truncation for smaller screens */
+  body.mobile-portrait .text-truncatable.truncated {
+    max-width: 120px;
+    font-size: 0.8rem;
   }
 }
 
