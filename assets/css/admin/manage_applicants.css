@@ -269,7 +269,7 @@ h1.fw-bold, h2.fw-bold {
   }
 }
 
-/* Tablet portrait mode (601px to 768px) */
+/* Tablet portrait mode (601px to 768px) - Works on ALL devices */
 @media (min-width: 601px) and (max-width: 768px) and (orientation: portrait) {
   .table td:nth-child(1),  /* Name */
   .table td:nth-child(2),  /* Contact */
@@ -284,6 +284,12 @@ h1.fw-bold, h2.fw-bold {
   .table td:nth-child(n+4) {
     white-space: normal;
     word-wrap: break-word;
+    overflow: visible;
+  }
+  
+  .table-responsive {
+    max-height: 70vh;
+    overflow-y: auto;
   }
 }
 
@@ -366,7 +372,7 @@ h1.fw-bold, h2.fw-bold {
   }
 }
 
-/* Portrait mode specific optimizations */
+/* Portrait mode specific optimizations - Works on ALL devices */
 @media (max-width: 600px) and (orientation: portrait) {
   body {
     font-size: 14px;
@@ -395,6 +401,14 @@ h1.fw-bold, h2.fw-bold {
     word-wrap: break-word;
   }
   
+  /* Allow wrapping for non-text columns */
+  .table td:nth-child(n+4) {
+    white-space: normal;
+    word-wrap: break-word;
+    overflow: visible;
+    text-overflow: clip;
+  }
+  
   /* Optimize action buttons for portrait */
   .btn-info.btn-sm {
     padding: 10px 16px;
@@ -415,6 +429,7 @@ h1.fw-bold, h2.fw-bold {
   .table td:last-child {
     padding-bottom: 15px;
     white-space: normal;
+    overflow: visible;
   }
   
   /* Scale down header appropriately */
@@ -427,6 +442,7 @@ h1.fw-bold, h2.fw-bold {
   .table-responsive {
     max-height: 65vh;
     overflow-y: auto;
+    overflow-x: hidden;
   }
   
   /* Flexible layout adjustments */
@@ -460,7 +476,24 @@ h1.fw-bold, h2.fw-bold {
   }
 }
 
-/* Very small portrait screens (iPhone SE, etc.) */
+/* Larger tablets in portrait mode (769px to 1024px) */
+@media (min-width: 769px) and (max-width: 1024px) and (orientation: portrait) {
+  .table td:nth-child(1),  /* Name */
+  .table td:nth-child(2),  /* Contact */
+  .table td:nth-child(3) { /* Email */
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  
+  .table th, .table td {
+    font-size: 0.9rem;
+    padding: 10px 8px;
+  }
+}
+
+/* Very small portrait screens (iPhone SE, etc.) - Works on ALL devices */
 @media (max-width: 400px) and (orientation: portrait) {
   .table td {
     font-size: 0.8rem;
@@ -481,6 +514,7 @@ h1.fw-bold, h2.fw-bold {
     white-space: normal;
     word-break: break-word;
     overflow-wrap: anywhere;
+    overflow: visible;
   }
   
   .table td::before {
@@ -522,15 +556,6 @@ h1.fw-bold, h2.fw-bold {
 }
 .table tbody tr.animated-row {
   animation: fadeInRow 0.5s;
-}
-
-/* Dynamic body classes for orientation detection */
-body.mobile-portrait .table td {
-  transition: all 0.3s ease;
-}
-
-body.mobile-landscape .table-responsive {
-  overflow-x: auto;
 }
 
 /* Touch feedback for mobile */
