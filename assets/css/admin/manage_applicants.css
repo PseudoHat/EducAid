@@ -114,6 +114,16 @@ h1.fw-bold, h2.fw-bold {
 
 @media screen and (max-width: 1200px) {
   .table th, .table td {
+    font-size: 0.95rem;
+    padding: 11px 12px;
+    white-space: normal; /* Allow wrapping */
+    word-break: break-word;
+    overflow-wrap: break-word;
+  }
+}
+
+@media screen and (max-width: 992px) {
+  .table th, .table td {
     font-size: 0.9rem;
     padding: 10px 11px;
   }
@@ -515,19 +525,110 @@ h1.fw-bold, h2.fw-bold {
 
 /* Larger tablets in portrait mode (769px to 1024px) */
 @media (min-width: 769px) and (max-width: 1024px) and (orientation: portrait) {
-  .table td[data-label="Name"],
-  .table td[data-label="Contact"],
-  .table td[data-label="Email"],
-  .table td[data-label="Mobile"] {
-    max-width: 220px;
+  /* For standard table layout (not card view) */
+  .table thead {
+    display: table-header-group;
+  }
+  
+  .table tbody {
+    display: table-row-group;
+  }
+  
+  .table tr {
+    display: table-row;
+  }
+  
+  .table td {
+    display: table-cell;
+    font-size: 0.85rem;
+    padding: 8px 6px;
+    vertical-align: middle;
+  }
+  
+  /* Apply ellipsis to Name (1st col), Contact (2nd col), Email (3rd col) using nth-child */
+  .table tbody td:nth-child(1),  /* Name */
+  .table tbody td:nth-child(2),  /* Contact */
+  .table tbody td:nth-child(3) { /* Email */
+    max-width: 150px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
   
+  /* Other columns wrap normally */
+  .table tbody td:nth-child(n+4) {
+    white-space: normal;
+    word-wrap: break-word;
+  }
+  
+  .table th {
+    font-size: 0.85rem;
+    padding: 8px 6px;
+  }
+  
+  .table-responsive {
+    overflow-x: auto;
+  }
+}
+
+/* Even larger tablets (1025px to 1366px) in portrait - like iPad Pro */
+@media (min-width: 1025px) and (max-width: 1366px) and (orientation: portrait) {
+  .table tbody td:nth-child(1),  /* Name */
+  .table tbody td:nth-child(2),  /* Contact */
+  .table tbody td:nth-child(3) { /* Email */
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  
+  .table tbody td:nth-child(n+4) {
+    white-space: normal;
+    word-wrap: break-word;
+  }
+}
+
+/* Modern iPads with high resolution (iPad Air M3, iPad Pro) - Portrait */
+@media (min-width: 1367px) and (max-width: 2048px) and (orientation: portrait) {
+  .table tbody td:nth-child(1),  /* Name */
+  .table tbody td:nth-child(2),  /* Contact */
+  .table tbody td:nth-child(3) { /* Email */
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  
+  .table tbody td:nth-child(n+4) {
+    white-space: normal;
+    word-wrap: break-word;
+  }
+  
   .table th, .table td {
     font-size: 0.9rem;
     padding: 10px 8px;
+  }
+}
+
+/* Universal portrait mode for tablets - applies to ALL tablet sizes */
+@media (orientation: portrait) and (min-width: 768px) and (max-width: 2048px) {
+  .table tbody td:nth-child(1),  /* Name */
+  .table tbody td:nth-child(2),  /* Contact */
+  .table tbody td:nth-child(3) { /* Email */
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  
+  .table tbody td:nth-child(n+4) {
+    white-space: normal;
+    word-wrap: break-word;
+  }
+  
+  .table-responsive {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
 }
 
