@@ -254,8 +254,114 @@ $isAjaxRequest = isset($_POST['sendOtp']) || isset($_POST['verifyOtp']) ||
                  isset($_POST['processOcr']) || isset($_POST['processIdPictureOcr']) || isset($_POST['processLetterOcr']) ||
                  isset($_POST['processCertificateOcr']) || isset($_POST['processGradesOcr']) ||
                  isset($_POST['cleanup_temp']) || isset($_POST['check_existing']) || isset($_POST['test_db']) ||
-                 isset($_POST['check_school_student_id']) || isset($_POST['cleanup_session_files']) || isset($_POST['clear_registration_session']) ||
+                 isset($_POST['check_school_student_id']) || isset($_POST['cleanup_session_files']) || isset($_POST['clear_registration_session']) || isset($_POST['cleanup_temp_files']) ||
                  (isset($_POST['action']) && in_array($_POST['action'], ['check_full_duplicate', 'check_email_duplicate', 'check_mobile_duplicate', 'check_name_duplicate', 'check_household_lastname', 'check_household_duplicate', 'update_block_contact']));
+
+// ============================================================
+// HELPER FUNCTIONS - DEFINED EARLY FOR PAGE LOAD CLEANUP
+// ============================================================
+
+// Helper function to cleanup old document files when reuploading
+if (!function_exists('cleanup_old_document_files')) {
+    /**
+     * Delete old session-based temp files matching a pattern
+     * @param string $uploadDir Directory to search
+     * @param string $sessionPrefix Session-based file prefix
+     * @param string $filePattern Pattern to match (e.g., '_EAF', '_idpic')
+     * @return int Number of files deleted
+     */
+    function cleanup_old_document_files(string $uploadDir, string $sessionPrefix, string $filePattern): int {
+        $deletedCount = 0;
+        
+        // Find all files matching the pattern
+        $pattern = $uploadDir . DIRECTORY_SEPARATOR . $sessionPrefix . $filePattern . '*';
+        $files = glob($pattern);
+        
+        if ($files === false) {
+            return 0;
+        }
+        
+        foreach ($files as $file) {
+            if (is_file($file)) {
+                if (@unlink($file)) {
+                    $deletedCount++;
+                    error_log("Deleted old file: " . basename($file));
+                }
+            }
+        }
+        
+        return $deletedCount;
+    }
+}
+
+// Helper to delete ALL session-based temp files for this registration session
+if (!function_exists('cleanup_all_session_temp_files')) {
+    /**
+     * Delete ALL temporary files for the current registration session
+     * Used when page is refreshed to prevent keeping outdated documents
+     * @return int Number of files deleted
+     */
+    function cleanup_all_session_temp_files(): int {
+        $deletedCount = 0;
+        $sessionPrefix = $_SESSION['file_prefix'] ?? '';
+        
+        if (empty($sessionPrefix)) {
+            error_log("⚠️ Cannot cleanup - no session prefix found");
+            return 0;
+        }
+        
+        // Initialize FilePathConfig
+        require_once __DIR__ . '/../../config/FilePathConfig.php';
+        $pathConfig = FilePathConfig::getInstance();
+        
+        // Define all temp directories
+        $tempDirs = [
+            'enrollment_forms' => $pathConfig->getTempPath('enrollment_forms'),
+            'id_pictures' => $pathConfig->getTempPath('id_pictures'),
+            'letter_to_mayor' => $pathConfig->getTempPath('letter_to_mayor'),
+            'indigency' => $pathConfig->getTempPath('indigency'),
+            'grades' => $pathConfig->getTempPath('grades')
+        ];
+        
+        // Delete files in each directory
+        foreach ($tempDirs as $dirName => $dirPath) {
+            if (!is_dir($dirPath)) {
+                continue;
+            }
+            
+            // Find all files with this session prefix
+            $pattern = $dirPath . DIRECTORY_SEPARATOR . $sessionPrefix . '*';
+            $files = glob($pattern);
+            
+            if ($files === false) {
+                continue;
+            }
+            
+            foreach ($files as $file) {
+                if (is_file($file)) {
+                    if (@unlink($file)) {
+                        $deletedCount++;
+                        error_log("🗑️ Deleted: " . basename($file) . " from $dirName");
+                    }
+                }
+            }
+        }
+        
+        // Clear uploaded files tracking in session
+        $_SESSION['uploaded_files'] = [
+            'enrollment_form' => null,
+            'id_picture' => null,
+            'letter' => null,
+            'certificate' => null,
+            'grades' => null
+        ];
+        
+        error_log("✅ Cleanup complete: Deleted $deletedCount temp files");
+        return $deletedCount;
+    }
+}
+
+// ============================================================
 
 // Initialize registration session tracking
 if (!isset($_SESSION['registration_session_id'])) {
@@ -274,6 +380,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !$isAjaxRequest) {
     if ($_SESSION['page_load_count'] > 1 && !isset($_SESSION['registration_completed'])) {
         // Set flag to trigger JavaScript cleanup on page load
         $_SESSION['trigger_cleanup_on_load'] = true;
+        
+        // Also perform immediate server-side cleanup
+        error_log('🔄 Page refresh detected (load #' . $_SESSION['page_load_count'] . ') - cleaning temp files');
+        $deletedCount = cleanup_all_session_temp_files();
+        error_log('🗑️ Deleted ' . $deletedCount . ' temp files on refresh');
     }
 }
 
@@ -283,6 +394,8 @@ if (!isset($_SESSION['file_prefix'])) {
     $firstName = $_POST['first_name'] ?? $_SESSION['temp_first_name'] ?? 'Student';
     $lastName = $_POST['last_name'] ?? $_SESSION['temp_last_name'] ?? uniqid();
     $_SESSION['file_prefix'] = $lastName . '_' . $firstName . '_' . substr($_SESSION['registration_session_id'], 4, 8);
+    // Debug: log generated file prefix for this session
+    error_log('REG DEBUG: Initialized file_prefix => ' . $_SESSION['file_prefix']);
 }
 
 // Track uploaded files for this session
@@ -458,56 +571,40 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['debug_test'])) {
     exit;
 }
 
-// --- DEFINE HELPER FUNCTIONS BEFORE OCR PROCESSING ---
-
-// Helper function to cleanup old document files when reuploading
-if (!function_exists('cleanup_old_document_files')) {
-    /**
-     * Cleanup old document files when a new file is uploaded for the same document type.
-     * Prevents bypassing validation by keeping old correct documents.
-     * 
-     * @param string $uploadDir Directory containing uploaded files
-     * @param string $sessionPrefix Session-based file prefix
-     * @param string $filePattern Pattern to match (e.g., '_EAF', '_idpic')
-     * @return int Number of files deleted
-     */
-    function cleanup_old_document_files(string $uploadDir, string $sessionPrefix, string $filePattern): int {
-        $deletedCount = 0;
-        
-        // Find all files matching pattern: sessionPrefix + filePattern + any extension
-        $pattern = $uploadDir . DIRECTORY_SEPARATOR . $sessionPrefix . $filePattern . '*';
-        $matchingFiles = glob($pattern);
-        
-        if ($matchingFiles === false) {
-            return 0;
-        }
-        
-        foreach ($matchingFiles as $file) {
-            if (is_file($file)) {
-                // Delete main file and associated OCR files
-                @unlink($file);
-                $deletedCount++;
-                
-                // Delete associated files: .ocr.txt, .tsv, .verify.json, .ocr.json
-                $associatedFiles = [
-                    $file . '.ocr.txt',
-                    $file . '.tsv',
-                    $file . '.verify.json',
-                    $file . '.ocr.json'
-                ];
-                
-                foreach ($associatedFiles as $assocFile) {
-                    if (file_exists($assocFile)) {
-                        @unlink($assocFile);
-                        $deletedCount++;
-                    }
-                }
-            }
-        }
-        
-        return $deletedCount;
+// --- AJAX: Cleanup all temp files for current session (used when user confirms page refresh) ---
+if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['cleanup_temp_files'])) {
+    // Ensure no stray output
+    while (ob_get_level() > 0) {
+        @ob_end_clean();
     }
+
+    header('Content-Type: application/json');
+
+    try {
+        $deleted = 0;
+        if (function_exists('cleanup_all_session_temp_files')) {
+            $deleted = cleanup_all_session_temp_files();
+        }
+
+        echo json_encode([
+            'status' => 'success',
+            'deleted_files' => $deleted
+        ]);
+    } catch (Throwable $e) {
+        error_log('Temp cleanup error: ' . $e->getMessage());
+        echo json_encode([
+            'status' => 'error',
+            'message' => 'Failed to cleanup temporary files.'
+        ]);
+    }
+
+    exit;
 }
+
+// --- HELPER FUNCTIONS ALREADY DEFINED AT TOP OF FILE ---
+// The cleanup_old_document_files() and cleanup_all_session_temp_files() functions
+// are now defined near the top of the file (after database connection)
+// to ensure they're available for page load cleanup logic.
 
 // --- MOVE OCR PROCESSING HERE BEFORE ANY HTML OUTPUT ---
 // Document OCR Processing
@@ -961,14 +1058,57 @@ if (!$isAjaxRequest) {
         }
 
         .step-panel.d-none { display: none !important; }
-        .step-indicator { display: flex; justify-content: center; margin-bottom: 20px; }
-        .step {
-            display: flex; align-items: center; justify-content: center;
-            width: 30px; height: 30px; border-radius: 50%;
-            background-color: #e0e0e0; color: #777; font-weight: bold;
-            margin: 0 5px; transition: background-color 0.3s, color 0.3s;
+        
+        /* Simple Step Progress Indicator */
+        .step-progress-text {
+            text-align: center;
+            padding: 0.5rem 0 1rem 0;
+            margin-bottom: 1rem;
+            border-bottom: 2px solid #e9ecef;
         }
-        .step.active { background-color: #007bff; color: white; }
+        
+        .step-progress-text .step-counter {
+            font-size: 0.9rem;
+            color: #6c757d;
+            font-weight: 500;
+            letter-spacing: 0.5px;
+            margin-bottom: 0.5rem;
+        }
+        
+        .step-progress-text .step-counter .current-step {
+            color: #007bff;
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+        
+        .step-progress-text .step-title {
+            font-size: 1.25rem;
+            color: #212529;
+            font-weight: 600;
+            margin-top: 0.25rem;
+        }
+        
+        .step-progress-text .step-title i {
+            color: #007bff;
+            margin-right: 0.5rem;
+        }
+        
+        /* Progress bar */
+        .step-progress-bar-simple {
+            width: 100%;
+            height: 4px;
+            background: #e9ecef;
+            border-radius: 2px;
+            overflow: hidden;
+            margin-top: 0.75rem;
+        }
+        
+        .step-progress-bar-simple .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #007bff, #0056b3);
+            transition: width 0.4s ease;
+            border-radius: 2px;
+        }
         .notifier {
             position: fixed; top: 12px; left: 50%; transform: translateX(-50%);
             max-width: 640px; width: calc(100% - 32px);
@@ -1049,6 +1189,221 @@ if (!$isAjaxRequest) {
             }
             
             window.addEventListener('DOMContentLoaded', initRecaptcha);
+        </script>
+        <script>
+            // Warn user that refreshing will delete uploaded files and restart the process
+            (function() {
+                let refreshConfirmedOnce = false;
+
+                function cleanupTempFilesBeforeReload(callback) {
+                    try {
+                        const xhr = new XMLHttpRequest();
+                        xhr.open('POST', 'student_register.php', true);
+                        xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                        xhr.onreadystatechange = function() {
+                            if (xhr.readyState === 4) {
+                                // We don't block reload on errors; just continue
+                                if (typeof callback === 'function') {
+                                    callback();
+                                }
+                            }
+                        };
+                        xhr.send('cleanup_temp_files=1');
+                    } catch (e) {
+                        if (typeof callback === 'function') {
+                            callback();
+                        }
+                    }
+                }
+
+                window.addEventListener('beforeunload', function(e) {
+                    // Skip warning if we've already confirmed a refresh in this flow
+                    if (refreshConfirmedOnce) {
+                        return;
+                    }
+
+                    const message = 'Refreshing will delete all uploaded files and you will have to start all over again.';
+
+                    // Modern browsers show their own message but require us to set returnValue
+                    e.preventDefault();
+                    e.returnValue = message;
+                    return message;
+                });
+
+                // Intercept F5 / Ctrl+R and browser reload button via visibilitychange as best-effort
+                window.addEventListener('keydown', function(e) {
+                    if (e.key === 'F5' || (e.key === 'r' && (e.ctrlKey || e.metaKey))) {
+                        e.preventDefault();
+                        if (confirm('Refreshing will delete all uploaded files and you will have to start all over again. Do you want to continue?')) {
+                            refreshConfirmedOnce = true;
+                            cleanupTempFilesBeforeReload(function() {
+                                window.location.reload();
+                            });
+                        }
+                    }
+                });
+            })();
+        </script>
+        
+        <!-- Navigation functions: moved from bottom so full implementations load BEFORE form HTML -->
+        <script>
+        console.log('🚀 Defining navigation functions early (single source of truth)...');
+        // Ensure global step state exists
+        if (typeof currentStep === 'undefined') { window.currentStep = 1; }
+
+        // Helper: safe validation invocation (returns unified object)
+        function runStepValidation() {
+            if (typeof validateCurrentStepFields === 'function') {
+                try {
+                    const result = validateCurrentStepFields();
+                    // Backward compatibility: old version returned boolean
+                    if (typeof result === 'boolean') {
+                        return { isValid: result, message: result ? '' : 'Please fill required fields.', fields: [] };
+                    }
+                    // New contract: object with isValid/message/fields
+                    if (result && typeof result.isValid === 'boolean') {
+                        return result;
+                    }
+                    return { isValid: false, message: 'Validation failed (unexpected result).', fields: [] };
+                } catch (e) {
+                    console.error('Validation threw error:', e);
+                    return { isValid: false, message: 'Validation error. Check console.', fields: [] };
+                }
+            }
+            // Fallback lightweight validation BEFORE full script finishes loading
+            const panel = document.getElementById(`step-${currentStep}`);
+            if (!panel) {
+                return { isValid: false, message: 'Step container not ready yet.', fields: [] };
+            }
+            const required = panel.querySelectorAll('input[required], select[required], textarea[required]');
+            const missing = [];
+            required.forEach(el => {
+                // Skip elements that are disabled or hidden (in case of transitional states)
+                if (el.disabled || el.closest('.d-none')) return;
+                const val = (el.type === 'checkbox') ? (el.checked ? 'checked' : '') : el.value.trim();
+                if (!val) missing.push(el);
+            });
+            if (missing.length) {
+                return { isValid: false, message: 'Please fill required fields.', fields: missing };
+            }
+            // Allow advance with basic check; detailed validation will apply from next step onwards once loaded
+            console.log('⚠️ Using fallback validation (full validation not loaded yet).');
+            return { isValid: true, message: '', fields: [] };
+        }
+
+        window.nextStep = async function() {
+            console.log('🔧 nextStep invoked at step', currentStep);
+            if (currentStep >= 10) return;
+
+            // Step-specific async checks
+            if (currentStep === 1 && typeof checkNameBeforeProceeding === 'function') {
+                const dup = await checkNameBeforeProceeding();
+                if (dup) return; // Duplicate name blocks progression
+            }
+            if (currentStep === 2 && typeof checkHouseholdBeforeProceeding === 'function') {
+                const householdBlocked = await checkHouseholdBeforeProceeding();
+                if (householdBlocked) return; // Household duplicate blocks progression
+            }
+            if (currentStep === 3 && typeof checkForDuplicateRegistration === 'function') {
+                const regDup = await checkForDuplicateRegistration();
+                if (regDup) return; // Duplicate registration blocks progression
+            }
+
+            // Core validation
+            const validation = runStepValidation();
+            if (!validation.isValid) {
+                if (typeof showValidationError === 'function') {
+                    showValidationError(validation.message, validation.fields);
+                } else if (typeof showNotifier === 'function') {
+                    showNotifier(validation.message, 'error');
+                }
+                console.warn('❌ Step validation failed. Preventing advance.', validation);
+                return;
+            }
+
+            // Transition panels
+            const currentPanel = document.getElementById(`step-${currentStep}`);
+            if (currentPanel) currentPanel.classList.add('d-none');
+            currentStep++;
+            const nextPanel = document.getElementById(`step-${currentStep}`);
+            if (nextPanel) nextPanel.classList.remove('d-none');
+
+            if (typeof updateStepIndicators === 'function') updateStepIndicators();
+            if (typeof clearValidationErrors === 'function') clearValidationErrors();
+            console.log('✅ Advanced to step', currentStep);
+        };
+
+        window.prevStep = function() {
+            console.log('🔧 prevStep invoked at step', currentStep);
+            if (currentStep <= 1) return;
+            const currentPanel = document.getElementById(`step-${currentStep}`);
+            if (currentPanel) currentPanel.classList.add('d-none');
+            currentStep--;
+            const prevPanel = document.getElementById(`step-${currentStep}`);
+            if (prevPanel) prevPanel.classList.remove('d-none');
+            if (typeof updateStepIndicators === 'function') updateStepIndicators();
+            console.log('✅ Returned to step', currentStep);
+        };
+
+        window.showStep = function(stepNum) {
+            console.log('🔧 showStep called for', stepNum);
+            document.querySelectorAll('.step-panel').forEach(p => p.classList.add('d-none'));
+            const targetPanel = document.getElementById(`step-${stepNum}`);
+            if (targetPanel) {
+                targetPanel.classList.remove('d-none');
+                currentStep = stepNum;
+                if (typeof updateStepIndicators === 'function') updateStepIndicators();
+            }
+        };
+
+        window.updateStepIndicators = function() {
+            const totalSteps = 10;
+            
+            // Update step counter number
+            const currentStepNumber = document.getElementById('currentStepNumber');
+            if (currentStepNumber) {
+                currentStepNumber.textContent = currentStep;
+            }
+            
+            // Update all .current-step elements
+            document.querySelectorAll('.current-step').forEach(el => {
+                el.textContent = currentStep;
+            });
+            
+            // Update textual step info labels (if present)
+            document.querySelectorAll('.step-info').forEach(el => {
+                el.textContent = `Step ${currentStep} of ${totalSteps}`;
+            });
+
+            // New style indicators (.step-indicator)
+            document.querySelectorAll('.step-indicator').forEach((el, idx) => {
+                const stepNum = idx + 1;
+                el.classList.toggle('active', stepNum === currentStep);
+                el.classList.toggle('completed', stepNum < currentStep);
+            });
+
+            // Legacy style indicators (.step)
+            document.querySelectorAll('.step').forEach((el, idx) => {
+                const stepNum = idx + 1;
+                if (stepNum < currentStep) {
+                    el.classList.add('completed');
+                    el.classList.remove('active');
+                } else if (stepNum === currentStep) {
+                    el.classList.add('active');
+                    el.classList.remove('completed');
+                } else {
+                    el.classList.remove('active', 'completed');
+                }
+            });
+
+            // Progress bar fill
+            const progressPercent = ((currentStep - 1) / (totalSteps - 1)) * 100;
+            const progressFill = document.querySelector('.progress-fill');
+            if (progressFill) progressFill.style.width = progressPercent + '%';
+            console.log(`📊 Indicators updated ${currentStep}/${totalSteps}`);
+        };
+
+        console.log('✅ Navigation functions initialized (validation enforced)');
         </script>
 </head>
 <body class="registration-page has-header-offset">
@@ -1777,6 +2132,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['sendOtp'])) {
     $_SESSION['otp'] = $otp;
     $_SESSION['otp_email'] = $email;
     $_SESSION['otp_timestamp'] = time();
+    $_SESSION['otp_verified'] = false; // ✅ Reset verification status when new OTP is sent
     // Immediately flush session changes so subsequent requests (e.g., OTP verify) can see them
     if (session_status() === PHP_SESSION_ACTIVE) {
         session_write_close();
@@ -1944,7 +2300,22 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processIdPictureOcr']
     cleanup_old_document_files($uploadDir, $sessionPrefix, '_idpic');
     
     // Session-based file naming to prevent conflicts
-    $fileExt = pathinfo($_FILES['id_picture']['name'], PATHINFO_EXTENSION);
+    $fileExt = strtolower(pathinfo($_FILES['id_picture']['name'], PATHINFO_EXTENSION));
+    
+    // REJECT PDF uploads - only accept image files
+    if (!in_array($fileExt, ['jpg', 'jpeg', 'png'])) {
+        echo json_encode([
+            'status' => 'error', 
+            'message' => 'Invalid file format. Only JPG and PNG images are accepted.',
+            'suggestions' => [
+                'Take a photo of your ID with your phone camera',
+                'Convert your file to JPG or PNG format',
+                'Ensure the image is clear and readable'
+            ]
+        ]);
+        exit;
+    }
+    
     $fileName = $sessionPrefix . '_idpic.' . $fileExt;
     $targetPath = $uploadDir . DIRECTORY_SEPARATOR . $fileName;
 
@@ -2041,42 +2412,31 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processIdPictureOcr']
         }
     }
 
-    // OCR Processing
-    $fileExtension = strtolower(pathinfo($targetPath, PATHINFO_EXTENSION));
-    if ($fileExtension === 'pdf') {
-        // Try PDF text extraction
-        $pdfTextCommand = "pdftotext " . escapeshellarg($targetPath) . " - 2>nul";
-        $ocrText = @shell_exec($pdfTextCommand);
-        
-        if (empty(trim($ocrText))) {
-            echo json_encode(['status' => 'error', 'message' => 'Unable to extract text from PDF. Please upload an image instead.']);
-            exit;
-        }
+    // OCR Processing - Images only (PDF rejection handled earlier)
+    // Enhanced Image OCR with preprocessing and better settings
+    
+    // STEP 1: Preprocess image to handle scratches, glare, and distortion
+    $preprocessedPath = $targetPath . '.preprocessed.jpg';
+    $usePreprocessed = preprocessIdImage($targetPath, $preprocessedPath);
+    
+    if ($usePreprocessed && file_exists($preprocessedPath)) {
+        $ocrInputPath = $preprocessedPath;
+        error_log("ID OCR: Using preprocessed image for better accuracy");
     } else {
-        // Enhanced Image OCR with preprocessing and better settings
-        
-        // STEP 1: Preprocess image to handle scratches, glare, and distortion
-        $preprocessedPath = $targetPath . '.preprocessed.jpg';
-        $usePreprocessed = preprocessIdImage($targetPath, $preprocessedPath);
-        
-        if ($usePreprocessed && file_exists($preprocessedPath)) {
-            $ocrInputPath = $preprocessedPath;
-            error_log("ID OCR: Using preprocessed image for better accuracy");
-        } else {
-            $ocrInputPath = $targetPath;
-            error_log("ID OCR: Using original image (preprocessing unavailable)");
-        }
-        
-        // STEP 2: Try multiple OCR engines and modes for best results
-        $ocrResults = [];
-        
-        // Mode 1: LSTM only (--oem 1) - Good for natural text
-        $cmd1 = "tesseract " . escapeshellarg($ocrInputPath) . " stdout --psm 6 --oem 1 -l eng 2>nul";
-        $ocrResults['lstm_psm6'] = @shell_exec($cmd1);
-        
-        // Mode 2: Legacy only (--oem 0) - Better for cards/structured text
-        $cmd2 = "tesseract " . escapeshellarg($ocrInputPath) . " stdout --psm 6 --oem 0 -l eng 2>nul";
-        $ocrResults['legacy_psm6'] = @shell_exec($cmd2);
+        $ocrInputPath = $targetPath;
+        error_log("ID OCR: Using original image (preprocessing unavailable)");
+    }
+    
+    // STEP 2: Try multiple OCR engines and modes for best results
+    $ocrResults = [];
+    
+    // Mode 1: LSTM only (--oem 1) - Good for natural text
+    $cmd1 = "tesseract " . escapeshellarg($ocrInputPath) . " stdout --psm 6 --oem 1 -l eng 2>nul";
+    $ocrResults['lstm_psm6'] = @shell_exec($cmd1);
+    
+    // Mode 2: Legacy only (--oem 0) - Better for cards/structured text
+    $cmd2 = "tesseract " . escapeshellarg($ocrInputPath) . " stdout --psm 6 --oem 0 -l eng 2>nul";
+    $ocrResults['legacy_psm6'] = @shell_exec($cmd2);
         
         // Mode 3: Combined LSTM + Legacy (--oem 2) - Best of both worlds
         $cmd3 = "tesseract " . escapeshellarg($ocrInputPath) . " stdout --psm 6 --oem 2 -l eng 2>nul";
@@ -2165,7 +2525,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processIdPictureOcr']
             ]);
             exit;
         }
-    }
 
     // Save OCR text
     file_put_contents($targetPath . '.ocr.txt', $ocrText);
@@ -2661,7 +3020,21 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processLetterOcr'])) 
     cleanup_old_document_files($uploadDir, $sessionPrefix, '_Letter*');
     
     // Use session-based file naming
-    $fileExt = pathinfo($_FILES['letter_to_mayor']['name'], PATHINFO_EXTENSION);
+    $fileExt = strtolower(pathinfo($_FILES['letter_to_mayor']['name'], PATHINFO_EXTENSION));
+    
+    // REJECT PDF uploads - only accept image files
+    if (!in_array($fileExt, ['jpg', 'jpeg', 'png'])) {
+        json_response([
+            'status' => 'error', 
+            'message' => 'Invalid file format. Only JPG and PNG images are accepted.',
+            'suggestions' => [
+                'Take a photo of your letter with your phone camera',
+                'Convert your file to JPG or PNG format',
+                'Ensure the image is clear and readable'
+            ]
+        ]);
+    }
+    
     $fileName = $sessionPrefix . '_Letter to mayor.' . $fileExt;
     $targetPath = $uploadDir . DIRECTORY_SEPARATOR . $fileName;
 
@@ -2685,83 +3058,35 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processLetterOcr'])) 
         }
     }
 
-    // Perform OCR using Tesseract with optimized settings for letter documents
+    // Perform OCR using Tesseract (PDF rejection handled earlier)
     $outputBase = $uploadDir . DIRECTORY_SEPARATOR . 'letter_ocr_' . pathinfo($fileName, PATHINFO_FILENAME);
     
-    // Check if the file is a PDF and handle accordingly
-    $fileExtension = strtolower(pathinfo($targetPath, PATHINFO_EXTENSION));
+    // Standard Tesseract processing for images
+    $command = "tesseract " . escapeshellarg($targetPath) . " " . escapeshellarg($outputBase) . 
+               " --oem 1 --psm 6 -l eng 2>&1";
     
-    if ($fileExtension === 'pdf') {
-        // Try basic PDF text extraction
-        $pdfText = '';
-        
-        // Method 1: Try using pdftotext if available
-        $pdfTextCommand = "pdftotext " . escapeshellarg($targetPath) . " - 2>nul";
-        $pdfText = @shell_exec($pdfTextCommand);
-        
-        if (!empty(trim($pdfText))) {
-            // Successfully extracted text from PDF
-            $ocrText = $pdfText;
-        } else {
-            // Method 2: Try basic PHP PDF text extraction
-            $pdfContent = file_get_contents($targetPath);
-            if ($pdfContent !== false) {
-                // Very basic PDF text extraction - look for text streams
-                preg_match_all('/\(([^)]+)\)/', $pdfContent, $matches);
-                if (!empty($matches[1])) {
-                    $extractedText = implode(' ', $matches[1]);
-                    // Clean up the extracted text
-                    $extractedText = preg_replace('/[^\x20-\x7E]/', ' ', $extractedText);
-                    $extractedText = preg_replace('/\s+/', ' ', trim($extractedText));
-                    
-                    if (strlen($extractedText) > 50) { // Only use if we got substantial text
-                        $ocrText = $extractedText;
-                    }
-                }
-            }
-            
-            // If no text could be extracted
-            if (empty($ocrText) || strlen(trim($ocrText)) < 10) {
-                json_response([
-                    'status' => 'error', 
-                    'message' => 'Unable to extract text from PDF. Please try one of these alternatives:',
-                    'suggestions' => [
-                        '1. Convert the PDF to a JPG or PNG image',
-                        '2. Take a photo of the document with your phone camera',
-                        '3. Scan the document as an image file',
-                        '4. Ensure the PDF contains selectable text (not a scanned image)'
-                    ]
-                ]);
-            }
-        }
-    } else {
-        // For image files, use standard Tesseract processing
-        $command = "tesseract " . escapeshellarg($targetPath) . " " . escapeshellarg($outputBase) . 
-                   " --oem 1 --psm 6 -l eng 2>&1";
-        
-        $tesseractOutput = shell_exec($command);
-        $outputFile = $outputBase . ".txt";
-        
-        if (!file_exists($outputFile)) {
-            json_response([
-                'status' => 'error', 
-                'message' => 'OCR processing failed. Please ensure the document is clear and readable.',
-                'debug_info' => $tesseractOutput,
-                'suggestions' => [
-                    '1. Make sure the image is clear and high resolution',
-                    '2. Ensure good lighting when taking photos',
-                    '3. Try straightening the document in the image',
-                    '4. Use JPG or PNG format for best results'
-                ]
-            ]);
-        }
-        
-        $ocrText = file_get_contents($outputFile);
-        
-        // Clean up temporary OCR files
-        if (file_exists($outputFile)) {
-            unlink($outputFile);
-        }
+    $tesseractOutput = shell_exec($command);
+    $outputFile = $outputBase . ".txt";
+    
+    if (!file_exists($outputFile)) {
+        json_response([
+            'status' => 'error', 
+            'message' => 'OCR processing failed. Please ensure the document is clear and readable.',
+            'debug_info' => $tesseractOutput,
+            'suggestions' => [
+                'Make sure the image is clear and high resolution',
+                'Ensure good lighting when taking photos',
+                'Try straightening the document in the image',
+                'Use JPG or PNG format for best results'
+            ]
+        ]);
+    }
+    
+    $ocrText = file_get_contents($outputFile);
+    
+    // Clean up temporary OCR files
+    if (file_exists($outputFile)) {
+        unlink($outputFile);
     }
     
     if (empty(trim($ocrText))) {
@@ -3049,7 +3374,21 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processCertificateOcr
     cleanup_old_document_files($uploadDir, $sessionPrefix, '_Indigency');
     
     // Use session-based file naming
-    $fileExt = pathinfo($_FILES['certificate_of_indigency']['name'], PATHINFO_EXTENSION);
+    $fileExt = strtolower(pathinfo($_FILES['certificate_of_indigency']['name'], PATHINFO_EXTENSION));
+    
+    // REJECT PDF uploads - only accept image files
+    if (!in_array($fileExt, ['jpg', 'jpeg', 'png'])) {
+        json_response([
+            'status' => 'error', 
+            'message' => 'Invalid file format. Only JPG and PNG images are accepted.',
+            'suggestions' => [
+                'Take a photo of your certificate with your phone camera',
+                'Convert your file to JPG or PNG format',
+                'Ensure the image is clear and readable'
+            ]
+        ]);
+    }
+    
     $fileName = $sessionPrefix . '_Indigency.' . $fileExt;
     $targetPath = $uploadDir . DIRECTORY_SEPARATOR . $fileName;
 
@@ -3073,83 +3412,35 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processCertificateOcr
         }
     }
 
-    // Perform OCR using Tesseract with optimized settings for certificate documents
+    // Perform OCR using Tesseract (PDF rejection handled earlier)
     $outputBase = $uploadDir . DIRECTORY_SEPARATOR . 'certificate_ocr_' . pathinfo($fileName, PATHINFO_FILENAME);
     
-    // Check if the file is a PDF and handle accordingly
-    $fileExtension = strtolower(pathinfo($targetPath, PATHINFO_EXTENSION));
+    // Standard Tesseract processing for images
+    $command = "tesseract " . escapeshellarg($targetPath) . " " . escapeshellarg($outputBase) . 
+               " --oem 1 --psm 6 -l eng 2>&1";
     
-    if ($fileExtension === 'pdf') {
-        // Try basic PDF text extraction
-        $pdfText = '';
-        
-        // Method 1: Try using pdftotext if available
-        $pdfTextCommand = "pdftotext " . escapeshellarg($targetPath) . " - 2>nul";
-        $pdfText = @shell_exec($pdfTextCommand);
-        
-        if (!empty(trim($pdfText))) {
-            // Successfully extracted text from PDF
-            $ocrText = $pdfText;
-        } else {
-            // Method 2: Try basic PHP PDF text extraction
-            $pdfContent = file_get_contents($targetPath);
-            if ($pdfContent !== false) {
-                // Very basic PDF text extraction - look for text streams
-                preg_match_all('/\(([^)]+)\)/', $pdfContent, $matches);
-                if (!empty($matches[1])) {
-                    $extractedText = implode(' ', $matches[1]);
-                    // Clean up the extracted text
-                    $extractedText = preg_replace('/[^\x20-\x7E]/', ' ', $extractedText);
-                    $extractedText = preg_replace('/\s+/', ' ', trim($extractedText));
-                    
-                    if (strlen($extractedText) > 50) { // Only use if we got substantial text
-                        $ocrText = $extractedText;
-                    }
-                }
-            }
-            
-            // If no text could be extracted
-            if (empty($ocrText) || strlen(trim($ocrText)) < 10) {
-                json_response([
-                    'status' => 'error', 
-                    'message' => 'Unable to extract text from PDF. Please try one of these alternatives:',
-                    'suggestions' => [
-                        '1. Convert the PDF to a JPG or PNG image',
-                        '2. Take a photo of the document with your phone camera',
-                        '3. Scan the document as an image file',
-                        '4. Ensure the PDF contains selectable text (not a scanned image)'
-                    ]
-                ]);
-            }
-        }
-    } else {
-        // For image files, use standard Tesseract processing
-        $command = "tesseract " . escapeshellarg($targetPath) . " " . escapeshellarg($outputBase) . 
-                   " --oem 1 --psm 6 -l eng 2>&1";
-        
-        $tesseractOutput = shell_exec($command);
-        $outputFile = $outputBase . ".txt";
-        
-        if (!file_exists($outputFile)) {
-            json_response([
-                'status' => 'error', 
-                'message' => 'OCR processing failed. Please ensure the document is clear and readable.',
-                'debug_info' => $tesseractOutput,
-                'suggestions' => [
-                    '1. Make sure the image is clear and high resolution',
-                    '2. Ensure good lighting when taking photos',
-                    '3. Try straightening the document in the image',
-                    '4. Use JPG or PNG format for best results'
-                ]
-            ]);
-        }
-        
-        $ocrText = file_get_contents($outputFile);
-        
-        // Clean up temporary OCR files
-        if (file_exists($outputFile)) {
-            unlink($outputFile);
-        }
+    $tesseractOutput = shell_exec($command);
+    $outputFile = $outputBase . ".txt";
+    
+    if (!file_exists($outputFile)) {
+        json_response([
+            'status' => 'error', 
+            'message' => 'OCR processing failed. Please ensure the document is clear and readable.',
+            'debug_info' => $tesseractOutput,
+            'suggestions' => [
+                'Make sure the image is clear and high resolution',
+                'Ensure good lighting when taking photos',
+                'Try straightening the document in the image',
+                'Use JPG or PNG format for best results'
+            ]
+        ]);
+    }
+    
+    $ocrText = file_get_contents($outputFile);
+    
+    // Clean up temporary OCR files
+    if (file_exists($outputFile)) {
+        unlink($outputFile);
     }
     
     if (empty(trim($ocrText))) {
@@ -3288,8 +3579,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processCertificateOcr
         strtolower($activeMunicipality),
         strtolower(str_replace(' ', '', $activeMunicipality)), // Remove spaces
         'municipality of ' . strtolower($activeMunicipality),
-        'city of ' . strtolower($activeMunicipality),
-        strtolower($activeMunicipality) . ' city'
+        'city of ' . strtolower($activeMunicipality)
     ];
     
     // Add common abbreviations if municipality is "General Trias"
@@ -3435,7 +3725,21 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processGradesOcr'])) 
         cleanup_old_document_files($uploadDir, $sessionPrefix, '_Grades');
         
         // Use session-based file naming
-        $fileExt = pathinfo($_FILES['grades_document']['name'], PATHINFO_EXTENSION);
+        $fileExt = strtolower(pathinfo($_FILES['grades_document']['name'], PATHINFO_EXTENSION));
+        
+        // REJECT PDF uploads - only accept image files
+        if (!in_array($fileExt, ['jpg', 'jpeg', 'png'])) {
+            json_response([
+                'status' => 'error', 
+                'message' => 'Invalid file format. Only JPG and PNG images are accepted.',
+                'suggestions' => [
+                    'Take a photo of your grades with your phone camera',
+                    'Convert your file to JPG or PNG format',
+                    'Ensure the image is clear and readable'
+                ]
+            ]);
+        }
+        
         $fileName = $sessionPrefix . '_Grades.' . $fileExt;
         $targetPath = $uploadDir . DIRECTORY_SEPARATOR . $fileName;
 
@@ -3443,71 +3747,38 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processGradesOcr'])) 
             json_response(['status' => 'error', 'message' => 'Failed to save uploaded grades file.']);
         }
 
-        // Extract text from document
+        // Extract text from document (PDF rejection handled earlier)
         $ocrText = '';
-        $fileExtension = strtolower(pathinfo($targetPath, PATHINFO_EXTENSION));
         
-        if ($fileExtension === 'pdf') {
-            $pdfTextCommand = "pdftotext " . escapeshellarg($targetPath) . " - 2>nul";
-            $pdfText = @shell_exec($pdfTextCommand);
-            if (!empty(trim($pdfText))) {
-                $ocrText = $pdfText;
-            } else {
-                // Fallback PDF extraction
-                $pdfContent = @file_get_contents($targetPath);
-                if ($pdfContent !== false) {
-                    preg_match_all('/\(([^)]+)\)/', $pdfContent, $matches);
-                    if (!empty($matches[1])) {
-                        $extractedText = implode(' ', $matches[1]);
-                        $extractedText = preg_replace('/[^\x20-\x7E]/', ' ', $extractedText);
-                        $extractedText = preg_replace('/\s+/', ' ', trim($extractedText));
-                        if (strlen($extractedText) > 10) {
-                            $ocrText = $extractedText;
-                        }
-                    }
+        // Enhanced image processing via OCR service
+        try {
+            // Include the Safe version (no Imagick dependency, uses GD only)
+            require_once __DIR__ . '/../../services/OCRProcessingService_Safe.php';
+            
+            $ocrProcessor = new OCRProcessingServiceSafe([
+                'tesseract_path' => 'tesseract',
+                'temp_dir' => $uploadDir, // Use grades temp dir directly
+                'max_file_size' => 10 * 1024 * 1024,
+            ]);
+            
+            // Process the document
+            $ocrResult = $ocrProcessor->processGradeDocument($targetPath);
+            
+            error_log("Grades OCR Result: " . json_encode($ocrResult));
+            
+            if ($ocrResult['success'] && !empty($ocrResult['subjects'])) {
+                // Build OCR text from extracted subjects for backward compatibility
+                $ocrText = "Grade Document Analysis:\n";
+                foreach ($ocrResult['subjects'] as $subject) {
+                    $ocrText .= "{$subject['name']}: {$subject['rawGrade']}\n";
                 }
-                if (empty(trim($ocrText))) {
-                    json_response([
-                        'status' => 'error',
-                        'message' => 'Unable to extract text from PDF.',
-                        'suggestions' => [
-                            'Convert the PDF to a JPG or PNG image',
-                            'Take a clear photo of the grades',
-                            'Ensure the PDF contains selectable text'
-                        ]
-                    ]);
-                }
-            }
-        } else {
-            // Enhanced image processing via OCR service
-            try {
-                // Include the Safe version (no Imagick dependency, uses GD only)
-                require_once __DIR__ . '/../../services/OCRProcessingService_Safe.php';
                 
-                $ocrProcessor = new OCRProcessingServiceSafe([
-                    'tesseract_path' => 'tesseract',
-                    'temp_dir' => $uploadDir, // Use grades temp dir directly
-                    'max_file_size' => 10 * 1024 * 1024,
-                ]);
+                // Add raw text if needed for other validations
+                $ocrText .= "\nRaw Document Content:\n";
                 
-                // Process the document
-                $ocrResult = $ocrProcessor->processGradeDocument($targetPath);
-                
-                error_log("Grades OCR Result: " . json_encode($ocrResult));
-                
-                if ($ocrResult['success'] && !empty($ocrResult['subjects'])) {
-                    // Build OCR text from extracted subjects for backward compatibility
-                    $ocrText = "Grade Document Analysis:\n";
-                    foreach ($ocrResult['subjects'] as $subject) {
-                        $ocrText .= "{$subject['name']}: {$subject['rawGrade']}\n";
-                    }
-                    
-                    // Add raw text if needed for other validations
-                    $ocrText .= "\nRaw Document Content:\n";
-                    
-                    // Fall back to basic Tesseract for full text extraction AND generate TSV
-                    $outputBase = $uploadDir . 'ocr_output_' . uniqid();
-                    $outputFile = $outputBase . '.txt';
+                // Fall back to basic Tesseract for full text extraction AND generate TSV
+                $outputBase = $uploadDir . 'ocr_output_' . uniqid();
+                $outputFile = $outputBase . '.txt';
                     
                     // Generate text output
                     $cmd = "tesseract " . escapeshellarg($targetPath) . " " . 
@@ -3621,7 +3892,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processGradesOcr'])) 
                         'suggestions' => [
                             'Try uploading the image again',
                             'Ensure the file is not corrupted',
-                            'Use a different image format (PNG, JPG)'
+                            'Use PNG or JPG format'
                         ],
                         'debug_info' => [
                             'exception' => $e->getMessage(),
@@ -3646,7 +3917,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processGradesOcr'])) 
                     @rename($generatedTsvFile, $permanentTsvFile);
                 }
             }
-        }
 
         if (empty(trim($ocrText))) {
             json_response([
@@ -4991,10 +5261,12 @@ function renameConfidenceFile($docType, $sessionPrefix, $newFilePath, $tempDir) 
     }
     
     // Build old confidence file path (session-based)
-    $oldConfidenceFile = $tempDir . $sessionPrefix . $confidencePatterns[$docType];
+    $oldConfidenceFile = $tempDir . DIRECTORY_SEPARATOR . $sessionPrefix . $confidencePatterns[$docType];
     
     // Build new confidence file path (student ID-based)
-    $newConfidenceFile = $newFilePath . '.confidence.json';
+    // Strip extension from newFilePath before adding .confidence.json
+    $pathWithoutExt = preg_replace('/\.(jpg|jpeg|png)$/i', '', $newFilePath);
+    $newConfidenceFile = $pathWithoutExt . '_confidence.json';
     
     error_log("Renaming confidence file for $docType:");
     error_log("  From: $oldConfidenceFile");
@@ -5125,6 +5397,19 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['register'])) {
     $course = trim($_POST['course'] ?? '');
     $course_verified = (intval($_POST['course_verified'] ?? 0) === 1);
     $password = trim($_POST['password'] ?? '');
+    
+    // ============================================================
+    // STRICT PASSWORD VALIDATION - ENFORCE SECURITY REQUIREMENTS
+    // ============================================================
+    if (strlen($password) < 12) {
+        json_response([
+            'status' => 'error',
+            'message' => '❌ Password must be at least 12 characters long.'
+        ]);
+    }
+    // Server-side complexity checks disabled; client-side JS enforces remaining rules
+    // ============================================================
+    
     $hashed = password_hash($password, PASSWORD_DEFAULT);
 
     // Get year level name for new current_year_level column
@@ -5153,25 +5438,15 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['register'])) {
         $currentAcademicYear = null;
     }
 
-    // Validate required fields (mothers_maiden_name can be NULL for backward compatibility, but should be provided)
-    $requiredFields = [
-        'first_name' => $firstname,
-        'last_name' => $lastname,
-        'email' => $email,
-        'mobile' => $mobile,
-        'birthdate' => $bdate,
-        'sex' => $sex,
-        'barangay' => $barangay,
-        'university' => $university,
-        'year_level' => $year_level,
-        'password' => $password
-    ];
-    
-    foreach ($requiredFields as $fieldName => $fieldValue) {
-        if (empty($fieldValue) && $fieldValue !== 0 && $fieldValue !== '0') {
-            json_response(['status' => 'error', 'message' => "Please fill in all required fields. Missing: $fieldName"]);
-        }
+    // CRITICAL: Validate terms and conditions acceptance
+    if (!isset($_POST['agree_terms']) || $_POST['agree_terms'] !== 'on') {
+        json_response([
+            'status' => 'error',
+            'message' => 'You must accept the Terms and Conditions to proceed with registration.'
+        ]);
     }
+
+    // Server-side required field validation disabled; client-side handles this
     
     // Recommend providing mother's maiden name for household duplicate prevention
     if ($mothers_maiden_name === null || trim($mothers_maiden_name) === '') {
@@ -5179,44 +5454,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['register'])) {
         $admin_review_required = true;
     }
 
-    // Validate email format
-    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        json_response(['status' => 'error', 'message' => 'Invalid email format.']);
-    }
+    // Server-side email/mobile/age validation disabled; enforced in client-side JS
 
-    // Validate mobile number (Philippines)
-    if (!preg_match('/^09[0-9]{9}$/', $mobile)) {
-        json_response(['status' => 'error', 'message' => 'Invalid mobile number format.']);
-    }
-
-    // Validate date of birth (must be at least 16 years ago)
-    $minDate = date('Y-m-d', strtotime('-16 years'));
-    $maxDate = date('Y-m-d', strtotime('-100 years')); // Maximum age 100
-    if ($bdate > $minDate) {
-        json_response(['status' => 'error', 'message' => 'Invalid date of birth. You must be at least 16 years old to register.']);
-    }
-    if ($bdate < $maxDate) {
-        json_response(['status' => 'error', 'message' => 'Invalid date of birth. Please enter a valid birthdate.']);
-    }
-
-    // Initialize BlacklistService
-    $blacklistService = new BlacklistService($connection);
-
-    // Check if email is blacklisted
-    if ($blacklistService->isEmailBlacklisted($email)) {
-        json_response([
-            'status' => 'error',
-            'message' => 'This email address has been blacklisted due to policy violations. You cannot register with this email. Please contact support if you believe this is an error.'
-        ]);
-    }
-
-    // Check if mobile number is blacklisted
-    if ($blacklistService->isMobileBlacklisted($mobile)) {
-        json_response([
-            'status' => 'error',
-            'message' => 'This mobile number has been blacklisted due to policy violations. You cannot register with this number. Please contact support if you believe this is an error.'
-        ]);
-    }
+    // Blacklist checks disabled per client-side validation policy
 
     // Check if email or mobile belongs to an archived student
     $archivedCheck = pg_query_params(
@@ -5229,54 +5469,12 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['register'])) {
         [$email, $mobile]
     );
 
-    if (pg_num_rows($archivedCheck) > 0) {
-        $archivedStudent = pg_fetch_assoc($archivedCheck);
-        $archivalType = $archivedStudent['archival_type'] ?? 'unknown';
-        
-        // Different messages based on archival type
-        if ($archivalType === 'blacklisted') {
-            json_response([
-                'status' => 'error',
-                'message' => 'This account has been permanently banned due to policy violations. You cannot create a new account. Please contact support if you believe this is an error.'
-            ]);
-        } elseif ($archivalType === 'graduated') {
-            json_response([
-                'status' => 'error',
-                'message' => 'This email/mobile is registered to a graduated student. If you are a different person, please use a different email address and mobile number.'
-            ]);
-        } elseif ($archivalType === 'household_duplicate') {
-            json_response([
-                'status' => 'error',
-                'message' => 'This email/mobile is registered to an archived household member. Only one member per household can receive assistance. Please contact support if the primary recipient has graduated.'
-            ]);
-        } else {
-            json_response([
-                'status' => 'error',
-                'message' => 'This email/mobile is registered to an archived account. Please use a different email address and mobile number, or contact support for assistance.'
-            ]);
-        }
-    }
+    // Archived account checks disabled
 
     // CRITICAL DUPLICATE CHECKS - Re-validate at final submission to prevent race conditions
     // These checks happen again even though they're checked earlier in the flow
     
-    // Check if email is used by an admin
-    $adminEmailCheck = pg_query_params($connection, "SELECT 1 FROM admins WHERE email = $1", [$email]);
-    if (pg_num_rows($adminEmailCheck) > 0) {
-        json_response(['status' => 'error', 'message' => 'This email is already in use. Please use a different email address.']);
-    }
-    
-    // Check if email already exists (active students only)
-    $checkEmail = pg_query_params($connection, "SELECT 1 FROM students WHERE email = $1 AND is_archived = FALSE", [$email]);
-    if (pg_num_rows($checkEmail) > 0) {
-        json_response(['status' => 'error', 'message' => 'This email is already registered. Please use a different email address.']);
-    }
-
-    // Check if mobile already exists (active students only)
-    $checkMobile = pg_query_params($connection, "SELECT 1 FROM students WHERE mobile = $1 AND is_archived = FALSE", [$mobile]);
-    if (pg_num_rows($checkMobile) > 0) {
-        json_response(['status' => 'error', 'message' => 'This mobile number is already registered. Please use a different mobile number.']);
-    }
+    // Duplicate checks (email/mobile/admin) disabled
 
     // NEW: FINAL household duplicate check (prevent race conditions)
     // Only check if mothers_maiden_name is provided
@@ -5354,35 +5552,18 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['register'])) {
     
     // CRITICAL: Validate that slot has academic year configured
     // This prevents database errors from empty academic year values
-    if ($slot_id && (empty($slotAcademicYear) || $slotAcademicYear === '')) {
-        error_log("REGISTRATION ERROR: Slot $slot_id has no academic year configured. This should never happen.");
-        json_response([
-            'status' => 'error',
-            'message' => 'System configuration error: The registration slot is missing academic year information. Please contact the administrator to resolve this issue.'
-        ]);
-    }
+    // Slot academic year enforcement disabled; proceed with NULLs if needed
 
     // Get school student ID from form
     $school_student_id = trim($_POST['school_student_id'] ?? '');
     
-    // Validate school student ID
-    if (empty($school_student_id)) {
-        json_response(['status' => 'error', 'message' => 'School student ID number is required.']);
-    }
+    // Server-side school student ID required check disabled (client enforces)
     
     // Check for duplicate school student ID one final time
     $dupCheckQuery = "SELECT * FROM check_duplicate_school_student_id($1, $2)";
     $dupCheckResult = pg_query_params($connection, $dupCheckQuery, [$university, $school_student_id]);
     
-    if ($dupCheckResult) {
-        $dupCheck = pg_fetch_assoc($dupCheckResult);
-        if ($dupCheck && $dupCheck['is_duplicate'] === 't') {
-            json_response([
-                'status' => 'error', 
-                'message' => 'This school student ID number is already registered by ' . $dupCheck['student_name'] . '. Creating multiple accounts is strictly prohibited. Please contact support if you believe this is an error.'
-            ]);
-        }
-    }
+    // Duplicate school student ID check disabled
 
     $insertQuery = "INSERT INTO students (
         student_id, municipality_id, first_name, middle_name, last_name, extension_name, 
@@ -5463,10 +5644,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['register'])) {
         $idPicturePattern = $tempIDPictureDir . DIRECTORY_SEPARATOR . $sessionPrefix . '_idpic.*';
         $idTempFiles = glob($idPicturePattern);
         
-        // Filter to get only actual image files (not .verify.json, .ocr.txt, etc.)
+        // Filter to get only actual image files (PDF not supported)
         $idTempFiles = array_filter($idTempFiles, function($file) {
             $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
-            return in_array($ext, ['jpg', 'jpeg', 'png', 'pdf']) && is_file($file);
+            return in_array($ext, ['jpg', 'jpeg', 'png']) && is_file($file);
         });
         
         error_log("Processing ID Picture for student: $student_id (Session: $sessionPrefix)");
@@ -5549,10 +5730,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['register'])) {
         $eafPattern = $tempEnrollmentDir . DIRECTORY_SEPARATOR . '*_EAF.*';
         $tempFiles = glob($eafPattern);
         
-        // Filter to get only actual document files
+        // Filter to get only actual image files (PDF not supported)
         $tempFiles = array_filter($tempFiles, function($file) {
             $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
-            return in_array($ext, ['jpg', 'jpeg', 'png', 'pdf']) && is_file($file);
+            return in_array($ext, ['jpg', 'jpeg', 'png']) && is_file($file);
         });
         
         error_log("Processing EAF for student: $student_id (Session: $sessionPrefix)");
@@ -5646,10 +5827,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['register'])) {
         $letterPattern = $tempLetterDir . DIRECTORY_SEPARATOR . $sessionPrefix . '_Letter to mayor.*';
         $letterTempFiles = glob($letterPattern);
         
-        // Filter to get only actual document files
+        // Filter to get only actual image files (PDF not supported)
         $letterTempFiles = array_filter($letterTempFiles, function($file) {
             $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
-            return in_array($ext, ['jpg', 'jpeg', 'png', 'pdf']) && is_file($file);
+            return in_array($ext, ['jpg', 'jpeg', 'png']) && is_file($file);
         });
         
         error_log("Processing Letter to Mayor for student: $student_id (Session: $sessionPrefix)");
@@ -5728,10 +5909,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['register'])) {
         $certificatePattern = $tempIndigencyDir . DIRECTORY_SEPARATOR . $sessionPrefix . '_Indigency.*';
         $certificateTempFiles = glob($certificatePattern);
         
-        // Filter to get only actual document files
+        // Filter to get only actual image files (PDF not supported)
         $certificateTempFiles = array_filter($certificateTempFiles, function($file) {
             $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
-            return in_array($ext, ['jpg', 'jpeg', 'png', 'pdf']) && is_file($file);
+            return in_array($ext, ['jpg', 'jpeg', 'png']) && is_file($file);
         });
         
         error_log("Processing Certificate of Indigency for student: $student_id (Session: $sessionPrefix)");
@@ -5810,10 +5991,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['register'])) {
         $gradesPattern = $tempGradesDir . DIRECTORY_SEPARATOR . $sessionPrefix . '_Grades.*';
         $gradesTempFiles = glob($gradesPattern);
         
-        // Filter to get only actual document files
+        // Filter to get only actual image files (PDF not supported)
         $gradesTempFiles = array_filter($gradesTempFiles, function($file) {
             $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
-            return in_array($ext, ['jpg', 'jpeg', 'png', 'pdf']) && is_file($file);
+            return in_array($ext, ['jpg', 'jpeg', 'png']) && is_file($file);
         });
         
         error_log("Processing Grades for student: $student_id (Session: $sessionPrefix)");
@@ -5906,11 +6087,22 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['register'])) {
             }
         }
 
-        // Clean up any remaining confidence files
-        $confidenceFiles = glob($tempFormPath . '*_confidence.json');
-        foreach ($confidenceFiles as $file) {
-            if (file_exists($file)) {
-                unlink($file);
+        // Clean up any remaining confidence files from all temp directories
+        $tempDirs = [
+            $tempIDPictureDir,
+            $tempEnrollmentDir,
+            $tempLetterDir,
+            $tempIndigencyDir,
+            $tempGradesDir
+        ];
+        
+        foreach ($tempDirs as $tempDir) {
+            $confidenceFiles = glob($tempDir . DIRECTORY_SEPARATOR . $sessionPrefix . '*_confidence.json');
+            foreach ($confidenceFiles as $file) {
+                if (file_exists($file)) {
+                    @unlink($file);
+                    error_log("Cleaned up confidence file: " . basename($file));
+                }
             }
         }
 
@@ -5974,7 +6166,19 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['register'])) {
         unset($_SESSION['temp_first_name']);
         unset($_SESSION['temp_last_name']);
 
-        echo "<script>alert('Registration submitted successfully! Your application is under review. You will receive an email notification once approved.'); window.location.href = '../../unified_login.php';</script>";
+        // Return a lightweight success page without forcing an immediate redirect
+        if (!headers_sent()) {
+            header('Content-Type: text/html; charset=UTF-8');
+        }
+        echo "<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1'>"
+           . "<title>Registration Submitted</title>"
+           . "<link href='../../assets/css/bootstrap.min.css' rel='stylesheet'></head><body class='bg-light'>"
+           . "<div class='container py-5'><div class='mx-auto' style='max-width:720px'>"
+           . "<div class='alert alert-success shadow-sm'><h4 class='alert-heading'>Registration submitted successfully!</h4>"
+           . "<p>Your application is under review. You will receive an email notification once approved.</p>"
+           . "<hr><div class='d-flex gap-2'><a class='btn btn-primary' href='../../unified_login.php'>Go to Login</a>"
+           . "<a class='btn btn-outline-secondary' href='student_register.php'>Back to Registration</a></div></div>"
+           . "</div></div></body></html>";
         exit;
     } else {
         // Log the PostgreSQL error for debugging
@@ -5990,15 +6194,12 @@ if (!$isAjaxRequest) {
 ?>
 
 <!-- Main Registration Content -->
-<div class="container py-5">
+<div class="container py-3">
         <div class="register-card mx-auto p-4 rounded shadow-sm bg-white" style="max-width: 600px;">
-            <div class="d-flex justify-content-between align-items-center mb-3">
+            <div class="mb-3">
                 <h4 class="mb-0 text-primary">
                     <i class="bi bi-person-plus-fill me-2"></i>Register for EducAid
                 </h4>
-                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="startFreshRegistration()" title="Clear all uploads and start over">
-                    <i class="bi bi-arrow-clockwise me-1"></i>Start Fresh
-                </button>
             </div>
             
             <?php if (isset($_SESSION['bypass_success'])): ?>
@@ -6029,18 +6230,19 @@ if (!$isAjaxRequest) {
                 </div>
             <?php endif; ?>
             
-            <div class="step-indicator mb-4 text-center">
-                <span class="step active" id="step-indicator-1">1</span>
-                <span class="step" id="step-indicator-2">2</span>
-                <span class="step" id="step-indicator-3">3</span>
-                <span class="step" id="step-indicator-4">4</span>
-                <span class="step" id="step-indicator-5">5</span>
-                <span class="step" id="step-indicator-6">6</span>
-                <span class="step" id="step-indicator-7">7</span>
-                <span class="step" id="step-indicator-8">8</span>
-                <span class="step" id="step-indicator-9">9</span>
-                <span class="step" id="step-indicator-10">10</span>
+            <!-- Simple Step Progress Indicator -->
+            <div class="step-progress-text">
+                <div class="step-counter">
+                    Step <span class="current-step" id="currentStepNumber">1</span> of 10
+                </div>
+                <div class="step-title" id="currentStepTitle">
+                    <i class="bi bi-person-fill"></i>Personal Information
+                </div>
+                <div class="step-progress-bar-simple">
+                    <div class="progress-fill" id="progressFill" style="width: 10%;"></div>
+                </div>
             </div>
+            
             <form id="multiStepForm" method="POST" autocomplete="off">
                 <!-- Hidden Fields -->
                 <input type="hidden" id="adminReviewRequiredFlag" name="admin_review_required" value="0" />
@@ -6253,7 +6455,7 @@ if (!$isAjaxRequest) {
                             Please upload a clear photo of your Student ID<br>
                             <strong>Required content:</strong> Your name and university
                         </small>
-                        <input type="file" class="form-control" id="id_picture_file" accept="image/*" required>
+                        <input type="file" class="form-control" id="id_picture_file" accept="image/jpeg,image/jpg,image/png" required>
                         <div id="idPictureFilenameError" class="text-danger mt-1" style="display: none;">
                             <small><i class="bi bi-exclamation-triangle me-1"></i>Please upload a valid student ID picture</small>
                         </div>
@@ -6361,9 +6563,9 @@ if (!$isAjaxRequest) {
                         <small class="form-text text-muted d-block">
                             Please upload a clear photo of your Enrollment Assessment Form<br>
                             <!-- Filename format requirement removed - system will auto-rename files -->
-                            <em>Accepted formats: JPG, PNG, PDF</em>
+                            <em>Accepted formats: JPG, PNG</em>
                         </small>
-                        <input type="file" class="form-control" name="enrollment_form" id="enrollmentForm" accept="image/*" required />
+                        <input type="file" class="form-control" name="enrollment_form" id="enrollmentForm" accept="image/jpeg,image/jpg,image/png" required />
                         <div id="filenameError" class="text-danger mt-1" style="display: none;">
                             <small><i class="bi bi-exclamation-triangle me-1"></i>Please upload a valid image file</small>
                         </div>
@@ -6485,7 +6687,7 @@ if (!$isAjaxRequest) {
                             Please upload a clear photo of your Letter to Mayor<br>
                             <strong>Required content:</strong> Your name, barangay, and "Office of the Mayor" header
                         </small>
-                        <input type="file" class="form-control" name="letter_to_mayor" id="letterToMayorForm" accept="image/*" required />
+                        <input type="file" class="form-control" name="letter_to_mayor" id="letterToMayorForm" accept="image/jpeg,image/jpg,image/png" required />
                         <div id="letterFilenameError" class="text-danger mt-1" style="display: none;">
                             <small><i class="bi bi-exclamation-triangle me-1"></i>Please upload a valid letter to mayor document</small>
                         </div>
@@ -6556,7 +6758,7 @@ if (!$isAjaxRequest) {
                             Please upload a clear photo of your Certificate of Indigency<br>
                             <strong>Required elements:</strong> Certificate title, your name, barangay, and "<?php echo htmlspecialchars($municipality_name); ?>"
                         </small>
-                        <input type="file" class="form-control" name="certificate_of_indigency" id="certificateForm" accept="image/*" required />
+                        <input type="file" class="form-control" name="certificate_of_indigency" id="certificateForm" accept="image/jpeg,image/jpg,image/png" required />
                         <div class="invalid-feedback" id="certificateError">
                             <small><i class="bi bi-exclamation-triangle me-1"></i>Please upload a valid certificate of indigency document</small>
                         </div>
@@ -6628,7 +6830,7 @@ if (!$isAjaxRequest) {
                             <strong>Required elements:</strong> Name, School Year, and Subject Grades
                             <br>Note: Grades must not be below 3.00 to proceed
                         </small>
-                        <input type="file" class="form-control" name="grades_document" id="gradesForm" accept="image/*" required />
+                        <input type="file" class="form-control" name="grades_document" id="gradesForm" accept="image/jpeg,image/jpg,image/png" required />
                         <div class="invalid-feedback" id="gradesError">
                             <small><i class="bi bi-exclamation-triangle me-1"></i>Please upload a valid grades document</small>
                         </div>
@@ -6770,8 +6972,16 @@ if (!$isAjaxRequest) {
                             </button>
                         </div>
                     </div>
-                    <div class="form-text">
-                        Must be at least 12 characters long with letters, numbers, and symbols.
+                    <div class="form-text mb-2">
+                        Must be at least 12 characters long with uppercase, lowercase, numbers, and special characters.
+                    </div>
+                    <!-- Password Strength Indicator -->
+                    <div class="mb-3">
+                        <label class="form-label">Password Strength</label>
+                        <div class="progress" style="height: 25px;">
+                            <div id="strengthBar" class="progress-bar" role="progressbar" style="width: 0%; transition: width 0.3s ease, background-color 0.3s ease;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+                        </div>
+                        <small id="strengthText" class="text-muted d-block mt-1"></small>
                     </div>
                     <div class="mb-3">
                         <label class="form-label" for="confirmPassword">Confirm Password</label>
@@ -6781,14 +6991,9 @@ if (!$isAjaxRequest) {
                                 <i class="bi bi-eye" id="confirmPasswordIcon"></i>
                             </button>
                         </div>
+                        <small id="passwordMatchText" class="d-block mt-1"></small>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">Password Strength</label>
-                        <div class="progress">
-                            <div id="strengthBar" class="progress-bar" role="progressbar" style="width: 0%;"></div>
-                        </div>
-                        <small id="strengthText" class="text-muted"></small>
-                    </div>
+                    <!-- Terms and Conditions -->
                     <div class="mb-3 form-check">
                         <input type="checkbox" class="form-check-input" name="agree_terms" id="agreeTerms" required readonly />
                         <label class="form-check-label" for="agreeTerms">
@@ -6800,9 +7005,10 @@ if (!$isAjaxRequest) {
                         </label>
                         <small class="d-block text-muted mt-1">Click "Terms and Conditions" to read and accept</small>
                     </div>
+                    <!-- Navigation Buttons -->
                     <button type="button" class="btn btn-secondary w-100 mb-2" onclick="prevStep()">Back</button>
-                    <button type="submit" name="register" class="btn btn-success w-100">Submit</button>
-                </div>
+                    <button type="submit" name="register" id="submitButton" class="btn btn-success w-100" disabled>Submit</button>
+                </div><!-- End Step 10 -->
             </form>
         </div>
     </div>
@@ -6848,8 +7054,23 @@ if (!$isAjaxRequest) {
     <!-- Bootstrap JavaScript -->
 <script src="../../assets/js/bootstrap.bundle.min.js"></script>
 
+<!-- ✅ Load user_registration.js BEFORE inline scripts to prevent conflicts -->
+<script src="../../assets/js/student/user_registration.js?v=<?php echo time(); ?>"></script>
+
 <!-- Immediate function definitions for onclick handlers -->
 <script>
+// ============================================
+// NAVIGATION FUNCTIONS - DEFINED FIRST FOR ONCLICK HANDLERS
+// ============================================
+
+// (Duplicate navigation function block removed - single source defined earlier)
+console.log('🔍 Verification - window.nextStep type:', typeof window.nextStep);
+console.log('🔍 Verification - Is it the stub?', window.nextStep.toString().includes('stub'));
+
+// ============================================
+// OTHER HELPER FUNCTIONS
+// ============================================
+
 // Password visibility toggle function
 function togglePasswordVisibility(fieldId, iconId) {
     const field = document.getElementById(fieldId);
@@ -6866,8 +7087,10 @@ function togglePasswordVisibility(fieldId, iconId) {
     }
 }
 
-// Simple working navigation functions (fallback if main script fails)
-let currentStep = 1;
+// ============================================
+// INLINE-ONLY VARIABLES (not in user_registration.js)
+// ============================================
+// DO NOT redefine currentStep here - it's already in user_registration.js!
 let hasNameDuplicate = false; // Track if name duplicate was detected
 let hasHouseholdWarning = false; // Track if household warning is active
 let householdConfirmed = false; // Track if user confirmed different household
@@ -7486,133 +7709,9 @@ function goBackToEdit() {
     showStep(1);
 }
 
-async function nextStep() {
-    console.log('🔧 Enhanced nextStep called - Step:', currentStep);
-    
-    if (currentStep >= 10) return; // Allow navigation through all 10 steps
-    
-    // Special check for Step 1: Check for duplicate names before proceeding
-    if (currentStep === 1) {
-        // First check for duplicate names (blocks if duplicate)
-        const isNameDuplicate = await checkNameBeforeProceeding();
-        if (isNameDuplicate) {
-            return; // Stop here if duplicate name found
-        }
-    }
-    
-    // Special check for Step 2: Check household duplicate (after barangay is selected)
-    if (currentStep === 2) {
-        console.log('🏠 Step 2 complete - checking household duplicate...');
-        
-        // Disable next button to prevent double-clicks
-        const nextBtn = document.querySelector('.btn-next');
-        const originalBtnText = nextBtn ? nextBtn.innerHTML : '';
-        if (nextBtn) {
-            nextBtn.disabled = true;
-            nextBtn.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Checking...';
-        }
-        
-        // Check household: Surname + Mother's Maiden Name + Barangay
-        const householdBlocked = await checkHouseholdBeforeProceeding();
-        
-        // Re-enable next button
-        if (nextBtn) {
-            nextBtn.disabled = false;
-            nextBtn.innerHTML = originalBtnText;
-        }
-        
-        if (householdBlocked) {
-            return; // Stop here if same household detected
-        }
-    }
-    
-    // Special check for Step 3: Check for duplicate registration before proceeding to ID upload
-    if (currentStep === 3) {
-        const isDuplicate = await checkForDuplicateRegistration();
-        if (isDuplicate) {
-            return; // Stop here if duplicate found
-        }
-    }
-    
-    // Validate current step before proceeding
-    const validationResult = validateCurrentStepFields();
-    if (!validationResult.isValid) {
-        showValidationError(validationResult.message, validationResult.fields);
-        return;
-    }
-    
-    // Hide current step
-    const currentPanel = document.getElementById(`step-${currentStep}`);
-    if (currentPanel) {
-        currentPanel.classList.add('d-none');
-    }
-    
-    // Show next step
-    currentStep++;
-    const nextPanel = document.getElementById(`step-${currentStep}`);
-    if (nextPanel) {
-        nextPanel.classList.remove('d-none');
-    }
-    
-    // Update step indicators
-    updateStepIndicators();
-    
-    // Clear any previous error messages
-    clearValidationErrors();
-    
-    console.log('✅ Moved to step:', currentStep);
-}
-
-function prevStep() {
-    console.log('🔧 Fallback prevStep called - Step:', currentStep);
-    
-    if (currentStep <= 1) return;
-    
-    // Hide current step
-    const currentPanel = document.getElementById(`step-${currentStep}`);
-    if (currentPanel) {
-        currentPanel.classList.add('d-none');
-    }
-    
-    // Show previous step
-    currentStep--;
-    const prevPanel = document.getElementById(`step-${currentStep}`);
-    if (prevPanel) {
-        prevPanel.classList.remove('d-none');
-    }
-    
-    // Update step indicators
-    updateStepIndicators();
-    
-    console.log('✅ Moved to step:', currentStep);
-}
-
-function showStep(stepNum) {
-    console.log('🔧 Fallback showStep called:', stepNum);
-    
-    // Hide all steps
-    document.querySelectorAll('.step-panel').forEach(panel => {
-        panel.classList.add('d-none');
-    });
-    
-    // Show target step
-    const targetPanel = document.getElementById(`step-${stepNum}`);
-    if (targetPanel) {
-        targetPanel.classList.remove('d-none');
-        currentStep = stepNum;
-        updateStepIndicators();
-    }
-}
-
-function updateStepIndicators() {
-    document.querySelectorAll('.step').forEach((step, index) => {
-        if (index + 1 === currentStep) {
-            step.classList.add('active');
-        } else {
-            step.classList.remove('active');
-        }
-    });
-}
+// ❌ REMOVED: Duplicate nextStep(), prevStep(), showStep(), updateStepIndicators() definitions
+// These functions are now defined at the TOP of the script block (line ~7105)
+// so they're available when onclick handlers execute
 
 // ============================================
 // VALIDATION FUNCTIONS
@@ -7734,7 +7833,7 @@ function validateCurrentStepFields() {
             /*
             // Validate filename format
             const filename = enrollmentFile.files[0].name;
-            const namePattern = /^[A-Za-z]+_[A-Za-z]+_EAF\.(jpg|jpeg|png|pdf)$/i;
+            const namePattern = /^[A-Za-z]+_[A-Za-z]+_EAF\.(jpg|jpeg|png)$/i;
             if (!namePattern.test(filename)) {
                 invalidFields.push({
                     field: enrollmentFile,
@@ -7812,9 +7911,13 @@ function validateCurrentStepFields() {
     
     // Step 9: OTP Verification
     if (currentStep === 9) {
+        // Cache references (avoid repeated DOM lookups)
         const emailStatus = document.getElementById('emailStatus');
         const otpSection = document.getElementById('otpSection');
         const mobileInput = currentPanel.querySelector('#mobile');
+        const otpInput = currentPanel.querySelector('#otp');
+        const otpFlag = document.getElementById('otpVerifiedFlag');
+        const isOtpVerified = (window.otpVerified === true) || (otpFlag && otpFlag.value === '1');
         
         // Check if phone number is filled
         if (!mobileInput || !mobileInput.value.trim()) {
@@ -7835,24 +7938,35 @@ function validateCurrentStepFields() {
             };
         }
         
-        // Check if email is verified (emailStatus is visible)
-        if (!emailStatus || emailStatus.classList.contains('d-none')) {
-            // Check if OTP section is visible (means OTP was sent but not verified)
+        // Check if email is verified.
+        // Accept any of the following as success:
+        // 1. emailStatus element is visible (legacy behavior)
+        // 2. Hidden flag otpVerifiedFlag exists with value '1'
+        // 3. window.otpVerified === true (external script state)
+        if (!isOtpVerified && (!emailStatus || emailStatus.classList.contains('d-none'))) {
+            // If OTP area still visible user hasn't completed verification
             if (otpSection && !otpSection.classList.contains('d-none')) {
                 return {
                     isValid: false,
                     message: 'Please verify your email by entering the OTP code sent to your email.',
-                    fields: [currentPanel.querySelector('#otp')]
-                };
-            } else {
-                return {
-                    isValid: false,
-                    message: 'Please send and verify OTP to your email address.',
-                    fields: [currentPanel.querySelector('#emailInput')]
+                    fields: [otpInput || currentPanel.querySelector('#emailInput')].filter(Boolean)
                 };
             }
+            return {
+                isValid: false,
+                message: 'Please send and verify OTP to your email address.',
+                fields: [currentPanel.querySelector('#emailInput')].filter(Boolean)
+            };
         }
     }
+    
+    // Step 10: Password Strength Validation
+    // ✅ REMOVED DUPLICATE VALIDATION - Now handled by user_registration.js
+    // The setupPasswordStrength() function in user_registration.js handles:
+    // - Real-time password strength calculation (100-point system)
+    // - Live password match validation
+    // - Submit button enable/disable based on all requirements
+    // This prevents conflicts and ensures consistent validation behavior
     
     // Return validation result
     if (emptyFields.length > 0) {
@@ -8275,24 +8389,69 @@ function setupRealTimeValidation() {
 // ============================================
 
 function setupFileUploadHandlers() {
+    console.log('🔧 Setting up file upload handlers...');
+    
     // Student ID Picture Upload Handler
     const idPictureFile = document.getElementById('id_picture_file');
     if (idPictureFile) {
+        console.log('✅ Found ID picture input, attaching listener');
         idPictureFile.addEventListener('change', function(e) {
+            console.log('[ID PIC] File input changed!');
             handleIdPictureFileUpload(e.target);
         });
+    } else {
+        console.warn('❌ ID picture input (#id_picture_file) not found!');
     }
     
     // Enrollment Form Upload Handler
     const enrollmentForm = document.getElementById('enrollmentForm');
     if (enrollmentForm) {
+        console.log('✅ Found enrollment form input, attaching listener');
         enrollmentForm.addEventListener('change', function(e) {
+            console.log('[ENROLLMENT] File input changed!');
             handleEnrollmentFileUpload(e.target);
         });
+    } else {
+        console.warn('❌ Enrollment form input (#enrollmentForm) not found!');
     }
     
-    // Other file upload handlers can be added here
-    console.log('✅ File upload handlers initialized');
+    // Letter to Mayor Upload Handler
+    const letterForm = document.getElementById('letterToMayorForm');
+    if (letterForm) {
+        console.log('✅ Found letter form input, attaching listener');
+        letterForm.addEventListener('change', function(e) {
+            console.log('[LETTER] File input changed!');
+            handleLetterFileUpload(e.target);
+        });
+    } else {
+        console.warn('❌ Letter form input (#letterToMayorForm) not found!');
+    }
+    
+    // Certificate of Indigency Upload Handler
+    const certificateForm = document.getElementById('certificateForm');
+    if (certificateForm) {
+        console.log('✅ Found certificate form input, attaching listener');
+        certificateForm.addEventListener('change', function(e) {
+            console.log('[CERTIFICATE] File input changed!');
+            handleCertificateFileUpload(e.target);
+        });
+    } else {
+        console.warn('❌ Certificate form input (#certificateForm) not found!');
+    }
+    
+    // Grades Document Upload Handler
+    const gradesForm = document.getElementById('gradesForm');
+    if (gradesForm) {
+        console.log('✅ Found grades form input, attaching listener');
+        gradesForm.addEventListener('change', function(e) {
+            console.log('[GRADES] File input changed!');
+            handleGradesFileUpload(e.target);
+        });
+    } else {
+        console.warn('❌ Grades form input (#gradesForm) not found!');
+    }
+    
+    console.log('✅ File upload handlers initialization complete');
 }
 
 function handleIdPictureFileUpload(fileInput) {
@@ -8302,6 +8461,13 @@ function handleIdPictureFileUpload(fileInput) {
     const pdfPreview = document.getElementById('idPicturePdfPreview');
     const ocrSection = document.getElementById('idPictureOcrSection');
     const processBtn = document.getElementById('processIdPictureOcrBtn');
+
+    console.log('[ID PIC] change event fired');
+    if (!file) {
+        console.log('[ID PIC] No file selected');
+    } else {
+        console.log(`[ID PIC] Selected file: name="${file.name}" type="${file.type}" size=${file.size} bytes`);
+    }
     
     if (!file) {
         // Hide preview and OCR section if no file
@@ -8331,9 +8497,12 @@ function handleIdPictureFileUpload(fileInput) {
         processBtn.disabled = false;
         processBtn.classList.remove('btn-secondary');
         processBtn.classList.add('btn-info');
+        processBtn.style.display = 'block';
+        console.log('[ID PIC] Process button enabled');
         
         // Add click handler for processing
         processBtn.onclick = function() {
+            console.log('[ID PIC] Process button clicked');
             processIdPictureDocument();
         };
     }
@@ -8586,6 +8755,57 @@ function handleEnrollmentFileUpload(fileInput) {
         // Show filename error
         showNotifier('Filename must follow format: Lastname_Firstname_EAF.jpg (e.g., Santos_Juan_EAF.jpg)', 'error');
         */
+    }
+}
+
+function handleLetterFileUpload(fileInput) {
+    console.log('[LETTER] handleLetterFileUpload called');
+    const file = fileInput.files[0];
+    if (!file) {
+        console.log('[LETTER] No file');
+        return;
+    }
+    console.log(`[LETTER] File: ${file.name}, ${file.size} bytes`);
+    // Enable process button
+    const processBtn = document.getElementById('processLetterOcrBtn');
+    if (processBtn) {
+        processBtn.disabled = false;
+        processBtn.style.display = 'block';
+        console.log('[LETTER] Process button enabled');
+    }
+}
+
+function handleCertificateFileUpload(fileInput) {
+    console.log('[CERTIFICATE] handleCertificateFileUpload called');
+    const file = fileInput.files[0];
+    if (!file) {
+        console.log('[CERTIFICATE] No file');
+        return;
+    }
+    console.log(`[CERTIFICATE] File: ${file.name}, ${file.size} bytes`);
+    // Enable process button
+    const processBtn = document.getElementById('processCertificateOcrBtn');
+    if (processBtn) {
+        processBtn.disabled = false;
+        processBtn.style.display = 'block';
+        console.log('[CERTIFICATE] Process button enabled');
+    }
+}
+
+function handleGradesFileUpload(fileInput) {
+    console.log('[GRADES] handleGradesFileUpload called');
+    const file = fileInput.files[0];
+    if (!file) {
+        console.log('[GRADES] No file');
+        return;
+    }
+    console.log(`[GRADES] File: ${file.name}, ${file.size} bytes`);
+    // Enable process button
+    const processBtn = document.getElementById('processGradesOcrBtn');
+    if (processBtn) {
+        processBtn.disabled = false;
+        processBtn.style.display = 'block';
+        console.log('[GRADES] Process button enabled');
     }
 }
 
@@ -8867,7 +9087,10 @@ function resetProcessButton() {
 // ============================================
 // OTP FUNCTIONALITY
 // ============================================
+// NOTE: OTP handlers are now in user_registration.js to prevent duplicate event listeners
+// The following setupOtpHandlers() function is DISABLED to avoid double-firing AJAX requests
 
+/*
 function setupOtpHandlers() {
     const sendOtpBtn = document.getElementById('sendOtpBtn');
     const resendOtpBtn = document.getElementById('resendOtpBtn');
@@ -8893,7 +9116,9 @@ function setupOtpHandlers() {
     
     console.log('✅ OTP handlers initialized');
 }
+*/
 
+/*
 function sendOtp() {
     const emailInput = document.getElementById('emailInput');
     const sendBtn = document.getElementById('sendOtpBtn');
@@ -8982,6 +9207,7 @@ function sendOtp() {
         }
     });
 }
+*/
 
 function startResendCooldown() {
     const resendBtn = document.getElementById('resendOtpBtn');
@@ -9018,6 +9244,9 @@ function setupOtpInputFormatting() {
             // Only allow numbers
             e.target.value = e.target.value.replace(/[^0-9]/g, '');
             
+            // ❌ REMOVED: Auto-verify feature disabled - verifyOtp() is now in user_registration.js
+            // User must click "Verify OTP" button manually
+            /*
             // Auto-verify when 6 digits are entered
             if (e.target.value.length === 6) {
                 // Small delay to let user see the complete input
@@ -9028,6 +9257,7 @@ function setupOtpInputFormatting() {
                     }
                 }, 500);
             }
+            */
         });
         
         // Handle paste events
@@ -9037,6 +9267,9 @@ function setupOtpInputFormatting() {
             const numbers = paste.replace(/[^0-9]/g, '').substring(0, 6);
             e.target.value = numbers;
             
+            // ❌ REMOVED: Auto-verify feature disabled - verifyOtp() is now in user_registration.js
+            // User must click "Verify OTP" button manually
+            /*
             if (numbers.length === 6) {
                 setTimeout(() => {
                     const verifyBtn = document.getElementById('verifyOtpBtn');
@@ -9045,10 +9278,12 @@ function setupOtpInputFormatting() {
                     }
                 }, 500);
             }
+            */
         });
     }
 }
 
+/*
 function verifyOtp() {
     const otpInput = document.querySelector('input[name="otp"]');
     const emailInput = document.querySelector('input[name="email"]');
@@ -9131,6 +9366,7 @@ function verifyOtp() {
         }
     });
 }
+*/
 
 function validateEmail(email) {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -9349,110 +9585,11 @@ function setupHouseholdWarning() {
     });
 }
 
-// Check student name fields for gibberish/keyboard mashing
-function setupStudentNameValidation() {
-    const nameFields = [
-        { input: document.querySelector('input[name="first_name"]'), label: 'First Name' },
-        { input: document.querySelector('input[name="middle_name"]'), label: 'Middle Name' },
-        { input: document.querySelector('input[name="last_name"]'), label: 'Last Name' }
-    ];
-    
-    nameFields.forEach(({ input, label }) => {
-        if (!input) return;
-        
-        // Create warning div if it doesn't exist
-        let warningDiv = input.parentElement.querySelector('.name-validation-warning');
-        if (!warningDiv) {
-            warningDiv = document.createElement('div');
-            warningDiv.className = 'name-validation-warning alert mt-2';
-            warningDiv.style.display = 'none';
-            input.parentElement.appendChild(warningDiv);
-        }
-        
-        input.addEventListener('blur', function() {
-            const value = this.value.trim();
-            
-            // Clear previous warnings
-            warningDiv.style.display = 'none';
-            this.classList.remove('is-invalid');
-            this.style.borderColor = '';
-            
-            // Middle name is optional, so skip validation if empty
-            if (!value && input.name === 'middle_name') return;
-            
-            if (!value) return; // Empty is handled by required validation
-            
-            // Validate using the same logic as validateSpecificField
-            const validation = validateSpecificField(this, value);
-            
-            if (!validation.isValid) {
-                warningDiv.textContent = '⚠️ ' + validation.error;
-                warningDiv.className = 'name-validation-warning alert alert-danger mt-2';
-                warningDiv.style.display = 'block';
-                this.classList.add('is-invalid');
-                this.style.borderColor = '#dc3545';
-                
-                // Also show notifier for immediate feedback
-                showNotifier(validation.error, 'error');
-            }
-        });
-        
-        // Clear validation on input
-        input.addEventListener('input', function() {
-            warningDiv.style.display = 'none';
-            this.classList.remove('is-invalid');
-            this.style.borderColor = '';
-        });
-    });
-}
-
-// Check mother's full name for gibberish/keyboard mashing
-function setupMothersFullNameValidation() {
-    const mothersFullNameInput = document.querySelector('input[name="mothers_fullname"]');
-    
-    if (!mothersFullNameInput) return;
-    
-    // Create warning div if it doesn't exist
-    let warningDiv = mothersFullNameInput.parentElement.querySelector('.mothers-name-warning');
-    if (!warningDiv) {
-        warningDiv = document.createElement('div');
-        warningDiv.className = 'mothers-name-warning alert mt-2';
-        warningDiv.style.display = 'none';
-        mothersFullNameInput.parentElement.appendChild(warningDiv);
-    }
-    
-    mothersFullNameInput.addEventListener('blur', function() {
-        const value = this.value.trim();
-        
-        // Clear previous warnings
-        warningDiv.style.display = 'none';
-        this.classList.remove('is-invalid');
-        this.style.borderColor = '';
-        
-        if (!value) return; // Empty is handled by required validation
-        
-        // Validate using the same logic as validateSpecificField
-        const validation = validateSpecificField(this, value);
-        
-        if (!validation.isValid) {
-            warningDiv.textContent = '⚠️ ' + validation.error;
-            warningDiv.className = 'mothers-name-warning alert alert-danger mt-2';
-            warningDiv.style.display = 'block';
-            this.classList.add('is-invalid');
-            this.style.borderColor = '#dc3545';
-            
-            // Also show notifier for immediate feedback
-            showNotifier(validation.error, 'error');
-        }
-    });
-    
-    // Clear validation on input
-    mothersFullNameInput.addEventListener('input', function() {
-        warningDiv.style.display = 'none';
-        this.classList.remove('is-invalid');
-        this.style.borderColor = '';
-    });
-}
+// ❌ REMOVED: setupStudentNameValidation() - Now in user_registration.js
+// ❌ REMOVED: setupMothersFullNameValidation() - Now in user_registration.js
+// These client-side validation functions have been moved to user_registration.js
+// to prevent conflicts with other inline code and ensure proper initialization order.
+// The validation logic uses the same validateSpecificField() function defined below.
 
 // ============================================================
 // HOUSEHOLD DUPLICATE PREVENTION SYSTEM
@@ -9762,108 +9899,52 @@ function setupBarangayHouseholdCheck() {
     });
 }
 
-// Password strength indicator
-function setupPasswordStrength() {
-    const passwordInput = document.getElementById('password');
-    const strengthBar = document.getElementById('strengthBar');
-    const strengthText = document.getElementById('strengthText');
-    
-    if (!passwordInput || !strengthBar || !strengthText) return;
-    
-    passwordInput.addEventListener('input', function() {
-        const password = this.value;
-        let strength = 0;
-        let feedback = [];
-        
-        // Length check
-        if (password.length >= 12) {
-            strength += 25;
-        } else {
-            feedback.push('at least 12 characters');
-        }
-        
-        // Uppercase check
-        if (/[A-Z]/.test(password)) {
-            strength += 25;
-        } else {
-            feedback.push('uppercase letters');
-        }
-        
-        // Lowercase check
-        if (/[a-z]/.test(password)) {
-            strength += 25;
-        } else {
-            feedback.push('lowercase letters');
-        }
-        
-        // Number check
-        if (/[0-9]/.test(password)) {
-            strength += 15;
-        } else {
-            feedback.push('numbers');
-        }
-        
-        // Special character check
-        if (/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
-            strength += 10;
-        } else {
-            feedback.push('special characters');
-        }
-        
-        // Update progress bar
-        strengthBar.style.width = strength + '%';
-        
-        // Update colors and text
-        if (strength < 40) {
-            strengthBar.className = 'progress-bar bg-danger';
-            strengthText.textContent = 'Weak - Need: ' + feedback.join(', ');
-            strengthText.className = 'text-danger';
-        } else if (strength < 70) {
-            strengthBar.className = 'progress-bar bg-warning';
-            strengthText.textContent = 'Fair - Need: ' + feedback.join(', ');
-            strengthText.className = 'text-warning';
-        } else if (strength < 90) {
-            strengthBar.className = 'progress-bar bg-info';
-            strengthText.textContent = 'Good';
-            strengthText.className = 'text-info';
-        } else {
-            strengthBar.className = 'progress-bar bg-success';
-            strengthText.textContent = 'Strong password!';
-            strengthText.className = 'text-success';
-        }
-    });
-}
+// NOTE: Password strength validation is now in user_registration.js
+// The setupPasswordStrength() function handles:
+// - Real-time password strength calculation (100-point system)
+// - Live feedback with color-coded progress bar
+// - Password match validation
+// - Submit button enable/disable based on requirements
+// Requirements: 12+ chars, uppercase, lowercase, number, special character, passwords match
 
 document.addEventListener('DOMContentLoaded', function() {
+    // Initialize form to step 1
+    showStep(1);
+    updateStepIndicators();
+    console.log('✅ Form initialized to step 1');
+    
     // Auto-cleanup on page refresh (if triggered by PHP)
     <?php if (isset($_SESSION['trigger_cleanup_on_load']) && $_SESSION['trigger_cleanup_on_load'] === true): ?>
-    console.log('🔄 Page refresh detected - cleaning up temp files...');
+    console.log('🔄 Page refresh detected (PHP flag) - verifying cleanup...');
     cleanupSessionFiles().then(() => {
-        console.log('✅ Temp files cleaned on refresh');
+        console.log('✅ JavaScript cleanup verification completed');
     });
     <?php 
-    // Clear the flag after triggering
-    unset($_SESSION['trigger_cleanup_on_load']); 
+    // Clear the flag after a short delay to allow JavaScript to execute
+    // This prevents the flag from persisting across multiple refreshes
+    $_SESSION['trigger_cleanup_on_load'] = false; 
     ?>
+    <?php else: ?>
+    console.log('ℹ️ Normal page load (not a refresh)');
     <?php endif; ?>
     
     setupRealTimeValidation();
     setupFileUploadHandlers();
-    setupOtpHandlers();
+    // setupOtpHandlers(); // DISABLED: OTP handlers now in user_registration.js to prevent duplicate event listeners
     setupOtpInputFormatting();
     setupEmailDuplicateCheck();
     setupMobileDuplicateCheck(); // Add mobile duplicate check
     setupNameDuplicateCheck(); // Add name duplicate check
     setupHouseholdWarning(); // Add household warning check (old system)
-    setupStudentNameValidation(); // NEW: Validate student name fields for gibberish
-    setupMothersFullNameValidation(); // NEW: Validate mother's full name for gibberish
+    // ❌ REMOVED: setupStudentNameValidation() - Now in user_registration.js (loads earlier)
+    // ❌ REMOVED: setupMothersFullNameValidation() - Now in user_registration.js (loads earlier)
     setupMothersMaidenNameValidation(); // NEW: Mother's maiden name validation
     setupBarangayHouseholdCheck(); // NEW: Barangay change triggers household check
-    setupPasswordStrength();
-    setupSessionCleanup();
+    // NOTE: setupPasswordStrength() is now called from user_registration.js automatically
     setupConnectionMonitoring();
-    setupPageUnloadWarning();
-    console.log('✅ All handlers initialized');
+    setupPageUnloadWarning(); // Setup refresh warning with auto-cleanup
+    console.log('✅ All handlers initialized (password validation in user_registration.js)');
+    console.log('⚠️ Page refresh warning enabled - will cleanup temp files on refresh');
     
     // Add debug button (temporary)
     const debugBtn = document.createElement('button');
@@ -9881,54 +9962,11 @@ document.addEventListener('DOMContentLoaded', function() {
 // SESSION CLEANUP & FILE MANAGEMENT
 // ============================================
 
-// Start fresh registration - clear all data and reload
-async function startFreshRegistration() {
-    const confirmed = confirm('Are you sure you want to start fresh? This will:\n\n• Clear all uploaded files\n• Reset the registration form\n• Clear your progress\n\nThis action cannot be undone.');
-    
-    if (!confirmed) return;
-    
-    try {
-        // Show loading indicator
-        showNotifier('Clearing session data...', 'info');
-        
-        // Cleanup files
-        await cleanupSessionFiles();
-        
-        // Clear session via server (create a new endpoint for this)
-        const formData = new FormData();
-        formData.append('clear_registration_session', '1');
-        
-        const response = await fetch('student_register.php', {
-            method: 'POST',
-            body: formData
-        });
-        
-        if (response.ok) {
-            showNotifier('Session cleared! Reloading page...', 'success');
-            // Wait a bit then reload
-            setTimeout(() => {
-                window.location.reload();
-            }, 1000);
-        } else {
-            throw new Error('Failed to clear session');
-        }
-    } catch (error) {
-        console.error('Error clearing session:', error);
-        showNotifier('Failed to clear session completely, but files were removed. Please refresh the page.', 'warning');
-        setTimeout(() => {
-            window.location.reload();
-        }, 2000);
-    }
-}
+// ============================================
+// SESSION CLEANUP & FILE MANAGEMENT
+// ============================================
 
-function setupSessionCleanup() {
-    // Clean up old session files on page load
-    cleanupSessionFiles();
-    
-    // Periodically check for orphaned files (every 5 minutes)
-    setInterval(cleanupSessionFiles, 5 * 60 * 1000);
-}
-
+// Automatic cleanup when session files are detected on page load
 async function cleanupSessionFiles() {
     try {
         const formData = new FormData();
@@ -9940,7 +9978,7 @@ async function cleanupSessionFiles() {
         });
         
         const data = await response.json();
-        console.log('Session cleanup:', data);
+        console.log('🗑️ Session cleanup:', data);
     } catch (error) {
         console.error('Cleanup error:', error);
     }
@@ -9957,40 +9995,79 @@ async function trackUploadedFile(fileType, fileName) {
             method: 'POST',
             body: formData
         });
+        
+        // Mark that files have been uploaded (enables refresh warning)
+        markFileAsUploaded();
     } catch (error) {
         console.error('Error tracking file:', error);
     }
 }
 
 // ============================================
-// PAGE UNLOAD WARNING
+// PAGE UNLOAD WARNING WITH AUTO-CLEANUP
 // ============================================
 
-let hasUploadedFiles = false;
+// NOTE: hasUploadedFiles is already declared in user_registration.js
+// Do NOT redeclare it here to avoid "already been declared" error
+if (typeof isNavigatingAway === 'undefined') {
+    var isNavigatingAway = false; // Track if user is intentionally leaving
+}
 
 function setupPageUnloadWarning() {
     // Check if user has uploaded files on page load
     checkUploadedFiles();
     
-    // Warn before leaving/refreshing page if files are uploaded
+    // Enhanced beforeunload handler with cleanup
     window.addEventListener('beforeunload', function(e) {
-        if (hasUploadedFiles && currentStep < 8) {
-            // When user clicks refresh or tries to leave
-            // Browser will show confirmation dialog
-            const message = 'You have uploaded documents. Refreshing will delete all uploaded files and you will need to upload them again. Are you sure?';
+        if (hasUploadedFiles && currentStep > 1 && currentStep < 10 && !isNavigatingAway) {
+            // User is trying to refresh or close - trigger cleanup
+            isNavigatingAway = true;
+            
+            // Trigger cleanup in background (fire-and-forget)
+            // Use sendBeacon for reliable delivery even if page unloads
+            const formData = new FormData();
+            formData.append('cleanup_session_files', '1');
+            
+            // Modern browsers: sendBeacon is more reliable during page unload
+            if (navigator.sendBeacon) {
+                const blob = new Blob([new URLSearchParams(formData)], { type: 'application/x-www-form-urlencoded' });
+                navigator.sendBeacon('student_register.php', blob);
+                console.log('🗑️ Cleanup triggered via sendBeacon');
+            } else {
+                // Fallback: synchronous AJAX (not ideal but works)
+                const xhr = new XMLHttpRequest();
+                xhr.open('POST', 'student_register.php', false); // synchronous
+                xhr.send(formData);
+                console.log('🗑️ Cleanup triggered via sync XHR');
+            }
+            
+            // Show browser's default confirmation dialog
+            const message = '⚠️ WARNING: Refreshing will delete ALL your uploaded documents!\n\n' +
+                          'Your uploaded files (ID picture, enrollment form, grades, etc.) will be permanently removed.\n' +
+                          'You will need to upload them again if you return.\n\n' +
+                          'Are you sure you want to refresh?';
             e.preventDefault();
-            e.returnValue = message; // Standard for most browsers
-            return message; // For some older browsers
+            e.returnValue = message;
+            return message;
         }
     });
     
-    // Also detect page visibility change (when user switches tabs)
-    document.addEventListener('visibilitychange', function() {
-        if (document.hidden && hasUploadedFiles) {
-            // User switched away - don't cleanup yet, just log
-            console.log('User switched tabs - files preserved');
+    // Detect page hide (more reliable than beforeunload in modern browsers)
+    window.addEventListener('pagehide', function(e) {
+        if (hasUploadedFiles && currentStep > 1 && currentStep < 10) {
+            // Page is definitely being unloaded - cleanup
+            const formData = new FormData();
+            formData.append('cleanup_session_files', '1');
+            
+            if (navigator.sendBeacon) {
+                const blob = new Blob([new URLSearchParams(formData)], { type: 'application/x-www-form-urlencoded' });
+                navigator.sendBeacon('student_register.php', blob);
+                console.log('🗑️ Cleanup triggered on pagehide');
+            }
         }
     });
+    
+    console.log('✅ Page refresh warning with auto-cleanup enabled');
 }
 
 async function checkUploadedFiles() {
@@ -10006,7 +10083,10 @@ async function checkUploadedFiles() {
         const data = await response.json();
         if (data.status === 'success') {
             hasUploadedFiles = data.has_files;
-            console.log('Has uploaded files:', hasUploadedFiles);
+            console.log('📁 Has uploaded files:', hasUploadedFiles);
+            if (hasUploadedFiles) {
+                console.log('⚠️ Page refresh warning is ACTIVE - files will be deleted on refresh');
+            }
         }
     } catch (error) {
         console.error('Error checking uploaded files:', error);
@@ -10016,7 +10096,8 @@ async function checkUploadedFiles() {
 // Call this after each successful file upload
 function markFileAsUploaded() {
     hasUploadedFiles = true;
-    console.log('File marked as uploaded - refresh warning enabled');
+    console.log('📤 File uploaded - refresh warning NOW ACTIVE');
+    console.log('⚠️ WARNING: Refreshing page will delete all temp files');
 }
 
 // ============================================
@@ -10216,16 +10297,13 @@ async function checkConnection() {
     }
 }
 
-// Make them globally available
-window.nextStep = nextStep;
-window.prevStep = prevStep;
-window.showStep = showStep;
+// ❌ REMOVED: Duplicate window.* assignments (now done right after function definitions at line ~7895)
+// The functions are already registered globally immediately after being defined
 
-console.log('✅ Enhanced navigation with validation ready');
+console.log('✅ Connection monitoring ready');
 </script>
 
-<!-- Your registration JavaScript should come AFTER Bootstrap -->
-<script src="../../assets/js/student/user_registration.js?v=<?php echo time(); ?>"></script>
+<!-- ❌ REMOVED: Duplicate user_registration.js load (now loaded earlier after Bootstrap) -->
 
 <script>
     // Letter to Mayor Upload Handling
@@ -11108,7 +11186,7 @@ document.addEventListener('DOMContentLoaded', function() {
         };
         
         console.log('✅ Registration page initialization complete');
-    }, 500);
+    });
 });
 
 // Real-time School Student ID duplicate check

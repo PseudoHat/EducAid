@@ -1,19 +1,41 @@
-// Configuration constants
-const CONFIG = {
-    STORAGE_KEY: 'educaid_registration_progress',
-    AUTO_SAVE_INTERVAL: 5000, // Auto-save every 5 seconds
-    STORAGE_EXPIRY: 24 * 60 * 60 * 1000, // 24 hours in milliseconds
-    VERSION: '2.0' // For handling future format changes - Updated for 8-step process
-};
-
 // Enhanced state variables
 let countdown;
 let currentStep = 1;
 let otpVerified = false;
 let documentVerified = false;
 let filenameValid = false;
-let hasUnsavedChanges = false;
-let autoSaveTimer = null;
+
+// Lightweight helper to persist OTP verification across inline/external scripts
+// Provides a single place to update DOM + state without repeated queries
+function setOtpVerifiedState(isVerified) {
+    otpVerified = !!isVerified;
+    window.otpVerified = otpVerified; // expose globally for inline validator
+    hasVerifiedOTP = otpVerified;     // keep ancillary tracking consistent
+
+    // Hidden flag (allows PHP inline validation to check quickly if needed)
+    const form = document.getElementById('multiStepForm');
+    let hidden = document.getElementById('otpVerifiedFlag');
+    if (otpVerified) {
+        if (!hidden && form) {
+            hidden = document.createElement('input');
+            hidden.type = 'hidden';
+            hidden.id = 'otpVerifiedFlag';
+            hidden.name = 'otp_verified';
+            hidden.value = '1';
+            form.appendChild(hidden);
+        } else if (hidden) {
+            hidden.value = '1';
+        }
+        // Reveal email status element so inline step-9 validator passes
+        const emailStatus = document.getElementById('emailStatus');
+        if (emailStatus) emailStatus.classList.remove('d-none');
+    } else {
+        if (hidden) hidden.remove();
+        const emailStatus = document.getElementById('emailStatus');
+        // Only hide if it exists and we are explicitly invalidating
+        if (emailStatus) emailStatus.classList.add('d-none');
+    }
+}
 
 // Registration progress tracking
 let registrationInProgress = false;
@@ -139,35 +161,10 @@ function updateRequiredFields() {
     });
 }
 
-function showStep(stepNumber) {
-    document.querySelectorAll('.step-panel').forEach(panel => {
-        panel.classList.add('d-none');
-    });
-    document.getElementById(`step-${stepNumber}`).classList.remove('d-none');
-
-    document.querySelectorAll('.step').forEach((step, index) => {
-        if (index + 1 === stepNumber) {
-            step.classList.add('active');
-        } else {
-            step.classList.remove('active');
-        }
-    });
-    currentStep = stepNumber;
-    updateRequiredFields();
-    
-    // ADD THIS: Setup date restrictions when Step 2 is shown
-    if (stepNumber === 2) {
-        setTimeout(() => {
-            setupDateOfBirthRestriction();
-        }, 100);
-    }
-    
-    // Save progress when changing steps
-    if (stepNumber > 1) {
-        hasUnsavedChanges = true;
-        saveProgress();
-    }
-}
+// ❌ REMOVED: showStep() function - now defined in inline script in student_register.php
+// The inline version includes full validation logic and updateStepIndicators() call
+// It also handles the date restriction setup for step 2
+// This external version was causing conflicts by overwriting the inline implementation
 
 function showNotifier(message, type = 'error') {
     const el = document.getElementById('notifier');
@@ -563,109 +560,12 @@ function setupDateOfBirthRestriction() {
     }
 }
 
-function nextStep() {
-    console.log('=== NextStep Debug ===');
-    console.log('Current step:', currentStep);
-    console.log('OTP verified:', otpVerified);
-    console.log('Document verified:', documentVerified);
-    console.log('=== End Debug ===');
-    
-    if (currentStep === 8) return;
-
-    // Clear any existing highlights first
-    clearFieldHighlights();
-    
-    // Validate current step
-    const missingFields = validateCurrentStep();
-    const specialValidationErrors = validateSpecialFields();
-    
-    // DEBUG: Log validation results
-    console.log('🔍 Step validation debug:');
-    console.log('- Missing fields:', missingFields);
-    console.log('- Special validation errors:', specialValidationErrors);
-    
-    // Combine all validation errors
-    const allErrors = [...missingFields, ...specialValidationErrors];
-    
-    if (allErrors.length > 0) {
-        highlightMissingFields(allErrors);
-        
-        // ENHANCED ERROR MESSAGE FOR STEP 1 NAME VALIDATION
-        if (currentStep === 1) {
-            const nameFields = ['first_name', 'middle_name', 'last_name'];
-            const invalidNameFields = allErrors.filter(field => 
-                nameFields.includes(field.name) && field.value && !/^[A-Za-z\s\-']+$/.test(field.value)
-            );
-            
-            if (invalidNameFields.length > 0) {
-                showNotifier('Names can only contain letters, spaces, hyphens (-), and apostrophes (\').', 'error');
-                return;
-            }
-        }
-        
-        showNotifier(`Please complete all required fields before proceeding. (${allErrors.length} field${allErrors.length > 1 ? 's' : ''} missing)`, 'error');
-        return;
-    }
-
-    // Step-specific validations
-    if (currentStep === 7) {
-        // Step 7 is grade validation, no OTP required yet
-        console.log('Moving from step 7 (grade validation) to step 8 (OTP)'); // Debug log
-        showStep(currentStep + 1);
-    } else if (currentStep === 8) {
-        console.log('Step 8 validation - otpVerified:', otpVerified); // Debug log
-        if (!otpVerified) {
-            const otpField = document.getElementById('otp');
-            highlightMissingFields([otpField]);
-            showNotifier('Please verify your OTP before proceeding.', 'error');
-            return;
-        }
-        // Success vibration when moving to final step
-        triggerMobileVibration('success');
-        console.log('OTP verified - proceeding to final submission'); // Debug log
-        // Don't move to next step - this should trigger form submission instead
-        // showStep(currentStep + 1);
-    } else if (currentStep === 4) {
-        if (!documentVerified) {
-            const fileField = document.getElementById('enrollmentForm');
-            highlightMissingFields([fileField]);
-            showNotifier('Please upload and verify your enrollment form before proceeding.', 'error');
-            return;
-        }
-        // Success vibration for document verification
-        triggerMobileVibration('success');
-        showStep(currentStep + 1);
-    } else if (currentStep < 8) {
-        // Success vibration for normal step progression
-        triggerMobileVibration('success');
-        showStep(currentStep + 1);
-    }
-    
-    // Save progress after successful step change
-    hasUnsavedChanges = true;
-    saveProgress();
-}
-
-function prevStep() {
-    if (currentStep > 1) {
-        triggerMobileVibration('default');
-        showStep(currentStep - 1);
-    }
-}
-
-// ============================================
-// MAKE FUNCTIONS GLOBALLY AVAILABLE FOR ONCLICK HANDLERS
-// ============================================
-window.nextStep = nextStep;
-window.prevStep = prevStep;
-window.showStep = showStep;
-
-// Debug: Log that functions are available
-console.log('✅ Core navigation functions registered globally:', {
-    nextStep: typeof window.nextStep,
-    prevStep: typeof window.prevStep,
-    showStep: typeof window.showStep
-});
+// ========================================
+// NOTE: nextStep(), prevStep(), showStep(), and updateStepIndicators() 
+// are defined in the inline JavaScript in student_register.php
+// because they depend on page-specific validation functions.
+// They are registered to window.* in the inline code.
+// ========================================
 
 // Add vibration to button clicks
 function addVibrationToButtons() {
@@ -676,67 +576,36 @@ function addVibrationToButtons() {
     });
 }
 document.addEventListener('DOMContentLoaded', () => {
-    // Check for existing progress
-    const saved = localStorage.getItem(CONFIG.STORAGE_KEY);
-    if (saved) {
-        try {
-            const progress = JSON.parse(saved);
-            if (Date.now() - progress.timestamp <= CONFIG.STORAGE_EXPIRY) {
-                showProgressRestoreDialog();
-            } else {
-                clearProgress();
-                initializeForm();
-            }
-        } catch (error) {
-            clearProgress();
-            initializeForm();
-        }
-    } else {
-        initializeForm();
-    }
+    // NOTE: showStep(1) is now called by inline code in student_register.php
+    // after all page-specific validation functions are defined
     
-    function initializeForm() {
-        showStep(1);
-        updateRequiredFields();
-        
-        // Setup nextStep7Btn with error handling
-        const nextStep7Btn = document.getElementById('nextStep7Btn');
-        if (nextStep7Btn) {
-            nextStep7Btn.disabled = true;
-            nextStep7Btn.addEventListener('click', nextStep);
-        } else {
-            console.warn('nextStep7Btn not found during initialization');
+    // ❌ REMOVED: nextStep7Btn event listener - nextStep is defined in inline script
+    // The inline script registers window.nextStep after defining it, so onclick handlers work
+    // Adding event listeners here before the inline script loads causes "nextStep is not defined" errors
+    
+    // Setup real-time validation
+    setupRealTimeValidation();
+    
+    // Add vibration to all buttons
+    addVibrationToButtons();
+    
+    // REMOVE THIS LINE - Date restriction will be called when Step 2 is shown
+    // setupDateOfBirthRestriction();
+    
+    // Add listeners to name fields to re-validate filename if changed
+    document.querySelector('input[name="first_name"]').addEventListener('input', function() {
+        if (document.getElementById('enrollmentForm').files.length > 0) {
+            const event = new Event('change');
+            document.getElementById('enrollmentForm').dispatchEvent(event);
         }
-        
-        // Setup auto-save functionality
-        setupAutoSave();
-        
-        // Setup real-time validation
-        setupRealTimeValidation();
-        
-        // Add vibration to all buttons
-        addVibrationToButtons();
-        
-        // REMOVE THIS LINE - Date restriction will be called when Step 2 is shown
-        // setupDateOfBirthRestriction();
-        
-        // Add listeners to name fields to re-validate filename if changed
-        document.querySelector('input[name="first_name"]').addEventListener('input', function() {
-            hasUnsavedChanges = true;
-            if (document.getElementById('enrollmentForm').files.length > 0) {
-                const event = new Event('change');
-                document.getElementById('enrollmentForm').dispatchEvent(event);
-            }
-        });
+    });
 
-        document.querySelector('input[name="last_name"]').addEventListener('input', function() {
-            hasUnsavedChanges = true;
-            if (document.getElementById('enrollmentForm').files.length > 0) {
-                const event = new Event('change');
-                document.getElementById('enrollmentForm').dispatchEvent(event);
-            }
-        });
-    }
+    document.querySelector('input[name="last_name"]').addEventListener('input', function() {
+        if (document.getElementById('enrollmentForm').files.length > 0) {
+            const event = new Event('change');
+            document.getElementById('enrollmentForm').dispatchEvent(event);
+        }
+    });
 });
 
 // ---- OTP BUTTON HANDLING ----
@@ -784,16 +653,28 @@ function handleSendOtpResponse(data){
         if (data.status === 'success') {
             triggerMobileVibration('success');
             showNotifier(data.message, 'success');
-            document.getElementById("otpSection").classList.remove("d-none");
-            document.getElementById("sendOtpBtn").classList.add("d-none");
-            document.getElementById("resendOtpBtn").style.display = 'block';
+            
+            // Add null checks for all DOM elements
+            const otpSection = document.getElementById("otpSection");
+            if (otpSection) otpSection.classList.remove("d-none");
+            
+            if (sendOtpBtn) sendOtpBtn.classList.add("d-none");
+            
+            const resendBtn = document.getElementById("resendOtpBtn");
+            if (resendBtn) resendBtn.style.display = 'block';
+            
             startOtpTimer();
         } else {
             triggerMobileVibration('error');
             showNotifier(data.message, 'error');
-            sendOtpBtn.disabled = false;
-            sendOtpBtn.textContent = "Send OTP (Email)";
-            document.getElementById("resendOtpBtn").disabled = true;
+            
+            if (sendOtpBtn) {
+                sendOtpBtn.disabled = false;
+                sendOtpBtn.textContent = "Send OTP (Email)";
+            }
+            
+            const resendBtn = document.getElementById("resendOtpBtn");
+            if (resendBtn) resendBtn.disabled = true;
         }
 }
 function handleSendOtpError(error){
@@ -801,9 +682,14 @@ function handleSendOtpError(error){
     const sendOtpBtn = document.getElementById('sendOtpBtn');
     triggerMobileVibration('error');
     showNotifier('Failed to send OTP. Please try again.', 'error');
-    sendOtpBtn.disabled = false;
-    sendOtpBtn.textContent = "Send OTP (Email)";
-    document.getElementById("resendOtpBtn").disabled = true;
+    
+    if (sendOtpBtn) {
+        sendOtpBtn.disabled = false;
+        sendOtpBtn.textContent = "Send OTP (Email)";
+    }
+    
+    const resendBtn = document.getElementById("resendOtpBtn");
+    if (resendBtn) resendBtn.disabled = true;
 }
 
 document.getElementById("resendOtpBtn").addEventListener("click", function() {
@@ -878,9 +764,18 @@ document.getElementById("verifyOtpBtn").addEventListener("click", function() {
     const enteredOtp = document.getElementById('otp').value;
     const emailForOtpVerification = document.getElementById('emailInput').value;
 
+    console.log('🔐 OTP Verification Debug:');
+    console.log('  Entered OTP:', enteredOtp);
+    console.log('  Email:', emailForOtpVerification);
+
     if (!enteredOtp) {
         highlightMissingFields([document.getElementById('otp')]);
         showNotifier('Please enter the OTP.', 'error');
+        return;
+    }
+    
+    if (enteredOtp.length !== 6) {
+        showNotifier('OTP must be 6 digits.', 'error');
         return;
     }
 
@@ -892,6 +787,8 @@ document.getElementById("verifyOtpBtn").addEventListener("click", function() {
     formData.append('verifyOtp', 'true');
     formData.append('otp', enteredOtp);
     formData.append('email', emailForOtpVerification);
+    
+    console.log('📤 Sending OTP verification request...');
 
     if (typeof grecaptcha !== 'undefined' && window.RECAPTCHA_SITE_KEY) {
         grecaptcha.ready(function(){
@@ -913,47 +810,68 @@ document.getElementById("verifyOtpBtn").addEventListener("click", function() {
 
 function handleVerifyOtpResponse(data){
     const verifyOtpBtn = document.getElementById('verifyOtpBtn');
-        console.log('OTP verification response:', data); // Debug log
+        console.log('📥 OTP verification response:', data); // Debug log
         if (data.status === 'success') {
+            console.log('✅ OTP Verified Successfully!');
             triggerMobileVibration('success');
             showNotifier(data.message, 'success');
-            otpVerified = true;
+            setOtpVerifiedState(true);
             trackOTPVerification(); // Track OTP verification completion
-            document.getElementById('otp').disabled = true;
-            verifyOtpBtn.classList.add('btn-success');
-            verifyOtpBtn.textContent = 'Verified!';
-            verifyOtpBtn.disabled = true;
+            
+            // Add null checks for all DOM element updates
+            const otpInput = document.getElementById('otp');
+            if (otpInput) otpInput.disabled = true;
+            
+            if (verifyOtpBtn) {
+                verifyOtpBtn.classList.add('btn-success');
+                verifyOtpBtn.textContent = 'Verified!';
+                verifyOtpBtn.disabled = true;
+            }
+            
             clearInterval(countdown);
-            document.getElementById('timer').textContent = '';
-            document.getElementById('resendOtpBtn').style.display = 'none';
+            
+            const timerElement = document.getElementById('timer');
+            if (timerElement) timerElement.textContent = '';
+            
+            const resendBtn = document.getElementById('resendOtpBtn');
+            if (resendBtn) resendBtn.style.display = 'none';
             
             // Enable and highlight the next step button
-            const nextBtn = document.getElementById('nextStep7Btn');
+            // Correct step navigation button id (OTP verification is Step 9)
+            let nextBtn = document.getElementById('nextStep9Btn');
+            // Fallback for legacy id still present
+            if (!nextBtn) nextBtn = document.getElementById('nextStep7Btn');
             if (nextBtn) {
                 nextBtn.disabled = false;
                 nextBtn.classList.add('btn-success');
-                nextBtn.textContent = 'Continue to Next Step';
+                nextBtn.textContent = 'Continue - Email Verified';
                 
-                // Ensure the button has a click event listener
-                if (!nextBtn.onclick && !nextBtn._hasEventListener) {
-                    nextBtn.addEventListener('click', nextStep);
-                    nextBtn._hasEventListener = true;
-                    console.log('Added event listener to nextStep7Btn during OTP verification');
-                }
+                // ❌ REMOVED: Event listener attachment for nextStep
+                // The nextStep function is defined in inline script (student_register.php)
+                // The button already has onclick="nextStep()" in HTML, so no listener needed
+                // Adding listener here causes conflicts and "nextStep is not defined" errors
                 
-                console.log('Next step button enabled successfully'); // Debug log
+                console.log('✅ Next step button enabled successfully'); // Debug log
             } else {
-                console.error('nextStep7Btn not found'); // Debug log
+                console.error('❌ nextStep7Btn not found'); // Debug log
             }
             
-            document.getElementById('emailInput').disabled = true;
-            document.getElementById('emailInput').classList.add('verified-email');
+            const emailInput = document.getElementById('emailInput');
+            if (emailInput) {
+                emailInput.disabled = true;
+                emailInput.classList.add('verified-email');
+            }
+            const otpSection = document.getElementById('otpSection');
+            if (otpSection) otpSection.style.display = 'none';
         } else {
+            console.error('❌ OTP Verification Failed:', data.message);
             triggerMobileVibration('error');
-            showNotifier(data.message, 'error');
-            verifyOtpBtn.disabled = false;
-            verifyOtpBtn.textContent = "Verify OTP";
-            otpVerified = false;
+            showNotifier(data.message || 'OTP verification failed. Please try again.', 'error');
+            if (verifyOtpBtn) {
+                verifyOtpBtn.disabled = false;
+                verifyOtpBtn.textContent = "Verify OTP";
+            }
+            setOtpVerifiedState(false);
         }
 }
 function handleVerifyOtpError(error){
@@ -963,204 +881,675 @@ function handleVerifyOtpError(error){
     showNotifier('Failed to verify OTP. Please try again.', 'error');
     verifyOtpBtn.disabled = false;
     verifyOtpBtn.textContent = "Verify OTP";
-    otpVerified = false;
+    setOtpVerifiedState(false);
 }
 
 function startOtpTimer() {
     let timeLeft = 300;
     clearInterval(countdown);
-    document.getElementById('timer').textContent = `Time left: ${timeLeft} seconds`;
+    // Create or reference timer element safely
+    let timerEl = document.getElementById('timer');
+    if (!timerEl) {
+        const otpSection = document.getElementById('otpSection');
+        if (otpSection) {
+            timerEl = document.createElement('div');
+            timerEl.id = 'timer';
+            timerEl.className = 'text-muted small mt-2';
+            // Place near resend button if available, otherwise append to section
+            const resend = document.getElementById('resendOtpBtn');
+            if (resend && resend.parentElement) {
+                resend.parentElement.appendChild(timerEl);
+            } else {
+                otpSection.appendChild(timerEl);
+            }
+        }
+    }
+    if (timerEl) timerEl.textContent = `Time left: ${timeLeft} seconds`;
 
     countdown = setInterval(function() {
         timeLeft--;
-        document.getElementById('timer').textContent = `Time left: ${timeLeft} seconds`;
+        const t = document.getElementById('timer');
+        if (t) t.textContent = `Time left: ${timeLeft} seconds`;
 
         if (timeLeft <= 0) {
             clearInterval(countdown);
             triggerMobileVibration('warning');
-            document.getElementById('timer').textContent = "OTP expired. Please request a new OTP.";
-            document.getElementById('otp').disabled = false;
-            document.getElementById('verifyOtpBtn').disabled = false;
-            document.getElementById('verifyOtpBtn').textContent = 'Verify OTP';
-            document.getElementById('verifyOtpBtn').classList.remove('btn-success');
-            document.getElementById('resendOtpBtn').disabled = false;
-            document.getElementById('resendOtpBtn').style.display = 'block';
-            document.getElementById('sendOtpBtn').classList.add('d-none');
-            otpVerified = false;
-            document.getElementById('nextStep7Btn').disabled = true;
+            const timerDiv = document.getElementById('timer');
+            if (timerDiv) timerDiv.textContent = "OTP expired. Please request a new OTP.";
+            const otp = document.getElementById('otp');
+            if (otp) otp.disabled = false;
+            const vbtn = document.getElementById('verifyOtpBtn');
+            if (vbtn) {
+                vbtn.disabled = false;
+                vbtn.textContent = 'Verify OTP';
+                vbtn.classList.remove('btn-success');
+            }
+            const rbtn = document.getElementById('resendOtpBtn');
+            if (rbtn) {
+                rbtn.disabled = false;
+                rbtn.style.display = 'block';
+            }
+            const sbtn = document.getElementById('sendOtpBtn');
+            if (sbtn) sbtn.classList.add('d-none');
+            setOtpVerifiedState(false);
+            const legacyBtn = document.getElementById('nextStep7Btn');
+            const step9Btn = document.getElementById('nextStep9Btn');
+            if (step9Btn) step9Btn.disabled = true; else if (legacyBtn) legacyBtn.disabled = true;
         }
     }, 1000);
 }
 
-const passwordInput = document.getElementById('password');
-const confirmPasswordInput = document.getElementById('confirmPassword');
-const strengthBar = document.getElementById('strengthBar');
-const strengthText = document.getElementById('strengthText');
-
-function updatePasswordStrength() {
+// ============================================
+// REAL-TIME PASSWORD VALIDATION WITH STRICT REQUIREMENTS
+// ============================================
+function setupPasswordStrength() {
+    console.log('🔐 Setting up LIVE password validation with strict requirements...');
+    
+    const passwordInput = document.getElementById('password');
+    const confirmPasswordInput = document.getElementById('confirmPassword');
+    const strengthBar = document.getElementById('strengthBar');
+    const strengthText = document.getElementById('strengthText');
+    const passwordMatchText = document.getElementById('passwordMatchText');
+    const submitButton = document.querySelector('button[type="submit"][name="register"]');
+    
     // Safety check - ensure elements exist
     if (!passwordInput || !strengthBar || !strengthText) {
-        console.warn('Password validation elements not found');
+        console.warn('❌ Password validation elements not found');
         return;
     }
     
-    const password = passwordInput.value;
-
-    if (password.length === 0) {
-        strengthBar.style.width = '0%';
-        strengthText.textContent = '';
-        return;
-    }
-
-    let strength = 0;
-    let feedback = [];
-
-    // 1. LENGTH SCORING (0-30 points) - Enhanced scoring
-    if (password.length >= 16) {
-        strength += 30;
-    } else if (password.length >= 12) {
-        strength += 25;
-    } else if (password.length >= 8) {
-        strength += 15;
-        feedback.push('Consider longer password');
-    } else {
-        strength += 5;
-        feedback.push('Password too short');
-    }
-
-    // 2. CHARACTER VARIETY (0-40 points) - Same as before but better scoring
-    if (/[A-Z]/.test(password)) strength += 10;  // Uppercase
-    if (/[a-z]/.test(password)) strength += 10;  // Lowercase
-    if (/[0-9]/.test(password)) strength += 10;  // Numbers
-    if (/[^A-Za-z0-9]/.test(password)) strength += 10; // Special characters
-
-    // 3. REPETITION PENALTY (deduct up to -25 points) - NEW ANTI-GAMING FEATURE
-    const charCount = {};
-    for (let char of password) {
-        charCount[char] = (charCount[char] || 0) + 1;
+    if (!confirmPasswordInput) {
+        console.warn('⚠️ Confirm password input not found');
     }
     
-    let repetitionPenalty = 0;
-    Object.values(charCount).forEach(count => {
-        if (count > 3) {
-            repetitionPenalty += (count - 3) * 4; // Heavy penalty for excessive repetition
-        } else if (count > 2) {
-            repetitionPenalty += (count - 2) * 2; // Moderate penalty
+    if (!submitButton) {
+        console.warn('⚠️ Submit button not found');
+    }
+    
+    console.log('✅ All password elements found, setting up validation...');
+    
+    // Internal function: Calculate 100-point strength score with STRICT requirements
+    function calculatePasswordStrength(password) {
+        let strength = 0;
+        let feedback = [];
+        
+        // STRICT REQUIREMENT 1: Minimum 12 characters (25 points)
+        if (password.length >= 12) {
+            strength += 25;
+        } else if (password.length > 0) {
+            feedback.push(`${12 - password.length} more character${12 - password.length > 1 ? 's' : ''}`);
         }
-    });
+        
+        // STRICT REQUIREMENT 2: Uppercase letter (25 points)
+        if (/[A-Z]/.test(password)) {
+            strength += 25;
+        } else if (password.length > 0) {
+            feedback.push('uppercase letter (A-Z)');
+        }
+        
+        // STRICT REQUIREMENT 3: Lowercase letter (25 points)
+        if (/[a-z]/.test(password)) {
+            strength += 25;
+        } else if (password.length > 0) {
+            feedback.push('lowercase letter (a-z)');
+        }
+        
+        // STRICT REQUIREMENT 4: Number (15 points)
+        if (/[0-9]/.test(password)) {
+            strength += 15;
+        } else if (password.length > 0) {
+            feedback.push('number (0-9)');
+        }
+        
+        // STRICT REQUIREMENT 5: Special character (10 points)
+        if (/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
+            strength += 10;
+        } else if (password.length > 0) {
+            feedback.push('special character (!@#$%...)');
+        }
+        
+        console.log(`💪 Password strength: ${strength} / 100`);
+        
+        return { strength, feedback };
+    }
     
-    // Check for consecutive repeated characters (e.g., "aaa", "111")
-    let consecutiveCount = 1;
-    for (let i = 1; i < password.length; i++) {
-        if (password[i] === password[i-1]) {
-            consecutiveCount++;
+    // Update strength bar UI with colors and text
+    function updatePasswordStrengthUI() {
+        const password = passwordInput.value;
+        const { strength, feedback } = calculatePasswordStrength(password);
+        
+        console.log(`🔍 Password input changed, length: ${password.length}`);
+        console.log(`📊 Strength: ${strength}%, Missing: ${feedback.join(', ')}`);
+        
+        strengthBar.style.width = strength + '%';
+        strengthBar.setAttribute('aria-valuenow', strength);
+        
+        if (password.length === 0) {
+            // Empty state
+            strengthBar.className = 'progress-bar bg-secondary';
+            strengthText.innerHTML = '<i class="bi bi-info-circle me-1"></i>Enter a password to see strength';
+            strengthText.className = 'text-muted d-block mt-1';
+            console.log('⚪ Password empty');
+        } else if (strength < 40) {
+            // RED: Weak (missing 3+ requirements)
+            strengthBar.className = 'progress-bar bg-danger';
+            strengthText.innerHTML = '<i class="bi bi-x-circle me-1"></i><strong>Weak</strong> - Need: ' + feedback.join(', ');
+            strengthText.className = 'text-danger d-block mt-1 fw-bold';
+            console.log('🔴 Password WEAK');
+        } else if (strength < 70) {
+            // YELLOW: Fair (missing 1-2 requirements)
+            strengthBar.className = 'progress-bar bg-warning';
+            strengthText.innerHTML = '<i class="bi bi-exclamation-triangle me-1"></i><strong>Fair</strong> - Need: ' + feedback.join(', ');
+            strengthText.className = 'text-warning d-block mt-1 fw-bold';
+            console.log('🟡 Password FAIR');
+        } else if (strength < 100) {
+            // BLUE: Good (missing 1 minor requirement)
+            strengthBar.className = 'progress-bar bg-info';
+            strengthText.innerHTML = '<i class="bi bi-check-circle me-1"></i><strong>Good</strong> - ' + (feedback.length > 0 ? 'Could add: ' + feedback.join(', ') : 'Strong password!');
+            strengthText.className = 'text-info d-block mt-1 fw-bold';
+            console.log('🔵 Password GOOD');
         } else {
-            if (consecutiveCount > 2) {
-                repetitionPenalty += consecutiveCount * 2;
+            // GREEN: Strong (all requirements met)
+            strengthBar.className = 'progress-bar bg-success';
+            strengthText.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i><strong>Excellent!</strong> All requirements met';
+            strengthText.className = 'text-success d-block mt-1 fw-bold';
+            console.log('🟢 Password STRONG');
+            if (typeof triggerMobileVibration === 'function') {
+                triggerMobileVibration('success');
             }
-            consecutiveCount = 1;
         }
-    }
-    if (consecutiveCount > 2) {
-        repetitionPenalty += consecutiveCount * 2;
+        
+        // Always check password match after updating strength
+        checkPasswordMatch();
     }
     
-    strength -= Math.min(repetitionPenalty, 25);
-    if (repetitionPenalty > 10) {
-        feedback.push('Avoid repeating characters');
+    // Check if passwords match
+    function checkPasswordMatch() {
+        if (!confirmPasswordInput || !passwordMatchText) {
+            updateSubmitButton();
+            return;
+        }
+        
+        const password = passwordInput.value;
+        const confirmPassword = confirmPasswordInput.value;
+        
+        console.log(`🔒 Checking password match... (password: ${password.length}, confirm: ${confirmPassword.length})`);
+        
+        if (confirmPassword.length === 0) {
+            // Empty confirm field - show hint
+            passwordMatchText.innerHTML = '<i class="bi bi-info-circle me-1"></i>Re-enter your password to confirm';
+            passwordMatchText.className = 'text-muted d-block mt-1';
+            confirmPasswordInput.classList.remove('is-valid', 'is-invalid');
+            console.log('⚪ Confirm password empty');
+        } else if (password === confirmPassword) {
+            // GREEN: Passwords match
+            passwordMatchText.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i><strong>Passwords match!</strong>';
+            passwordMatchText.className = 'text-success d-block mt-1 fw-bold';
+            confirmPasswordInput.classList.remove('is-invalid');
+            confirmPasswordInput.classList.add('is-valid');
+            console.log('✅ Passwords MATCH');
+            if (typeof triggerMobileVibration === 'function') {
+                triggerMobileVibration('success');
+            }
+        } else {
+            // RED: Passwords don't match
+            passwordMatchText.innerHTML = '<i class="bi bi-x-circle-fill me-1"></i><strong>Passwords do not match</strong>';
+            passwordMatchText.className = 'text-danger d-block mt-1 fw-bold';
+            confirmPasswordInput.classList.remove('is-valid');
+            confirmPasswordInput.classList.add('is-invalid');
+            console.log('❌ Passwords DO NOT MATCH');
+        }
+        
+        // Update submit button state
+        updateSubmitButton();
     }
+    
+    // Enable/disable submit button based on validation
+    function updateSubmitButton() {
+        if (!submitButton) {
+            return;
+        }
+        
+        const password = passwordInput.value;
+        const confirmPassword = confirmPasswordInput ? confirmPasswordInput.value : '';
+        const { strength } = calculatePasswordStrength(password);
+        
+        // Check all requirements
+        const isPasswordStrong = strength >= 70; // Must be "Good" or better
+        const doPasswordsMatch = password === confirmPassword && password.length > 0;
+        const areFieldsFilled = password.length > 0 && confirmPassword.length > 0;
+        
+        console.log(`🔍 Submit button check - Strong: ${isPasswordStrong}, Match: ${doPasswordsMatch}, Filled: ${areFieldsFilled}`);
+        
+        if (!isPasswordStrong || !doPasswordsMatch || !areFieldsFilled) {
+            submitButton.disabled = true;
+            submitButton.classList.add('opacity-50');
+            submitButton.style.cursor = 'not-allowed';
+            submitButton.title = 'Complete all password requirements to enable';
+            console.log('🔒 Submit button DISABLED');
+        } else {
+            submitButton.disabled = false;
+            submitButton.classList.remove('opacity-50');
+            submitButton.style.cursor = 'pointer';
+            submitButton.title = '';
+            console.log('✅ Submit button ENABLED');
+        }
+    }
+    
+    // Initial state - ensure submit button is disabled on load
+    if (submitButton) {
+        submitButton.disabled = true;
+        submitButton.classList.add('opacity-50');
+        submitButton.style.cursor = 'not-allowed';
+        submitButton.title = 'Complete all password requirements to enable';
+        console.log('🔒 Initial state: Submit button DISABLED');
+    }
+    
+    // Set initial hint text
+    if (passwordMatchText) {
+        passwordMatchText.innerHTML = '<i class="bi bi-info-circle me-1"></i>Re-enter your password to confirm';
+        passwordMatchText.className = 'text-muted d-block mt-1';
+    }
+    
+    if (strengthText && passwordInput.value.length === 0) {
+        strengthText.innerHTML = '<i class="bi bi-info-circle me-1"></i>Enter a password to see strength';
+        strengthText.className = 'text-muted d-block mt-1';
+    }
+    
+    // Attach event listeners for LIVE updates
+    console.log('📡 Attaching event listeners...');
+    passwordInput.addEventListener('input', updatePasswordStrengthUI);
+    passwordInput.addEventListener('keyup', updatePasswordStrengthUI); // Backup for some browsers
+    
+    if (confirmPasswordInput) {
+        confirmPasswordInput.addEventListener('input', checkPasswordMatch);
+        confirmPasswordInput.addEventListener('keyup', checkPasswordMatch); // Backup for some browsers
+    }
+    
+    // If fields already have values (e.g., browser autofill), validate immediately
+    if (passwordInput.value.length > 0) {
+        console.log('⚡ Password field has initial value, triggering validation...');
+        updatePasswordStrengthUI();
+    }
+    
+    console.log('✅ Password validation setup complete!');
+}
 
-    // 4. PATTERN DETECTION PENALTY (deduct up to -20 points) - NEW ANTI-GAMING FEATURE
-    let patternPenalty = 0;
-    const commonPatterns = [
-        /123456/i,     // Sequential numbers
-        /abcdef/i,     // Sequential letters  
-        /qwerty/i,     // Keyboard patterns
-        /asdfgh/i,     // Keyboard patterns
-        /password/i,   // Common word
-        /admin/i,      // Common word
-        /(\d)\1{2,}/,  // Repeated digits (111, 222, etc.)
-        /([a-zA-Z])\1{2,}/i, // Repeated letters (aaa, BBB, etc.)
+// Call setup when DOM is ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', setupPasswordStrength);
+} else {
+    // DOM already loaded
+    setupPasswordStrength();
+}
+
+// ============================================================
+// STUDENT NAME VALIDATION (Gibberish/Keyboard Mashing Detection)
+// ============================================================
+function validateNameField(field, value) {
+    const fieldName = field.name;
+    const nameType = fieldName.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+    
+    // Must contain only letters, spaces, hyphens, apostrophes
+    if (!/^[A-Za-z\s\-']+$/.test(value)) {
+        return {
+            isValid: false,
+            error: 'Names can only contain letters, spaces, hyphens (-), and apostrophes (\')'
+        };
+    }
+    
+    // Must be at least 2 characters (except middle name which is optional)
+    if (value.trim().length < 2 && fieldName !== 'middle_name') {
+        return {
+            isValid: false,
+            error: `${nameType} must be at least 2 characters long`
+        };
+    }
+    
+    // Must contain at least one vowel (real names have vowels)
+    // EXCEPTION: Middle and last names can be 2-character consonant surnames (e.g., "Dy", "Ng", "Wu")
+    const isShortSurname = (fieldName === 'middle_name' || fieldName === 'last_name') && value.trim().length === 2;
+    if (!/[aeiouAEIOU]/.test(value) && !isShortSurname) {
+        return {
+            isValid: false,
+            error: `Please enter a valid ${nameType.toLowerCase()} (names typically contain vowels)`
+        };
+    }
+    
+    // Detect keyboard mashing patterns
+    // 1. Check for excessive repeated characters (e.g., "aaaa", "jjjj")
+    if (/(.)\1{3,}/.test(value.toLowerCase())) {
+        return {
+            isValid: false,
+            error: `Please enter a real ${nameType.toLowerCase()} (too many repeated characters detected)`
+        };
+    }
+    
+    // 2. Check for repeated 2-character patterns (e.g., "adadad", "asdasd")
+    if (/(.{2})\1{2,}/.test(value.toLowerCase())) {
+        return {
+            isValid: false,
+            error: `Please enter a real ${nameType.toLowerCase()} (repeated pattern detected)`
+        };
+    }
+    
+    // 3. Check for repeated 3-character patterns (e.g., "abcabcabc")
+    if (/(.{3})\1{2,}/.test(value.toLowerCase())) {
+        return {
+            isValid: false,
+            error: `Please enter a real ${nameType.toLowerCase()} (repeated pattern detected)`
+        };
+    }
+    
+    // 4. Check for sequential keyboard patterns (horizontal rows)
+    const keyboardRows = [
+        'qwertyuiop',
+        'asdfghjkl',
+        'zxcvbnm',
+        'qazwsxedcrfvtgbyhnujmikolp' // vertical patterns
     ];
     
-    commonPatterns.forEach(pattern => {
-        if (pattern.test(password)) {
-            patternPenalty += 5;
+    const lowerValue = value.toLowerCase().replace(/[^a-z]/g, '');
+    for (const row of keyboardRows) {
+        // Check for 4+ consecutive characters from same keyboard row
+        for (let i = 0; i < row.length - 3; i++) {
+            const pattern = row.substring(i, i + 4);
+            if (lowerValue.includes(pattern) || lowerValue.includes(pattern.split('').reverse().join(''))) {
+                return {
+                    isValid: false,
+                    error: `Please enter a real ${nameType.toLowerCase()} (keyboard pattern detected)`
+                };
+            }
+        }
+    }
+    
+    // 5. Check consonant-to-vowel ratio (real names have balanced ratios)
+    // EXCEPTION: Skip ratio check for 2-character surnames (e.g., "Dy", "Ng")
+    const consonants = (value.match(/[bcdfghjklmnpqrstvwxyzBCDFGHJKLMNPQRSTVWXYZ]/g) || []).length;
+    const vowels = (value.match(/[aeiouAEIOU]/g) || []).length;
+    if (consonants > 0 && vowels > 0 && !isShortSurname) {
+        const ratio = consonants / vowels;
+        // If ratio is > 5:1 for names, it's likely gibberish
+        if (ratio > 5) {
+            return {
+                isValid: false,
+                error: `Please enter a real ${nameType.toLowerCase()} (unusual letter pattern detected)`
+            };
+        }
+    }
+    
+    // 6. Check for single letters repeated with spaces (e.g., "a b c d")
+    const words = value.trim().split(/\s+/);
+    const singleLetterWords = words.filter(w => w.length === 1);
+    if (singleLetterWords.length >= 2) {
+        return {
+            isValid: false,
+            error: `Please enter a real ${nameType.toLowerCase()} (too many single-letter parts detected)`
+        };
+    }
+    
+    // 7. Check for low character diversity (names should use varied letters)
+    // Skip for 2-character surnames (e.g., "Dy", "Ng")
+    if (!isShortSurname && value.length >= 5) {
+        const uniqueChars = new Set(value.toLowerCase().replace(/[^a-z]/g, '').split('')).size;
+        const totalChars = value.replace(/[^a-z]/gi, '').length;
+        const diversityRatio = uniqueChars / totalChars;
+        
+        // If less than 40% unique characters, it's likely gibberish (e.g., "asdadawdasdad" has low diversity)
+        if (diversityRatio < 0.4) {
+            return {
+                isValid: false,
+                error: `Please enter a real ${nameType.toLowerCase()} (too many repeated letters detected)`
+            };
+        }
+    }
+    
+    return { isValid: true };
+}
+
+function setupStudentNameValidation() {
+    console.log('🔤 Setting up student name validation...');
+    
+    const nameFields = [
+        { input: document.querySelector('input[name="first_name"]'), label: 'First Name' },
+        { input: document.querySelector('input[name="middle_name"]'), label: 'Middle Name' },
+        { input: document.querySelector('input[name="last_name"]'), label: 'Last Name' }
+    ];
+    
+    nameFields.forEach(({ input, label }) => {
+        if (!input) {
+            console.warn(`⚠️ ${label} input not found`);
+            return;
+        }
+        
+        // Create warning div if it doesn't exist
+        let warningDiv = input.parentElement.querySelector('.name-validation-warning');
+        if (!warningDiv) {
+            warningDiv = document.createElement('div');
+            warningDiv.className = 'name-validation-warning alert mt-2';
+            warningDiv.style.display = 'none';
+            input.parentElement.appendChild(warningDiv);
+        }
+        
+        input.addEventListener('blur', function() {
+            const value = this.value.trim();
+            
+            // Clear previous warnings
+            warningDiv.style.display = 'none';
+            this.classList.remove('is-invalid');
+            this.style.borderColor = '';
+            
+            // Middle name is optional, so skip validation if empty
+            if (!value && input.name === 'middle_name') return;
+            
+            if (!value) return; // Empty is handled by required validation
+            
+            // Validate name
+            const validation = validateNameField(this, value);
+            
+            if (!validation.isValid) {
+                warningDiv.textContent = '⚠️ ' + validation.error;
+                warningDiv.className = 'name-validation-warning alert alert-danger mt-2';
+                warningDiv.style.display = 'block';
+                this.classList.add('is-invalid');
+                this.style.borderColor = '#dc3545';
+                console.log(`❌ ${label} validation failed: ${validation.error}`);
+            }
+        });
+        
+        // Clear validation on input
+        input.addEventListener('input', function() {
+            warningDiv.style.display = 'none';
+            this.classList.remove('is-invalid');
+            this.style.borderColor = '';
+        });
+    });
+    
+    console.log('✅ Student name validation initialized');
+}
+
+// Auto-initialize
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', setupStudentNameValidation);
+} else {
+    setupStudentNameValidation();
+}
+
+// ============================================================
+// MOTHER'S FULL NAME VALIDATION (Gibberish/Keyboard Mashing Detection)
+// ============================================================
+function validateMothersFullName(value) {
+    // Must contain only valid name characters
+    if (!/^[A-Za-z\s\-']+$/.test(value)) {
+        return {
+            isValid: false,
+            error: 'Mother\'s name can only contain letters, spaces, hyphens (-), and apostrophes (\')'
+        };
+    }
+    
+    // Split into words (must have at least 3 words - first, middle, and maiden surname)
+    const words = value.trim().split(/\s+/).filter(w => w.length > 0);
+    if (words.length < 3) {
+        return {
+            isValid: false,
+            error: 'Please enter mother\'s complete maiden name (at least first, middle, and last name)'
+        };
+    }
+    
+    // Each word must be at least 2 characters
+    for (const word of words) {
+        if (word.length < 2) {
+            return {
+                isValid: false,
+                error: 'Each part of the name must be at least 2 characters long'
+            };
+        }
+    }
+    
+    // Must contain at least one vowel (real names have vowels)
+    if (!/[aeiouAEIOU]/.test(value)) {
+        return {
+            isValid: false,
+            error: 'Please enter a valid name (names typically contain vowels)'
+        };
+    }
+    
+    // Detect keyboard mashing patterns
+    // 1. Check for excessive repeated characters (e.g., "aaaa", "jjjj")
+    if (/(.)\1{3,}/.test(value.toLowerCase())) {
+        return {
+            isValid: false,
+            error: 'Please enter a real name (too many repeated characters detected)'
+        };
+    }
+    
+    // 2. Check for repeated 2-character patterns (e.g., "adadad", "asdasd")
+    if (/(.{2})\1{2,}/.test(value.toLowerCase())) {
+        return {
+            isValid: false,
+            error: 'Please enter a real name (repeated pattern detected)'
+        };
+    }
+    
+    // 3. Check for repeated 3-character patterns (e.g., "abcabcabc")
+    if (/(.{3})\1{2,}/.test(value.toLowerCase())) {
+        return {
+            isValid: false,
+            error: 'Please enter a real name (repeated pattern detected)'
+        };
+    }
+    
+    // 4. Check for sequential keyboard patterns (horizontal rows)
+    const keyboardRows = [
+        'qwertyuiop',
+        'asdfghjkl',
+        'zxcvbnm',
+        'qazwsxedcrfvtgbyhnujmikolp' // vertical patterns
+    ];
+    
+    const lowerValue = value.toLowerCase().replace(/[^a-z]/g, '');
+    for (const row of keyboardRows) {
+        // Check for 4+ consecutive characters from same keyboard row
+        for (let i = 0; i < row.length - 3; i++) {
+            const pattern = row.substring(i, i + 4);
+            if (lowerValue.includes(pattern) || lowerValue.includes(pattern.split('').reverse().join(''))) {
+                return {
+                    isValid: false,
+                    error: 'Please enter a real name (keyboard pattern detected)'
+                };
+            }
+        }
+    }
+    
+    // 5. Check consonant-to-vowel ratio (real names have balanced ratios)
+    const consonants = (value.match(/[bcdfghjklmnpqrstvwxyzBCDFGHJKLMNPQRSTVWXYZ]/g) || []).length;
+    const vowels = (value.match(/[aeiouAEIOU]/g) || []).length;
+    if (consonants > 0 && vowels > 0) {
+        const ratio = consonants / vowels;
+        // If ratio is > 6:1, it's likely gibberish (e.g., "hsjkfhlnds" has ratio ~9:1)
+        if (ratio > 6) {
+            return {
+                isValid: false,
+                error: 'Please enter a real name (unusual letter pattern detected)'
+            };
+        }
+    }
+    
+    // 6. Check for low character diversity (names should use varied letters)
+    if (value.length >= 5) {
+        const uniqueChars = new Set(value.toLowerCase().replace(/[^a-z]/g, '').split('')).size;
+        const totalChars = value.replace(/[^a-z]/gi, '').length;
+        const diversityRatio = uniqueChars / totalChars;
+        
+        // If less than 40% unique characters, it's likely gibberish
+        if (diversityRatio < 0.4) {
+            return {
+                isValid: false,
+                error: 'Please enter a real name (too many repeated letters detected)'
+            };
+        }
+    }
+    
+    return { isValid: true };
+}
+
+function setupMothersFullNameValidation() {
+    console.log('👩 Setting up mother\'s full name validation...');
+    
+    const mothersFullNameInput = document.querySelector('input[name="mothers_fullname"]');
+    
+    if (!mothersFullNameInput) {
+        console.warn('⚠️ Mother\'s full name input not found');
+        return;
+    }
+    
+    // Create warning div if it doesn't exist
+    let warningDiv = mothersFullNameInput.parentElement.querySelector('.mothers-name-warning');
+    if (!warningDiv) {
+        warningDiv = document.createElement('div');
+        warningDiv.className = 'mothers-name-warning alert mt-2';
+        warningDiv.style.display = 'none';
+        mothersFullNameInput.parentElement.appendChild(warningDiv);
+    }
+    
+    mothersFullNameInput.addEventListener('blur', function() {
+        const value = this.value.trim();
+        
+        // Clear previous warnings
+        warningDiv.style.display = 'none';
+        this.classList.remove('is-invalid');
+        this.style.borderColor = '';
+        
+        if (!value) return; // Empty is handled by required validation
+        
+        // Validate mother's full name
+        const validation = validateMothersFullName(value);
+        
+        if (!validation.isValid) {
+            warningDiv.textContent = '⚠️ ' + validation.error;
+            warningDiv.className = 'mothers-name-warning alert alert-danger mt-2';
+            warningDiv.style.display = 'block';
+            this.classList.add('is-invalid');
+            this.style.borderColor = '#dc3545';
+            console.log(`❌ Mother's name validation failed: ${validation.error}`);
         }
     });
     
-    strength -= Math.min(patternPenalty, 20);
-    if (patternPenalty > 5) {
-        feedback.push('Avoid predictable patterns');
-    }
-
-    // 5. BONUS POINTS FOR EXCELLENT PASSWORDS (up to +20 points)
-    if (password.length >= 16 && /[A-Z]/.test(password) && /[a-z]/.test(password) && /[0-9]/.test(password) && /[^A-Za-z0-9]/.test(password)) {
-        strength += 10; // Bonus for very long passwords with all character types
-    }
-    
-    // Multiple special characters bonus
-    const specialChars = password.match(/[^A-Za-z0-9]/g);
-    if (specialChars && specialChars.length >= 3) {
-        strength += 5;
-    }
-    
-    // Mixed case bonus
-    if (/[A-Z]/.test(password) && /[a-z]/.test(password)) {
-        strength += 5;
-    }
-
-    // Ensure strength is between 0-100
-    strength = Math.max(0, Math.min(strength, 100));
-
-    // UPDATE VISUAL DISPLAY WITH 5 LEVELS INSTEAD OF 3
-    strengthBar.style.width = strength + '%';
-    strengthBar.className = 'progress-bar';
-
-    if (strength < 30) {
-        strengthBar.classList.add('bg-danger');
-        strengthText.textContent = 'Very Weak';
-        strengthText.style.color = '#dc3545';
-    } else if (strength < 50) {
-        strengthBar.classList.add('bg-warning');
-        strengthText.textContent = 'Weak';
-        strengthText.style.color = '#fd7e14';
-    } else if (strength < 70) {
-        strengthBar.classList.add('bg-info');
-        strengthText.textContent = 'Fair';
-        strengthText.style.color = '#17a2b8';
-    } else if (strength < 85) {
-        strengthBar.classList.add('bg-primary');
-        strengthText.textContent = 'Good';
-        strengthText.style.color = '#007bff';
-    } else {
-        strengthBar.classList.add('bg-success');
-        strengthText.textContent = 'Very Strong';
-        strengthText.style.color = '#28a745';
-        triggerMobileVibration('success'); // Vibrate when password becomes very strong
-    }
-}
-
-// Add event listeners only if elements exist
-if (passwordInput) {
-    passwordInput.addEventListener('input', updatePasswordStrength);
-} else {
-    console.warn('Password input not found - password strength validation disabled');
-}
-
-if (confirmPasswordInput && passwordInput) {
-    confirmPasswordInput.addEventListener('input', function() {
-        if (passwordInput.value !== confirmPasswordInput.value) {
-            confirmPasswordInput.setCustomValidity('Passwords do not match');
-            this.classList.add('missing-field');
-        } else {
-            confirmPasswordInput.setCustomValidity('');
-            this.classList.remove('missing-field');
-            triggerMobileVibration('success'); // Vibrate when passwords match
-        }
+    // Clear validation on input
+    mothersFullNameInput.addEventListener('input', function() {
+        warningDiv.style.display = 'none';
+        this.classList.remove('is-invalid');
+        this.style.borderColor = '';
     });
+    
+    console.log('✅ Mother\'s full name validation initialized');
+}
+
+// Auto-initialize
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', setupMothersFullNameValidation);
 } else {
-    console.warn('Confirm password input not found - password match validation disabled');
+    setupMothersFullNameValidation();
 }
 
 // ----- FIX FOR REQUIRED FIELD ERROR -----
@@ -1171,8 +1560,8 @@ document.getElementById('multiStepForm').addEventListener('submit', async functi
     console.log('Current step:', currentStep);
     console.log('Is submitting:', isSubmitting);
     
-    if (currentStep !== 8) {
-        console.log('❌ Not on step 8, preventing submission');
+    if (currentStep !== 10) {
+        console.log('❌ Not on step 10, preventing submission');
         e.preventDefault();
         triggerMobileVibration('error');
         showNotifier('Please complete all steps first.', 'error');
@@ -1288,6 +1677,39 @@ document.getElementById('multiStepForm').addEventListener('submit', async functi
         input.name = key;
         input.value = value;
         newForm.appendChild(input);
+    }
+    
+    // CRITICAL: Explicitly ensure password fields are included (they might be missed if hidden)
+    const passwordField = document.getElementById('password');
+    const confirmPasswordField = document.getElementById('confirmPassword');
+    
+    if (passwordField && passwordField.value) {
+        // Check if password was already added by FormData
+        const existingPassword = Array.from(newForm.querySelectorAll('input[name="password"]'))[0];
+        if (!existingPassword) {
+            console.log('⚠️ Password field was missing from FormData, adding explicitly');
+            const passwordInput = document.createElement('input');
+            passwordInput.type = 'hidden';
+            passwordInput.name = 'password';
+            passwordInput.value = passwordField.value;
+            newForm.appendChild(passwordInput);
+        } else {
+            console.log('✅ Password field found in FormData:', existingPassword.value.substring(0, 3) + '***');
+        }
+    } else {
+        console.error('❌ Password field is empty or not found!');
+    }
+    
+    if (confirmPasswordField && confirmPasswordField.value) {
+        const existingConfirm = Array.from(newForm.querySelectorAll('input[name="confirm_password"]'))[0];
+        if (!existingConfirm) {
+            console.log('⚠️ Confirm password field was missing from FormData, adding explicitly');
+            const confirmInput = document.createElement('input');
+            confirmInput.type = 'hidden';
+            confirmInput.name = 'confirm_password';
+            confirmInput.value = confirmPasswordField.value;
+            newForm.appendChild(confirmInput);
+        }
     }
 
     // Overwrite / add the (possibly refreshed) reCAPTCHA token explicitly
@@ -1411,6 +1833,9 @@ document.getElementById('enrollmentForm').addEventListener('change', function(e)
     }
 });
 
+// ❌ REMOVED: Duplicate enrollment form OCR handler - now handled by processEnrollmentDocument() in student_register.php
+// This was causing double-firing: one request succeeds (processEnrollmentOcr), one fails (processOcr)
+/*
 document.getElementById('processOcrBtn').addEventListener('click', function() {
     const fileInput = document.getElementById('enrollmentForm');
     const file = fileInput.files[0];
@@ -1458,6 +1883,7 @@ document.getElementById('processOcrBtn').addEventListener('click', function() {
             .catch(handleProcessOcrError);
     }
 });
+*/
 
 function handleProcessOcrResponse(data){
     const processBtn = document.getElementById('processOcrBtn');
@@ -1655,363 +2081,6 @@ style.textContent = `
 `;
 document.head.appendChild(style);
 
-// ========================================
-// SAVE STATE FUNCTIONALITY
-// ========================================
-
-function saveProgress() {
-    try {
-        const formData = new FormData(document.getElementById('multiStepForm'));
-        const progress = {
-            version: CONFIG.VERSION,
-            timestamp: Date.now(),
-            currentStep: currentStep,
-            otpVerified: otpVerified,
-            documentVerified: documentVerified,
-            filenameValid: filenameValid,
-            formFields: {},
-            fileInfo: null,
-            specialStates: {}
-        };
-
-        // Save form field values
-        for (let [key, value] of formData.entries()) {
-            // Skip file inputs as they can't be restored
-            if (key !== 'enrollment_form') {
-                progress.formFields[key] = value;
-            }
-        }
-
-        // Save file information (not the actual file)
-        const fileInput = document.getElementById('enrollmentForm');
-        if (fileInput.files.length > 0) {
-            const file = fileInput.files[0];
-            progress.fileInfo = {
-                name: file.name,
-                size: file.size,
-                type: file.type,
-                lastModified: file.lastModified
-            };
-        }
-
-        // Save special UI states
-        progress.specialStates = {
-            otpSectionVisible: !document.getElementById("otpSection").classList.contains("d-none"),
-            emailDisabled: document.getElementById('emailInput').disabled,
-            sendOtpBtnHidden: document.getElementById("sendOtpBtn").classList.contains("d-none"),
-            verifyBtnSuccess: document.getElementById("verifyOtpBtn").classList.contains("btn-success"),
-            nextStep7BtnEnabled: !document.getElementById('nextStep7Btn').disabled,
-            uploadPreviewVisible: !document.getElementById('uploadPreview').classList.contains('d-none'),
-            ocrSectionVisible: !document.getElementById('ocrSection').classList.contains('d-none'),
-            ocrResultsVisible: !document.getElementById('ocrResults').classList.contains('d-none')
-        };
-
-        localStorage.setItem(CONFIG.STORAGE_KEY, JSON.stringify(progress));
-        hasUnsavedChanges = false;
-        console.log('Progress saved successfully');
-        
-        // Show brief save indicator
-        showSaveIndicator('Saved');
-        
-    } catch (error) {
-        console.error('Error saving progress:', error);
-        showSaveIndicator('Save failed', 'error');
-    }
-}
-
-function loadProgress() {
-    try {
-        const saved = localStorage.getItem(CONFIG.STORAGE_KEY);
-        if (!saved) return false;
-
-        const progress = JSON.parse(saved);
-
-        // Check version compatibility
-        if (progress.version !== CONFIG.VERSION) {
-            console.log('Save version mismatch, clearing old data');
-            clearProgress();
-            return false;
-        }
-
-        // Check if progress is still valid (not expired)
-        if (Date.now() - progress.timestamp > CONFIG.STORAGE_EXPIRY) {
-            console.log('Saved progress expired, clearing data');
-            clearProgress();
-            return false;
-        }
-
-        // Restore state variables
-        currentStep = progress.currentStep || 1;
-        otpVerified = progress.otpVerified || false;
-        documentVerified = progress.documentVerified || false;
-        filenameValid = progress.filenameValid || false;
-
-        // Restore form field values
-        Object.entries(progress.formFields).forEach(([key, value]) => {
-            const field = document.querySelector(`[name="${key}"]`);
-            if (field) {
-                if (field.type === 'radio') {
-                    const radioButton = document.querySelector(`[name="${key}"][value="${value}"]`);
-                    if (radioButton) radioButton.checked = true;
-                } else if (field.type === 'checkbox') {
-                    field.checked = value === 'on' || value === true;
-                } else {
-                    field.value = value;
-                }
-            }
-        });
-
-        // Restore special UI states
-        if (progress.specialStates) {
-            const states = progress.specialStates;
-            
-            if (states.otpSectionVisible) {
-                document.getElementById("otpSection").classList.remove("d-none");
-            }
-            
-            if (states.emailDisabled) {
-                document.getElementById('emailInput').disabled = true;
-                document.getElementById('emailInput').classList.add('verified-email');
-            }
-            
-            if (states.sendOtpBtnHidden) {
-                document.getElementById("sendOtpBtn").classList.add("d-none");
-                document.getElementById("resendOtpBtn").style.display = 'block';
-            }
-            
-            if (states.verifyBtnSuccess) {
-                const verifyBtn = document.getElementById("verifyOtpBtn");
-                verifyBtn.classList.add('btn-success');
-                verifyBtn.textContent = 'Verified!';
-                verifyBtn.disabled = true;
-                document.getElementById('otp').disabled = true;
-            }
-            
-            if (states.nextStep7BtnEnabled) {
-                document.getElementById('nextStep7Btn').disabled = false;
-            }
-            
-            if (states.uploadPreviewVisible && progress.fileInfo) {
-                document.getElementById('uploadPreview').classList.remove('d-none');
-                // Show file info message since we can't restore the actual file
-                showFileRestoreMessage(progress.fileInfo);
-            }
-            
-            if (states.ocrSectionVisible) {
-                document.getElementById('ocrSection').classList.remove('d-none');
-            }
-            
-            if (states.ocrResultsVisible) {
-                document.getElementById('ocrResults').classList.remove('d-none');
-                // Enable next button if document was verified
-                if (documentVerified) {
-                    document.getElementById('nextStep4Btn').disabled = false;
-                }
-            }
-        }
-
-        // Show the correct step
-        showStep(currentStep);
-        
-        // Update password strength if password was restored
-        if (document.getElementById('password').value) {
-            updatePasswordStrength();
-        }
-
-        console.log('Progress loaded successfully');
-        showSaveIndicator('Progress restored', 'success');
-        
-        return true;
-        
-    } catch (error) {
-        console.error('Error loading progress:', error);
-        clearProgress();
-        return false;
-    }
-}
-
-function clearProgress() {
-    localStorage.removeItem(CONFIG.STORAGE_KEY);
-    hasUnsavedChanges = false;
-    console.log('Progress cleared');
-}
-
-function showFileRestoreMessage(fileInfo) {
-    const alertDiv = document.createElement('div');
-    alertDiv.className = 'alert alert-info mt-2';
-    alertDiv.innerHTML = `
-        <i class="bi bi-info-circle me-2"></i>
-        <strong>File was previously selected:</strong> ${fileInfo.name}<br>
-        <small>Please re-upload your file to continue with document verification.</small>
-        <button type="button" class="btn-close float-end" data-bs-dismiss="alert"></button>
-    `;
-    
-    const uploadSection = document.getElementById('enrollmentForm').closest('.mb-3');
-    uploadSection.appendChild(alertDiv);
-    
-    // Auto-remove after 10 seconds
-    setTimeout(() => {
-        if (alertDiv.parentNode) {
-            alertDiv.remove();
-        }
-    }, 10000);
-}
-
-function showSaveIndicator(message, type = 'success') {
-    // Create or update save indicator
-    let indicator = document.getElementById('saveIndicator');
-    if (!indicator) {
-        indicator = document.createElement('div');
-        indicator.id = 'saveIndicator';
-        indicator.style.cssText = `
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            padding: 8px 16px;
-            border-radius: 4px;
-            font-size: 12px;
-            font-weight: 500;
-            z-index: 9999;
-            opacity: 0;
-            transition: opacity 0.3s ease;
-            pointer-events: none;
-        `;
-        document.body.appendChild(indicator);
-    }
-    
-    // Set colors based on type
-    if (type === 'error') {
-        indicator.style.backgroundColor = '#dc3545';
-        indicator.style.color = 'white';
-    } else {
-        indicator.style.backgroundColor = '#28a745';
-        indicator.style.color = 'white';
-    }
-    
-    indicator.textContent = message;
-    indicator.style.opacity = '1';
-    
-    setTimeout(() => {
-        indicator.style.opacity = '0';
-    }, 2000);
-}
-
-function setupAutoSave() {
-    // Clear existing timer
-    if (autoSaveTimer) {
-        clearInterval(autoSaveTimer);
-    }
-    
-    // Set up auto-save timer
-    autoSaveTimer = setInterval(() => {
-        if (hasUnsavedChanges) {
-            saveProgress();
-        }
-    }, CONFIG.AUTO_SAVE_INTERVAL);
-    
-    // Save on form changes
-    const form = document.getElementById('multiStepForm');
-    form.addEventListener('input', () => {
-        hasUnsavedChanges = true;
-    });
-    
-    form.addEventListener('change', () => {
-        hasUnsavedChanges = true;
-    });
-    
-    // Save before page unload
-    window.addEventListener('beforeunload', (e) => {
-        if (hasUnsavedChanges && currentStep > 1 && currentStep < 8) {
-            saveProgress();
-            e.preventDefault();
-            e.returnValue = 'You have unsaved registration progress. Are you sure you want to leave?';
-        }
-    });
-    
-    // Save when visibility changes (mobile apps, tab switching)
-    document.addEventListener('visibilitychange', () => {
-        if (document.hidden && hasUnsavedChanges) {
-            saveProgress();
-        }
-    });
-}
-
-function showProgressRestoreDialog() {
-    // Check if Bootstrap is available
-    if (typeof bootstrap === 'undefined') {
-        // Fallback to simple confirm dialog
-        const restore = confirm(
-            'We found your previous registration progress.\n\n' +
-            'Click OK to continue where you left off, or Cancel to start fresh.'
-        );
-        
-        if (restore) {
-            if (loadProgress()) {
-                triggerMobileVibration('success');
-                showNotifier('Previous progress restored successfully!', 'success');
-            }
-        } else {
-            clearProgress();
-            triggerMobileVibration('default');
-            showNotifier('Starting fresh registration', 'success');
-        }
-        return;
-    }
-
-    // Original Bootstrap modal code
-    const modal = document.createElement('div');
-    modal.className = 'modal fade';
-    modal.id = 'restoreProgressModal';
-    modal.innerHTML = `
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">
-                        <i class="bi bi-clock-history me-2"></i>Previous Progress Found
-                    </h5>
-                </div>
-                <div class="modal-body">
-                    <p>We found your previous registration progress. Would you like to continue where you left off?</p>
-                    <div class="d-flex gap-2">
-                        <button type="button" class="btn btn-primary flex-fill" id="restoreProgressBtn">
-                            <i class="bi bi-arrow-clockwise me-2"></i>Continue Previous
-                        </button>
-                        <button type="button" class="btn btn-outline-secondary flex-fill" id="startFreshBtn">
-                            <i class="bi bi-arrow-counterclockwise me-2"></i>Start Fresh
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(modal);
-    
-    const bootstrapModal = new bootstrap.Modal(modal);
-    bootstrapModal.show();
-    
-    document.getElementById('restoreProgressBtn').addEventListener('click', () => {
-        if (loadProgress()) {
-            triggerMobileVibration('success');
-            showNotifier('Previous progress restored successfully!', 'success');
-        }
-        bootstrapModal.hide();
-        modal.remove();
-    });
-    
-    document.getElementById('startFreshBtn').addEventListener('click', () => {
-        clearProgress();
-        triggerMobileVibration('default');
-        showNotifier('Starting fresh registration', 'success');
-        bootstrapModal.hide();
-        modal.remove();
-    });
-    
-    modal.addEventListener('hidden.bs.modal', () => {
-        modal.remove();
-    });
-}
-
 // Enhanced Terms Modal with Scroll Requirement
 document.addEventListener('DOMContentLoaded', () => {
     const acceptTermsBtn = document.getElementById('acceptTermsBtn');
@@ -2074,6 +2143,15 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // Show success notification
             showNotifier('Terms and conditions accepted successfully!', 'success');
+            
+            // Close the modal properly using Bootstrap
+            if (window.bootstrap && window.bootstrap.Modal) {
+                const modalInstance = bootstrap.Modal.getInstance(termsModal);
+                if (modalInstance) {
+                    modalInstance.hide();
+                    console.log('✅ Terms modal closed after acceptance');
+                }
+            }
         });
     }
     
@@ -2113,6 +2191,18 @@ document.addEventListener('DOMContentLoaded', () => {
                     submitBtn.focus();
                 }
             }
+            
+            // Clean up any leftover backdrop elements (fixes overlay bug)
+            const backdrops = document.querySelectorAll('.modal-backdrop');
+            backdrops.forEach(backdrop => {
+                backdrop.remove();
+                console.log('🧹 Cleaned up modal backdrop');
+            });
+            
+            // Ensure body doesn't have modal-open class stuck
+            document.body.classList.remove('modal-open');
+            document.body.style.overflow = '';
+            document.body.style.paddingRight = '';
         });
     }
     
@@ -2141,17 +2231,10 @@ function showTermsModal() {
     }
 }
 
-// Backup event listener setup for nextStep7Btn
-document.addEventListener('DOMContentLoaded', () => {
-    // Wait a bit for all DOM elements to be ready
-    setTimeout(() => {
-        const nextStep7Btn = document.getElementById('nextStep7Btn');
-        if (nextStep7Btn && !nextStep7Btn.onclick) {
-            console.log('Setting up backup event listener for nextStep7Btn');
-            nextStep7Btn.addEventListener('click', nextStep);
-        }
-    }, 100);
-});
+// ❌ REMOVED: Backup event listener for nextStep7Btn
+// The nextStep function is defined in inline script (student_register.php) which loads AFTER this file
+// Trying to attach event listeners here before inline script loads causes "nextStep is not defined" errors
+// The button uses onclick="nextStep()" in HTML, which works once the inline script defines window.nextStep
 
 // Debug functions for testing (can be called from browser console)
 window.debugRegistration = {
@@ -2169,13 +2252,19 @@ window.debugRegistration = {
         console.log('Testing nextStep function...');
         console.log('Current step:', currentStep);
         console.log('OTP verified:', otpVerified);
-        nextStep();
+        // Check if nextStep exists before calling
+        if (typeof window.nextStep === 'function') {
+            window.nextStep();
+        } else {
+            console.error('nextStep function not yet defined');
+        }
     },
     checkButton: function() {
         const btn = document.getElementById('nextStep7Btn');
         console.log('Button element:', btn);
         console.log('Button disabled:', btn ? btn.disabled : 'N/A');
         console.log('Button onclick:', btn ? btn.onclick : 'N/A');
+        console.log('window.nextStep type:', typeof window.nextStep);
     }
 };
 
@@ -2183,9 +2272,6 @@ window.debugRegistration = {
 
 function startAgain() {
     if (confirm('Are you sure you want to start the registration process again? All entered data will be lost.')) {
-        // Clear localStorage
-        localStorage.removeItem(CONFIG.STORAGE_KEY);
-        
         // Clear all form data
         document.querySelectorAll('input, select, textarea').forEach(el => {
             if (el.type === 'checkbox' || el.type === 'radio') {
@@ -2202,10 +2288,9 @@ function startAgain() {
         
         // Reset all state variables
         currentStep = 1;
-        otpVerified = false;
+    setOtpVerifiedState(false);
         documentVerified = false;
         filenameValid = false;
-        hasUnsavedChanges = false;
         registrationInProgress = false;
         hasUploadedFiles = false;
         hasVerifiedOTP = false;
