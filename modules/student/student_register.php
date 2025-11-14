@@ -918,6 +918,7 @@ if (!$isAjaxRequest) {
         body.registration-page nav.navbar.fixed-header {
             z-index: 1050 !important;
             position: fixed !important;
+            isolation: auto !important;
         }
         
         body.registration-page .navbar-toggler {
@@ -926,10 +927,42 @@ if (!$isAjaxRequest) {
             pointer-events: auto !important;
             cursor: pointer !important;
             touch-action: manipulation !important;
+            display: block !important;
+            opacity: 1 !important;
+            visibility: visible !important;
         }
         
         body.registration-page .navbar-collapse {
             z-index: 1051 !important;
+        }
+        
+        /* Ensure no pseudo-elements are blocking */
+        body.registration-page .navbar-toggler::before,
+        body.registration-page .navbar-toggler::after {
+            pointer-events: none !important;
+        }
+        
+        body.registration-page .navbar-toggler-icon,
+        body.registration-page .navbar-toggler-icon::before,
+        body.registration-page .navbar-toggler-icon::after {
+            pointer-events: none !important;
+        }
+        
+        /* Make sure container doesn't block */
+        body.registration-page .navbar .container-fluid {
+            position: relative !important;
+            z-index: auto !important;
+        }
+        
+        /* Ensure navbar brand doesn't overflow and block toggler */
+        body.registration-page .navbar-brand {
+            z-index: auto !important;
+            pointer-events: auto !important;
+        }
+        
+        /* Critical: Make sure nothing in the navbar blocks the toggler */
+        body.registration-page nav.navbar.fixed-header > * {
+            pointer-events: auto !important;
         }
 
         body.registration-page .navbar .btn-outline-primary {
