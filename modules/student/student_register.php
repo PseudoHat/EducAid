@@ -1006,8 +1006,53 @@ if (!$isAjaxRequest) {
         }
 
         body.registration-page nav.navbar.fixed-header {
-            isolation: isolate;
-            contain: layout style;
+            z-index: 1050 !important;
+            position: fixed !important;
+            isolation: auto !important;
+        }
+        
+        body.registration-page .navbar-toggler {
+            z-index: 1052 !important;
+            position: relative !important;
+            pointer-events: auto !important;
+            cursor: pointer !important;
+            touch-action: manipulation !important;
+            display: block !important;
+            opacity: 1 !important;
+            visibility: visible !important;
+        }
+        
+        body.registration-page .navbar-collapse {
+            z-index: 1051 !important;
+        }
+        
+        /* Ensure no pseudo-elements are blocking */
+        body.registration-page .navbar-toggler::before,
+        body.registration-page .navbar-toggler::after {
+            pointer-events: none !important;
+        }
+        
+        body.registration-page .navbar-toggler-icon,
+        body.registration-page .navbar-toggler-icon::before,
+        body.registration-page .navbar-toggler-icon::after {
+            pointer-events: none !important;
+        }
+        
+        /* Make sure container doesn't block */
+        body.registration-page .navbar .container-fluid {
+            position: relative !important;
+            z-index: auto !important;
+        }
+        
+        /* Ensure navbar brand doesn't overflow and block toggler */
+        body.registration-page .navbar-brand {
+            z-index: auto !important;
+            pointer-events: auto !important;
+        }
+        
+        /* Critical: Make sure nothing in the navbar blocks the toggler */
+        body.registration-page nav.navbar.fixed-header > * {
+            pointer-events: auto !important;
         }
 
         body.registration-page .navbar .btn-outline-primary {
@@ -1114,9 +1159,13 @@ if (!$isAjaxRequest) {
             max-width: 640px; width: calc(100% - 32px);
             padding: 14px 24px; background-color: #f8d7da; color: #721c24;
             border-radius: 8px; display: none; box-shadow: 0 6px 16px -4px rgba(0,0,0,0.25), 0 2px 6px rgba(0,0,0,0.18);
-            z-index: 5000; /* Above nav/topbar and modals backdrop (Bootstrap modal backdrop is 1040, modal 1050) */
+            z-index: 1060; /* Above navbar (1050) but below modals (Bootstrap modal is 1055) */
             font-weight: 500; letter-spacing: .25px; backdrop-filter: blur(6px);
             animation: notifierSlide .35s ease-out;
+            pointer-events: none; /* Don't block clicks */
+        }
+        .notifier > * {
+            pointer-events: auto; /* But allow clicks on notifier content */
         }
         @keyframes notifierSlide { from { opacity: 0; transform: translate(-50%, -10px);} to { opacity: 1; transform: translate(-50%, 0);} }
         .notifier.success { background-color: #d4edda; color: #155724; }
@@ -1152,6 +1201,23 @@ if (!$isAjaxRequest) {
         #nameDuplicateWarning i,
         #householdWarning i {
             font-size: 1.1rem;
+        }
+        
+        /* NUCLEAR FIX: Ensure navbar toggler is ALWAYS clickable */
+        @media (max-width: 991.98px) {
+            body.registration-page .navbar-toggler {
+                z-index: 9999 !important;
+                position: fixed !important;
+                right: 1rem !important;
+                top: calc(var(--topbar-height, 0px) + 0.5rem) !important;
+                pointer-events: auto !important;
+            }
+        }
+        
+        /* Ensure reCAPTCHA badge doesn't block navbar */
+        .grecaptcha-badge {
+            z-index: 1000 !important;
+            bottom: 14px !important;
         }
         </style>
         <!-- reCAPTCHA v3 -->
