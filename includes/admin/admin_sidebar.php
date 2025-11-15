@@ -897,8 +897,10 @@ if (!function_exists('adjustColorOpacity')) {
   .admin-sidebar .sidebar-profile .avatar-circle { width: 38px; height: 38px; font-size: .9rem; }
   /* Reduce horizontal margins on items */
   .admin-sidebar .nav-item a, .admin-sidebar .dropdown > a { margin: 2px 6px; padding: 9px 12px; }
-  /* Provide bottom safe-area so last items / logout not obscured by iPhone home indicator */
-  .admin-sidebar { padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 12px); }
+  /* Provide bottom safe-area on the actual scroller so content can scroll past the home indicator */
+  .admin-sidebar .nav-list { padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 72px) !important; }
+  /* Remove flex spacer on mobile; sticky logout handles pinning */
+  .admin-sidebar .nav-list > li.mt-auto { display: none !important; }
   /* Make logout sticky just above safe area */
   .admin-sidebar .nav-item.logout { position: sticky; bottom: calc(env(safe-area-inset-bottom, 0px) + 4px); z-index: 10; }
   .admin-sidebar .nav-item.logout a.logout-link { margin-bottom: 0; }
