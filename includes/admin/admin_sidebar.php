@@ -352,7 +352,7 @@ $isCMSActive = in_array($current, $cmsFiles, true);
 
     <!-- Website CMS (super_admin only) -->
     <?php if ($admin_role === 'super_admin'): ?>
-      <li class="nav-item dropdown">
+      <li class="nav-item dropdown d-none d-md-block">
         <a href="#submenu-cms" data-bs-toggle="collapse" class="dropdown-toggle">
           <i class="bi bi-palette icon"></i>
           <span class="links_name">Website CMS</span>
