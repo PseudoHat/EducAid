@@ -99,7 +99,8 @@
   .table td {
     border: none;
     border-bottom: 1px solid #f2f2f2;
-    padding: 12px 15px;
+    /* reserve space on the left for the label */
+    padding: 12px 15px 12px 130px;
     text-align: left;
     position: relative;
     font-size: 0.9rem;
@@ -117,13 +118,13 @@
     font-weight: 600;
     font-size: 0.85rem;
     line-height: 1.5;
-    display: inline-block;
-    min-width: 90px;
-    max-width: 110px;
-    vertical-align: top;
-    margin-right: 12px;
+    position: absolute;
+    left: 15px;
+    top: 12px;
+    width: 110px;
+    display: block;
   }
-  .table td > * { display: inline; vertical-align: top; max-width: calc(100% - 110px); }
+  .table td > * { display: inline; vertical-align: top; }
 
   /* Action column full width (handles Action/Actions label) */
   .table td[data-label="Action"],
@@ -153,12 +154,7 @@
     justify-content: space-between;
     padding: 12px 15px;
   }
-  .table td[data-label="Select"]::before {
-    margin-right: 0;
-    min-width: auto;
-    font-weight: 700;
-    color: #1182FF;
-  }
+  .table td[data-label="Select"]::before { position: static; margin-right: 0; min-width: auto; font-weight: 700; color: #1182FF; width: auto; }
   .table td[data-label="Select"] input[type="checkbox"] {
     width: 22px; height: 22px;
     accent-color: #1182FF;

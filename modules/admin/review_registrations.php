@@ -861,7 +861,46 @@ $yearLevels = pg_fetch_all(pg_query($connection, "SELECT year_level_id, name FRO
             transform: translateY(-1px);
         }
         
-        /* Zoom/high-DPI handling, min-widths, and scrollbars are centralized in table_core.css. */
+                /* Zoom/high-DPI handling, min-widths, and scrollbars are centralized in table_core.css. */
+
+                /* ==================== Modal Sizing (Responsive) ==================== */
+                /* General: constrain very tall content */
+                #actionModal .modal-body,
+                #studentDetailsModal .modal-body,
+                #blacklistModal .modal-body {
+                    max-height: calc(100vh - 240px);
+                    overflow-y: auto;
+                }
+        
+                @media (max-width: 767.98px){
+                    #actionModal .modal-dialog,
+                    #studentDetailsModal .modal-dialog,
+                    #blacklistModal .modal-dialog {
+                        max-width: 95% !important;
+                        margin: 1.25rem auto !important;
+                    }
+                    #actionModal .modal-content,
+                    #studentDetailsModal .modal-content,
+                    #blacklistModal .modal-content {
+                        max-height: 85vh !important;
+                        border-radius: 1rem !important;
+                    }
+                    #actionModal .modal-header,
+                    #studentDetailsModal .modal-header,
+                    #blacklistModal .modal-header { padding: .6rem .9rem; }
+                    #actionModal .modal-body,
+                    #studentDetailsModal .modal-body,
+                    #blacklistModal .modal-body {
+                        padding: .75rem .9rem;
+                        max-height: calc(85vh - 120px);
+                        overflow-y: auto;
+                    }
+                    #actionModal .modal-footer,
+                    #studentDetailsModal .modal-footer,
+                    #blacklistModal .modal-footer { padding: .55rem .9rem; }
+                    #studentDetailsModal .modal-dialog,
+                    #blacklistModal .modal-dialog { width: auto; }
+                }
     </style>
 </head>
 <body>
