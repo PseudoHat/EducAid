@@ -831,6 +831,8 @@ $yearLevels = pg_fetch_all(pg_query($connection, "SELECT year_level_id, name FRO
             margin-bottom: 20px;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
+        .quick-actions .qa-row{display:grid;grid-template-columns:1fr;gap:16px;align-items:center}
+        @media (min-width:768px){.quick-actions .qa-row{grid-template-columns:1fr auto}}
         .quick-actions h5 {
             color: white;
             margin-bottom: 5px;
@@ -838,11 +840,20 @@ $yearLevels = pg_fetch_all(pg_query($connection, "SELECT year_level_id, name FRO
         .quick-actions small {
             color: rgba(255, 255, 255, 0.8);
         }
+        .qa-actions{display:grid;grid-auto-flow:row;gap:12px}
+        @media (min-width:768px){.qa-actions{grid-auto-flow:column}}
         .auto-approve-btn {
             background: linear-gradient(45deg, #28a745, #20c997);
             border: none;
             color: white;
             font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 14px 16px;
+            min-width: 220px;
+            border-radius: 12px;
             transition: all 0.3s ease;
         }
         .auto-approve-btn:hover {
@@ -855,6 +866,13 @@ $yearLevels = pg_fetch_all(pg_query($connection, "SELECT year_level_id, name FRO
             border: none;
             color: white;
             font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 14px 16px;
+            min-width: 180px;
+            border-radius: 12px;
         }
         .refresh-btn:hover {
             color: white;
@@ -992,12 +1010,12 @@ $yearLevels = pg_fetch_all(pg_query($connection, "SELECT year_level_id, name FRO
 
                 <!-- Auto-Approve Section -->
                 <div class="quick-actions">
-                    <div class="d-flex align-items-center justify-content-between">
+                    <div class="qa-row">
                         <div>
                             <h5 class="mb-1"><i class="bi bi-lightning-charge me-2"></i>Quick Actions</h5>
                             <small>Streamline review process for high-confidence registrations (80%+)</small>
                         </div>
-                        <div class="d-flex gap-2">
+                        <div class="qa-actions">
                             <?php
                             // Count high confidence registrations (80%+) - exclude archived
                             $highConfidenceQuery = "SELECT COUNT(*) FROM students s WHERE s.status = 'under_registration' AND (s.is_archived = FALSE OR s.is_archived IS NULL) AND COALESCE(s.confidence_score, calculate_confidence_score(s.student_id)) >= 80";
