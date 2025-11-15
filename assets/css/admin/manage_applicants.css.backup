@@ -1,47 +1,10 @@
 /* ==================== manage_applicants.css ==================== */
 /* Clean, mobile-first responsive design with card layout for mobile */
 
-:root {
-  --admin-topbar-h: 52px;
-  --admin-header-h: 56px;
-}
-
 body {
   font-family: 'Poppins', sans-serif;
   background: #f8f9fa;
   color: #222;
-}
-
-/* Ensure the fixed admin header doesn't clip its contents.
-   Let it auto-size while the page offset uses --admin-header-h. */
-.admin-main-header { height: auto !important; }
-
-/* ==================== MAIN LAYOUT ==================== */
-.home-section,
-#mainContent {
-  margin-left: 250px;
-  width: calc(100% - 250px);
-  min-height: calc(100vh - var(--admin-topbar-h));
-  /* Use a tighter adjustment so there isn't an oversized gap below header */
-  padding: calc(var(--admin-topbar-h) + var(--admin-header-h) + 2px) 20px 40px 20px;
-  background: #f8f9fa;
-  position: relative;
-  z-index: 1;
-  box-sizing: border-box;
-}
-
-.sidebar.close ~ .home-section,
-.sidebar.close ~ #mainContent {
-  margin-left: 70px;
-  width: calc(100% - 70px);
-}
-
-@media (max-width: 768px) {
-  .home-section,
-  #mainContent {
-    margin-left: 0 !important;
-    width: 100% !important;
-  }
 }
 
 /* ==================== SECTION HEADER ==================== */
@@ -67,63 +30,6 @@ h1.fw-bold, h2.fw-bold {
   font-weight: 700;
   font-size: 2.2rem;
   letter-spacing: 0.01em;
-}
-
-/* ==================== PAGE HEADER ==================== */
-.page-header {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: .75rem 1rem;
-  align-items: start;
-}
-.page-header-title h1 { line-height: 1.1; color: #212529 !important; }
-.page-header-actions {
-  display: flex;
-  align-items: center;
-  gap: .6rem;
-  flex-wrap: wrap;
-}
-.page-header .applicants-badge {
-  background: #0dcaf0 !important; /* info */
-  color: #06323a; /* better contrast */
-  font-weight: 700;
-  font-size: .95rem;
-  padding: .5rem .7rem;
-  border-radius: .65rem;
-  border: 1px solid #08b6cf;
-  box-shadow: 0 0 0 .12rem rgba(13,202,240,.18);
-}
-.page-header .btn-migrate {
-  display: inline-flex;
-  align-items: center;
-  gap: .45rem;
-  white-space: nowrap;
-  padding: .5rem .7rem;
-  border-width: 2px;
-  border-color: #1182FF;
-  color: #0b5ed7; /* readable primary */
-  background-color: rgba(17,130,255,.08);
-  font-weight: 600;
-}
-.page-header .btn-migrate:hover,
-.page-header .btn-migrate:focus {
-  background-color: #1182FF;
-  color: #fff;
-  border-color: #1182FF;
-}
-.page-header .btn-migrate .bi { font-size: .95rem; }
-
-/* Desktop: actions on the right, title on the left */
-@media (min-width: 768px) {
-  .page-header { grid-template-columns: 1fr auto; }
-}
-
-/* Mobile: slightly reduce title size and stack neatly */
-@media (max-width: 576px) {
-  .page-header-title h1 { font-size: 1.9rem; }
-  .page-header-actions { gap: .55rem; }
-  .page-header .applicants-badge { font-size: .92rem; padding: .45rem .6rem; }
-  .page-header .btn-migrate { padding: .45rem .6rem; }
 }
 
 /* ==================== FILTER SECTION ==================== */
@@ -423,433 +329,103 @@ h1.fw-bold, h2.fw-bold {
   }
 }
 
-/* ==================== MOBILE CARD LAYOUT (<768px) ==================== */
-@media (max-width: 767px) {
-  /* Container adjustments */
-  .container-fluid {
-    padding: 12px !important;
-  }
-
-  /* Hide desktop table header */
-  .table thead {
-    display: none;
-  }
-
-  /* Convert table to card-based layout */
-  .table,
-  .table tbody,
-  .table tr,
-  .table td {
-    display: block;
-    width: 100%;
-  }
-
-  /* Card styling for each row */
+/* Enhanced Mobile View */
+@media (max-width: 600px) {
+  .card, .table-responsive { border-radius: 0.5rem; }
+  .table thead { display: none; }
+  .table, .table tbody, .table tr, .table td { display: block; width: 100%; }
   .table tr {
-    margin-bottom: 1rem;
+    margin-bottom: 1.1rem;
     background: #fff;
-    border-radius: 0.75rem;
-    box-shadow: 0 2px 8px rgba(17,130,255,0.12);
-    border: 1px solid #e9ecef;
-    padding: 1rem;
-    transition: all 0.2s ease;
+    border-radius: 0.6rem;
+    box-shadow: 0 1px 6px rgba(17,130,255,0.08);
+    border: none;
+    padding: 0.7rem;
   }
-
-  .table tr:active {
-    background-color: #f0f6ff;
-    transform: scale(0.99);
-  }
-
-  /* Cell styling with labels */
   .table td {
     border: none;
     border-bottom: 1px solid #f2f2f2;
-    padding: 12px 15px;
-    text-align: left;
-    position: relative;
+    min-height: 36px;
     font-size: 0.9rem;
-    line-height: 1.6;
-    min-height: 48px;
+    background: none;
+    position: relative;
+    padding: 10px 7px 10px 42%;
+    text-align: left;
+    line-height: 1.4;
+  }
+  
+  /* Apply ellipsis to Name, Contact, Email columns */
+  .table td[data-label="Name"],
+  .table td[data-label="Contact"],
+  .table td[data-label="Email"],
+  .table td[data-label="Mobile"] {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
     display: block;
-    overflow: visible;
   }
-
-  .table td:last-child {
-    border-bottom: none;
-    padding-bottom: 0;
+  
+  /* Allow other columns to wrap */
+  .table td[data-label="Year Level"],
+  .table td[data-label="Graduating"],
+  .table td[data-label="Type"],
+  .table td[data-label="Documents"],
+  .table td[data-label="Action"] {
+    white-space: normal;
+    word-break: break-word;
+    overflow-wrap: break-word;
   }
-
-  /* Label styling (left side of each cell) */
+  
+  .table td:last-child { border-bottom: none; }
   .table td::before {
     content: attr(data-label);
+    position: absolute;
+    left: 10px;
+    top: 10px;
+    width: 40%;
+    max-width: 120px;
     color: #1182FF;
     font-weight: 600;
     font-size: 0.85rem;
-    line-height: 1.5;
-    display: inline-block;
-    min-width: 90px;
-    max-width: 110px;
-    vertical-align: top;
-    margin-right: 12px;
-  }
-  
-  /* Value wrapper - inline-block to flow with label */
-  .table td > * {
-    display: inline;
-    vertical-align: top;
+    text-align: left;
+    white-space: normal;
     word-wrap: break-word;
-    overflow-wrap: break-word;
-    word-break: break-word;
-    max-width: calc(100% - 110px);
+    padding-right: 5px;
+    letter-spacing: 0.01em;
+    line-height: 1.3;
   }
-  
-  /* For text nodes directly in td */
-  .table td {
-    word-wrap: break-word;
-    overflow-wrap: break-word;
-    word-break: break-word;
-  }
-
-  /* Action column full width */
-  .table td[data-label="Action"] {
-    padding: 15px !important;
-    margin-top: 8px;
-    display: block !important;
-    text-align: center;
-  }
-  
-  .table td[data-label="Action"] > * {
-    max-width: 100% !important;
-  }
-
-  .table td[data-label="Action"]::before {
-    position: relative !important;
-    left: 0 !important;
-    top: 0 !important;
-    display: block !important;
-    width: 100% !important;
-    margin: 0 0 12px 0 !important;
-    padding: 0 !important;
-    text-align: center !important;
-    min-width: auto !important;
-    max-width: none !important;
-  }
-
-  /* Full width buttons on mobile - stack vertically */
-  .table td[data-label="Action"] .btn {
+  .btn-info.btn-sm {
+    padding: 8px 16px;
+    font-size: 0.9rem;
     width: 100%;
-    max-width: 100%;
-    padding: 12px 16px;
-    font-size: 0.95rem;
-    margin: 0 0 8px 0 !important;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
+    margin-top: 5px;
   }
-  
-  .table td[data-label="Action"] .btn:last-child {
-    margin-bottom: 0 !important;
-  }
-  
-  .table td[data-label="Action"] .btn i {
-    font-size: 1.1rem;
-  }
-
-  /* Badge styling */
-  .badge-success,
-  .badge-secondary,
-  .badge.bg-success,
-  .badge.bg-secondary {
-    font-size: 0.8rem;
-    padding: 3px 7px;
+  .badge-success, .badge-secondary {
+    font-size: 0.85rem;
+    padding: 4px 8px;
     display: inline-block;
   }
-
-  /* Section header adjustments */
-  .section-header {
-    margin-bottom: 1.5rem;
+  
+  /* Adjust header text size */
+  .section-header h2 { 
+    font-size: 1.4rem; 
   }
-
-  .section-header h2 {
-    font-size: 1.4rem;
+  .section-header .bi { 
+    font-size: 1.6rem; 
   }
-
-  .section-header .bi {
-    font-size: 1.6rem;
-  }
-
+  
   /* Filter section adjustments */
-  .filter-section,
-  .filter-container {
+  .filter-section {
     padding: 15px;
   }
-
+  
   .form-label {
     font-size: 0.9rem;
   }
-
-  .form-select,
-  .form-control {
+  
+  .form-select, .form-control {
     font-size: 0.9rem;
-  }
-
-  .card-body {
-    padding: 1rem;
-  }
-
-  /* Remove table scrolling on mobile */
-  .table-responsive {
-    overflow-x: visible;
-    box-shadow: none;
-  }
-  
-  /* ==================== MODAL MOBILE OPTIMIZATION ==================== */
-  /* Override fullscreen modal behavior */
-  .modal-fullscreen-sm-down {
-    max-width: 95% !important;
-    margin: 1.5rem auto !important;
-  }
-  
-  .modal-fullscreen-sm-down .modal-content {
-    height: auto !important;
-    max-height: 85vh !important;
-    border-radius: 1rem !important;
-  }
-  
-  .modal-fullscreen-sm-down .modal-header {
-    padding: 0.75rem 1rem;
-    position: sticky;
-    top: 0;
-    background: #f8f9fa;
-    z-index: 1;
-    border-radius: 1rem 1rem 0 0;
-    border-bottom: 1px solid #e0e0e0;
-  }
-  
-  .modal-fullscreen-sm-down .modal-body {
-    padding: 0.75rem;
-    overflow-y: auto;
-    max-height: calc(85vh - 180px);
-  }
-  
-  .modal-fullscreen-sm-down .modal-footer {
-    padding: 0.5rem;
-    position: sticky;
-    bottom: 0;
-    background: #fff;
-    z-index: 1;
-    border-top: 1px solid #e0e0e0;
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 8px;
-    justify-items: stretch;
-    align-items: center;
-    grid-auto-flow: row dense;
-  }
-  
-  .modal-fullscreen-sm-down .modal-title {
-    font-size: 1rem;
-    line-height: 1.3;
-  }
-  
-  .modal-fullscreen-sm-down .modal-title .badge {
-    font-size: 0.7rem;
-    padding: 2px 6px;
-  }
-  
-  /* Icon-only buttons on mobile - hide text */
-  .modal-footer .btn {
-    width: 100%;
-    min-width: 48px;
-    height: 48px;
-    padding: 0;
-    font-size: 0; /* hide text, show only icons */
-    margin: 0 !important;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 0.5rem;
-  }
-  
-  .modal-footer .btn i {
-    font-size: 1.3rem;
-    margin: 0;
-  }
-  
-  /* Show only icons, hide text */
-  .modal-footer .btn * {
-    font-size: 0;
-  }
-  
-  .modal-footer .btn i,
-  .modal-footer .btn .bi {
-    font-size: 1.3rem !important;
-  }
-
-  /* Center the incomplete documents message above the buttons */
-  .modal-footer .incomplete-message {
-    grid-column: 1 / -1;
-    grid-row: 1;
-    text-align: center;
-    width: 100%;
-    margin: 4px 0 6px 0;
-    font-size: 0.9rem;
-  }
-
-  /* Flatten the admin tools wrapper so its children become grid items */
-  .modal-footer .ms-auto {
-    display: contents !important;
-    margin-left: 0 !important;
-  }
-  
-  /* Flatten the verify form wrapper so button participates in grid */
-  .modal-footer form,
-  .modal-footer .verify-form,
-  .modal-footer form.d-inline {
-    display: contents !important;
-    margin: 0 !important;
-  }
-
-  /* Enforce button positions in the grid: blacklist | archive | reject | verify */
-  .modal-footer .btn-outline-danger.btn-sm { 
-    grid-column: 1; 
-    grid-row: 2; 
-  }
-  .modal-footer .btn-outline-warning.btn-sm { 
-    grid-column: 2; 
-    grid-row: 2; 
-  }
-  .modal-footer .btn-danger.btn-sm { 
-    grid-column: 3; 
-    grid-row: 2; 
-  }
-  .modal-footer .btn-success.btn-sm { 
-    grid-column: 4; 
-    grid-row: 2; 
-    width: 100%;
-  }
-  
-  /* ==================== ARCHIVE & BLACKLIST MODAL OPTIMIZATION ==================== */
-  /* Apply same compact sizing to archive and blacklist modals */
-  #archiveModal .modal-dialog,
-  #blacklistModal .modal-dialog {
-    max-width: 95% !important;
-    margin: 1.5rem auto !important;
-  }
-  
-  #archiveModal .modal-content,
-  #blacklistModal .modal-content {
-    max-height: 85vh !important;
-    border-radius: 1rem !important;
-    display: flex;
-    flex-direction: column;
-  }
-  
-  #archiveModal .modal-header,
-  #blacklistModal .modal-header {
-    padding: 0.75rem 1rem;
-    border-radius: 1rem 1rem 0 0;
-    flex-shrink: 0;
-  }
-  
-  #archiveModal .modal-title,
-  #blacklistModal .modal-title {
-    font-size: 1rem;
-    line-height: 1.3;
-  }
-  
-  #archiveModal .modal-body,
-  #blacklistModal .modal-body {
-    padding: 0.75rem;
-    overflow-y: auto;
-    flex: 1;
-    max-height: calc(85vh - 140px);
-  }
-  
-  #archiveModal .modal-footer,
-  #blacklistModal .modal-footer {
-    padding: 0.75rem;
-    border-top: 1px solid #e0e0e0;
-    flex-shrink: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-  
-  /* Stack buttons vertically in archive/blacklist modals */
-  #archiveModal .modal-footer .btn,
-  #blacklistModal .modal-footer .btn {
-    width: 100%;
-    padding: 10px 12px;
-    font-size: 0.85rem;
-    margin: 0 !important;
-  }
-  
-  /* Compact form elements */
-  #archiveModal .form-select,
-  #archiveModal .form-control,
-  #archiveModal .form-label,
-  #blacklistModal .form-select,
-  #blacklistModal .form-control,
-  #blacklistModal .form-label {
-    font-size: 0.9rem;
-  }
-  
-  #archiveModal .alert,
-  #blacklistModal .alert {
-    font-size: 0.85rem;
-    padding: 0.5rem;
-  }
-  
-  #archiveModal .alert ul,
-  #blacklistModal .alert ul {
-    margin-bottom: 0.5rem;
-    padding-left: 1.2rem;
-  }
-}
-
-/* ==================== SMALL MOBILE (<576px) ==================== */
-@media (max-width: 575px) {
-  .section-header h2 {
-    font-size: 1.3rem;
-  }
-
-  .section-header .bi {
-    font-size: 1.5rem;
-  }
-
-  .table tr {
-    padding: 0.8rem;
-  }
-
-  .table td {
-    padding: 10px 8px 10px 42%;
-    font-size: 0.85rem;
-  }
-
-  .table td::before {
-    font-size: 0.8rem;
-    width: 40%;
-    top: 10px;
-  }
-
-  .btn-info.btn-sm {
-    padding: 9px 14px;
-    font-size: 0.85rem;
-  }
-
-  .badge-success,
-  .badge-secondary,
-  .badge.bg-success,
-  .badge.bg-secondary {
-    font-size: 0.75rem;
-    padding: 2px 6px;
-  }
-
-  .filter-section,
-  .filter-container {
-    padding: 12px;
   }
 }
 
@@ -934,7 +510,7 @@ h1.fw-bold, h2.fw-bold {
   .table-responsive {
     max-height: 65vh;
     overflow-y: auto;
-    overflow-x: auto;
+    overflow-x: hidden;
   }
   
   /* Flexible layout adjustments */
@@ -945,30 +521,70 @@ h1.fw-bold, h2.fw-bold {
     flex: 1 1 auto;
   }
 }
+}
 
-/* ==================== TABLET LANDSCAPE ==================== */
-@media (min-width: 768px) and (max-width: 1024px) and (orientation: landscape) {
-  .table th,
-  .table td {
+/* Landscape mode on mobile - use more horizontal space */
+@media (max-width: 900px) and (orientation: landscape) {
+  .table-responsive {
+    max-height: 70vh;
+    overflow-y: auto;
+  }
+  
+  .table {
     font-size: 0.85rem;
+  }
+  
+  .table th, .table td {
     padding: 8px 10px;
+    font-size: 0.8rem;
   }
   
   .section-header h2 {
-    font-size: 1.5rem;
-  }
-  
-  .table-responsive {
-    overflow-x: auto;
+    font-size: 1.3rem;
   }
 }
 
-/* ==================== TABLET PORTRAIT ==================== */
-@media (min-width: 768px) and (max-width: 1024px) and (orientation: portrait) {
-  .table th,
+/* Larger tablets in portrait mode (769px to 1024px) */
+@media (min-width: 769px) and (max-width: 1024px) and (orientation: portrait) {
+  /* For standard table layout (not card view) */
+  .table thead {
+    display: table-header-group;
+  }
+  
+  .table tbody {
+    display: table-row-group;
+  }
+  
+  .table tr {
+    display: table-row;
+  }
+  
   .table td {
-    font-size: 0.9rem;
-    padding: 9px 10px;
+    display: table-cell;
+    font-size: 0.85rem;
+    padding: 8px 6px;
+    vertical-align: middle;
+  }
+  
+  /* Apply ellipsis to Name (1st col), Contact (2nd col), Email (3rd col) using nth-child */
+  .table tbody td:nth-child(1),  /* Name */
+  .table tbody td:nth-child(2),  /* Contact */
+  .table tbody td:nth-child(3) { /* Email */
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  
+  /* Other columns wrap normally */
+  .table tbody td:nth-child(n+4) {
+    white-space: normal;
+    word-wrap: break-word;
+  }
+  
+  .table th {
+    font-size: 0.85rem;
+    padding: 8px 6px;
   }
   
   .table-responsive {
@@ -976,8 +592,140 @@ h1.fw-bold, h2.fw-bold {
   }
 }
 
-/* Blue emphasis only when explicitly requested */
-.text-primary-em {
+/* Even larger tablets (1025px to 1366px) in portrait - like iPad Pro */
+@media (min-width: 1025px) and (max-width: 1366px) and (orientation: portrait) {
+  .table tbody td:nth-child(1),  /* Name */
+  .table tbody td:nth-child(2),  /* Contact */
+  .table tbody td:nth-child(3) { /* Email */
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  
+  .table tbody td:nth-child(n+4) {
+    white-space: normal;
+    word-wrap: break-word;
+  }
+}
+
+/* Modern iPads with high resolution (iPad Air M3, iPad Pro) - Portrait */
+@media (min-width: 1367px) and (max-width: 2048px) and (orientation: portrait) {
+  .table tbody td:nth-child(1),  /* Name */
+  .table tbody td:nth-child(2),  /* Contact */
+  .table tbody td:nth-child(3) { /* Email */
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  
+  .table tbody td:nth-child(n+4) {
+    white-space: normal;
+    word-wrap: break-word;
+  }
+  
+  .table th, .table td {
+    font-size: 0.9rem;
+    padding: 10px 8px;
+  }
+}
+
+/* Universal portrait mode for tablets - applies to ALL tablet sizes */
+@media (orientation: portrait) and (min-width: 768px) and (max-width: 2048px) {
+  .table tbody td:nth-child(1),  /* Name */
+  .table tbody td:nth-child(2),  /* Contact */
+  .table tbody td:nth-child(3) { /* Email */
+    max-width: 200px !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+  
+  .table tbody td:nth-child(n+4) {
+    white-space: normal !important;
+    word-wrap: break-word !important;
+  }
+  
+  .table-responsive {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* Force for all portrait modes regardless of width */
+@media (orientation: portrait) {
+  .table tbody tr td:nth-of-type(1),  /* Name - first td in each row */
+  .table tbody tr td:nth-of-type(2),  /* Contact - second td */
+  .table tbody tr td:nth-of-type(3) { /* Email - third td */
+    max-width: 200px !important;
+    min-width: 100px !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+    display: table-cell !important;
+  }
+}
+
+/* Very small portrait screens (iPhone SE, etc.) - Works on ALL devices */
+@media (max-width: 400px) and (orientation: portrait) {
+  .table td {
+    font-size: 0.8rem;
+    padding: 10px 5px 10px 38%;
+    line-height: 1.4;
+  }
+  
+  .table td[data-label="Name"],
+  .table td[data-label="Contact"],
+  .table td[data-label="Email"],
+  .table td[data-label="Mobile"] {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  
+  .table td[data-label="Year Level"],
+  .table td[data-label="Graduating"],
+  .table td[data-label="Type"],
+  .table td[data-label="Documents"],
+  .table td[data-label="Action"] {
+    white-space: normal;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    overflow: visible;
+  }
+  
+  .table td::before {
+    font-size: 0.75rem;
+    left: 8px;
+    width: 36%;
+    line-height: 1.3;
+  }
+  
+  .section-header h2 {
+    font-size: 1.2rem;
+    line-height: 1.2;
+  }
+  
+  .filter-section {
+    padding: 12px;
+  }
+  
+  .btn-info.btn-sm {
+    font-size: 0.8rem;
+    padding: 8px 12px;
+  }
+  
+  .badge-success,
+  .badge-secondary {
+    font-size: 0.7rem;
+    padding: 2px 6px;
+  }
+}
+
+/* Blue emphasis for important/bold/section text */
+.text-primary-em, .fw-bold, b, strong {
   color: #1182FF !important;
 }
 
@@ -1152,6 +900,7 @@ h1.fw-bold, h2.fw-bold {
 
 /* Ensure proper container behavior */
 .container-fluid {
+  overflow-x: hidden;
   max-width: 100%;
 }
 

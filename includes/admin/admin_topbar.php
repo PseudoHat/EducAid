@@ -170,12 +170,15 @@ if (isset($connection)) {
     font-size: 0.7rem;
   }
   .admin-topbar .container-fluid {
-    gap: 0.5rem !important;
-    row-gap: 0.5rem;
+    gap: 0.4rem !important;
+    row-gap: 0.35rem;
     justify-content: center !important;
+    padding-top: 6px;
+    padding-bottom: 6px;
+    min-height: 40px;
   }
   .admin-topbar .d-flex.align-items-center.gap-3 {
-    gap: 0.5rem !important;
+    gap: 0.4rem !important;
     flex-wrap: wrap;
     justify-content: center;
   }
@@ -186,6 +189,14 @@ if (isset($connection)) {
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+  /* Hide non-essential items on mobile: email, phone, hours, separators */
+  .admin-topbar [data-topbar-email],
+  .admin-topbar .bi-envelope,
+  .admin-topbar [data-topbar-phone],
+  .admin-topbar .bi-telephone,
+  .admin-topbar [data-topbar-hours],
+  .admin-topbar [data-topbar-hours-mobile],
+  .admin-topbar .vr { display: none !important; }
 }
 
 /* Municipality Badge Styling */
@@ -242,3 +253,17 @@ $b = hexdec(substr($text_color, 5, 2));
 }
 
 </style>
+<script>
+// Sync --admin-topbar-h to actual rendered height so header aligns perfectly
+document.addEventListener('DOMContentLoaded', function(){
+  var bar = document.getElementById('adminTopbar');
+  if(bar){
+    var setVar = function(){
+      var h = bar.getBoundingClientRect().height;
+      document.documentElement.style.setProperty('--admin-topbar-h', h + 'px');
+    };
+    setVar();
+    window.addEventListener('resize', setVar);
+  }
+});
+</script>

@@ -16,6 +16,7 @@
  */
 
 class SessionTimeoutMiddleware {
+    private $db;
     private $connection;
     private $idleTimeoutMinutes;
     private $absoluteTimeoutHours;
@@ -24,18 +25,20 @@ class SessionTimeoutMiddleware {
     /**
      * Initialize middleware with database connection and timeout settings
      */
-    public function __construct($connection = null) {
-        if ($connection === null) {
+    public function __construct($db = null) {
+        if ($db === null) {
+            // Load database connection from config
+            require_once __DIR__ . '/../config/database.php';
             global $connection;
-            $this->connection = $connection;
+            $this->db = $connection;
         } else {
-            $this->connection = $connection;
+            $this->db = $db;
         }
         
         // Load timeout settings from environment
-        $this->idleTimeoutMinutes = (int) ($_ENV['SESSION_IDLE_TIMEOUT_MINUTES'] ?? 30);
-        $this->absoluteTimeoutHours = (int) ($_ENV['SESSION_ABSOLUTE_TIMEOUT_HOURS'] ?? 8);
-        $this->warningBeforeLogoutSeconds = (int) ($_ENV['SESSION_WARNING_BEFORE_LOGOUT_SECONDS'] ?? 120);
+        $this->idleTimeoutMinutes = (int) (getenv('SESSION_IDLE_TIMEOUT_MINUTES') ?: 30);
+        $this->absoluteTimeoutHours = (int) (getenv('SESSION_ABSOLUTE_TIMEOUT_HOURS') ?: 8);
+        $this->warningBeforeLogoutSeconds = (int) (getenv('SESSION_WARNING_BEFORE_LOGOUT_SECONDS') ?: 120);
     }
     
     /**
@@ -132,8 +135,24 @@ class SessionTimeoutMiddleware {
             return null;
         }
         
-        if (!$this->connection) {
-            error_log("Session timeout middleware error: No database connection");
+        try {
+            $result = pg_query_params($this->db, 
+                "SELECT session_id, student_id, created_at, last_activity, expires_at
+                FROM student_active_sessions
+                WHERE student_id = $1 
+                AND session_id = $2
+                LIMIT 1",
+                [$_SESSION['student_id'], session_id()]
+            );
+            
+            if ($result === false) {
+                error_log("Session timeout middleware error: " . pg_last_error($this->db));
+                return null;
+            }
+            
+            return pg_fetch_assoc($result);
+        } catch (Exception $e) {
+            error_log("Session timeout middleware error: " . $e->getMessage());
             return null;
         }
         
@@ -218,20 +237,20 @@ class SessionTimeoutMiddleware {
             return;
         }
         
-        $query = "
-            UPDATE student_active_sessions
-            SET last_activity = NOW()
-            WHERE student_id = $1 
-            AND session_id = $2
-        ";
-        
-        $result = @pg_query_params($this->connection, $query, [
-            $_SESSION['student_id'],
-            session_id()
-        ]);
-        
-        if (!$result) {
-            error_log("Failed to update activity: " . pg_last_error($this->connection));
+        try {
+            $result = pg_query_params($this->db,
+                "UPDATE student_active_sessions
+                SET last_activity = NOW()
+                WHERE student_id = $1 
+                AND session_id = $2",
+                [$_SESSION['student_id'], session_id()]
+            );
+            
+            if ($result === false) {
+                error_log("Failed to update activity: " . pg_last_error($this->db));
+            }
+        } catch (Exception $e) {
+            error_log("Failed to update activity: " . $e->getMessage());
         }
     }
     
@@ -245,20 +264,20 @@ class SessionTimeoutMiddleware {
         error_log("Session timeout - Reason: {$reason}, Student ID: " . ($_SESSION['student_id'] ?? 'unknown'));
         
         // Remove session from database
-        if (isset($_SESSION['student_id']) && $this->connection) {
-            $query = "
-                DELETE FROM student_active_sessions
-                WHERE student_id = $1 
-                AND session_id = $2
-            ";
-            
-            $result = @pg_query_params($this->connection, $query, [
-                $_SESSION['student_id'],
-                session_id()
-            ]);
-            
-            if (!$result) {
-                error_log("Failed to delete session: " . pg_last_error($this->connection));
+        if (isset($_SESSION['student_id'])) {
+            try {
+                $result = pg_query_params($this->db,
+                    "DELETE FROM student_active_sessions
+                    WHERE student_id = $1 
+                    AND session_id = $2",
+                    [$_SESSION['student_id'], session_id()]
+                );
+                
+                if ($result === false) {
+                    error_log("Failed to delete session: " . pg_last_error($this->db));
+                }
+            } catch (Exception $e) {
+                error_log("Failed to delete session: " . $e->getMessage());
             }
         }
         

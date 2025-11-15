@@ -179,7 +179,14 @@ $__hdr = educaid_get_header_theme($connection ?? null);
 .admin-header-actions .dropdown-item-text {font-size: 0.9rem;}
 .badge-sm {font-size: 0.7rem; padding: 0.25em 0.5em;}
 
-@media (max-width: 576px){.admin-main-header{padding:.4rem 0;}#menu-toggle{font-size:26px;} .admin-header-actions{gap:.65rem;} .admin-header-actions .dropdown-menu{min-width:280px;}}
+@media (max-width: 576px){
+  .admin-main-header{padding:.25rem 0;}
+  #menu-toggle{font-size:24px;}
+  .admin-header-actions{gap:.5rem;}
+  .admin-icon-btn{padding:.4rem .5rem;border-radius:8px;}
+  .admin-icon-btn .bi{font-size:.95rem;}
+  .admin-header-actions .dropdown-menu{min-width:260px;}
+}
 </style>
 <script>
 // Fast inline safeguard: if server rendered 0 unread (badge omitted) but a stale badge remains in cached DOM, remove it.

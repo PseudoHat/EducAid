@@ -402,8 +402,27 @@ while ($row = pg_fetch_assoc($barangaysResult)) {
     $barangays[] = $row['barangay_entered'];
 }
 ?>
-<?php $page_title='Household Blocked Registrations'; $extra_css=[]; include __DIR__ . '/../../includes/admin/admin_head.php'; ?>
-
+<?php $page_title='Household Blocked Registrations'; $extra_css=['../../assets/css/admin/manage_applicants.css', '../../assets/css/admin/table_core.css']; include __DIR__ . '/../../includes/admin/admin_head.php'; ?>
+<style>
+    .bulk-actions-bar {
+        background: #ffffff;
+        border: 1px solid #dee2e6;
+        padding: 12px 20px;
+        border-radius: 10px;
+        margin-bottom: 16px;
+        position: sticky;
+        top: calc(var(--admin-topbar-h, 52px) + var(--admin-header-h, 56px) + 8px);
+        z-index: 1020;
+        box-shadow: 0 6px 14px rgba(0,0,0,.1);
+        backdrop-filter: saturate(1.2) blur(2px);
+    }
+    @media (max-width: 767.98px) {
+        .bulk-actions-bar {
+            padding: 10px 12px;
+            border-radius: 12px;
+        }
+    }
+</style>
 
 <!-- Page Content Starts Here -->
 <?php include __DIR__ . '/../../includes/admin/admin_topbar.php'; ?>
@@ -417,77 +436,48 @@ while ($row = pg_fetch_assoc($barangaysResult)) {
             <!-- Page Header -->
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <div>
-                    <h1 class="mb-2">
-                        <i class="bi bi-shield-x"></i>
+                    <h1 class="fw-bold mb-2">
                         Household Blocked Registrations
-                        </h1>
-                        <p class="text-muted mb-0">View and manage registration attempts blocked by household duplicate prevention</p>
-                    </div>
-                    <a href="homepage.php" class="btn btn-outline-secondary d-flex align-items-center gap-2">
-                        <i class="bi bi-arrow-left"></i>
-                        <span>Back to Dashboard</span>
-                    </a>
+                    </h1>
+                    <p class="text-muted mb-0">View and manage registration attempts blocked by household duplicate prevention</p>
                 </div>
+                <a href="homepage.php" class="btn btn-outline-secondary d-flex align-items-center gap-2">
+                    <i class="bi bi-arrow-left"></i>
+                    <span>Back to Dashboard</span>
+                </a>
+            </div>
 
                 <!-- Statistics Cards -->
                 <div class="row g-3 g-md-4 mb-4">
                     <div class="col-6 col-md-3">
-                        <div class="card stats-card danger">
+                        <div class="card" style="border-left: 4px solid #dc3545; background: linear-gradient(135deg, #fff 0%, #ffe5e8 100%);">
                             <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <p class="text-muted mb-1 fw-semibold">Total Blocks</p>
-                                        <h3><?= $stats['total_blocks'] ?></h3>
-                                    </div>
-                                    <div class="stat-icon">
-                                        <i class="bi bi-shield-x"></i>
-                                    </div>
-                                </div>
+                                <p class="text-muted mb-1 fw-semibold small">Total Blocks</p>
+                                <h3 class="fw-bold mb-0" style="color: #dc3545;"><?= $stats['total_blocks'] ?></h3>
                             </div>
                         </div>
                     </div>
                     <div class="col-6 col-md-3">
-                        <div class="card stats-card warning">
+                        <div class="card" style="border-left: 4px solid #ffc107; background: linear-gradient(135deg, #fff 0%, #fff8e1 100%);">
                             <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <p class="text-muted mb-1 fw-semibold">Active Blocks</p>
-                                        <h3><?= $stats['active_blocks'] ?></h3>
-                                    </div>
-                                    <div class="stat-icon">
-                                        <i class="bi bi-exclamation-triangle"></i>
-                                    </div>
-                                </div>
+                                <p class="text-muted mb-1 fw-semibold small">Active Blocks</p>
+                                <h3 class="fw-bold mb-0" style="color: #f57c00;"><?= $stats['active_blocks'] ?></h3>
                             </div>
                         </div>
                     </div>
                     <div class="col-6 col-md-3">
-                        <div class="card stats-card success">
+                        <div class="card" style="border-left: 4px solid #28a745; background: linear-gradient(135deg, #fff 0%, #e8f5e9 100%);">
                             <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <p class="text-muted mb-1 fw-semibold">Overridden</p>
-                                        <h3><?= $stats['overridden'] ?></h3>
-                                    </div>
-                                    <div class="stat-icon">
-                                        <i class="bi bi-check-circle"></i>
-                                    </div>
-                                </div>
+                                <p class="text-muted mb-1 fw-semibold small">Overridden</p>
+                                <h3 class="fw-bold mb-0" style="color: #28a745;"><?= $stats['overridden'] ?></h3>
                             </div>
                         </div>
                     </div>
                     <div class="col-6 col-md-3">
-                        <div class="card stats-card info">
+                        <div class="card" style="border-left: 4px solid #17a2b8; background: linear-gradient(135deg, #fff 0%, #e0f7fa 100%);">
                             <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <p class="text-muted mb-1 fw-semibold">Last 30 Days</p>
-                                        <h3><?= $stats['blocks_last_30d'] ?></h3>
-                                    </div>
-                                    <div class="stat-icon">
-                                        <i class="bi bi-calendar3"></i>
-                                    </div>
-                                </div>
+                                <p class="text-muted mb-1 fw-semibold small">Last 30 Days</p>
+                                <h3 class="fw-bold mb-0" style="color: #17a2b8;"><?= $stats['blocks_last_30d'] ?></h3>
                             </div>
                         </div>
                     </div>
@@ -497,14 +487,13 @@ while ($row = pg_fetch_assoc($barangaysResult)) {
                 <div class="card mb-4">
                     <div class="card-header">
                         <h5>
-                            <i class="bi bi-funnel-fill"></i>
                             Filter Options
                         </h5>
                     </div>
                     <div class="card-body">
                         <form method="GET" class="row g-3">
                             <div class="col-12 col-md-3">
-                                <label class="form-label"><i class="bi bi-geo-alt me-1"></i>Barangay</label>
+                                <label class="form-label">Barangay</label>
                                 <select name="barangay" class="form-select">
                                     <option value="">All Barangays</option>
                                     <?php foreach ($barangays as $brgy): ?>
@@ -515,7 +504,7 @@ while ($row = pg_fetch_assoc($barangaysResult)) {
                                 </select>
                             </div>
                             <div class="col-12 col-md-2">
-                                <label class="form-label"><i class="bi bi-toggle2-on me-1"></i>Status</label>
+                                <label class="form-label">Status</label>
                                 <select name="override_status" class="form-select">
                                     <option value="">All</option>
                                     <option value="blocked" <?= $overrideFilter === 'blocked' ? 'selected' : '' ?>>Blocked</option>
@@ -523,21 +512,19 @@ while ($row = pg_fetch_assoc($barangaysResult)) {
                                 </select>
                             </div>
                             <div class="col-12 col-sm-6 col-md-2">
-                                <label class="form-label"><i class="bi bi-calendar-date me-1"></i>Date From</label>
+                                <label class="form-label">Date From</label>
                                 <input type="date" name="date_from" class="form-control" value="<?= htmlspecialchars($dateFrom) ?>">
                             </div>
                             <div class="col-12 col-sm-6 col-md-2">
-                                <label class="form-label"><i class="bi bi-calendar-check me-1"></i>Date To</label>
+                                <label class="form-label">Date To</label>
                                 <input type="date" name="date_to" class="form-control" value="<?= htmlspecialchars($dateTo) ?>">
                             </div>
                             <div class="col-12 col-md-3 d-flex flex-column flex-sm-row align-items-stretch align-items-sm-end gap-2">
                                 <button type="submit" class="btn btn-primary flex-grow-1">
-                                    <i class="bi bi-funnel me-1"></i>Apply Filters
+                                    Apply Filters
                                 </button>
                                 <a href="household_blocked_registrations.php" class="btn btn-outline-secondary" title="Clear Filters">
-                                    <i class="bi bi-x-circle me-1 d-sm-none"></i>
-                                    <span class="d-none d-sm-inline"><i class="bi bi-x-circle"></i></span>
-                                    <span class="d-sm-none">Clear</span>
+                                    Clear
                                 </a>
                             </div>
                         </form>
@@ -545,36 +532,36 @@ while ($row = pg_fetch_assoc($barangaysResult)) {
                 </div>
 
                 <!-- Blocked Attempts Table -->
-                <div class="card">
-                    <div class="card-header d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3">
-                        <div>
-                            <h5 class="mb-0">
-                                <i class="bi bi-table"></i>
-                                Blocked Registration Attempts
-                                <span class="badge bg-danger ms-2"><?= count($records) ?> Records</span>
-                            </h5>
+                <div class="mb-3">
+                    <h5 class="mb-0 fw-bold">
+                        Blocked Registration Attempts
+                        <span class="badge bg-danger ms-2"><?= count($records) ?> Records</span>
+                    </h5>
+                </div>
+
+                <!-- Sticky Bulk Actions Bar -->
+                <div id="bulkActionsBar" class="bulk-actions-bar d-none">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="d-flex align-items-center gap-2">
+                            <input type="checkbox" id="selectAllSticky" class="form-check-input" onchange="toggleSelectAll(this)">
+                            <span class="fw-semibold"><span id="selectedCountText">0</span> selected</span>
                         </div>
-                        <div>
-                            <button id="bulkDeleteBtn" class="btn btn-danger btn-sm" style="display: none;" onclick="confirmBulkDelete()">
-                                <i class="bi bi-trash-fill me-1"></i><span class="d-none d-sm-inline">Delete Selected (</span><span class="d-sm-none">Delete (</span><span id="selectedCount">0</span>)
-                            </button>
-                        </div>
+                        <button class="btn btn-danger btn-sm" onclick="confirmBulkDelete()">
+                            <i class="bi bi-trash-fill me-1"></i>Delete Selected
+                        </button>
                     </div>
-                    <div class="card-body">
-                        <?php if (empty($records)): ?>
-                            <div class="alert alert-info">
-                                <i class="bi bi-info-circle me-2"></i>No blocked registration attempts found matching your criteria.
-                            </div>
-                        <?php else: ?>
-                            <!-- Mobile layout hint -->
-                            <div class="alert alert-info d-md-none mb-3">
-                                <small><i class="bi bi-card-list me-1"></i>Viewing in mobile-friendly card layout</small>
-                            </div>
-                            <div class="table-responsive">
+                </div>
+
+                <?php if (empty($records)): ?>
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle me-2"></i>No blocked registration attempts found matching your criteria.
+                    </div>
+                <?php else: ?>
+                    <div class="table-responsive">
                                 <table class="table table-hover">
                                     <thead>
                                         <tr>
-                                            <th style="width: 40px;">
+                                            <th>
                                                 <input type="checkbox" id="selectAll" class="form-check-input" onchange="toggleSelectAll(this)">
                                             </th>
                                             <th><i class="bi bi-clock me-1"></i>Date/Time</th>
@@ -609,7 +596,7 @@ while ($row = pg_fetch_assoc($barangaysResult)) {
                                                     </small>
                                                     <?php if (!empty($record['attempted_email']) || !empty($record['attempted_mobile'])): ?>
                                                         <div class="mt-1">
-                                                            <span class="badge bg-info" style="font-size: 0.7rem;">
+                                                            <span class="badge bg-info">
                                                                 <i class="bi bi-inbox-fill me-1"></i>Contact Provided
                                                             </span>
                                                         </div>
@@ -625,7 +612,7 @@ while ($row = pg_fetch_assoc($barangaysResult)) {
                                                 </td>
                                                 <td data-label="Mother's Name" class="fw-semibold"><?= htmlspecialchars($record['mothers_maiden_name_entered']) ?></td>
                                                 <td data-label="Barangay">
-                                                    <span class="badge bg-secondary" style="font-size: 0.85rem;">
+                                                    <span class="badge bg-secondary">
                                                         <?= htmlspecialchars($record['barangay_entered']) ?>
                                                     </span>
                                                 </td>
@@ -723,8 +710,6 @@ while ($row = pg_fetch_assoc($barangaysResult)) {
                                 </nav>
                             <?php endif; ?>
                         <?php endif; ?>
-                    </div>
-                </div>
             </div>
         </section>
     </div>
@@ -745,15 +730,21 @@ while ($row = pg_fetch_assoc($barangaysResult)) {
         // Update bulk delete button visibility and count
         function updateBulkDeleteButton() {
             const checkboxes = document.querySelectorAll('.record-checkbox:checked');
-            const bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
-            const selectedCount = document.getElementById('selectedCount');
-            
+            const bulkActionsBar = document.getElementById('bulkActionsBar');
+            const selectedCountText = document.getElementById('selectedCountText');
+            const selectAllSticky = document.getElementById('selectAllSticky');
+
             if (checkboxes.length > 0) {
-                bulkDeleteBtn.style.display = 'inline-block';
-                selectedCount.textContent = checkboxes.length;
+                bulkActionsBar.classList.remove('d-none');
+                selectedCountText.textContent = checkboxes.length;
+                
+                // Sync sticky checkbox with selection state
+                const allCheckboxes = document.querySelectorAll('.record-checkbox');
+                selectAllSticky.checked = checkboxes.length === allCheckboxes.length;
             } else {
-                bulkDeleteBtn.style.display = 'none';
+                bulkActionsBar.classList.add('d-none');
                 document.getElementById('selectAll').checked = false;
+                selectAllSticky.checked = false;
             }
         }
 
