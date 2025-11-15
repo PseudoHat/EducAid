@@ -279,7 +279,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_year_level']))
         $school_student_id = isset($_POST['school_student_id']) ? trim($_POST['school_student_id']) : null;
         
         // Debug log
-        error_log("UPDATE REQUEST - student_id: {$student_id}, university_id: {$university_id}, mothers_maiden_name: " . ($mothers_maiden_name ?: 'NULL') . ", school_student_id: " . ($school_student_id ?: 'NULL') . ", year_level: {$year_level}");
+        error_log("UPDATE REQUEST - student_id: {$student_id}, university_id: {$university_id}, mothers_maiden_name: " . ($mothers_maiden_name ?: 'NULL') . ", school_student_id: " . ($school_student_id ?: 'NULL') . ", year_level: {$year_level}, is_graduating: " . ($is_graduating ? 'YES' : 'NO') . ", academic_year: {$academic_year}");
         
         // Password update for migrated students (optional - only required if provided or if completing profile for first time)
         $new_password = isset($_POST['new_password']) ? trim($_POST['new_password']) : null;
@@ -583,9 +583,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_year_level']))
         // Define year level hierarchy for comparison
         $year_levels = ['1st Year' => 1, '2nd Year' => 2, '3rd Year' => 3, '4th Year' => 4, '5th Year' => 5];
         
+        error_log("YEAR LEVEL ADVANCEMENT CHECK - current: {$current_info['current_year_level']}, new: {$year_level}, is_graduating: " . ($is_graduating ? 'YES' : 'NO'));
+        
         // Check if student is trying to stay in same year level or go down
         // This requires admin verification - archive the account
         $confirm_archive = isset($_POST['confirm_archive']) && $_POST['confirm_archive'] === '1';
+        error_log("YEAR LEVEL ADVANCEMENT CHECK - confirm_archive: " . ($confirm_archive ? 'YES' : 'NO'));
         
         if (!empty($current_info['current_year_level']) && 
             isset($year_levels[$current_info['current_year_level']]) && 
@@ -593,6 +596,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_year_level']))
             
             $previous_level_num = $year_levels[$current_info['current_year_level']];
             $new_level_num = $year_levels[$year_level];
+            
+            error_log("YEAR LEVEL COMPARISON - previous_num: {$previous_level_num}, new_num: {$new_level_num}, requires_admin: " . (($new_level_num <= $previous_level_num && !$is_graduating) ? 'YES' : 'NO'));
             
             // If same or lower year level (not advancing), require admin verification
             if ($new_level_num <= $previous_level_num && !$is_graduating) {
@@ -841,6 +846,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_year_level']))
         // Update student year level credentials
         // For migrated students, also update university_id, year_level_id, mothers_maiden_name, school_student_id, AND password
         if (!empty($university_id)) {
+            error_log("YEAR LEVEL LOOKUP - Searching for: '{$year_level}'");
             // Get year_level_id from year level name
             $yl_query = pg_query_params($connection,
                 "SELECT year_level_id FROM year_levels WHERE name = $1",
@@ -856,6 +862,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_year_level']))
             
             $yl_row = pg_fetch_assoc($yl_query);
             $year_level_id = $yl_row ? intval($yl_row['year_level_id']) : null;
+            error_log("YEAR LEVEL LOOKUP RESULT - year_level_id: " . ($year_level_id ?: 'NULL') . ", row data: " . json_encode($yl_row));
             
             if (!$year_level_id) {
                 error_log("Year level ID not found for: {$year_level}");
