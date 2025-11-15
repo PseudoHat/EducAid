@@ -9,6 +9,107 @@ if (!isset($_SESSION['admin_username'])) {
     exit;
 }
 
+// Dev-only: Seed demo blacklisted students on localhost
+if ((($_GET['seed'] ?? '') === 'demo') && in_array($_SERVER['HTTP_HOST'] ?? '', ['localhost', '127.0.0.1'])) {
+    $adminId = $_SESSION['admin_id'] ?? null;
+    $adminEmail = $_SESSION['admin_email'] ?? null;
+
+    // Ensure we have adminId and email (fetch from DB if needed)
+    if (!$adminId && !empty($_SESSION['admin_username'])) {
+        $admRes = pg_query_params($connection, "SELECT admin_id, email FROM admins WHERE username = $1 LIMIT 1", [$_SESSION['admin_username']]);
+        if ($admRes && pg_num_rows($admRes)) {
+            $admRow = pg_fetch_assoc($admRes);
+            $adminId = $admRow['admin_id'];
+            $adminEmail = $admRow['email'] ?: $adminEmail;
+        }
+    }
+    if ($adminId && !$adminEmail) {
+        $admRes2 = pg_query_params($connection, "SELECT email FROM admins WHERE admin_id = $1 LIMIT 1", [$adminId]);
+        if ($admRes2 && pg_num_rows($admRes2)) {
+            $adminEmail = pg_fetch_result($admRes2, 0, 0);
+        }
+    }
+    if (!$adminEmail) { $adminEmail = 'dev-seed@localhost'; }
+    pg_query($connection, 'BEGIN');
+    try {
+        // Pick any municipality and a barangay under it
+        $munRes = pg_query($connection, "SELECT municipality_id FROM municipalities ORDER BY municipality_id LIMIT 1");
+        $municipalityId = $munRes && pg_num_rows($munRes) ? intval(pg_fetch_result($munRes, 0, 0)) : 1;
+
+        $brgyRes = pg_query_params($connection, "SELECT barangay_id FROM barangays WHERE municipality_id = $1 ORDER BY barangay_id LIMIT 1", [$municipalityId]);
+        if (!$brgyRes || !pg_num_rows($brgyRes)) {
+            $brgyRes = pg_query($connection, "SELECT barangay_id FROM barangays ORDER BY barangay_id LIMIT 1");
+        }
+        $barangayId = $brgyRes && pg_num_rows($brgyRes) ? intval(pg_fetch_result($brgyRes, 0, 0)) : 1;
+
+        $pwdHash = password_hash('DevSeeder#123', PASSWORD_BCRYPT);
+
+        $samples = [
+            [
+                'first' => 'Blacklist', 'last' => 'User Alpha', 'email' => 'alpha.demo@example.test', 'mobile' => '+63 900 111 2222',
+                'sex' => 'Female', 'reason' => 'system_abuse', 'detail' => 'Automated demo seed for mobile testing.'
+            ],
+            [
+                'first' => 'Blacklist', 'last' => 'User Beta', 'email' => 'beta.demo@example.test', 'mobile' => '+63 900 333 4444',
+                'sex' => 'Male', 'reason' => 'fraudulent_activity', 'detail' => 'Multiple suspicious signups detected (demo).'
+            ],
+            [
+                'first' => 'Blacklist', 'last' => 'User Gamma', 'email' => 'gamma.demo@example.test', 'mobile' => '+63 900 555 6666',
+                'sex' => 'Female', 'reason' => 'academic_misconduct', 'detail' => 'Forgery of documents (demo).'
+            ],
+        ];
+
+        foreach ($samples as $i => $s) {
+            $sid = 'DEMO-BL-' . date('YmdHis') . '-' . ($i + 1);
+
+            // Insert student (status blacklisted)
+            $insertStudent = pg_query_params(
+                $connection,
+                "INSERT INTO students (
+                    municipality_id, first_name, last_name, email, mobile, password, sex, status,
+                    application_date, bdate, barangay_id, student_id, status_blacklisted
+                ) VALUES (
+                    $1,$2,$3,$4,$5,$6,$7,'blacklisted', now(), $8, $9, $10, TRUE
+                ) RETURNING student_id",
+                [
+                    $municipalityId,
+                    $s['first'],
+                    $s['last'],
+                    $s['email'],
+                    $s['mobile'],
+                    $pwdHash,
+                    $s['sex'],
+                    date('Y-m-d', strtotime('2000-01-01 +'.($i*100).' days')),
+                    $barangayId,
+                    $sid
+                ]
+            );
+
+            if (!$insertStudent) { throw new Exception('Failed to insert student'); }
+
+            // Insert into blacklisted_students
+            $ok = pg_query_params(
+                $connection,
+                "INSERT INTO blacklisted_students (student_id, reason_category, detailed_reason, blacklisted_by, admin_email, admin_notes, blacklisted_at)
+                 VALUES ($1,$2,$3,$4,$5,$6, now())",
+                [$sid, $s['reason'], $s['detail'], $adminId, $adminEmail, 'Seeded via blacklist_archive.php?seed=demo']
+            );
+            if (!$ok) { throw new Exception('Failed to insert blacklist record'); }
+        }
+
+        pg_query($connection, 'COMMIT');
+        // Redirect back without seed param
+        $base = strtok($_SERVER['REQUEST_URI'], '?');
+        header('Location: ' . $base . '?seeded=1');
+        exit;
+    } catch (Exception $e) {
+        pg_query($connection, 'ROLLBACK');
+        http_response_code(500);
+        echo '<pre>Seeder error: ' . htmlspecialchars($e->getMessage()) . '</pre>';
+        exit;
+    }
+}
+
 // Pagination and filtering
 $limit = 25;
 $page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
@@ -113,6 +214,15 @@ $reasonCategories = [
     .truncate-50{max-width:240px;display:inline-block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;vertical-align:bottom;}
     @media (max-width: 992px){.blacklist-hero{padding:1.25rem 1.25rem;} .blacklist-hero h1{font-size:1.35rem;} .filter-card{padding:1rem;} }
     @media (max-width: 576px){.filter-card .row > div{margin-bottom:.75rem;} .filter-card .row > div:last-child{margin-bottom:0;} .table-wrap{border-radius:14px;} }
+
+    /* Mobile-only compact modal size for details modal (align with Manage Applicant modal feel) */
+    @media (max-width: 576px) {
+        .modal-mobile-compact .modal-dialog { max-width: 420px; width: 88%; margin: 1rem auto; }
+        .modal-mobile-compact .modal-content { border-radius: 12px; }
+        .modal-mobile-compact .modal-body { max-height: 60vh; overflow-y: auto; }
+        .modal-mobile-compact .modal-header,
+        .modal-mobile-compact .modal-footer { padding-top: 0.6rem; padding-bottom: 0.6rem; }
+    }
 </style>
 </head>
 <body>
@@ -178,7 +288,7 @@ $reasonCategories = [
                     </div>
                 <?php else: ?>
                     <div class="table-responsive">
-                        <table class="table table-hover mb-0 align-middle" id="blacklistTable">
+                        <table class="table table-hover mb-0 align-middle compact-cards" id="blacklistTable">
                             <thead class="table-dark">
                                 <tr>
                                     <th style="min-width:180px;">Student</th>
@@ -275,8 +385,8 @@ $reasonCategories = [
 </div>
 
 <!-- Details Modal -->
-<div class="modal fade" id="detailsModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
+<div class="modal fade modal-mobile-compact" id="detailsModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header bg-danger text-white">
                 <h5 class="modal-title">

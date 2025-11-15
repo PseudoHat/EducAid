@@ -191,6 +191,8 @@
     /* Grid guarantees labels align and values wrap on the right */
     display: grid !important;
     grid-template-columns: var(--label-col) 1fr;
+    grid-auto-rows: minmax(0, auto);
+    grid-auto-flow: row;
     align-items: start;
     gap: 8px 12px;
     padding: 10px 15px !important;
@@ -213,6 +215,7 @@
   .table.compact-cards td > * {
     display: block !important;
     grid-column: 2;
-    grid-row: 1;
+    /* let items stack in successive rows to avoid overlap */
+    margin: 0;
   }
 }
