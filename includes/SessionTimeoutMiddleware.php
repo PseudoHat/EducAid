@@ -16,7 +16,7 @@
  */
 
 class SessionTimeoutMiddleware {
-    private $db;
+    private $connection;
     private $idleTimeoutMinutes;
     private $absoluteTimeoutHours;
     private $warningBeforeLogoutSeconds;
@@ -67,6 +67,15 @@ class SessionTimeoutMiddleware {
         $sessionData = $this->getSessionData();
         
         if (!$sessionData) {
+            // Check if this is a fresh session (just logged in)
+            // Fresh sessions might not be in the database yet
+            if (isset($_SESSION['student_id']) && !isset($_SESSION['session_validated'])) {
+                // Mark session as validated to check next time
+                $_SESSION['session_validated'] = true;
+                // Allow this request to proceed
+                return ['status' => 'new_session', 'skip_validation' => true];
+            }
+            
             // Session not found in database - force logout
             $this->forceLogout('session_not_found');
             return ['status' => 'logged_out', 'reason' => 'session_not_found'];
@@ -145,6 +154,26 @@ class SessionTimeoutMiddleware {
             error_log("Session timeout middleware error: " . $e->getMessage());
             return null;
         }
+        
+        $query = "
+            SELECT session_id, student_id, created_at, last_activity, expires_at
+            FROM student_active_sessions
+            WHERE student_id = $1 
+            AND session_id = $2
+            LIMIT 1
+        ";
+        
+        $result = @pg_query_params($this->connection, $query, [
+            $_SESSION['student_id'],
+            session_id()
+        ]);
+        
+        if (!$result) {
+            error_log("Session timeout middleware error: " . pg_last_error($this->connection));
+            return null;
+        }
+        
+        return pg_fetch_assoc($result);
     }
     
     /**
@@ -203,7 +232,7 @@ class SessionTimeoutMiddleware {
      * Update last_activity timestamp in database
      */
     private function updateActivity() {
-        if (!isset($_SESSION['student_id'])) {
+        if (!isset($_SESSION['student_id']) || !$this->connection) {
             return;
         }
         
