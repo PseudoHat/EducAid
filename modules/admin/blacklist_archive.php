@@ -217,11 +217,17 @@ $reasonCategories = [
 
     /* Mobile-only compact modal size for details modal (align with Manage Applicant modal feel) */
     @media (max-width: 576px) {
-        .modal-mobile-compact .modal-dialog { max-width: 420px; width: 88%; margin: 1rem auto; }
+        .modal-mobile-compact .modal-dialog { max-width: 380px; width: 84%; margin: 1rem auto; }
         .modal-mobile-compact .modal-content { border-radius: 12px; }
-        .modal-mobile-compact .modal-body { max-height: 60vh; overflow-y: auto; }
+        .modal-mobile-compact .modal-body { max-height: 58vh; overflow-y: auto; padding: .75rem; }
         .modal-mobile-compact .modal-header,
-        .modal-mobile-compact .modal-footer { padding-top: 0.6rem; padding-bottom: 0.6rem; }
+        .modal-mobile-compact .modal-footer { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+        .modal-mobile-compact .modal-title { font-size: 1rem; }
+    }
+
+    /* Slimmer dialog on larger screens too */
+    @media (min-width: 576px) {
+        #detailsModal .modal-dialog { max-width: 520px; }
     }
 </style>
 </head>
@@ -386,7 +392,7 @@ $reasonCategories = [
 
 <!-- Details Modal -->
 <div class="modal fade modal-mobile-compact" id="detailsModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header bg-danger text-white">
                 <h5 class="modal-title">
