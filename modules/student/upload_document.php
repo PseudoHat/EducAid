@@ -926,6 +926,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_year_level']))
                 echo json_encode(['success' => false, 'message' => 'Database error: Failed to update student record. Error: ' . $db_error]);
                 exit;
             }
+            error_log("UPDATE SUCCESS - student_id: {$student_id}, rows affected: " . pg_affected_rows($update_result));
         } else {
             $update_query = "UPDATE students 
                             SET current_year_level = $1,
@@ -950,6 +951,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_year_level']))
         }
         
         if ($update_result) {
+            error_log("UPDATE RESULT CHECK PASSED - Proceeding to history logging");
             // Log the change in student_status_history
             $history_query = "INSERT INTO student_status_history 
                              (student_id, year_level, is_graduating, academic_year, updated_at, update_source, notes)
@@ -960,13 +962,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_year_level']))
                 $note .= " - Same year level as previous year (possibly repeating)";
             }
             
-            pg_query_params($connection, $history_query, [
+            $history_result = pg_query_params($connection, $history_query, [
                 $student_id,
                 $year_level,
                 $is_graduating ? 'true' : 'false',
                 $academic_year,
                 $note
             ]);
+            if (!$history_result) {
+                error_log("History insert failed for student {$student_id}: " . pg_last_error($connection));
+            } else {
+                error_log("History insert SUCCESS for student {$student_id}");
+            }
             
             // If migrated student is completing their profile (university_id present), add audit log
             if (!empty($university_id) && !empty($student_check['admin_review_required']) && $student_check['admin_review_required']) {
@@ -1017,6 +1024,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_year_level']))
                 }
             }
             
+            error_log("AUDIT LOG SECTION COMPLETE - Checking graduation status: " . ($is_graduating ? 'YES' : 'NO'));
             // If student marked themselves as graduating, notify admin
             if ($is_graduating) {
                 $notification_query = "INSERT INTO admin_notifications 
@@ -1029,18 +1037,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_year_level']))
                 ]);
             }
             
+            error_log("SENDING SUCCESS RESPONSE to student {$student_id}");
             echo json_encode([
                 'success' => true,
                 'message' => 'Year level updated successfully! You can now upload documents.'
             ]);
         } else {
+            error_log("UPDATE RESULT FALSE - This should not happen");
             echo json_encode(['success' => false, 'message' => 'Failed to update year level. Database update failed.']);
         }
     } catch (Exception $e) {
-        error_log('Year level update error for student ' . $student_id . ': ' . $e->getMessage());
+        error_log('Year level update EXCEPTION for student ' . $student_id . ': ' . $e->getMessage());
         error_log('Stack trace: ' . $e->getTraceAsString());
         echo json_encode(['success' => false, 'message' => 'Error: ' . $e->getMessage()]);
     }
+    error_log("UPDATE HANDLER COMPLETE - exiting");
     exit;
 }
 
