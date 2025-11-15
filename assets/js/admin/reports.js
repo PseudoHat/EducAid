@@ -135,18 +135,18 @@ function displayPreview(data) {
         
         html += `
             <tr>
-                <td class="text-center">${index + 1}</td>
-                <td><code>${escapeHtml(student.student_id)}</code></td>
-                <td><strong>${escapeHtml(fullName)}</strong></td>
-                <td class="text-center">
+                <td class="text-center" data-label="No.">${index + 1}</td>
+                <td data-label="Student ID"><code>${escapeHtml(student.student_id)}</code></td>
+                <td data-label="Name"><strong>${escapeHtml(fullName)}</strong></td>
+                <td class="text-center" data-label="Gender">
                     <span class="badge ${student.sex === 'Male' ? 'bg-primary' : 'bg-info'}">
                         ${escapeHtml(student.sex || '-')}
                     </span>
                 </td>
-                <td>${escapeHtml(student.barangay || '-')}</td>
-                <td><small>${escapeHtml(student.university || '-')}</small></td>
-                <td class="text-center">${escapeHtml(student.year_level || '-')}</td>
-                <td class="text-center">
+                <td data-label="Barangay">${escapeHtml(student.barangay || '-')}</td>
+                <td data-label="University"><small>${escapeHtml(student.university || '-')}</small></td>
+                <td class="text-center" data-label="Year Level">${escapeHtml(student.year_level || '-')}</td>
+                <td class="text-center" data-label="Status">
                     <span class="badge ${getStatusBadgeClass(student.status_display)}">
                         ${escapeHtml(student.status_display)}
                     </span>

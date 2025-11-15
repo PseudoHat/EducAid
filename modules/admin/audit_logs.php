@@ -196,7 +196,7 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
     exit;
 }
 ?>
-<?php $page_title='Audit Trail'; include __DIR__ . '/../../includes/admin/admin_head.php'; ?>
+<?php $page_title='Audit Trail'; $extra_css=['../../assets/css/admin/table_core.css']; include __DIR__ . '/../../includes/admin/admin_head.php'; ?>
 <style>
     .stat-card {
         border-radius: 12px;
@@ -468,7 +468,7 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
             <div class="log-table">
                 <div class="table-responsive">
                     <table class="table table-hover mb-0">
-                        <thead class="table-light">
+                        <thead class="table-dark">
                             <tr>
                                 <th style="width: 80px;">ID</th>
                                 <th style="width: 160px;">Date & Time</th>
@@ -492,35 +492,35 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
                             <?php else: ?>
                                 <?php foreach ($logs as $log): ?>
                                     <tr class="log-row">
-                                        <td><code><?= htmlspecialchars($log['audit_id']) ?></code></td>
-                                        <td>
+                                        <td data-label="ID"><code><?= htmlspecialchars($log['audit_id']) ?></code></td>
+                                        <td data-label="Date & Time">
                                             <small>
                                                 <?= date('M d, Y', strtotime($log['created_at'])) ?><br>
                                                 <span class="text-muted"><?= date('g:i:s A', strtotime($log['created_at'])) ?></span>
                                             </small>
                                         </td>
-                                        <td>
+                                        <td data-label="User Type">
                                             <span class="user-type-<?= htmlspecialchars($log['user_type']) ?>">
                                                 <i class="bi bi-person-circle me-1"></i>
                                                 <?= htmlspecialchars(ucfirst($log['user_type'])) ?>
                                             </span>
                                         </td>
-                                        <td>
+                                        <td data-label="Username">
                                             <strong><?= htmlspecialchars($log['username'] ?? 'N/A') ?></strong>
                                             <?php if (!empty($log['user_id'])): ?>
                                                 <br><small class="text-muted">ID: <?= htmlspecialchars($log['user_id']) ?></small>
                                             <?php endif; ?>
                                         </td>
-                                        <td>
+                                        <td data-label="Category">
                                             <span class="badge bg-secondary event-category-badge">
                                                 <?= htmlspecialchars(str_replace('_', ' ', $log['event_category'])) ?>
                                             </span>
                                             <br><small class="text-muted"><?= htmlspecialchars($log['event_type']) ?></small>
                                         </td>
-                                        <td>
+                                        <td data-label="Action Description">
                                             <small><?= htmlspecialchars($log['action_description']) ?></small>
                                         </td>
-                                        <td>
+                                        <td data-label="Status">
                                             <?php
                                             $statusClass = 'status-' . $log['status'];
                                             $statusIcon = $log['status'] === 'success' ? 'check-circle' : ($log['status'] === 'failure' ? 'x-circle' : 'exclamation-triangle');
@@ -530,8 +530,8 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
                                                 <?= htmlspecialchars(ucfirst($log['status'])) ?>
                                             </span>
                                         </td>
-                                        <td><code><?= htmlspecialchars($log['ip_address'] ?? 'N/A') ?></code></td>
-                                        <td>
+                                        <td data-label="IP Address"><code><?= htmlspecialchars($log['ip_address'] ?? 'N/A') ?></code></td>
+                                        <td data-label="Details">
                                             <button class="btn btn-sm btn-outline-primary details-btn" 
                                                     onclick="showDetails(<?= htmlspecialchars(json_encode($log), ENT_QUOTES) ?>)">
                                                 <i class="bi bi-eye me-1"></i> View

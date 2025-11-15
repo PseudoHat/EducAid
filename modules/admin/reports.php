@@ -56,8 +56,8 @@ if ($adminRole === 'super_admin') {
 $pageTitle = "Reports & Analytics";
 include __DIR__ . '/../../includes/admin/admin_head.php';
 ?>
+<link rel="stylesheet" href="../../assets/css/admin/table_core.css">
 <link rel="stylesheet" href="../../assets/css/admin/reports.css">
-<link rel="stylesheet" href="../../assets/css/admin/modern-ui.css">
 <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
 </head>
 <body>
@@ -366,13 +366,12 @@ include __DIR__ . '/../../includes/admin/admin_head.php';
             </button>
         </div>
         <div class="card-body">
-            <div class="modern-alert modern-alert-info">
-                <i class="bi bi-info-circle"></i>
+            <div class="alert alert-info">
                 <strong>Preview Mode:</strong> Showing up to 50 records. Export to PDF/Excel for complete dataset.
             </div>
             <div class="table-responsive">
-                <table class="table table-striped table-hover table-bordered" id="previewTable">
-                    <thead class="table-primary">
+                <table class="table table-hover" id="previewTable">
+                    <thead class="table-dark">
                         <tr>
                             <th style="width: 5%;">No.</th>
                             <th style="width: 12%;">Student ID</th>
