@@ -318,6 +318,7 @@ while ($row = pg_fetch_assoc($barangayResult)) {
 // This is now calculated after POST actions above
 ?>
 <?php $page_title='Verify Students'; $extra_css=['../../assets/css/admin/verify_students.css']; include __DIR__ . '/../../includes/admin/admin_head.php'; ?>
+<link rel="stylesheet" href="../../assets/css/admin/table_core.css"/>
 </head>
 <body>
 <?php include __DIR__ . '/../../includes/admin/admin_topbar.php'; ?>
@@ -413,22 +414,23 @@ while ($row = pg_fetch_assoc($barangayResult)) {
             <span class="badge" style="background: rgba(255,255,255,0.2); color: white;"><?= $isFinalized ? 'Locked' : 'Not Locked' ?></span>
           </div>
           <div class="card-body">
-            <div class="table-responsive">
-              <table class="table table-hover table-bordered align-middle">
-                <thead class="table-light">
-                  <tr>
-                    <th style="width:44px;">
-                      <input type="checkbox" id="selectAllActive" <?= $isFinalized ? 'disabled' : '' ?>>
-                    </th>
-                    <th>Full Name</th>
-                    <th>Email</th>
-                    <th>Mobile Number</th>
-                    <th>Barangay</th>
-                    <th class="payroll-col">Payroll #</th>
-                    <th class="qr-col">QR Generated?</th>
-                  </tr>
-                </thead>
-                <tbody>
+            <div class="table-card">
+              <div class="table-responsive">
+                <table class="table align-middle">
+                  <thead>
+                    <tr>
+                      <th style="width:44px;">
+                        <input type="checkbox" id="selectAllActive" <?= $isFinalized ? 'disabled' : '' ?>>
+                      </th>
+                      <th>Full Name</th>
+                      <th>Email</th>
+                      <th>Mobile Number</th>
+                      <th>Barangay</th>
+                      <th class="payroll-col">Payroll #</th>
+                      <th class="qr-col">QR Generated?</th>
+                    </tr>
+                  </thead>
+                  <tbody>
                   <?php
                   // Re-apply barangay filter and sort using helper to ensure consistent join with barangays
                   $actives = fetch_students($connection, 'active', $sort, $barangayFilter, $searchSurname);
@@ -448,10 +450,10 @@ while ($row = pg_fetch_assoc($barangayResult)) {
                       $has_qr = !empty($payroll) && !empty($unique_id);
                   ?>
                       <tr onclick="showStudentOptions('<?= $id ?>', '<?= htmlspecialchars($name, ENT_QUOTES) ?>', '<?= htmlspecialchars($email, ENT_QUOTES) ?>', '<?= htmlspecialchars($barangay, ENT_QUOTES) ?>')" style="cursor: pointer; <?= $admin_review_required ? 'background-color: #fff3cd;' : '' ?>" title="Click for options">
-                        <td onclick="event.stopPropagation();">
+                        <td data-label="Select" onclick="event.stopPropagation();">
                           <input type="checkbox" name="selected_actives[]" value="<?= $id ?>" <?= $isFinalized ? 'disabled' : '' ?> />
                         </td>
-                        <td>
+                        <td data-label="Full Name">
                           <?= $name ?>
                           <?php if ($admin_review_required): ?>
                             <span class="badge bg-warning text-dark ms-2" data-bs-toggle="tooltip" data-bs-placement="right" 
@@ -460,17 +462,17 @@ while ($row = pg_fetch_assoc($barangayResult)) {
                             </span>
                           <?php endif; ?>
                         </td>
-                        <td><?= $email ?></td>
-                        <td><?= $mobile ?></td>
-                        <td><?= $barangay ?></td>
-                        <td class="payroll-col">
+                        <td data-label="Email"><?= $email ?></td>
+                        <td data-label="Mobile Number"><?= $mobile ?></td>
+                        <td data-label="Barangay"><?= $barangay ?></td>
+                        <td data-label="Payroll #" class="payroll-col">
                           <?php if ($isFinalized && !empty($payroll)): ?>
                             <?= $payroll ?>
                           <?php else: ?>
                             <span class="text-muted">N/A</span>
                           <?php endif; ?>
                         </td>
-                        <td class="qr-col">
+                        <td data-label="QR Generated?" class="qr-col">
                           <?php if ($isFinalized && $has_qr): ?>
                             <span class="badge bg-success">
                               <i class="bi bi-check-circle me-1"></i>Yes
@@ -498,6 +500,7 @@ while ($row = pg_fetch_assoc($barangayResult)) {
                 </tbody>
               </table>
             </div>
+          </div>
 
             <div class="d-flex flex-wrap gap-2 mt-2">
               <button type="submit" name="deactivate" class="btn btn-danger" id="revertBtn" <?= $isFinalized ? 'disabled' : '' ?>>
@@ -764,6 +767,39 @@ while ($row = pg_fetch_assoc($barangayResult)) {
     document.querySelectorAll("input[name='selected_actives[]']").forEach(cb => {
       cb.addEventListener('change', updateRevertState);
     });
+    
+    // Mobile sticky action bar - show/hide based on selection
+    function updateMobileStickyBar() {
+      var actionBar = document.querySelector('#activeStudentsForm .d-flex.flex-wrap.gap-2.mt-2');
+      if (!actionBar) return;
+      
+      // Only apply on mobile
+      if (window.innerWidth <= 767) {
+        var count = document.querySelectorAll("input[name='selected_actives[]']:checked").length;
+        if (count > 0) {
+          actionBar.classList.add('show-actions');
+        } else {
+          actionBar.classList.remove('show-actions');
+        }
+      } else {
+        // Remove class on desktop
+        actionBar.classList.remove('show-actions');
+      }
+    }
+    
+    // Update sticky bar on checkbox change
+    if (selectAll) {
+      selectAll.addEventListener('change', updateMobileStickyBar);
+    }
+    document.querySelectorAll("input[name='selected_actives[]']").forEach(cb => {
+      cb.addEventListener('change', updateMobileStickyBar);
+    });
+    
+    // Update on window resize
+    window.addEventListener('resize', updateMobileStickyBar);
+    
+    // Initial check
+    updateMobileStickyBar();
 
     // Prevent submit if none selected
     var form = document.getElementById('activeStudentsForm');

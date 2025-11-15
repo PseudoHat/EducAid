@@ -151,12 +151,55 @@
   .table td[data-label="Select"] {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-start;
+    width: 100%;
     padding: 12px 15px;
   }
-  .table td[data-label="Select"]::before { position: static; margin-right: 0; min-width: auto; font-weight: 700; color: #1182FF; width: auto; }
+  .table td[data-label="Select"]::before {
+    position: static;
+    margin: 0 10px 0 0;
+    min-width: auto;
+    width: auto;
+    font-weight: 700;
+    color: #1182FF;
+    display: inline-block;
+    white-space: nowrap;
+    letter-spacing: 0;
+    word-break: keep-all;
+    overflow-wrap: normal;
+  }
   .table td[data-label="Select"] input[type="checkbox"] {
     width: 22px; height: 22px;
     accent-color: #1182FF;
+    margin-left: auto; /* push checkbox to the far right */
+  }
+}
+
+/* ==================== COMPACT CARD VARIANT (labels inline) ==================== */
+@media (max-width: 767px) {
+  /* Use on tables with class .compact-cards for tighter, inline label-value rows */
+  .table.compact-cards tr { padding: 0.75rem; }
+  .table.compact-cards td {
+    display: flex !important;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px 15px !important;
+    /* remove reserved left space from default layout */
+    padding-left: 15px !important;
+  }
+  .table.compact-cards td::before {
+    /* move label into normal flow, inline on the left */
+    position: static !important;
+    display: inline-block !important;
+    width: auto !important;
+    min-width: 120px; /* keeps labels readable */
+    margin-right: 10px;
+  }
+  /* Allow multi-line content on the value side without shifting label */
+  .table.compact-cards td > * { display: inline; }
+  .table.compact-cards td[data-label="Date & Time"],
+  .table.compact-cards td[data-label="Scanned By"] {
+    align-items: flex-start;
   }
 }

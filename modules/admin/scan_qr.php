@@ -849,6 +849,7 @@ $csrf_complete_token = CSRFProtection::generateToken('complete_distribution');
 ?>
 
 <?php $page_title='QR Code Scanner'; include __DIR__ . '/../../includes/admin/admin_head.php'; ?>
+  <link rel="stylesheet" href="../../assets/css/admin/table_core.css">
   <style>
     body { font-family: 'Poppins', sans-serif; }
     #reader { 
@@ -858,17 +859,43 @@ $csrf_complete_token = CSRFProtection::generateToken('complete_distribution');
       border: 2px solid #007bff;
       border-radius: 10px;
     }
-    .controls { 
-      text-align: center; 
-      margin: 20px 0; 
+    /* Scan controls layout */
+    .scan-controls { margin: 16px 0 8px; }
+    .scan-controls .form-select { height: 48px; }
+    .scan-controls .btn { height: 48px; }
+    @media (max-width: 767.98px) {
+      .scan-controls .form-select, .scan-controls .btn { height: 48px; font-size: 1rem; }
+      .scanner-section { padding: 20px; }
     }
     .status-active { background-color: #d4edda; color: #155724; }
     .status-given { background-color: #f8d7da; color: #721c24; }
-    .table-container {
-      max-height: 600px;
-      overflow-y: auto;
-      border: 1px solid #dee2e6;
-      border-radius: 5px;
+
+    /* Progress + status summary cards */
+    .summary-row { margin-bottom: 1.25rem; }
+    .stat-card {
+      background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+      color: #fff;
+      border: 0;
+      border-radius: 14px;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.10);
+    }
+    .stat-card .label { opacity: .9; font-weight: 600; letter-spacing: .2px; }
+    .stat-card .value { font-weight: 800; }
+
+    .status-card {
+      background: #f1f5f9; /* slate-100 */
+      border: 1px solid #e2e8f0; /* slate-200 */
+      border-radius: 14px;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.06);
+    }
+    .status-card.completed { background: #eafaf1; border-color: #b7f0cc; }
+    .status-card .title { font-weight: 700; }
+    .status-card .meta { font-size: .9rem; color: #64748b; }
+
+    @media (max-width: 767.98px) {
+      .stat-card .value { font-size: 2.25rem; }
+      .stat-card .label, .status-card .title { font-size: 1rem; }
+      .status-card { padding: 14px !important; }
     }
     .scanner-section {
       background: white;
@@ -894,7 +921,7 @@ $csrf_complete_token = CSRFProtection::generateToken('complete_distribution');
     <section class="home-section" id="page-content-wrapper">
       <div class="container py-5">
         <div class="d-flex justify-content-between align-items-center mb-4">
-          <h1><i class="bi bi-qr-code-scan me-2"></i>QR Code Scanner & Distribution</h1>
+          <h1 class="fw-bold">QR Code Scanner & Distribution</h1>
         </div>
 
         <!-- Flash Messages -->
@@ -916,37 +943,46 @@ $csrf_complete_token = CSRFProtection::generateToken('complete_distribution');
           <?php unset($_SESSION['error_message']); ?>
         <?php endif; ?>
 
-        <!-- Distribution Statistics Card -->
-        <div class="card mb-4" style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%); color: white; border: none;">
-          <div class="card-body p-4">
-            <div class="row align-items-center">
-              <div class="col-md-8">
-                <h3 class="mb-2"><i class="bi bi-box-seam me-2"></i>Distribution Progress</h3>
-                <p class="mb-0 opacity-75">Students who have received their aid packages</p>
+        <!-- Summary: Progress + Status (mobile-first) -->
+        <div class="row g-3 summary-row">
+          <div class="col-12 col-md-8">
+            <div class="stat-card p-3 p-md-4 h-100 d-flex align-items-center justify-content-between">
+              <div>
+                <div class="label">Distribution Progress</div>
+                <div class="small" style="opacity:.85">Students who have received their aid packages</div>
               </div>
-              <div class="col-md-4 text-end">
-                <h1 class="display-3 mb-0 fw-bold"><?php echo $total_distributed; ?></h1>
-                <p class="mb-0">Distributed</p>
+              <div class="text-end">
+                <div class="value display-5 mb-0"><?php echo $total_distributed; ?></div>
+                <div class="fw-semibold">Distributed</div>
               </div>
             </div>
           </div>
-        </div>
-
-        <!-- Action Buttons Row -->
-        <div class="d-flex justify-content-end align-items-center mb-4">
-          <?php if ($distribution_completed): ?>
-          <div class="alert alert-success d-inline-flex align-items-center mb-0 me-3">
-            <i class="bi bi-check-circle-fill me-2"></i>
-            <strong>Distribution Completed</strong> - The distribution for <?= htmlspecialchars($prefill_academic_year . ' ' . $prefill_semester) ?> has been finalized.
+          <div class="col-12 col-md-4">
+            <?php if ($distribution_completed): ?>
+              <div class="status-card completed p-3 p-md-4 h-100 d-flex align-items-center justify-content-between">
+                <div class="d-flex align-items-start">
+                  <i class="bi bi-check-circle-fill text-success fs-4 me-2"></i>
+                  <div>
+                    <div class="title">Distribution Completed</div>
+                    <div class="meta">Finalized for <?= htmlspecialchars($prefill_academic_year . ' ' . $prefill_semester) ?></div>
+                  </div>
+                </div>
+              </div>
+            <?php else: ?>
+              <div class="status-card p-3 p-md-4 h-100 d-flex align-items-center justify-content-between">
+                <div class="d-flex align-items-start">
+                  <i class="bi bi-hourglass-split text-warning fs-4 me-2"></i>
+                  <div>
+                    <div class="title">Distribution Ongoing</div>
+                    <div class="meta">Review and complete when ready</div>
+                  </div>
+                </div>
+                <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#completeDistributionModal">
+                  <i class="bi bi-check-circle me-1"></i>Complete
+                </button>
+              </div>
+            <?php endif; ?>
           </div>
-          <button type="button" class="btn btn-secondary btn-lg" disabled title="Distribution already completed for this academic period">
-            <i class="bi bi-check-circle me-2"></i>Distribution Completed
-          </button>
-          <?php else: ?>
-          <button type="button" class="btn btn-success btn-lg" data-bs-toggle="modal" data-bs-target="#completeDistributionModal">
-            <i class="bi bi-check-circle me-2"></i>Complete Distribution
-          </button>
-          <?php endif; ?>
         </div>
 
         <!-- Scanner Section -->
@@ -959,17 +995,26 @@ $csrf_complete_token = CSRFProtection::generateToken('complete_distribution');
           </div>
           <?php endif; ?>
           <div id="reader" <?= $distribution_completed ? 'style="pointer-events: none; opacity: 0.5;"' : '' ?>></div>
-          <div class="controls">
-            <select id="camera-select" class="form-select w-auto d-inline-block me-2" <?= $distribution_completed ? 'disabled' : '' ?>>
-              <option value="">Select Camera</option>
-            </select>
-            <button id="start-button" class="btn btn-success me-2" <?= $distribution_completed ? 'disabled' : '' ?>>
-              <i class="bi bi-play-fill me-1"></i>Start Scanner
-            </button>
-            <button id="stop-button" class="btn btn-danger me-2" disabled>
-              <i class="bi bi-stop-fill me-1"></i>Stop Scanner
-            </button>
+          <div class="scan-controls">
+            <div class="row g-2 align-items-stretch">
+              <div class="col-12 col-md-5">
+                <select id="camera-select" class="form-select form-select-lg w-100" <?= $distribution_completed ? 'disabled' : '' ?>>
+                  <option value="">Select Camera</option>
+                </select>
+              </div>
+              <div class="col-6 col-md-3 d-grid">
+                <button id="start-button" class="btn btn-success btn-lg" <?= $distribution_completed ? 'disabled' : '' ?>>
+                  <i class="bi bi-play-fill me-1"></i>Start Scanner
+                </button>
+              </div>
+              <div class="col-6 col-md-3 d-grid">
+                <button id="stop-button" class="btn btn-outline-danger btn-lg" disabled>
+                  <i class="bi bi-stop-fill me-1"></i>Stop Scanner
+                </button>
+              </div>
+            </div>
           </div>
+          <hr class="my-3 text-primary" style="opacity:.2;">
           <?php if (!$distribution_completed): ?>
           <div class="alert alert-info mt-3">
             <i class="bi bi-info-circle me-2"></i>
@@ -984,104 +1029,101 @@ $csrf_complete_token = CSRFProtection::generateToken('complete_distribution');
         </div>
 
         <!-- Students Table -->
-        <div class="card">
-          <div class="card-header d-flex justify-content-between align-items-center">
-            <div>
-              <h3 class="mb-0"><i class="bi bi-people-fill me-2"></i>Students with Payroll Numbers</h3>
-              <small class="text-muted">Total: <?= count($students) ?> students</small>
-            </div>
-            <a href="?export=csv" class="btn btn-success">
-              <i class="bi bi-download me-2"></i>Export to CSV
-            </a>
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <div>
+            <h3 class="mb-0"><i class="bi bi-people-fill me-2"></i>Students with Payroll Numbers</h3>
+            <small class="text-muted">Total: <?= count($students) ?> students</small>
           </div>
-          <div class="card-body p-0">
-            <div class="table-container">
-              <table class="table table-striped table-hover mb-0" id="studentsTable">
-                <thead class="table-dark sticky-top">
-                  <tr>
-                    <th>#</th>
-                    <th></th>Payroll #</th>
-                    <th>Student Name</th>
-                    <th>Student ID</th>
-                    <th>Status</th>
-                    <th>Date & Time</th>
-                    <th>Scanned By</th>
-                    <th>QR Code</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <?php 
-                  $counter = 1;
-                  foreach ($students as $student): 
-                  ?>
-                    <tr id="student-<?= $student['student_id'] ?>">
-                      <td class="fw-semibold text-muted"><?= $counter++ ?></td>
-                      <td>
-                        <code class="bg-dark text-white px-2 py-1 rounded">#<?= htmlspecialchars($student['payroll_no']) ?></code>
-                      </td>
-                      <td class="fw-semibold">
-                        <?= htmlspecialchars(trim($student['first_name'] . ' ' . $student['middle_name'] . ' ' . $student['last_name'])) ?>
-                      </td>
-                      <td>
-                        <small class="text-muted"><?= htmlspecialchars($student['student_id']) ?></small>
-                      </td>
-                      <td>
-                        <?php if ($student['status'] === 'given'): ?>
-                          <span class="badge bg-success">
-                            <i class="bi bi-check-circle me-1"></i>Given
-                          </span>
-                        <?php else: ?>
-                          <span class="badge bg-warning">
-                            <i class="bi bi-hourglass-split me-1"></i>Active
-                          </span>
-                        <?php endif; ?>
-                      </td>
-                      <td>
-                        <?php if (!empty($student['distribution_date'])): ?>
-                          <div class="small">
-                            <i class="bi bi-calendar-check text-primary me-1"></i>
-                            <strong><?= date('M d, Y', strtotime($student['distribution_date'])) ?></strong>
-                          </div>
-                          <div class="small text-muted">
-                            <i class="bi bi-clock me-1"></i>
-                            <?= date('g:i A', strtotime($student['distribution_date'])) ?>
-                          </div>
-                        <?php else: ?>
-                          <span class="text-muted">-</span>
-                        <?php endif; ?>
-                      </td>
-                      <td>
-                        <?php if (!empty($student['scanned_by_name'])): ?>
-                          <div class="small">
-                            <i class="bi bi-person-circle text-success me-1"></i>
-                            <strong><?= htmlspecialchars($student['scanned_by_name']) ?></strong>
-                          </div>
-                          <?php if (!empty($student['distributed_by_username'])): ?>
-                          <div class="small text-muted">
-                            <i class="bi bi-at"></i><?= htmlspecialchars($student['distributed_by_username']) ?>
-                          </div>
-                          <?php endif; ?>
-                        <?php else: ?>
-                          <span class="text-muted">-</span>
-                        <?php endif; ?>
-                      </td>
-                      <td>
-                        <?php if ($student['qr_unique_id']): ?>
-                          <span class="badge bg-info">
-                            <i class="bi bi-qr-code me-1"></i>Has QR
-                          </span>
-                        <?php else: ?>
-                          <span class="badge bg-secondary">
-                            <i class="bi bi-x-circle me-1"></i>No QR
-                          </span>
-                        <?php endif; ?>
-                      </td>
-                    </tr>
-                  <?php endforeach; ?>
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <a href="?export=csv" class="btn btn-success">
+            <i class="bi bi-download me-2"></i>Export to CSV
+          </a>
+        </div>
+
+        <div class="table-responsive">
+          <table class="table table-hover mb-0 compact-cards" id="studentsTable">
+            <thead class="table-dark">
+              <tr>
+                <th>#</th>
+                <th>Payroll #</th>
+                <th>Student Name</th>
+                <th>Student ID</th>
+                <th>Status</th>
+                <th>Date & Time</th>
+                <th>Scanned By</th>
+                <th>QR Code</th>
+              </tr>
+            </thead>
+            <tbody>
+              <?php 
+              $counter = 1;
+              foreach ($students as $student): 
+              ?>
+                <tr id="student-<?= $student['student_id'] ?>">
+                  <td class="fw-semibold text-muted" data-label="#"><?= $counter++ ?></td>
+                  <td data-label="Payroll #">
+                    <code class="bg-dark text-white px-2 py-1 rounded">#<?= htmlspecialchars($student['payroll_no']) ?></code>
+                  </td>
+                  <td class="fw-semibold" data-label="Student Name">
+                    <?= htmlspecialchars(trim($student['first_name'] . ' ' . $student['middle_name'] . ' ' . $student['last_name'])) ?>
+                  </td>
+                  <td data-label="Student ID">
+                    <small class="text-muted"><?= htmlspecialchars($student['student_id']) ?></small>
+                  </td>
+                  <td data-label="Status">
+                    <?php if ($student['status'] === 'given'): ?>
+                      <span class="badge bg-success">
+                        <i class="bi bi-check-circle me-1"></i>Given
+                      </span>
+                    <?php else: ?>
+                      <span class="badge bg-warning">
+                        <i class="bi bi-hourglass-split me-1"></i>Active
+                      </span>
+                    <?php endif; ?>
+                  </td>
+                  <td data-label="Date & Time">
+                    <?php if (!empty($student['distribution_date'])): ?>
+                      <div class="small">
+                        <i class="bi bi-calendar-check text-primary me-1"></i>
+                        <strong><?= date('M d, Y', strtotime($student['distribution_date'])) ?></strong>
+                      </div>
+                      <div class="small text-muted">
+                        <i class="bi bi-clock me-1"></i>
+                        <?= date('g:i A', strtotime($student['distribution_date'])) ?>
+                      </div>
+                    <?php else: ?>
+                      <span class="text-muted">-</span>
+                    <?php endif; ?>
+                  </td>
+                  <td data-label="Scanned By">
+                    <?php if (!empty($student['scanned_by_name'])): ?>
+                      <div class="small">
+                        <i class="bi bi-person-circle text-success me-1"></i>
+                        <strong><?= htmlspecialchars($student['scanned_by_name']) ?></strong>
+                      </div>
+                      <?php if (!empty($student['distributed_by_username'])): ?>
+                      <div class="small text-muted">
+                        <i class="bi bi-at"></i><?= htmlspecialchars($student['distributed_by_username']) ?>
+                      </div>
+                      <?php endif; ?>
+                    <?php else: ?>
+                      <span class="text-muted">-</span>
+                    <?php endif; ?>
+                  </td>
+                  <td data-label="QR Code">
+                    <?php if ($student['qr_unique_id']): ?>
+                      <span class="badge bg-info">
+                        <i class="bi bi-qr-code me-1"></i>Has QR
+                      </span>
+                    <?php else: ?>
+                      <span class="badge bg-secondary">
+                        <i class="bi bi-x-circle me-1"></i>No QR
+                      </span>
+                    <?php endif; ?>
+                  </td>
+                </tr>
+              <?php endforeach; ?>
+            </tbody>
+          </table>
         </div>
       </div>
     </section>
