@@ -887,6 +887,27 @@ if (!function_exists('adjustColorOpacity')) {
     font-weight: 600;
     opacity: .85;
 }
+/* ================= Mobile spacing & safe-area fixes ================= */
+@media (max-width: 768px) {
+  /* Ensure nav items start directly under profile without large gap if global CSS sets space-between */
+  .admin-sidebar .nav-list { justify-content: flex-start !important; padding-top: .25rem; }
+  /* Compact profile padding */
+  .admin-sidebar .sidebar-profile { padding: .65rem .9rem .7rem .9rem; margin-bottom: .2rem; }
+  /* Slightly smaller avatar for narrow devices */
+  .admin-sidebar .sidebar-profile .avatar-circle { width: 38px; height: 38px; font-size: .9rem; }
+  /* Reduce horizontal margins on items */
+  .admin-sidebar .nav-item a, .admin-sidebar .dropdown > a { margin: 2px 6px; padding: 9px 12px; }
+  /* Provide bottom safe-area so last items / logout not obscured by iPhone home indicator */
+  .admin-sidebar { padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 12px); }
+  /* Make logout sticky just above safe area */
+  .admin-sidebar .nav-item.logout { position: sticky; bottom: calc(env(safe-area-inset-bottom, 0px) + 4px); z-index: 10; }
+  .admin-sidebar .nav-item.logout a.logout-link { margin-bottom: 0; }
+}
+/* Ultra-small devices (<380px) tighten further */
+@media (max-width: 380px) {
+  .admin-sidebar .nav-item a, .admin-sidebar .dropdown > a { padding: 8px 11px; }
+  .admin-sidebar .sidebar-profile .profile-text .name { max-width: 110px; }
+}
 </style>
 
 <script>
