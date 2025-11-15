@@ -419,7 +419,7 @@ $statsQuery = "
 $statsResult = pg_query($connection, $statsQuery);
 $stats = pg_fetch_assoc($statsResult);
 ?>
-<?php $page_title='Archived Students'; $extra_css=['../../assets/css/admin/manage_applicants.css']; include __DIR__ . '/../../includes/admin/admin_head.php'; ?>
+<?php $page_title='Archived Students'; $extra_css=['../../assets/css/admin/manage_applicants.css','../../assets/css/admin/table_core.css']; include __DIR__ . '/../../includes/admin/admin_head.php'; ?>
 <style>
     :root {
         --primary-color: #2c3e50;
@@ -431,12 +431,19 @@ $stats = pg_fetch_assoc($statsResult);
         --light-bg: #ecf0f1;
     }
 
+    /* Single-row, scrollable stats bar to avoid orphaned last card */
     .stats-cards {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-        gap: 20px;
+        display: flex;
+        flex-wrap: nowrap;
+        gap: 16px;
         margin-bottom: 25px;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        padding-bottom: 6px; /* space for scrollbar */
+        scroll-snap-type: x proximity;
     }
+    .stats-cards .stat-card { flex: 0 0 240px; scroll-snap-align: start; }
+    @media (min-width: 1400px) { .stats-cards .stat-card { flex-basis: 260px; } }
 
     .stat-card {
         background: white;
@@ -553,6 +560,27 @@ $stats = pg_fetch_assoc($statsResult);
     .modal-backdrop {
         z-index: 9998 !important;
     }
+
+    /* Mobile-only compact modal size for this page */
+    @media (max-width: 576px) {
+        .modal-mobile-compact .modal-dialog {
+            max-width: 420px; /* cap width so background remains visible */
+            width: 88%;
+            margin: 1rem auto;
+        }
+        .modal-mobile-compact .modal-content {
+            border-radius: 12px;
+        }
+        .modal-mobile-compact .modal-body {
+            max-height: 60vh; /* shorter height to expose backdrop */
+            overflow-y: auto;
+        }
+        .modal-mobile-compact .modal-header,
+        .modal-mobile-compact .modal-footer {
+            padding-top: 0.6rem;
+            padding-bottom: 0.6rem;
+        }
+    }
 </style>
 <body>
 <?php include __DIR__ . '/../../includes/admin/admin_topbar.php'; ?>
@@ -564,7 +592,6 @@ $stats = pg_fetch_assoc($statsResult);
         <div class="container-fluid py-4 px-4">
             <div class="section-header mb-4 d-flex justify-content-between align-items-center">
                 <h2 class="fw-bold text-primary mb-0">
-                    <i class="bi bi-archive-fill"></i>
                     Archived Students
                 </h2>
                 <span class="badge bg-secondary fs-6"><?php echo $stats['total_archived']; ?> Archived</span>
@@ -669,8 +696,7 @@ $stats = pg_fetch_assoc($statsResult);
             </form>
         </div>
 
-        <!-- Table Section -->
-        <div class="table-section">
+        <!-- Table Section: removed card wrapper for consistency -->
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <h5 class="mb-0">Archived Students (<?php echo number_format($totalRecords); ?>)</h5>
                 <span class="text-muted">Page <?php echo $page; ?> of <?php echo $totalPages; ?></span>
@@ -678,8 +704,8 @@ $stats = pg_fetch_assoc($statsResult);
 
             <?php if ($result && $resultRowCount > 0): ?>
                 <div class="table-responsive">
-                    <table class="table table-hover">
-                        <thead>
+                    <table class="table table-hover mb-0">
+                        <thead class="table-dark">
                             <tr>
                                 <th>Student ID</th>
                                 <th>Name</th>
@@ -701,15 +727,15 @@ $stats = pg_fetch_assoc($statsResult);
                                           ($student['extension_name'] ?? ''));
                             ?>
                                 <tr>
-                                    <td><?php echo htmlspecialchars($student['student_id']); ?></td>
-                                    <td>
+                                    <td data-label="Student ID"><?php echo htmlspecialchars($student['student_id']); ?></td>
+                                    <td data-label="Name">
                                         <strong><?php echo htmlspecialchars($fullName); ?></strong>
                                     </td>
-                                    <td><?php echo htmlspecialchars($student['email']); ?></td>
-                                    <td><?php echo htmlspecialchars($student['year_level_name'] ?? 'N/A'); ?></td>
-                                    <td><?php echo htmlspecialchars($student['university_name'] ?? 'N/A'); ?></td>
-                                    <td><?php echo date('M d, Y h:i A', strtotime($student['archived_at'])); ?></td>
-                                    <td>
+                                    <td data-label="Email"><?php echo htmlspecialchars($student['email']); ?></td>
+                                    <td data-label="Year Level"><?php echo htmlspecialchars($student['year_level_name'] ?? 'N/A'); ?></td>
+                                    <td data-label="University"><?php echo htmlspecialchars($student['university_name'] ?? 'N/A'); ?></td>
+                                    <td data-label="Archived At"><?php echo date('M d, Y h:i A', strtotime($student['archived_at'])); ?></td>
+                                    <td data-label="Type">
                                         <span class="badge <?php echo strtolower($student['archive_type']); ?>">
                                             <?php echo $student['archive_type']; ?>
                                         </span>
@@ -721,7 +747,7 @@ $stats = pg_fetch_assoc($statsResult);
                                             </small>
                                         <?php endif; ?>
                                     </td>
-                                    <td>
+                                    <td data-label="Archived By">
                                         <?php echo $student['archived_by_name'] ?? '<em>System</em>'; ?>
                                         <?php if ($student['unarchived_at']): ?>
                                             <br>
@@ -731,7 +757,7 @@ $stats = pg_fetch_assoc($statsResult);
                                             </small>
                                         <?php endif; ?>
                                     </td>
-                                    <td>
+                                    <td data-label="Actions">
                                         <button class="btn btn-sm btn-info" 
                                                 onclick="viewDetails('<?php echo htmlspecialchars($student['student_id'], ENT_QUOTES); ?>')">
                                             <i class="bi bi-eye"></i>
@@ -808,12 +834,12 @@ $stats = pg_fetch_assoc($statsResult);
                     <p>There are no archived students matching your criteria.</p>
                 </div>
             <?php endif; ?>
-        </div>
+        
     </section>
 </body>div>
 
 <!-- Student Details Modal - MUST BE OUTSIDE WRAPPER -->
-<div class="modal fade" id="detailsModal" tabindex="-1">
+<div class="modal fade modal-mobile-compact" id="detailsModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
@@ -828,7 +854,7 @@ $stats = pg_fetch_assoc($statsResult);
 </div>
 
 <!-- Unarchive Modal -->
-<div class="modal fade" id="unarchiveModal" tabindex="-1">
+<div class="modal fade modal-mobile-compact" id="unarchiveModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header bg-success text-white">

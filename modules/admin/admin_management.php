@@ -99,6 +99,7 @@ $admins = pg_fetch_all($adminsResult) ?: [];
 
 <?php $page_title='Admin Management'; include __DIR__ . '/../../includes/admin/admin_head.php'; ?>
 <link rel="stylesheet" href="../../assets/css/admin/modern-ui.css">
+<link rel="stylesheet" href="../../assets/css/admin/table_core.css">
 </head>
 <body>
 <?php include __DIR__ . '/../../includes/admin/admin_topbar.php'; ?>
@@ -135,8 +136,8 @@ $admins = pg_fetch_all($adminsResult) ?: [];
                 </div>
                 <div class="card-body p-4">
                     <div class="table-responsive">
-                        <table class="table modern-table">
-                            <thead>
+                        <table class="table table-hover mb-0" id="adminsTable">
+                            <thead class="table-dark">
                                 <tr>
                                     <th>Name</th>
                                     <th>Username</th>
@@ -151,22 +152,22 @@ $admins = pg_fetch_all($adminsResult) ?: [];
                             <tbody>
                                 <?php foreach ($admins as $admin): ?>
                                     <tr>
-                                        <td><?= htmlspecialchars($admin['first_name'] . ' ' . $admin['middle_name'] . ' ' . $admin['last_name']) ?></td>
-                                        <td><?= htmlspecialchars($admin['username']) ?></td>
-                                        <td><?= htmlspecialchars($admin['email']) ?></td>
-                                        <td>
+                                        <td data-label="Name"><?= htmlspecialchars($admin['first_name'] . ' ' . $admin['middle_name'] . ' ' . $admin['last_name']) ?></td>
+                                        <td data-label="Username"><?= htmlspecialchars($admin['username']) ?></td>
+                                        <td data-label="Email"><?= htmlspecialchars($admin['email']) ?></td>
+                                        <td data-label="Role">
                                             <span class="badge <?= $admin['role'] === 'super_admin' ? 'bg-danger' : 'bg-info' ?>">
                                                 <?= $admin['role'] === 'super_admin' ? 'Super Admin' : 'Sub Admin' ?>
                                             </span>
                                         </td>
-                                        <td>
+                                        <td data-label="Status">
                                             <span class="badge <?= $admin['is_active'] === 't' ? 'bg-success' : 'bg-secondary' ?>">
                                                 <?= $admin['is_active'] === 't' ? 'Active' : 'Inactive' ?>
                                             </span>
                                         </td>
-                                        <td><?= date('M d, Y', strtotime($admin['created_at'])) ?></td>
-                                        <td><?= $admin['last_login'] ? date('M d, Y H:i', strtotime($admin['last_login'])) : 'Never' ?></td>
-                                        <td>
+                                        <td data-label="Created"><?= date('M d, Y', strtotime($admin['created_at'])) ?></td>
+                                        <td data-label="Last Login"><?= $admin['last_login'] ? date('M d, Y H:i', strtotime($admin['last_login'])) : 'Never' ?></td>
+                                        <td data-label="Actions">
                                             <?php if ($admin['admin_id'] != ($_SESSION['admin_id'] ?? 0)): ?>
                                                 <button type="button" class="btn btn-sm <?= $admin['is_active'] === 't' ? 'btn-outline-danger' : 'btn-outline-success' ?>" onclick="showToggleStatusModal(<?= $admin['admin_id'] ?>, '<?= htmlspecialchars($admin['first_name'] . ' ' . $admin['last_name'], ENT_QUOTES) ?>', '<?= $admin['is_active'] === 't' ? 'deactivate' : 'activate' ?>')">
                                                     <i class="bi <?= $admin['is_active'] === 't' ? 'bi-person-x' : 'bi-person-check' ?>"></i>

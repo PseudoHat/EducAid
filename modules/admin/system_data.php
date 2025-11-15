@@ -400,6 +400,7 @@ if (isset($_GET['error'])) {
     <link rel="stylesheet" href="../../assets/css/admin/homepage.css" />
     <link rel="stylesheet" href="../../assets/css/admin/sidebar.css" />
     <link rel="stylesheet" href="../../assets/css/admin/modern-ui.css" />
+    <link rel="stylesheet" href="../../assets/css/admin/table_core.css" />
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet" />
 </head>
 <body>
@@ -451,8 +452,8 @@ if (isset($_GET['error'])) {
                     
                     <!-- Universities List -->
                     <div class="table-responsive">
-                        <table class="table modern-table" id="universitiesTable">
-                            <thead>
+                        <table class="table table-hover mb-0" id="universitiesTable">
+                            <thead class="table-dark">
                                 <tr>
                                     <th style="width: 50px;">#</th>
                                     <th>University Name</th>
@@ -467,12 +468,12 @@ if (isset($_GET['error'])) {
                                 $displayNumber = 1;
                                 foreach ($universities as $university): ?>
                                     <tr>
-                                        <td><?= $displayNumber++ ?></td>
-                                        <td><?= htmlspecialchars($university['name']) ?></td>
-                                        <td><span class="modern-badge modern-badge-info"><?= htmlspecialchars($university['code']) ?></span></td>
-                                        <td><?= $university['student_count'] ?> students</td>
-                                        <td><?= date('M d, Y', strtotime($university['created_at'])) ?></td>
-                                        <td>
+                                        <td data-label="#" class="fw-semibold text-muted"><?= $displayNumber++ ?></td>
+                                        <td data-label="University Name"><?= htmlspecialchars($university['name']) ?></td>
+                                        <td data-label="Code"><span class="modern-badge modern-badge-info"><?= htmlspecialchars($university['code']) ?></span></td>
+                                        <td data-label="Students"><?= $university['student_count'] ?> students</td>
+                                        <td data-label="Created"><?= date('M d, Y', strtotime($university['created_at'])) ?></td>
+                                        <td data-label="Actions">
                                             <button type="button" class="btn btn-sm btn-outline-primary me-1" onclick="showEditUniversityModal(<?= $university['university_id'] ?>, '<?= htmlspecialchars($university['name'], ENT_QUOTES) ?>', '<?= htmlspecialchars($university['code'], ENT_QUOTES) ?>')">
                                                 <i class="bi bi-pencil"></i> Edit
                                             </button>
@@ -536,8 +537,8 @@ if (isset($_GET['error'])) {
                     
                     <!-- Barangays List -->
                     <div class="table-responsive">
-                        <table class="table modern-table" id="barangaysTable">
-                            <thead>
+                        <table class="table table-hover mb-0" id="barangaysTable">
+                            <thead class="table-dark">
                                 <tr>
                                     <th style="width: 50px;">#</th>
                                     <th>Barangay Name</th>
@@ -550,10 +551,10 @@ if (isset($_GET['error'])) {
                                 $displayNumber = 1;
                                 foreach ($barangays as $barangay): ?>
                                     <tr>
-                                        <td><?= $displayNumber++ ?></td>
-                                        <td><?= htmlspecialchars($barangay['name']) ?></td>
-                                        <td><?= $barangay['student_count'] ?> students</td>
-                                        <td>
+                                        <td data-label="#" class="fw-semibold text-muted"><?= $displayNumber++ ?></td>
+                                        <td data-label="Barangay Name"><?= htmlspecialchars($barangay['name']) ?></td>
+                                        <td data-label="Students"><?= $barangay['student_count'] ?> students</td>
+                                        <td data-label="Actions">
                                             <button type="button" class="btn btn-sm btn-outline-primary me-1" onclick="showEditBarangayModal(<?= $barangay['barangay_id'] ?>, '<?= htmlspecialchars($barangay['name'], ENT_QUOTES) ?>')">
                                                 <i class="bi bi-pencil"></i> Edit
                                             </button>
@@ -600,8 +601,8 @@ if (isset($_GET['error'])) {
                 </div>
                 <div class="card-body p-4">
                     <div class="table-responsive">
-                        <table class="table modern-table">
-                            <thead>
+                        <table class="table table-hover mb-0">
+                            <thead class="table-dark">
                                 <tr>
                                     <th>Year Level</th>
                                     <th>Code</th>
@@ -611,9 +612,9 @@ if (isset($_GET['error'])) {
                             <tbody>
                                 <?php foreach ($yearLevels as $yearLevel): ?>
                                     <tr>
-                                        <td><?= htmlspecialchars($yearLevel['name']) ?></td>
-                                        <td><span class="badge bg-secondary"><?= htmlspecialchars($yearLevel['code']) ?></span></td>
-                                        <td><?= $yearLevel['sort_order'] ?></td>
+                                        <td data-label="Year Level"><?= htmlspecialchars($yearLevel['name']) ?></td>
+                                        <td data-label="Code"><span class="badge bg-secondary"><?= htmlspecialchars($yearLevel['code']) ?></span></td>
+                                        <td data-label="Order"><?= $yearLevel['sort_order'] ?></td>
                                     </tr>
                                 <?php endforeach; ?>
                             </tbody>

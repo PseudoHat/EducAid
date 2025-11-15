@@ -82,6 +82,7 @@ $reasonCategories = [
 ?>
 
 <?php $page_title='Blacklist Archive'; include __DIR__ . '/../../includes/admin/admin_head.php'; ?>
+<link rel="stylesheet" href="../../assets/css/admin/table_core.css">
 <style>
     .blacklist-hero{background:linear-gradient(135deg,#dc3545,#b71f28);color:#fff;border-radius:18px;padding:1.75rem 1.75rem;margin-bottom:1.75rem;position:relative;overflow:hidden;}
     .blacklist-hero:before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 85% 15%,rgba(255,255,255,.25),transparent 60%);pointer-events:none;}
@@ -93,6 +94,8 @@ $reasonCategories = [
     .filter-card .btn{border-radius:10px;font-weight:500;}
     .table-wrap{background:#fff;border:1px solid #e5e7eb;border-radius:18px;box-shadow:0 4px 10px -2px rgba(0,0,0,.05),0 2px 4px -2px rgba(0,0,0,.04);overflow:hidden;}
     .table thead th{background:#f8f9fa;color:#374151;font-weight:600;font-size:.7rem;text-transform:uppercase;letter-spacing:.6px;border-top:none;border-bottom:1px solid #e5e7eb;padding:.75rem .85rem;}
+    /* Ensure dark header stays dark (override local rule above) */
+    .table thead.table-dark th{background:#343a40!important;color:#fff!important;border:none!important;}
     .table tbody td{vertical-align:middle;font-size:.85rem;padding:.7rem .85rem;border-color:#f0f2f4;}
     .table tbody tr:hover{background:#fcfcfd;}
     .reason-badge{font-size:.65rem;padding:.35rem .55rem;font-weight:600;letter-spacing:.4px;border-radius:20px;}
@@ -175,8 +178,8 @@ $reasonCategories = [
                     </div>
                 <?php else: ?>
                     <div class="table-responsive">
-                        <table class="table mb-0 align-middle">
-                            <thead>
+                        <table class="table table-hover mb-0 align-middle" id="blacklistTable">
+                            <thead class="table-dark">
                                 <tr>
                                     <th style="min-width:180px;">Student</th>
                                     <th style="min-width:200px;">Contact</th>
@@ -189,15 +192,15 @@ $reasonCategories = [
                             <tbody>
                             <?php foreach ($blacklistedStudents as $student): ?>
                                 <tr>
-                                    <td>
+                                    <td data-label="Student">
                                         <strong><?= htmlspecialchars($student['first_name'] . ' ' . $student['last_name']) ?></strong><br>
                                         <small class="text-muted"><?= htmlspecialchars($student['barangay_name'] ?? 'N/A') ?></small>
                                     </td>
-                                    <td class="contact-icons">
+                                    <td class="contact-icons" data-label="Contact">
                                         <i class="bi bi-envelope"></i> <small class="truncate-50" title="<?= htmlspecialchars($student['email']) ?>"><?= htmlspecialchars($student['email']) ?></small><br>
                                         <i class="bi bi-phone"></i> <small><?= htmlspecialchars($student['mobile'] ?? 'N/A') ?></small>
                                     </td>
-                                    <td>
+                                    <td data-label="Reason">
                                         <?php $reasonClass = 'reason-' . str_replace('_','-',$student['reason_category']); ?>
                                         <span class="badge <?= $reasonClass ?> reason-badge"><?= $reasonCategories[$student['reason_category']] ?></span>
                                         <?php if (!empty($student['detailed_reason'])): ?>
@@ -206,15 +209,15 @@ $reasonCategories = [
                                             </div>
                                         <?php endif; ?>
                                     </td>
-                                    <td>
+                                    <td data-label="Blacklisted By">
                                         <strong><?= htmlspecialchars($student['blacklisted_by_name'] ?? 'System') ?></strong><br>
                                         <small class="text-muted truncate-50" title="<?= htmlspecialchars($student['admin_email']) ?>"><?= htmlspecialchars($student['admin_email']) ?></small>
                                     </td>
-                                    <td>
+                                    <td data-label="Date">
                                         <?= date('M j, Y', strtotime($student['blacklisted_at'])) ?><br>
                                         <small class="text-muted"><?= date('g:i A', strtotime($student['blacklisted_at'])) ?></small>
                                     </td>
-                                    <td>
+                                    <td data-label="Actions">
                                         <div class="btn-group btn-group-sm" role="group">
                                             <button class="btn btn-outline-info" onclick="viewDetails('<?= $student['student_id'] ?>')" title="View Details">
                                                 <i class="bi bi-eye"></i>
