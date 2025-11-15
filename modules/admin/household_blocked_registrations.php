@@ -402,7 +402,7 @@ while ($row = pg_fetch_assoc($barangaysResult)) {
     $barangays[] = $row['barangay_entered'];
 }
 ?>
-<?php $page_title='Household Blocked Registrations'; $extra_css=[]; include __DIR__ . '/../../includes/admin/admin_head.php'; ?>
+<?php $page_title='Household Blocked Registrations'; $extra_css=['../../assets/css/admin/table_core.css','../../assets/css/admin/household_blocked_registrations.css']; include __DIR__ . '/../../includes/admin/admin_head.php'; ?>
 
 
 <!-- Page Content Starts Here -->
@@ -413,7 +413,7 @@ while ($row = pg_fetch_assoc($barangaysResult)) {
     <?php include __DIR__ . '/../../includes/admin/admin_header.php'; ?>
     
     <section class="home-section" id="mainContent">
-        <div class="container-fluid py-4">
+        <div class="container-fluid py-4 px-4">
             <!-- Page Header -->
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <div>
@@ -544,23 +544,22 @@ while ($row = pg_fetch_assoc($barangaysResult)) {
                     </div>
                 </div>
 
-                <!-- Blocked Attempts Table -->
-                <div class="card">
-                    <div class="card-header d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3">
-                        <div>
-                            <h5 class="mb-0">
-                                <i class="bi bi-table"></i>
-                                Blocked Registration Attempts
-                                <span class="badge bg-danger ms-2"><?= count($records) ?> Records</span>
-                            </h5>
-                        </div>
-                        <div>
-                            <button id="bulkDeleteBtn" class="btn btn-danger btn-sm" style="display: none;" onclick="confirmBulkDelete()">
-                                <i class="bi bi-trash-fill me-1"></i><span class="d-none d-sm-inline">Delete Selected (</span><span class="d-sm-none">Delete (</span><span id="selectedCount">0</span>)
-                            </button>
-                        </div>
+                <!-- Blocked Attempts Table (card wrapper removed for consistency) -->
+                <div class="blocked-attempts-header d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3 mb-2">
+                    <div>
+                        <h5 class="mb-0 fw-semibold">
+                            <i class="bi bi-table"></i>
+                            Blocked Registration Attempts
+                            <span class="badge bg-danger ms-2"><?= count($records) ?> Records</span>
+                        </h5>
                     </div>
-                    <div class="card-body">
+                    <div>
+                        <button id="bulkDeleteBtn" class="btn btn-danger btn-sm d-none" onclick="confirmBulkDelete()">
+                            <i class="bi bi-trash-fill me-1"></i><span class="d-none d-sm-inline">Delete Selected (</span><span class="d-sm-none">Delete (</span><span id="selectedCount">0</span>)
+                        </button>
+                    </div>
+                </div>
+                <div class="blocked-attempts-body">
                         <?php if (empty($records)): ?>
                             <div class="alert alert-info">
                                 <i class="bi bi-info-circle me-2"></i>No blocked registration attempts found matching your criteria.
@@ -571,10 +570,10 @@ while ($row = pg_fetch_assoc($barangaysResult)) {
                                 <small><i class="bi bi-card-list me-1"></i>Viewing in mobile-friendly card layout</small>
                             </div>
                             <div class="table-responsive">
-                                <table class="table table-hover">
+                                <table class="table table-hover blocked-attempts-table">
                                     <thead>
                                         <tr>
-                                            <th style="width: 40px;">
+                                            <th>
                                                 <input type="checkbox" id="selectAll" class="form-check-input" onchange="toggleSelectAll(this)">
                                             </th>
                                             <th><i class="bi bi-clock me-1"></i>Date/Time</th>
@@ -609,7 +608,7 @@ while ($row = pg_fetch_assoc($barangaysResult)) {
                                                     </small>
                                                     <?php if (!empty($record['attempted_email']) || !empty($record['attempted_mobile'])): ?>
                                                         <div class="mt-1">
-                                                            <span class="badge bg-info" style="font-size: 0.7rem;">
+                                                            <span class="badge bg-info">
                                                                 <i class="bi bi-inbox-fill me-1"></i>Contact Provided
                                                             </span>
                                                         </div>
@@ -625,7 +624,7 @@ while ($row = pg_fetch_assoc($barangaysResult)) {
                                                 </td>
                                                 <td data-label="Mother's Name" class="fw-semibold"><?= htmlspecialchars($record['mothers_maiden_name_entered']) ?></td>
                                                 <td data-label="Barangay">
-                                                    <span class="badge bg-secondary" style="font-size: 0.85rem;">
+                                                    <span class="badge bg-secondary">
                                                         <?= htmlspecialchars($record['barangay_entered']) ?>
                                                     </span>
                                                 </td>
@@ -723,7 +722,6 @@ while ($row = pg_fetch_assoc($barangaysResult)) {
                                 </nav>
                             <?php endif; ?>
                         <?php endif; ?>
-                    </div>
                 </div>
             </div>
         </section>
@@ -747,12 +745,12 @@ while ($row = pg_fetch_assoc($barangaysResult)) {
             const checkboxes = document.querySelectorAll('.record-checkbox:checked');
             const bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
             const selectedCount = document.getElementById('selectedCount');
-            
+
             if (checkboxes.length > 0) {
-                bulkDeleteBtn.style.display = 'inline-block';
+                bulkDeleteBtn.classList.remove('d-none');
                 selectedCount.textContent = checkboxes.length;
             } else {
-                bulkDeleteBtn.style.display = 'none';
+                bulkDeleteBtn.classList.add('d-none');
                 document.getElementById('selectAll').checked = false;
             }
         }
