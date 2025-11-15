@@ -36,7 +36,7 @@ $student_query = pg_query_params($connection,
     "SELECT s.*, 
             b.name as barangay_name, 
             u.name as university_name, 
-            yl.year_level_name as current_year_level
+            yl.name as current_year_level
      FROM students s
      LEFT JOIN barangays b ON s.barangay_id = b.barangay_id
      LEFT JOIN universities u ON s.university_id = u.university_id
