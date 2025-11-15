@@ -936,11 +936,6 @@ $yearLevels = pg_fetch_all(pg_query($connection, "SELECT year_level_id, name FRO
                 overflow-x: auto !important;
             }
         }
-        
-        /* Prevent container overflow */
-        .container-fluid {
-            overflow-x: hidden;
-        }
     </style>
 </head>
 <body>

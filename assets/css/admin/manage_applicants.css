@@ -1,10 +1,47 @@
 /* ==================== manage_applicants.css ==================== */
 /* Clean, mobile-first responsive design with card layout for mobile */
 
+:root {
+  --admin-topbar-h: 52px;
+  --admin-header-h: 56px;
+}
+
 body {
   font-family: 'Poppins', sans-serif;
   background: #f8f9fa;
   color: #222;
+}
+
+/* Ensure the fixed admin header doesn't clip its contents.
+   Let it auto-size while the page offset uses --admin-header-h. */
+.admin-main-header { height: auto !important; }
+
+/* ==================== MAIN LAYOUT ==================== */
+.home-section,
+#mainContent {
+  margin-left: 250px;
+  width: calc(100% - 250px);
+  min-height: calc(100vh - var(--admin-topbar-h));
+  /* Use a tighter adjustment so there isn't an oversized gap below header */
+  padding: calc(var(--admin-topbar-h) + var(--admin-header-h) + 2px) 20px 40px 20px;
+  background: #f8f9fa;
+  position: relative;
+  z-index: 1;
+  box-sizing: border-box;
+}
+
+.sidebar.close ~ .home-section,
+.sidebar.close ~ #mainContent {
+  margin-left: 70px;
+  width: calc(100% - 70px);
+}
+
+@media (max-width: 768px) {
+  .home-section,
+  #mainContent {
+    margin-left: 0 !important;
+    width: 100% !important;
+  }
 }
 
 /* ==================== SECTION HEADER ==================== */
@@ -840,7 +877,7 @@ h1.fw-bold, h2.fw-bold {
   .table-responsive {
     max-height: 65vh;
     overflow-y: auto;
-    overflow-x: hidden;
+    overflow-x: auto;
   }
   
   /* Flexible layout adjustments */
@@ -1058,7 +1095,6 @@ h1.fw-bold, h2.fw-bold {
 
 /* Ensure proper container behavior */
 .container-fluid {
-  overflow-x: hidden;
   max-width: 100%;
 }
 
