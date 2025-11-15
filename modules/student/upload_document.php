@@ -273,7 +273,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_year_level']))
         $mothers_maiden_name = isset($_POST['mothers_maiden_name']) ? trim($_POST['mothers_maiden_name']) : null;
         $school_student_id = isset($_POST['school_student_id']) ? trim($_POST['school_student_id']) : null;
         
-        // Password update for migrated students (required)
+        // Password update for migrated students (optional - only required if provided or if completing profile for first time)
         $new_password = isset($_POST['new_password']) ? trim($_POST['new_password']) : null;
         $confirm_password = isset($_POST['confirm_password']) ? trim($_POST['confirm_password']) : null;
         
@@ -307,18 +307,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_year_level']))
                 exit;
             }
             
-            // Validate password for migrated students
-            if (empty($new_password)) {
-                echo json_encode(['success' => false, 'message' => 'Please create a new password.']);
-                exit;
-            }
-            if (strlen($new_password) < 8) {
-                echo json_encode(['success' => false, 'message' => 'Password must be at least 8 characters long.']);
-                exit;
-            }
-            if ($new_password !== $confirm_password) {
-                echo json_encode(['success' => false, 'message' => 'Passwords do not match.']);
-                exit;
+            // Validate password for migrated students ONLY if provided
+            // Password is optional if they already completed profile before
+            if (!empty($new_password) || !empty($confirm_password)) {
+                if (empty($new_password)) {
+                    echo json_encode(['success' => false, 'message' => 'Please enter your new password in both fields.']);
+                    exit;
+                }
+                if (strlen($new_password) < 8) {
+                    echo json_encode(['success' => false, 'message' => 'Password must be at least 8 characters long.']);
+                    exit;
+                }
+                if ($new_password !== $confirm_password) {
+                    echo json_encode(['success' => false, 'message' => 'Passwords do not match.']);
+                    exit;
+                }
             }
         }
         
@@ -932,9 +935,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_year_level']))
                 'message' => 'Year level updated successfully! You can now upload documents.'
             ]);
         } else {
-            echo json_encode(['success' => false, 'message' => 'Failed to update year level. Please try again.']);
+            echo json_encode(['success' => false, 'message' => 'Failed to update year level. Database update failed.']);
         }
     } catch (Exception $e) {
+        error_log('Year level update error for student ' . $student_id . ': ' . $e->getMessage());
+        error_log('Stack trace: ' . $e->getTraceAsString());
         echo json_encode(['success' => false, 'message' => 'Error: ' . $e->getMessage()]);
     }
     exit;
@@ -2898,27 +2903,26 @@ $page_title = 'Upload Documents';
                             </div>
                         </div>
                         
-                        <!-- New Password (Migrated Students Only) -->
+                        <!-- New Password (Migrated Students Only - Optional) -->
                         <div class="mb-4">
                             <label class="form-label fw-bold mb-3" style="color: #1f2937; font-size: 1rem;">
-                                <i class="bi bi-shield-lock me-2" style="color: #667eea;"></i> New Password <span class="text-danger">*</span>
+                                <i class="bi bi-shield-lock me-2" style="color: #667eea;"></i> New Password <span class="text-muted">(Optional)</span>
                             </label>
                             <div class="position-relative">
                                 <input type="password" class="form-control form-control-lg" id="newPassword" name="new_password" 
-                                       required 
                                        minlength="8"
-                                       placeholder="Create a new secure password"
+                                       placeholder="Leave blank to keep current password"
                                        style="border-radius: 12px; border: 2px solid #e5e7eb; padding: 14px 48px 14px 18px; font-size: 1rem; transition: all 0.2s;">
                                 <button type="button" class="btn btn-link position-absolute" id="toggleNewPassword" 
                                         style="right: 8px; top: 50%; transform: translateY(-50%); padding: 4px 8px; color: #6b7280;">
                                     <i class="bi bi-eye" id="newPasswordIcon"></i>
                                 </button>
                             </div>
-                            <div class="mt-2" style="background: #fef2f2; border-left: 3px solid #dc2626; padding: 12px 16px; border-radius: 8px;">
+                            <div class="mt-2" style="background: #e0f2fe; border-left: 3px solid #3b82f6; padding: 12px 16px; border-radius: 8px;">
                                 <div class="d-flex align-items-start">
-                                    <i class="bi bi-exclamation-triangle me-2 flex-shrink-0" style="color: #dc2626; font-size: 18px; margin-top: 2px;"></i>
-                                    <small style="color: #991b1b; line-height: 1.5;">
-                                        <strong>Required:</strong> You are currently using a temporary generated password. Please create a new secure password (minimum 8 characters).
+                                    <i class="bi bi-info-circle me-2 flex-shrink-0" style="color: #1e40af; font-size: 18px; margin-top: 2px;"></i>
+                                    <small style="color: #1e3a8a; line-height: 1.5;">
+                                        <strong>Optional:</strong> If you want to change your password, enter a new one (minimum 8 characters). Otherwise, leave it blank to continue with your current password.
                                     </small>
                                 </div>
                             </div>
@@ -2927,11 +2931,10 @@ $page_title = 'Upload Documents';
                         <!-- Confirm Password -->
                         <div class="mb-4">
                             <label class="form-label fw-bold mb-3" style="color: #1f2937; font-size: 1rem;">
-                                <i class="bi bi-shield-check me-2" style="color: #667eea;"></i> Confirm Password <span class="text-danger">*</span>
+                                <i class="bi bi-shield-check me-2" style="color: #667eea;"></i> Confirm Password <span class="text-muted">(If changing)</span>
                             </label>
                             <div class="position-relative">
                                 <input type="password" class="form-control form-control-lg" id="confirmPassword" name="confirm_password" 
-                                       required 
                                        minlength="8"
                                        placeholder="Re-enter your new password"
                                        style="border-radius: 12px; border: 2px solid #e5e7eb; padding: 14px 48px 14px 18px; font-size: 1rem; transition: all 0.2s;">
@@ -3201,19 +3204,25 @@ $page_title = 'Upload Documents';
                 form.addEventListener('submit', async function(e) {
                     e.preventDefault();
                     
-                    // Validate passwords match for migrated students
+                    // Validate passwords match for migrated students (only if password is being changed)
                     const newPasswordInput = document.getElementById('newPassword');
                     const confirmPasswordInput = document.getElementById('confirmPassword');
                     
                     if (newPasswordInput && confirmPasswordInput) {
-                        if (newPasswordInput.value !== confirmPasswordInput.value) {
-                            alert('Passwords do not match. Please check and try again.');
-                            return;
-                        }
+                        const newPwd = newPasswordInput.value.trim();
+                        const confirmPwd = confirmPasswordInput.value.trim();
                         
-                        if (newPasswordInput.value.length < 8) {
-                            alert('Password must be at least 8 characters long.');
-                            return;
+                        // Only validate if user is trying to change password
+                        if (newPwd || confirmPwd) {
+                            if (newPwd !== confirmPwd) {
+                                alert('Passwords do not match. Please check and try again.');
+                                return;
+                            }
+                            
+                            if (newPwd.length < 8) {
+                                alert('Password must be at least 8 characters long.');
+                                return;
+                            }
                         }
                     }
                     
@@ -3231,7 +3240,23 @@ $page_title = 'Upload Documents';
                             body: formData
                         });
                         
-                        const result = await response.json();
+                        // Check if response is OK
+                        if (!response.ok) {
+                            throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+                        }
+                        
+                        // Try to parse JSON
+                        const text = await response.text();
+                        console.log('Raw response:', text);
+                        
+                        let result;
+                        try {
+                            result = JSON.parse(text);
+                        } catch (jsonError) {
+                            console.error('JSON parse error:', jsonError);
+                            console.error('Response text:', text);
+                            throw new Error('Server returned invalid response. Please check the console for details.');
+                        }
                         
                         if (result.success) {
                             if (result.archived && result.logout_required) {
