@@ -1,0 +1,166 @@
+/* table_core.css - Shared responsive table helpers for admin list pages
+   Focus: scrolling, wrapping, touch behavior, and accessibility.
+   Note: avoids card-conversion to keep markup-agnostic. */
+
+:root {
+  --table-cell-font: 1rem;
+}
+
+.table-responsive {
+  border-radius: 0.9rem;
+  overflow-x: auto;
+  overflow-y: visible;
+  margin-top: 10px;
+  background: #fff;
+  box-shadow: 0 0 10px rgba(0,0,0,0.08);
+  -webkit-overflow-scrolling: touch;
+  width: 100%;
+}
+
+.table {
+  background: #fff;
+  border-radius: 0.85rem;
+  margin-bottom: 0;
+  width: 100%;
+  min-width: 100%;
+  table-layout: auto;
+}
+
+.table th, .table td {
+  vertical-align: middle;
+  font-size: var(--table-cell-font);
+  padding: 12px 14px;
+  border: none;
+  white-space: nowrap;
+  overflow: visible;
+}
+
+/* At narrower widths, allow wrapping to reduce horizontal scroll */
+@media screen and (max-width: 1400px) {
+  .table th, .table td {
+    font-size: 0.95rem;
+    padding: 11px 12px;
+    white-space: normal;
+    word-break: break-word;
+    overflow-wrap: break-word;
+  }
+}
+
+@media screen and (max-width: 1200px) {
+  .table th, .table td {
+    font-size: 0.95rem;
+    padding: 11px 12px;
+    white-space: normal;
+    word-break: break-word;
+    overflow-wrap: break-word;
+  }
+}
+
+@media screen and (max-width: 992px) {
+  .table th, .table td {
+    font-size: 0.92rem;
+    padding: 10px 11px;
+  }
+}
+
+/* Ensure containers don't introduce horizontal scrollbars */
+.container-fluid { max-width: 100%; }
+
+/* Subtle custom scrollbar for horizontal scroll containers */
+.table-responsive::-webkit-scrollbar { height: 8px; }
+.table-responsive::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
+.table-responsive::-webkit-scrollbar-thumb { background: #a9b0b8; border-radius: 4px; }
+.table-responsive::-webkit-scrollbar-thumb:hover { background: #8e97a0; }
+
+/* ==================== MOBILE CARD LAYOUT (<768px) ==================== */
+@media (max-width: 767px) {
+  /* Hide desktop table header */
+  .table thead { display: none; }
+
+  /* Convert table to card-based layout */
+  .table,
+  .table tbody,
+  .table tr,
+  .table td { display: block; width: 100%; }
+
+  /* Card styling for each row */
+  .table tr {
+    margin-bottom: 1rem;
+    background: #fff;
+    border-radius: 0.75rem;
+    box-shadow: 0 2px 8px rgba(17,130,255,0.12);
+    border: 1px solid #e9ecef;
+    padding: 1rem;
+    transition: all 0.2s ease;
+  }
+  .table tr:active { background-color: #f0f6ff; transform: scale(0.99); }
+
+  /* Cell styling with labels */
+  .table td {
+    border: none;
+    border-bottom: 1px solid #f2f2f2;
+    padding: 12px 15px;
+    text-align: left;
+    position: relative;
+    font-size: 0.9rem;
+    line-height: 1.6;
+    min-height: 48px;
+    display: block;
+    overflow: visible;
+  }
+  .table td:last-child { border-bottom: none; padding-bottom: 0; }
+
+  /* Label styling (left side of each cell) */
+  .table td::before {
+    content: attr(data-label);
+    color: #1182FF;
+    font-weight: 600;
+    font-size: 0.85rem;
+    line-height: 1.5;
+    display: inline-block;
+    min-width: 90px;
+    max-width: 110px;
+    vertical-align: top;
+    margin-right: 12px;
+  }
+  .table td > * { display: inline; vertical-align: top; max-width: calc(100% - 110px); }
+
+  /* Action column full width (handles Action/Actions label) */
+  .table td[data-label="Action"],
+  .table td[data-label="Actions"] {
+    padding: 15px !important; margin-top: 8px; display: block !important; text-align: center;
+  }
+  .table td[data-label="Action"] > *,
+  .table td[data-label="Actions"] > * { max-width: 100% !important; }
+  .table td[data-label="Action"]::before,
+  .table td[data-label="Actions"]::before {
+    position: relative !important; left: 0 !important; top: 0 !important; display: block !important;
+    width: 100% !important; margin: 0 0 12px 0 !important; padding: 0 !important; text-align: center !important;
+    min-width: auto !important; max-width: none !important;
+  }
+  .table td[data-label="Action"] .btn,
+  .table td[data-label="Actions"] .btn {
+    width: 100%; max-width: 100%; padding: 12px 16px; font-size: 0.95rem; margin: 0 0 8px 0 !important;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .table td[data-label="Action"] .btn:last-child,
+  .table td[data-label="Actions"] .btn:last-child { margin-bottom: 0 !important; }
+
+  /* Select row cell: label left, checkbox right */
+  .table td[data-label="Select"] {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 15px;
+  }
+  .table td[data-label="Select"]::before {
+    margin-right: 0;
+    min-width: auto;
+    font-weight: 700;
+    color: #1182FF;
+  }
+  .table td[data-label="Select"] input[type="checkbox"] {
+    width: 22px; height: 22px;
+    accent-color: #1182FF;
+  }
+}

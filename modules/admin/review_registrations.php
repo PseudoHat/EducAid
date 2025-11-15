@@ -746,7 +746,7 @@ $universities = pg_fetch_all(pg_query($connection, "SELECT university_id, name F
 $yearLevels = pg_fetch_all(pg_query($connection, "SELECT year_level_id, name FROM year_levels ORDER BY sort_order"));
 ?>
 
-<?php $page_title='Review Registrations'; $extra_css=[]; include __DIR__ . '/../../includes/admin/admin_head.php'; ?>
+<?php $page_title='Review Registrations'; $extra_css=['../../assets/css/admin/table_core.css']; include __DIR__ . '/../../includes/admin/admin_head.php'; ?>
 <style>
     /* existing page styles */
         .filter-section {
@@ -767,34 +767,8 @@ $yearLevels = pg_fetch_all(pg_query($connection, "SELECT year_level_id, name FRO
         .doc-zoom-indicator { position:absolute; left:12px; top:12px; background:rgba(0,0,0,.55); color:#fff; padding:4px 10px; border-radius:20px; font-size:12px; font-weight:600; letter-spacing:.5px; z-index:50; pointer-events:none; }
         .doc-hint { position:absolute; bottom:10px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,.55); color:#fff; padding:4px 12px; border-radius:20px; font-size:12px; opacity:.85; z-index:50; pointer-events:none; }
         @media (max-width: 768px){ .doc-viewer-stage{ height:60vh; } }
-        .table-responsive {
-            box-shadow: 0 0 10px rgba(0,0,0,0.1);
-            border-radius: 8px;
-            overflow-x: auto;
-            overflow-y: visible;
-            -webkit-overflow-scrolling: touch;
-        }
-        .table {
-            min-width: 1200px;
-            width: 100%;
-        }
-        .table thead th {
-            background: #495057;
-            color: white;
-            border: none;
-            font-weight: 600;
-            position: sticky;
-            top: 0;
-            z-index: 10;
-        }
-        .table th,
-        .table td {
-            white-space: nowrap;
-            min-width: 80px;
-        }
-        .table tbody tr:hover {
-            background-color: #f8f9fa;
-        }
+        /* Table layout now comes from table_core.css (shared). Keep only hover styling if desired. */
+        .table tbody tr:hover { background-color: #f8f9fa; }
         .action-buttons {
             display: flex;
             gap: 5px;
@@ -809,13 +783,23 @@ $yearLevels = pg_fetch_all(pg_query($connection, "SELECT year_level_id, name FRO
             font-size: 0.75em;
             padding: 4px 8px;
         }
-        .bulk-actions {
-            background: #e9ecef;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            display: none;
-        }
+                .bulk-actions {
+                        background: #ffffff;
+                        border: 1px solid #dee2e6;
+                        padding: 12px 14px;
+                        border-radius: 10px;
+                        margin-bottom: 16px;
+                        display: none;
+                        position: sticky;
+                        top: calc(var(--admin-topbar-h, 52px) + var(--admin-header-h, 56px) + 8px);
+                        z-index: 1020;
+                        box-shadow: 0 6px 14px rgba(0,0,0,.06);
+                        backdrop-filter: saturate(1.2) blur(2px);
+                    }
+                @media (max-width: 767.98px){
+                    .bulk-actions { padding: 10px 12px; border-radius: 12px; }
+                    .bulk-actions .btn { font-weight: 600; }
+                }
         .pagination-info {
             color: #6c757d;
             font-size: 0.9em;
@@ -877,65 +861,7 @@ $yearLevels = pg_fetch_all(pg_query($connection, "SELECT year_level_id, name FRO
             transform: translateY(-1px);
         }
         
-        /* ================================================
-           ZOOM & RESOLUTION FIXES
-           Handles browser zoom and high-DPI displays
-           ================================================ */
-        
-        /* Scrollbar styling */
-        .table-responsive::-webkit-scrollbar {
-            height: 10px;
-        }
-        .table-responsive::-webkit-scrollbar-track {
-            background: #f1f1f1;
-            border-radius: 5px;
-        }
-        .table-responsive::-webkit-scrollbar-thumb {
-            background: #888;
-            border-radius: 5px;
-        }
-        .table-responsive::-webkit-scrollbar-thumb:hover {
-            background: #555;
-        }
-        
-        /* For desktop views at any zoom level */
-        @media (min-width: 992px) {
-            .table-responsive {
-                overflow-x: auto !important;
-                max-width: 100%;
-            }
-            .table {
-                min-width: 1400px !important;
-            }
-            .table th,
-            .table td {
-                min-width: 90px;
-            }
-            /* Name column */
-            .table th:nth-child(2),
-            .table td:nth-child(2) {
-                min-width: 200px;
-            }
-            /* Contact/Email columns */
-            .table th:nth-child(3),
-            .table td:nth-child(3),
-            .table th:nth-child(4),
-            .table td:nth-child(4) {
-                min-width: 150px;
-            }
-            /* Action column */
-            .table th:last-child,
-            .table td:last-child {
-                min-width: 160px;
-            }
-        }
-        
-        /* High-DPI displays */
-        @media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
-            .table-responsive {
-                overflow-x: auto !important;
-            }
-        }
+        /* Zoom/high-DPI handling, min-widths, and scrollbars are centralized in table_core.css. */
     </style>
 </head>
 <body>
@@ -1119,10 +1045,10 @@ $yearLevels = pg_fetch_all(pg_query($connection, "SELECT year_level_id, name FRO
                             <tbody>
                                 <?php foreach ($pendingRegistrations as $registration): ?>
                                     <tr>
-                                        <td>
+                                        <td data-label="Select">
                                             <input type="checkbox" class="row-select" value="<?php echo $registration['student_id']; ?>" onchange="updateSelection()">
                                         </td>
-                                        <td>
+                                        <td data-label="Name">
                                             <div class="d-flex align-items-center">
                                                 <div>
                                                     <div class="fw-semibold">
@@ -1132,19 +1058,19 @@ $yearLevels = pg_fetch_all(pg_query($connection, "SELECT year_level_id, name FRO
                                                 </div>
                                             </div>
                                         </td>
-                                        <td>
+                                        <td data-label="Contact">
                                             <div class="small">
                                                 <div><?php echo htmlspecialchars($registration['email']); ?></div>
                                                 <div class="text-muted"><?php echo htmlspecialchars($registration['mobile']); ?></div>
                                             </div>
                                         </td>
-                                        <td><?php echo htmlspecialchars($registration['barangay_name']); ?></td>
-                                        <td>
+                                        <td data-label="Barangay"><?php echo htmlspecialchars($registration['barangay_name']); ?></td>
+                                        <td data-label="University">
                                             <div class="small">
                                                 <?php echo htmlspecialchars($registration['university_name']); ?>
                                             </div>
                                         </td>
-                                        <td>
+                                        <td data-label="Course">
                                             <?php if (!empty($registration['course'])): ?>
                                                 <div class="small">
                                                     <?php echo htmlspecialchars($registration['course']); ?>
@@ -1153,13 +1079,13 @@ $yearLevels = pg_fetch_all(pg_query($connection, "SELECT year_level_id, name FRO
                                                 <span class="text-muted small">Not specified</span>
                                             <?php endif; ?>
                                         </td>
-                                        <td><?php echo htmlspecialchars($registration['year_level_name']); ?></td>
-                                        <td>
+                                        <td data-label="Year"><?php echo htmlspecialchars($registration['year_level_name']); ?></td>
+                                        <td data-label="Applied">
                                             <small class="text-muted">
                                                 <?php echo date('M d, Y', strtotime($registration['application_date'])); ?>
                                             </small>
                                         </td>
-                                        <td>
+                                        <td data-label="Confidence">
                                             <?php 
                                             $score = $registration['confidence_score'];
                                             $level = $registration['confidence_level'];
@@ -1174,7 +1100,7 @@ $yearLevels = pg_fetch_all(pg_query($connection, "SELECT year_level_id, name FRO
                                                 <small class="text-muted"><?php echo $level; ?></small>
                                             </div>
                                         </td>
-                                        <td>
+                                        <td data-label="Actions">
                                             <div class="action-buttons">
                                                 <button type="button" class="btn btn-success btn-sm" 
                                                         onclick="showActionModal('<?php echo $registration['student_id']; ?>', 'approve', '<?php echo htmlspecialchars(trim($registration['first_name'] . ' ' . $registration['last_name'] . ' ' . $registration['extension_name'])); ?>')">

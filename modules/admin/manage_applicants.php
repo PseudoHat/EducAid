@@ -2293,25 +2293,28 @@ if ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '' === 'XMLHttpRequest' || (isset($_GET
             <?php unset($_SESSION['success_message'], $_SESSION['success']); ?>
             <?php endif; ?>
 
-            <!-- Page Header - Clean style -->
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <div>
-                    <h1 class="fw-bold mb-1">Manage Applicants</h1>
-                    <p class="text-muted mb-0">Review and manage student applicants in the system.</p>
-                </div>
-                <div class="text-end d-flex gap-2 align-items-center">
-                    <?php if ($hasActiveDistribution): ?>
-                        <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#migrationModal">
-                            <i class="bi bi-upload me-1"></i> Migrate from CSV
-                        </button>
-                    <?php else: ?>
-                        <button class="btn btn-outline-secondary btn-sm" disabled title="Migration requires an active distribution">
-                            <i class="bi bi-upload me-1"></i> Migrate from CSV <span class="badge bg-warning text-dark ms-1">No Active Distribution</span>
-                        </button>
-                    <?php endif; ?>
-                    <span class="badge bg-info fs-6"><?php echo $totalApplicants; ?> Applicants</span>
-                </div>
-            </div>
+                        <!-- Page Header - Responsive structured layout -->
+                        <div class="page-header mb-4">
+                            <div class="page-header-title">
+                                <h1 class="fw-bold mb-1">Manage Applicants</h1>
+                                <p class="text-muted mb-0">Review and manage student applicants in the system.</p>
+                            </div>
+                            <div class="page-header-actions">
+                                <span class="badge applicants-badge"><?php echo $totalApplicants; ?> Applicants</span>
+                                <?php if ($hasActiveDistribution): ?>
+                                    <button class="btn btn-outline-primary btn-sm btn-migrate" data-bs-toggle="modal" data-bs-target="#migrationModal">
+                                        <i class="bi bi-upload"></i>
+                                        <span>Migrate CSV</span>
+                                    </button>
+                                <?php else: ?>
+                                    <button class="btn btn-outline-secondary btn-sm btn-migrate" disabled title="Migration requires an active distribution">
+                                        <i class="bi bi-upload"></i>
+                                        <span>Migrate CSV</span>
+                                        <span class="badge bg-warning text-dark ms-1">No Active Distribution</span>
+                                    </button>
+                                <?php endif; ?>
+                            </div>
+                        </div>
 
             <!-- Filter Section - Clean style -->
             <div class="filter-section">

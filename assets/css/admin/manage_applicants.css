@@ -69,6 +69,63 @@ h1.fw-bold, h2.fw-bold {
   letter-spacing: 0.01em;
 }
 
+/* ==================== PAGE HEADER ==================== */
+.page-header {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: .75rem 1rem;
+  align-items: start;
+}
+.page-header-title h1 { line-height: 1.1; color: #212529 !important; }
+.page-header-actions {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  flex-wrap: wrap;
+}
+.page-header .applicants-badge {
+  background: #0dcaf0 !important; /* info */
+  color: #06323a; /* better contrast */
+  font-weight: 700;
+  font-size: .95rem;
+  padding: .5rem .7rem;
+  border-radius: .65rem;
+  border: 1px solid #08b6cf;
+  box-shadow: 0 0 0 .12rem rgba(13,202,240,.18);
+}
+.page-header .btn-migrate {
+  display: inline-flex;
+  align-items: center;
+  gap: .45rem;
+  white-space: nowrap;
+  padding: .5rem .7rem;
+  border-width: 2px;
+  border-color: #1182FF;
+  color: #0b5ed7; /* readable primary */
+  background-color: rgba(17,130,255,.08);
+  font-weight: 600;
+}
+.page-header .btn-migrate:hover,
+.page-header .btn-migrate:focus {
+  background-color: #1182FF;
+  color: #fff;
+  border-color: #1182FF;
+}
+.page-header .btn-migrate .bi { font-size: .95rem; }
+
+/* Desktop: actions on the right, title on the left */
+@media (min-width: 768px) {
+  .page-header { grid-template-columns: 1fr auto; }
+}
+
+/* Mobile: slightly reduce title size and stack neatly */
+@media (max-width: 576px) {
+  .page-header-title h1 { font-size: 1.9rem; }
+  .page-header-actions { gap: .55rem; }
+  .page-header .applicants-badge { font-size: .92rem; padding: .45rem .6rem; }
+  .page-header .btn-migrate { padding: .45rem .6rem; }
+}
+
 /* ==================== FILTER SECTION ==================== */
 .filter-section {
   background: white;
@@ -919,8 +976,8 @@ h1.fw-bold, h2.fw-bold {
   }
 }
 
-/* Blue emphasis for important/bold/section text */
-.text-primary-em, .fw-bold, b, strong {
+/* Blue emphasis only when explicitly requested */
+.text-primary-em {
   color: #1182FF !important;
 }
 
