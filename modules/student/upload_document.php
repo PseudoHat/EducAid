@@ -34,8 +34,8 @@ $reuploadService = new DocumentReuploadService($connection);
 // Get student information including year level details
 $student_query = pg_query_params($connection, 
     "SELECT s.*, 
-            b.barangay_name, 
-            u.university_name, 
+            b.name as barangay_name, 
+            u.name as university_name, 
             yl.year_level_name as current_year_level
      FROM students s
      LEFT JOIN barangays b ON s.barangay_id = b.barangay_id
