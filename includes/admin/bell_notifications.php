@@ -132,6 +132,51 @@ $recent_notifications = getRecentNotifications($connection, $admin_id);
     padding: 0.75rem 1rem;
     background-color: #f8f9fa;
 }
+
+/* Compact mobile presentation */
+@media (max-width: 576px) {
+    .notification-dropdown {
+        width: min(92vw, 360px);
+        max-height: 70vh;
+        padding: 0;
+    }
+    .notification-item {
+        padding: 0.5rem 0.75rem;
+    }
+    .notification-item .flex-shrink-0 i {
+        font-size: 1rem;
+    }
+    .notification-item h6 {
+        font-size: 0.95rem;
+        line-height: 1.2;
+        margin-bottom: 0.125rem;
+    }
+    .notification-item p {
+        font-size: 0.8rem;
+        line-height: 1.2;
+        margin-bottom: 0.25rem;
+        display: -webkit-box;
+        -webkit-line-clamp: 1;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+    .notification-item small {
+        font-size: 0.75rem;
+    }
+    .dropdown-header {
+        padding: 0.5rem 0.75rem;
+    }
+    .dropdown-item.text-center {
+        padding: 0.5rem 0.75rem;
+    }
+    .dropdown-item.text-center .btn {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.8rem;
+    }
+    .dropdown-divider {
+        margin: 0.25rem 0;
+    }
+}
 </style>
 
 <script>
