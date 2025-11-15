@@ -65,6 +65,15 @@ class SessionTimeoutMiddleware {
         $sessionData = $this->getSessionData();
         
         if (!$sessionData) {
+            // Check if this is a fresh session (just logged in)
+            // Fresh sessions might not be in the database yet
+            if (isset($_SESSION['student_id']) && !isset($_SESSION['session_validated'])) {
+                // Mark session as validated to check next time
+                $_SESSION['session_validated'] = true;
+                // Allow this request to proceed
+                return ['status' => 'new_session', 'skip_validation' => true];
+            }
+            
             // Session not found in database - force logout
             $this->forceLogout('session_not_found');
             return ['status' => 'logged_out', 'reason' => 'session_not_found'];
