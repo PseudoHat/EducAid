@@ -403,7 +403,26 @@ while ($row = pg_fetch_assoc($barangaysResult)) {
 }
 ?>
 <?php $page_title='Household Blocked Registrations'; $extra_css=['../../assets/css/admin/manage_applicants.css', '../../assets/css/admin/table_core.css']; include __DIR__ . '/../../includes/admin/admin_head.php'; ?>
-
+<style>
+    .bulk-actions-bar {
+        background: #ffffff;
+        border: 1px solid #dee2e6;
+        padding: 12px 20px;
+        border-radius: 10px;
+        margin-bottom: 16px;
+        position: sticky;
+        top: calc(var(--admin-topbar-h, 52px) + var(--admin-header-h, 56px) + 8px);
+        z-index: 1020;
+        box-shadow: 0 6px 14px rgba(0,0,0,.1);
+        backdrop-filter: saturate(1.2) blur(2px);
+    }
+    @media (max-width: 767.98px) {
+        .bulk-actions-bar {
+            padding: 10px 12px;
+            border-radius: 12px;
+        }
+    }
+</style>
 
 <!-- Page Content Starts Here -->
 <?php include __DIR__ . '/../../includes/admin/admin_topbar.php'; ?>
@@ -513,16 +532,22 @@ while ($row = pg_fetch_assoc($barangaysResult)) {
                 </div>
 
                 <!-- Blocked Attempts Table -->
-                <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3 mb-3">
-                    <div>
-                        <h5 class="mb-0 fw-bold">
-                            Blocked Registration Attempts
-                            <span class="badge bg-danger ms-2"><?= count($records) ?> Records</span>
-                        </h5>
-                    </div>
-                    <div>
-                        <button id="bulkDeleteBtn" class="btn btn-danger btn-sm d-none" onclick="confirmBulkDelete()">
-                            <i class="bi bi-trash-fill me-1"></i><span class="d-none d-sm-inline">Delete Selected (</span><span class="d-sm-none">Delete (</span><span id="selectedCount">0</span>)
+                <div class="mb-3">
+                    <h5 class="mb-0 fw-bold">
+                        Blocked Registration Attempts
+                        <span class="badge bg-danger ms-2"><?= count($records) ?> Records</span>
+                    </h5>
+                </div>
+
+                <!-- Sticky Bulk Actions Bar -->
+                <div id="bulkActionsBar" class="bulk-actions-bar d-none">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="d-flex align-items-center gap-2">
+                            <input type="checkbox" id="selectAllSticky" class="form-check-input" onchange="toggleSelectAll(this)">
+                            <span class="fw-semibold"><span id="selectedCountText">0</span> selected</span>
+                        </div>
+                        <button class="btn btn-danger btn-sm" onclick="confirmBulkDelete()">
+                            <i class="bi bi-trash-fill me-1"></i>Delete Selected
                         </button>
                     </div>
                 </div>
@@ -705,15 +730,21 @@ while ($row = pg_fetch_assoc($barangaysResult)) {
         // Update bulk delete button visibility and count
         function updateBulkDeleteButton() {
             const checkboxes = document.querySelectorAll('.record-checkbox:checked');
-            const bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
-            const selectedCount = document.getElementById('selectedCount');
+            const bulkActionsBar = document.getElementById('bulkActionsBar');
+            const selectedCountText = document.getElementById('selectedCountText');
+            const selectAllSticky = document.getElementById('selectAllSticky');
 
             if (checkboxes.length > 0) {
-                bulkDeleteBtn.classList.remove('d-none');
-                selectedCount.textContent = checkboxes.length;
+                bulkActionsBar.classList.remove('d-none');
+                selectedCountText.textContent = checkboxes.length;
+                
+                // Sync sticky checkbox with selection state
+                const allCheckboxes = document.querySelectorAll('.record-checkbox');
+                selectAllSticky.checked = checkboxes.length === allCheckboxes.length;
             } else {
-                bulkDeleteBtn.classList.add('d-none');
+                bulkActionsBar.classList.add('d-none');
                 document.getElementById('selectAll').checked = false;
+                selectAllSticky.checked = false;
             }
         }
 
