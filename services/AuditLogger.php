@@ -70,6 +70,18 @@ class AuditLogger {
             }
             // Extract options with defaults
             $userId = $options['user_id'] ?? null;
+            
+            // Handle string-based IDs (like student_id) - convert to null for integer field
+            // Store the actual ID in metadata instead
+            if ($userId !== null && !is_numeric($userId)) {
+                // Store original string ID in metadata
+                $options['metadata'] = $options['metadata'] ?? [];
+                $options['metadata']['original_user_id'] = $userId;
+                $userId = null; // Set to null since DB field expects integer
+            } else if ($userId !== null) {
+                $userId = (int)$userId;
+            }
+            
             $userType = $options['user_type'] ?? 'system';
             $username = $options['username'] ?? null;
             $status = $options['status'] ?? 'success';
@@ -143,13 +155,14 @@ class AuditLogger {
             'authentication',
             ucfirst($userType) . " '{$username}' logged in successfully",
             [
-                'user_id' => $userId,
+                'user_id' => $userId, // Will be handled by logEvent (converted to null if string)
                 'user_type' => $userType,
                 'username' => $username,
                 'status' => 'success',
                 'metadata' => [
                     'login_time' => date('Y-m-d H:i:s'),
-                    'session_id' => session_id()
+                    'session_id' => session_id(),
+                    'actual_user_id' => $userId // Keep original ID
                 ]
             ]
         );
@@ -190,7 +203,8 @@ class AuditLogger {
                 'username' => $username,
                 'status' => 'success',
                 'metadata' => [
-                    'logout_time' => date('Y-m-d H:i:s')
+                    'logout_time' => date('Y-m-d H:i:s'),
+                    'actual_user_id' => $userId
                 ]
             ]
         );
@@ -484,7 +498,8 @@ class AuditLogger {
                 'old_values' => ['email' => $oldEmail],
                 'new_values' => ['email' => $newEmail],
                 'metadata' => [
-                    'change_time' => date('Y-m-d H:i:s')
+                    'change_time' => date('Y-m-d H:i:s'),
+                    'actual_user_id' => $userId
                 ]
             ]
         );
@@ -505,7 +520,8 @@ class AuditLogger {
                 'affected_table' => $userType === 'admin' ? 'admins' : 'students',
                 'affected_record_id' => $userId,
                 'metadata' => [
-                    'change_time' => date('Y-m-d H:i:s')
+                    'change_time' => date('Y-m-d H:i:s'),
+                    'actual_user_id' => $userId
                 ]
             ]
         );
