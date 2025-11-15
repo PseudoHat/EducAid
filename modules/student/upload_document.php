@@ -278,6 +278,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_year_level']))
         $mothers_maiden_name = isset($_POST['mothers_maiden_name']) ? trim($_POST['mothers_maiden_name']) : null;
         $school_student_id = isset($_POST['school_student_id']) ? trim($_POST['school_student_id']) : null;
         
+        // Debug log
+        error_log("UPDATE REQUEST - student_id: {$student_id}, university_id: {$university_id}, mothers_maiden_name: " . ($mothers_maiden_name ?: 'NULL') . ", school_student_id: " . ($school_student_id ?: 'NULL') . ", year_level: {$year_level}");
+        
         // Password update for migrated students (optional - only required if provided or if completing profile for first time)
         $new_password = isset($_POST['new_password']) ? trim($_POST['new_password']) : null;
         $confirm_password = isset($_POST['confirm_password']) ? trim($_POST['confirm_password']) : null;
