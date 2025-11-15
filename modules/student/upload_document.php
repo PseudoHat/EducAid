@@ -590,7 +590,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_year_level']))
         $confirm_archive = isset($_POST['confirm_archive']) && $_POST['confirm_archive'] === '1';
         error_log("YEAR LEVEL ADVANCEMENT CHECK - confirm_archive: " . ($confirm_archive ? 'YES' : 'NO'));
         
-        if (!empty($current_info['current_year_level']) && 
+        // SKIP year repetition check for students who never confirmed their year level before
+        // (status_academic_year is NULL means they're setting it for the first time)
+        $is_first_year_confirmation = empty($current_info['status_academic_year']);
+        error_log("YEAR LEVEL ADVANCEMENT CHECK - is_first_year_confirmation: " . ($is_first_year_confirmation ? 'YES' : 'NO') . ", status_academic_year: " . ($current_info['status_academic_year'] ?: 'NULL'));
+        
+        if (!$is_first_year_confirmation && 
+            !empty($current_info['current_year_level']) && 
             isset($year_levels[$current_info['current_year_level']]) && 
             isset($year_levels[$year_level])) {
             
