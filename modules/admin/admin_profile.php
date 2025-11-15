@@ -480,6 +480,113 @@ $csrf_password_token = CSRFProtection::generateToken('password_otp_request');
     border-radius: 0 0 12px 12px;
   }
   
+  /* Modal responsive sizing */
+  @media (max-width: 767px) {
+    /* Apply compact sizing similar to manage_applicants */
+    #changeEmailModal .modal-dialog,
+    #changePasswordModal .modal-dialog {
+      max-width: 90% !important;
+      margin: 1.5rem auto !important;
+    }
+    
+    #changeEmailModal .modal-content,
+    #changePasswordModal .modal-content {
+      height: auto !important;
+      max-height: 85vh !important;
+      border-radius: 1rem !important;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    #changeEmailModal .modal-header,
+    #changePasswordModal .modal-header {
+      padding: 0.75rem 1rem;
+      position: sticky;
+      top: 0;
+      background: #f8f9fa;
+      z-index: 1;
+      border-radius: 1rem 1rem 0 0;
+      border-bottom: 1px solid #e0e0e0;
+    }
+    
+    #changeEmailModal .modal-body,
+    #changePasswordModal .modal-body {
+      padding: 0.75rem 1rem;
+      overflow-y: auto;
+      max-height: calc(85vh - 140px);
+      flex: 1;
+    }
+    
+    #changeEmailModal .modal-footer,
+    #changePasswordModal .modal-footer {
+      padding: 0.75rem 1rem;
+      position: sticky;
+      bottom: 0;
+      background: #fff;
+      z-index: 1;
+      border-top: 1px solid #e0e0e0;
+      flex-shrink: 0;
+    }
+    
+    #changeEmailModal .modal-title,
+    #changePasswordModal .modal-title {
+      font-size: 1rem;
+      line-height: 1.3;
+    }
+    
+    #changeEmailModal .modal-title i,
+    #changePasswordModal .modal-title i {
+      font-size: 0.9rem;
+    }
+    
+    #changeEmailModal .form-label,
+    #changePasswordModal .form-label {
+      font-size: 0.85rem;
+      margin-bottom: 0.4rem;
+      font-weight: 600;
+    }
+    
+    #changeEmailModal .form-control,
+    #changePasswordModal .form-control {
+      font-size: 0.9rem;
+      padding: 0.6rem 0.75rem;
+    }
+    
+    #changeEmailModal .btn,
+    #changePasswordModal .btn {
+      font-size: 0.875rem;
+      padding: 0.6rem 1rem;
+    }
+    
+    #changeEmailModal .small,
+    #changePasswordModal .small,
+    #changeEmailModal small,
+    #changePasswordModal small {
+      font-size: 0.75rem;
+    }
+    
+    #changeEmailModal .alert,
+    #changePasswordModal .alert {
+      padding: 0.75rem;
+      font-size: 0.85rem;
+      margin-bottom: 0.75rem;
+    }
+    
+    #changeEmailModal .input-group-text,
+    #changePasswordModal .input-group-text {
+      font-size: 0.85rem;
+      padding: 0.6rem 0.75rem;
+    }
+    
+    /* OTP input special styling */
+    #changeEmailModal #emailOTP,
+    #changePasswordModal #passwordOTP {
+      font-size: 1.2rem !important;
+      letter-spacing: 4px;
+      padding: 0.75rem !important;
+    }
+  }
+  
   /* Form Controls */
   .form-control {
     border-radius: 8px;
@@ -525,15 +632,68 @@ $csrf_password_token = CSRFProtection::generateToken('password_otp_request');
       text-align: center;
     }
     
+    .info-card-header {
+      padding: 1rem 1.15rem;
+      flex-wrap: wrap;
+    }
+    
+    .info-card-header h5 {
+      font-size: 0.95rem;
+    }
+    
+    .info-card-body {
+      padding: 1rem 1.15rem;
+    }
+    
     .info-item {
       flex-direction: column;
-      align-items: flex-start;
+      align-items: stretch;
       gap: 0.5rem;
+      padding: 1rem 0;
+      border-top: 1px solid #e4e8ec;
+    }
+    
+    .info-item:first-of-type {
+      border-top: none;
+      padding-top: 0;
+    }
+    
+    .info-label {
+      font-size: 0.7rem;
+      min-width: auto;
+      margin-bottom: 0.25rem;
+      letter-spacing: 0.3px;
+    }
+    
+    .info-value {
+      margin: 0;
+      font-size: 0.95rem;
+      margin-bottom: 0.5rem;
     }
     
     .info-actions {
       width: 100%;
+      justify-content: flex-start;
+      margin-top: 0.25rem;
+    }
+    
+    .info-actions .text-muted {
+      font-size: 0.75rem;
+    }
+    
+    .btn-edit, .btn-change-pwd {
+      width: 100%;
       justify-content: center;
+      padding: 0.5rem 1rem;
+    }
+    
+    .settings-icon-btn {
+      width: 36px;
+      height: 36px;
+    }
+    
+    .settings-icon-btn .bi {
+      font-size: 0.95rem;
     }
   }
 </style>

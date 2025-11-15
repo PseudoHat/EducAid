@@ -742,6 +742,7 @@ if ($current_year_check && pg_num_rows($current_year_check) > 0) {
 <!DOCTYPE html>
 <html lang="en">
 <?php $page_title='Distribution Control Center'; include __DIR__ . '/../../includes/admin/admin_head.php'; ?>
+<link rel="stylesheet" href="../../assets/css/admin/table_core.css"/>
 <style>
   /* Clean Distribution Control Styling - Matching review_registrations.php */
   .filter-section {
@@ -783,7 +784,7 @@ if ($current_year_check && pg_num_rows($current_year_check) > 0) {
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
   }
   
-  .metric-card {
+    .metric-card {
     background: white;
     border-radius: 12px;
     border: 1px solid #e3e7ec;
@@ -791,6 +792,8 @@ if ($current_year_check && pg_num_rows($current_year_check) > 0) {
     text-align: center;
     transition: all 0.3s ease;
     height: 100%;
+        position: relative;
+        overflow: hidden;
   }
   
   .metric-card:hover {
@@ -799,29 +802,42 @@ if ($current_year_check && pg_num_rows($current_year_check) > 0) {
     border-color: #d0d7de;
   }
   
-  .metric-icon {
-    width: 60px;
-    height: 60px;
-    border-radius: 12px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.75rem;
-    margin-bottom: 1rem;
-  }
+    /* Metric icons + accent design */
+    .metric-card .metric-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-size: 1.25rem;
+            margin-bottom: 0.25rem;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+    }
+    .metric-card.accent-primary { --metric-accent: #667eea; }
+    .metric-card.accent-success { --metric-accent: #38a169; }
+    .metric-card.accent-info { --metric-accent: #3182ce; }
+    .metric-card.accent-warning { --metric-accent: #ed8936; }
+    .metric-card.accent-danger { --metric-accent: #e53e3e; }
+    .metric-card.accent-primary .metric-icon { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+    .metric-card.accent-success .metric-icon { background: linear-gradient(135deg, #48bb78 0%, #38a169 100%); }
+    .metric-card.accent-info .metric-icon { background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%); }
+    .metric-card.accent-warning .metric-icon { background: linear-gradient(135deg, #f6ad55 0%, #ed8936 100%); }
+    .metric-card.accent-danger .metric-icon { background: linear-gradient(135deg, #f56565 0%, #e53e3e 100%); }
   
-  .metric-value {
-    font-size: 2rem;
-    font-weight: 700;
-    margin-bottom: 0.25rem;
-    color: #2c3e50;
-  }
+    .metric-value {
+        font-size: 2rem;
+        font-weight: 800;
+        margin-bottom: 0.25rem;
+        color: #2c3e50;
+    }
   
-  .metric-label {
-    font-size: 0.875rem;
-    color: #6c757d;
-    font-weight: 500;
-  }
+    .metric-label {
+        font-size: 0.95rem;
+        color: #475569;
+        font-weight: 700;
+    }
   
   .action-card {
     background: white;
@@ -960,19 +976,210 @@ if ($current_year_check && pg_num_rows($current_year_check) > 0) {
     background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
     color: #1e40af;
   }
+
+    /* ==================== DESKTOP TABLE CARD (match manage_applicants) ==================== */
+    @media (min-width: 768px) {
+        .table-card {
+            background: #ffffff;
+            border-radius: 12px;
+            border: 1px solid #e3e7ec;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            overflow: hidden;
+        }
+        .table-card .table-responsive { margin-top: 0; border-radius: 0; box-shadow: none; background: transparent; }
+        .table-card .table { margin: 0; border-collapse: separate; border-spacing: 0; }
+        .table-card thead th {
+            background: #3a4046 !important; /* dark header like manage_applicants */
+            color: #ffffff !important;
+            font-weight: 700;
+            font-size: 1rem;
+            padding: 14px 18px;
+            border: none !important;
+        }
+        .table-card tbody td {
+            padding: 18px;
+            font-size: 1rem;
+            color: #2c3e50;
+            border-top: 1px solid #eef1f4 !important;
+        }
+    }
   
-  @media (max-width: 768px) {
+    @media (max-width: 768px) {
     .control-header {
       padding: 1.5rem;
     }
     
-    .metric-card {
+    /* Header Section Mobile Optimization */
+    .d-flex.justify-content-between.align-items-center {
+      flex-direction: column !important;
+      align-items: flex-start !important;
+      gap: 1rem;
+    }
+    
+    .d-flex.justify-content-between.align-items-center > div {
+      width: 100%;
+    }
+    
+    .d-flex.justify-content-between.align-items-center > div:first-child h1 {
+      font-size: 2rem;
+      margin-bottom: 0.5rem;
+    }
+    
+    .d-flex.justify-content-between.align-items-center > div:first-child p {
+      font-size: 1rem;
+      margin-bottom: 0.75rem;
+    }
+    
+        /* Badge layout for semester and deadline (scoped) */
+        #mainContent .d-flex.gap-2.mt-2 {
+            display: grid !important;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.5rem !important;
+            margin-top: 0.75rem !important;
+        }
+        #mainContent .d-flex.gap-2.mt-2 .badge {
+            width: 100%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: flex-start;
+            gap: .5rem;
+            min-height: 42px;
+            padding: 8px 12px !important;
+        }
+    
+    .d-flex.gap-2.mt-2 .badge {
+      width: 100%;
+      text-align: left;
+      font-size: 0.9rem !important;
+      padding: 8px 12px !important;
+    }
+    
+    /* Status badge and buttons alignment */
+    .d-flex.flex-column.align-items-end {
+      align-items: flex-start !important;
+      width: 100%;
+    }
+    
+    .d-flex.flex-column.align-items-end .badge {
+      width: 100%;
+      text-align: center;
+      font-size: 1rem !important;
+      padding: 10px 14px;
+    }
+    
+        /* Manage Slots and Scheduling buttons (scoped) */
+        #mainContent .d-flex.flex-column.align-items-end .d-flex.gap-2 {
+            width: 100%;
+            display: grid !important;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.5rem !important;
+            margin-top: 0.75rem !important;
+        }
+    
+        #mainContent .d-flex.flex-column.align-items-end .d-flex.gap-2 a {
+            width: 100%;
+            text-align: center;
+            justify-content: center;
+            font-size: 0.95rem;
+            padding: 0.6rem 1rem;
+            height: 48px;
+            display: inline-flex;
+            align-items: center;
+            gap: .5rem;
+        }
+        #mainContent .d-flex.flex-column.align-items-end .d-flex.gap-2 a .bi { font-size: 1.1rem; }
+
+        /* Subtitle spacing tweak */
+        #mainContent .d-flex.justify-content-between.align-items-center > div:first-child p.text-muted {
+            margin-bottom: .5rem !important;
+        }
+    
+        /* Metric cards: compact, two-column grid */
+        .metric-card { margin-bottom: 1rem; padding: 1rem; }
+    
+        .metric-value { font-size: 1.6rem; }
+    
+        .metric-label { font-size: 0.95rem; }
+    
+    /* Action cards optimization */
+    .action-card {
+      padding: 1.25rem;
       margin-bottom: 1rem;
     }
     
-    .action-card {
-      padding: 1.5rem;
+    .action-card-title {
+      font-size: 1.15rem;
     }
+    
+    .action-card-text {
+      font-size: 0.95rem;
+    }
+    
+    /* Quick actions mobile */
+    .quick-actions {
+      padding: 1rem;
+    }
+    
+    .quick-actions .d-flex {
+      flex-direction: column !important;
+      gap: 1rem !important;
+    }
+    
+    .quick-actions h5 {
+      font-size: 1.1rem;
+    }
+    
+    .quick-actions small {
+      font-size: 0.9rem;
+    }
+    
+    .quick-actions .btn-light {
+      width: 100%;
+      text-align: center;
+      font-size: 0.95rem;
+    }
+    
+    /* Table responsive */
+    .history-table {
+      font-size: 0.9rem;
+    }
+    
+    .history-table th,
+    .history-table td {
+      padding: 0.75rem 0.5rem;
+      font-size: 0.9rem;
+    }
+  }
+  
+  @media (max-width: 576px) {
+    /* Extra small devices - slightly smaller but still readable */
+    .d-flex.justify-content-between.align-items-center > div:first-child h1 {
+      font-size: 1.75rem;
+    }
+    
+    .d-flex.justify-content-between.align-items-center > div:first-child p {
+      font-size: 0.95rem;
+    }
+    
+        #mainContent .badge {
+      font-size: 0.85rem !important;
+    }
+    
+        #mainContent .btn {
+      font-size: 0.9rem;
+      padding: 0.55rem 1rem;
+    }
+    
+        /* make metrics 2-up on very small screens */
+        .metrics-row .col-sm-6 { flex: 0 0 50%; max-width: 50%; }
+        .metric-value { font-size: 1.5rem; }
+        .metric-label { font-size: 0.9rem; }
+
+        /* For very narrow devices, fall back to single column for chips/buttons */
+        #mainContent .d-flex.gap-2.mt-2,
+        #mainContent .d-flex.flex-column.align-items-end .d-flex.gap-2 {
+            grid-template-columns: 1fr !important;
+        }
   }
 </style>
 <body>
@@ -1083,39 +1290,33 @@ if ($current_year_check && pg_num_rows($current_year_check) > 0) {
             </div>
                             
             <!-- Metrics Dashboard -->
-            <div class="row g-3 mb-4">
+            <div class="row g-3 mb-4 metrics-row">
                 <div class="col-md-3 col-sm-6">
-                    <div class="metric-card">
-                        <div class="metric-icon" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
-                            <i class="bi bi-people-fill text-white"></i>
-                        </div>
+                    <div class="metric-card accent-primary">
+                        <div class="metric-icon"><i class="bi bi-people-fill"></i></div>
                         <div class="metric-value"><?= $student_counts['active_count'] ?></div>
                         <div class="metric-label">Active Students</div>
                     </div>
                 </div>
                 <div class="col-md-3 col-sm-6">
-                    <div class="metric-card">
-                        <div class="metric-icon" style="background: linear-gradient(135deg, <?= $workflow_status['slots_open'] ? '#48bb78' : '#f56565' ?> 0%, <?= $workflow_status['slots_open'] ? '#38a169' : '#e53e3e' ?> 100%);">
-                            <i class="bi bi-door-<?= $workflow_status['slots_open'] ? 'open' : 'closed' ?>-fill text-white"></i>
-                        </div>
+                    <?php $slotsAccent = $workflow_status['slots_open'] ? 'accent-success' : 'accent-danger'; $slotIcon = $workflow_status['slots_open'] ? 'door-open-fill' : 'door-closed-fill'; ?>
+                    <div class="metric-card <?= $slotsAccent ?>">
+                        <div class="metric-icon"><i class="bi bi-<?= $slotIcon ?>"></i></div>
                         <div class="metric-value"><?= $workflow_status['slots_open'] ? 'Open' : 'Closed' ?></div>
                         <div class="metric-label">Registration Slots</div>
                     </div>
                 </div>
                 <div class="col-md-3 col-sm-6">
-                    <div class="metric-card">
-                        <div class="metric-icon" style="background: linear-gradient(135deg, <?= $workflow_status['uploads_enabled'] ? '#4299e1' : '#ed8936' ?> 0%, <?= $workflow_status['uploads_enabled'] ? '#3182ce' : '#dd6b20' ?> 100%);">
-                            <i class="bi bi-cloud-<?= $workflow_status['uploads_enabled'] ? 'upload' : 'slash' ?>-fill text-white"></i>
-                        </div>
+                    <?php $uploadsAccent = $workflow_status['uploads_enabled'] ? 'accent-info' : 'accent-warning'; $uploadIcon = $workflow_status['uploads_enabled'] ? 'cloud-upload-fill' : 'cloud-slash-fill'; ?>
+                    <div class="metric-card <?= $uploadsAccent ?>">
+                        <div class="metric-icon"><i class="bi bi-<?= $uploadIcon ?>"></i></div>
                         <div class="metric-value"><?= $workflow_status['uploads_enabled'] ? 'Enabled' : 'Disabled' ?></div>
                         <div class="metric-label">Document Uploads</div>
                     </div>
                 </div>
                 <div class="col-md-3 col-sm-6">
-                    <div class="metric-card">
-                        <div class="metric-icon" style="background: linear-gradient(135deg, #f6ad55 0%, #ed8936 100%);">
-                            <i class="bi bi-person-plus-fill text-white"></i>
-                        </div>
+                    <div class="metric-card accent-warning">
+                        <div class="metric-icon"><i class="bi bi-person-plus-fill"></i></div>
                         <div class="metric-value"><?= $student_counts['applicant_count'] ?></div>
                         <div class="metric-label">Pending Applicants</div>
                     </div>
@@ -1191,8 +1392,9 @@ if ($current_year_check && pg_num_rows($current_year_check) > 0) {
                                     <h4 class="mb-3">
                                         <i class="bi bi-clock-history me-2"></i>Recent Distribution History
                                     </h4>
-                                    <div class="table-responsive">
-                                        <table class="table table-sm">
+                                    <div class="table-card">
+                                      <div class="table-responsive">
+                                        <table class="table align-middle">
                                             <thead class="table-light">
                                                 <tr>
                                                     <th>Date</th>
@@ -1204,14 +1406,15 @@ if ($current_year_check && pg_num_rows($current_year_check) > 0) {
                                             <tbody>
                                                 <?php while ($hist = pg_fetch_assoc($history_result)): ?>
                                                     <tr>
-                                                        <td><?= date('M j, Y', strtotime($hist['distribution_date'])) ?></td>
-                                                        <td><?= htmlspecialchars($hist['academic_year']) ?> <?= htmlspecialchars($hist['semester']) ?></td>
-                                                        <td><?= $hist['actual_student_count'] ?? 0 ?></td>
-                                                        <td><?= htmlspecialchars($hist['location']) ?></td>
+                                                        <td data-label="Date"><?= date('M j, Y', strtotime($hist['distribution_date'])) ?></td>
+                                                        <td data-label="Academic Period"><?= htmlspecialchars($hist['academic_year']) ?> <?= htmlspecialchars($hist['semester']) ?></td>
+                                                        <td data-label="Students"><?= $hist['actual_student_count'] ?? 0 ?></td>
+                                                        <td data-label="Location"><?= htmlspecialchars($hist['location']) ?></td>
                                                     </tr>
                                                 <?php endwhile; ?>
                                             </tbody>
                                         </table>
+                                      </div>
                                     </div>
                             </div>
                         <?php endif; ?>

@@ -440,6 +440,20 @@ if ($totalSlotsQuery) {
 }
 ?>
 <?php $page_title='Manage Signup Slots'; $extra_css=['../../assets/css/admin/manage_slots.css']; include __DIR__ . '/../../includes/admin/admin_head.php'; ?>
+<link rel="stylesheet" href="../../assets/css/admin/table_core.css"/>
+<style>
+  /* Mobile capacity alert fix */
+  @media (max-width: 768px) {
+    .alert {
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+    }
+    .alert a {
+      display: inline-block;
+      word-break: break-word;
+    }
+  }
+</style>
 </head>
 <body>
 <?php include __DIR__ . '/../../includes/admin/admin_topbar.php'; ?>
@@ -595,10 +609,12 @@ if ($totalSlotsQuery) {
           <?php endif; ?>
           
           <?php if ($maxCapacity === null): ?>
-          <div class="alert alert-warning mt-3 mb-0">
-            <i class="bi bi-exclamation-triangle me-2"></i>
-            <strong>Notice:</strong> Maximum capacity not set. Please configure it in 
-            <a href="settings.php" class="alert-link">Settings</a> to get slot recommendations.
+          <div class="alert alert-warning mt-3 mb-0" style="display: flex; align-items: start; gap: 0.5rem;">
+            <i class="bi bi-exclamation-triangle" style="flex-shrink: 0; margin-top: 0.125rem;"></i>
+            <div style="flex: 1; min-width: 0;">
+              <strong>Notice:</strong> Maximum capacity not set. Please configure it in 
+              <a href="settings.php" class="alert-link">Settings</a> to get slot recommendations.
+            </div>
           </div>
           <?php endif; ?>
         </div>
@@ -824,37 +840,39 @@ if ($totalSlotsQuery) {
               </form>
 
               <h6 class="fw-semibold mt-4"><i class="bi bi-people"></i> All Registrations (Pending + Approved)</h6>
-              <div class="table-responsive">
-                <table class="table table-bordered table-sm table-striped align-middle">
-                  <thead class="table-light">
-                    <tr>
-                      <th>Name</th>
-                      <th>Application Date</th>
-                      <th>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <?php foreach ($applicantList as $a): ?>
+              <div class="table-card">
+                <div class="table-responsive">
+                  <table class="table align-middle">
+                    <thead>
                       <tr>
-                        <td><?= htmlspecialchars(formatName($a['last_name'], $a['first_name'], $a['middle_name'])) ?></td>
-                        <td><?= date('M d, Y — h:i A', strtotime($a['application_date'])) ?></td>
-                        <td>
-                          <?php if ($a['status'] === 'under_registration'): ?>
-                            <span class="badge bg-warning">Pending Approval</span>
-                          <?php elseif ($a['status'] === 'applicant'): ?>
-                            <span class="badge bg-success">Approved</span>
-                          <?php elseif ($a['status'] === 'verified'): ?>
-                            <span class="badge bg-info">Verified</span>
-                          <?php elseif ($a['status'] === 'active'): ?>
-                            <span class="badge bg-primary">Active</span>
-                          <?php else: ?>
-                            <span class="badge bg-secondary"><?php echo htmlspecialchars(ucfirst($a['status'])); ?></span>
-                          <?php endif; ?>
-                        </td>
+                        <th>Name</th>
+                        <th>Application Date</th>
+                        <th>Status</th>
                       </tr>
-                    <?php endforeach; ?>
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      <?php foreach ($applicantList as $a): ?>
+                        <tr>
+                          <td data-label="Name"><?= htmlspecialchars(formatName($a['last_name'], $a['first_name'], $a['middle_name'])) ?></td>
+                          <td data-label="Application Date"><?= date('M d, Y — h:i A', strtotime($a['application_date'])) ?></td>
+                          <td data-label="Status">
+                            <?php if ($a['status'] === 'under_registration'): ?>
+                              <span class="badge bg-warning">Pending Approval</span>
+                            <?php elseif ($a['status'] === 'applicant'): ?>
+                              <span class="badge bg-success">Approved</span>
+                            <?php elseif ($a['status'] === 'verified'): ?>
+                              <span class="badge bg-info">Verified</span>
+                            <?php elseif ($a['status'] === 'active'): ?>
+                              <span class="badge bg-primary">Active</span>
+                            <?php else: ?>
+                              <span class="badge bg-secondary"><?php echo htmlspecialchars(ucfirst($a['status'])); ?></span>
+                            <?php endif; ?>
+                          </td>
+                        </tr>
+                      <?php endforeach; ?>
+                    </tbody>
+                  </table>
+                </div>
               </div>
               <?php
                 $totalPages = ceil($totalApplicants / $limit);
@@ -944,44 +962,39 @@ if ($totalSlotsQuery) {
                   </div>
                   
                   <?php if ($participants_count > 0): ?>
-                    <div class="card shadow-sm">
-                      <div class="card-header">
-                        <strong><i class="bi bi-person-lines-fill me-2"></i>Slot Participants</strong>
-                      </div>
-                      <div class="card-body p-0">
-                        <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
-                          <table class="table table-sm table-hover mb-0">
-                            <thead style="position: sticky; top: 0; background: #495057; color: white; z-index: 1;">
+                    <div class="table-card">
+                      <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+                        <table class="table mb-0">
+                          <thead style="position: sticky; top: 0; z-index: 1;">
+                            <tr>
+                              <th style="width: 5%">#</th>
+                              <th style="width: 45%">Name</th>
+                              <th style="width: 25%">Application Date</th>
+                              <th style="width: 25%">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <?php foreach ($participants as $idx => $participant): ?>
                               <tr>
-                                <th style="width: 5%">#</th>
-                                <th style="width: 45%">Name</th>
-                                <th style="width: 25%">Application Date</th>
-                                <th style="width: 25%">Status</th>
+                                <td data-label="#"><?= $idx + 1 ?></td>
+                                <td data-label="Name"><?= htmlspecialchars($participant['first_name'] . ' ' . $participant['last_name']) ?></td>
+                                <td data-label="Application Date"><?= date('M j, Y', strtotime($participant['application_date'])) ?></td>
+                                <td data-label="Status">
+                                  <?php
+                                  $status_badges = [
+                                      'under_registration' => '<span class="badge bg-warning text-dark">Pending</span>',
+                                      'applicant' => '<span class="badge bg-info">Approved</span>',
+                                      'active' => '<span class="badge bg-success">Verified</span>',
+                                      'given' => '<span class="badge bg-primary">Distributed</span>',
+                                      'archived' => '<span class="badge bg-secondary">Archived</span>'
+                                  ];
+                                  echo $status_badges[$participant['status']] ?? '<span class="badge bg-secondary">' . ucfirst($participant['status']) . '</span>';
+                                  ?>
+                                </td>
                               </tr>
-                            </thead>
-                            <tbody>
-                              <?php foreach ($participants as $idx => $participant): ?>
-                                <tr>
-                                  <td><?= $idx + 1 ?></td>
-                                  <td><?= htmlspecialchars($participant['first_name'] . ' ' . $participant['last_name']) ?></td>
-                                  <td><?= date('M j, Y', strtotime($participant['application_date'])) ?></td>
-                                  <td>
-                                    <?php
-                                    $status_badges = [
-                                        'under_registration' => '<span class="badge bg-warning text-dark">Pending</span>',
-                                        'applicant' => '<span class="badge bg-info">Approved</span>',
-                                        'active' => '<span class="badge bg-success">Verified</span>',
-                                        'given' => '<span class="badge bg-primary">Distributed</span>',
-                                        'archived' => '<span class="badge bg-secondary">Archived</span>'
-                                    ];
-                                    echo $status_badges[$participant['status']] ?? '<span class="badge bg-secondary">' . ucfirst($participant['status']) . '</span>';
-                                    ?>
-                                  </td>
-                                </tr>
-                              <?php endforeach; ?>
-                            </tbody>
-                          </table>
-                        </div>
+                            <?php endforeach; ?>
+                          </tbody>
+                        </table>
                       </div>
                     </div>
                   <?php else: ?>
