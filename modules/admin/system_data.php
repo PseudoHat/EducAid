@@ -399,9 +399,23 @@ if (isset($_GET['error'])) {
     <link rel="stylesheet" href="../../assets/css/bootstrap-icons.css" />
     <link rel="stylesheet" href="../../assets/css/admin/homepage.css" />
     <link rel="stylesheet" href="../../assets/css/admin/sidebar.css" />
-    <link rel="stylesheet" href="../../assets/css/admin/modern-ui.css" />
     <link rel="stylesheet" href="../../assets/css/admin/table_core.css" />
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet" />
+    <style>
+        .page-title { font-weight: 700; color: #111; }
+        .page-subtitle { color: #6c757d; }
+        .card-gradient .card-header {
+            background: linear-gradient(135deg, #6f42c1 0%, #0d6efd 100%);
+            color: #fff;
+        }
+        .tab-card .card { border: 1px solid rgba(0,0,0,.075); box-shadow: 0 2px 8px rgba(0,0,0,.05); }
+        .nav-tabs .nav-link { font-weight: 600; }
+        .section-actions .btn { white-space: nowrap; }
+        @media (max-width: 576px) {
+            .modal-mobile-compact .modal-dialog { max-width: 92vw; margin: .75rem auto; }
+            .modal-mobile-compact .modal-content { max-height: 75vh; overflow: auto; }
+        }
+    </style>
 </head>
 <body>
 <div id="wrapper">
@@ -419,208 +433,207 @@ if (isset($_GET['error'])) {
         <!-- Removed duplicate burger menu nav (already provided by topbar/header includes) -->
         
         <div class="container-fluid py-4 px-4">
-            <h4 class="fw-bold mb-4"><i class="bi bi-database me-2 text-primary"></i>System Data Management</h4>
-            
+            <div class="mb-4">
+                <h4 class="page-title mb-1">System Data Management</h4>
+                <div class="page-subtitle">Manage reference lists for universities, barangays, and year levels.</div>
+            </div>
+
             <?php if (isset($success)): ?>
-                <div class="modern-alert modern-alert-success"><?= htmlspecialchars($success) ?></div>
+                <div class="alert alert-success"><?= htmlspecialchars($success) ?></div>
             <?php endif; ?>
             <?php if (isset($error)): ?>
-                <div class="modern-alert modern-alert-danger"><?= htmlspecialchars($error) ?></div>
+                <div class="alert alert-danger"><?= htmlspecialchars($error) ?></div>
             <?php endif; ?>
 
-            <!-- Universities Management -->
-            <div class="modern-card mb-4">
-                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0"><i class="bi bi-building me-2"></i>Universities Management</h5>
-                    <span class="badge bg-light text-dark"><?= count($universities) ?> universities</span>
-                </div>
-                <div class="card-body p-4">
-                    <!-- Controls Row -->
-                    <div class="row mb-3">
-                        <div class="col-md-6">
-                            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addUniversityModal">
-                                <i class="bi bi-plus"></i> Add University
-                            </button>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="input-group">
-                                <input type="text" class="form-control" id="universitySearch" placeholder="Search universities...">
-                                <span class="input-group-text"><i class="bi bi-search"></i></span>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Universities List -->
-                    <div class="table-responsive">
-                        <table class="table table-hover mb-0" id="universitiesTable">
-                            <thead class="table-dark">
-                                <tr>
-                                    <th style="width: 50px;">#</th>
-                                    <th>University Name</th>
-                                    <th>Code</th>
-                                    <th>Students</th>
-                                    <th>Created</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php 
-                                $displayNumber = 1;
-                                foreach ($universities as $university): ?>
-                                    <tr>
-                                        <td data-label="#" class="fw-semibold text-muted"><?= $displayNumber++ ?></td>
-                                        <td data-label="University Name"><?= htmlspecialchars($university['name']) ?></td>
-                                        <td data-label="Code"><span class="modern-badge modern-badge-info"><?= htmlspecialchars($university['code']) ?></span></td>
-                                        <td data-label="Students"><?= $university['student_count'] ?> students</td>
-                                        <td data-label="Created"><?= date('M d, Y', strtotime($university['created_at'])) ?></td>
-                                        <td data-label="Actions">
-                                            <button type="button" class="btn btn-sm btn-outline-primary me-1" onclick="showEditUniversityModal(<?= $university['university_id'] ?>, '<?= htmlspecialchars($university['name'], ENT_QUOTES) ?>', '<?= htmlspecialchars($university['code'], ENT_QUOTES) ?>')">
-                                                <i class="bi bi-pencil"></i> Edit
-                                            </button>
-                                            <?php if ($university['student_count'] == 0): ?>
-                                                <button type="button" class="btn btn-sm btn-outline-danger" onclick="showDeleteUniversityModal(<?= $university['university_id'] ?>, '<?= htmlspecialchars($university['name'], ENT_QUOTES) ?>')">
-                                                    <i class="bi bi-trash"></i> Delete
-                                                </button>
-                                            <?php else: ?>
-                                                <span class="text-muted small">(<?= $university['student_count'] ?> students)</span>
-                                            <?php endif; ?>
-                                        </td>
-                                    </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                    
-                    <!-- Pagination Controls -->
-                    <div class="d-flex justify-content-between align-items-center mt-3">
-                        <div>
-                            <select id="universitiesPerPage" class="form-select form-select-sm" style="width: auto;">
-                                <option value="10">10 per page</option>
-                                <option value="25" selected>25 per page</option>
-                                <option value="50">50 per page</option>
-                                <option value="100">100 per page</option>
-                            </select>
-                        </div>
-                        <div>
-                            <span id="universitiesInfo" class="text-muted"></span>
-                        </div>
-                        <div>
-                            <nav>
-                                <ul class="pagination pagination-sm mb-0" id="universitiesPagination"></ul>
-                            </nav>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <ul class="nav nav-tabs" id="systemDataTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="universities-tab" data-bs-toggle="tab" data-bs-target="#tab-universities" type="button" role="tab" aria-controls="tab-universities" aria-selected="true">
+                        Universities <span class="badge bg-secondary ms-1"><?= count($universities) ?></span>
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="barangays-tab" data-bs-toggle="tab" data-bs-target="#tab-barangays" type="button" role="tab" aria-controls="tab-barangays" aria-selected="false">
+                        Barangays <span class="badge bg-secondary ms-1"><?= count($barangays) ?></span>
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="yearlevels-tab" data-bs-toggle="tab" data-bs-target="#tab-yearlevels" type="button" role="tab" aria-controls="tab-yearlevels" aria-selected="false">
+                        Year Levels <span class="badge bg-secondary ms-1"><?= count($yearLevels) ?></span>
+                    </button>
+                </li>
+            </ul>
 
-            <!-- Barangays Management (now inside same container to align with Universities) -->
-            <div class="modern-card mb-4">
-                <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0"><i class="bi bi-geo-alt me-2"></i>Barangays Management</h5>
-                    <span class="badge bg-light text-dark"><?= count($barangays) ?> barangays</span>
-                </div>
-                <div class="card-body p-4">
-                    <!-- Controls Row -->
-                    <div class="row mb-3">
-                        <div class="col-md-6">
-                            <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addBarangayModal">
-                                <i class="bi bi-plus"></i> Add Barangay
-                            </button>
+            <div class="tab-content pt-3 tab-card" id="systemDataTabsContent">
+                <!-- Universities Management -->
+                <div class="tab-pane fade show active" id="tab-universities" role="tabpanel" aria-labelledby="universities-tab">
+                    <div class="card card-gradient mb-4">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">Universities</h5>
+                            <div class="d-flex align-items-center gap-2 section-actions">
+                                <span class="badge bg-light text-dark"><?= count($universities) ?> total</span>
+                                <button type="button" class="btn btn-light" data-bs-toggle="modal" data-bs-target="#addUniversityModal">Add University</button>
+                            </div>
                         </div>
-                        <div class="col-md-6">
-                            <div class="input-group">
-                                <input type="text" class="form-control" id="barangaySearch" placeholder="Search barangays...">
-                                <span class="input-group-text"><i class="bi bi-search"></i></span>
+                        <div class="card-body p-4">
+                            <div class="row mb-3 g-2">
+                                <div class="col-md-6">
+                                    <div class="input-group">
+                                        <input type="text" class="form-control" id="universitySearch" placeholder="Search universities...">
+                                        <span class="input-group-text">Search</span>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 text-md-end">
+                                    <select id="universitiesPerPage" class="form-select form-select-sm" style="display:inline-block; width:auto;">
+                                        <option value="10">10 per page</option>
+                                        <option value="25" selected>25 per page</option>
+                                        <option value="50">50 per page</option>
+                                        <option value="100">100 per page</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="table-responsive">
+                                <table class="table table-hover mb-0" id="universitiesTable">
+                                    <thead class="table-dark">
+                                        <tr>
+                                            <th style="width: 50px;">#</th>
+                                            <th>University Name</th>
+                                            <th>Code</th>
+                                            <th>Students</th>
+                                            <th>Created</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php 
+                                        $displayNumber = 1;
+                                        foreach ($universities as $university): ?>
+                                            <tr>
+                                                <td data-label="#" class="fw-semibold text-muted"><?= $displayNumber++ ?></td>
+                                                <td data-label="University Name"><?= htmlspecialchars($university['name']) ?></td>
+                                                <td data-label="Code"><span class="badge text-bg-info"><?= htmlspecialchars($university['code']) ?></span></td>
+                                                <td data-label="Students"><?= $university['student_count'] ?> students</td>
+                                                <td data-label="Created"><?= date('M d, Y', strtotime($university['created_at'])) ?></td>
+                                                <td data-label="Actions">
+                                                    <button type="button" class="btn btn-sm btn-outline-primary me-1" onclick="showEditUniversityModal(<?= $university['university_id'] ?>, '<?= htmlspecialchars($university['name'], ENT_QUOTES) ?>', '<?= htmlspecialchars($university['code'], ENT_QUOTES) ?>')">Edit</button>
+                                                    <?php if ($university['student_count'] == 0): ?>
+                                                        <button type="button" class="btn btn-sm btn-outline-danger" onclick="showDeleteUniversityModal(<?= $university['university_id'] ?>, '<?= htmlspecialchars($university['name'], ENT_QUOTES) ?>')">Delete</button>
+                                                    <?php else: ?>
+                                                        <span class="text-muted small">(<?= $university['student_count'] ?> students)</span>
+                                                    <?php endif; ?>
+                                                </td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div class="d-flex justify-content-between align-items-center mt-3">
+                                <div><span id="universitiesInfo" class="text-muted"></span></div>
+                                <nav><ul class="pagination pagination-sm mb-0" id="universitiesPagination"></ul></nav>
                             </div>
                         </div>
                     </div>
-                    
-                    <!-- Barangays List -->
-                    <div class="table-responsive">
-                        <table class="table table-hover mb-0" id="barangaysTable">
-                            <thead class="table-dark">
-                                <tr>
-                                    <th style="width: 50px;">#</th>
-                                    <th>Barangay Name</th>
-                                    <th>Students</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php 
-                                $displayNumber = 1;
-                                foreach ($barangays as $barangay): ?>
-                                    <tr>
-                                        <td data-label="#" class="fw-semibold text-muted"><?= $displayNumber++ ?></td>
-                                        <td data-label="Barangay Name"><?= htmlspecialchars($barangay['name']) ?></td>
-                                        <td data-label="Students"><?= $barangay['student_count'] ?> students</td>
-                                        <td data-label="Actions">
-                                            <button type="button" class="btn btn-sm btn-outline-primary me-1" onclick="showEditBarangayModal(<?= $barangay['barangay_id'] ?>, '<?= htmlspecialchars($barangay['name'], ENT_QUOTES) ?>')">
-                                                <i class="bi bi-pencil"></i> Edit
-                                            </button>
-                                            <?php if ($barangay['student_count'] == 0): ?>
-                                                <button type="button" class="btn btn-sm btn-outline-danger" onclick="showDeleteBarangayModal(<?= $barangay['barangay_id'] ?>, '<?= htmlspecialchars($barangay['name'], ENT_QUOTES) ?>')">
-                                                    <i class="bi bi-trash"></i> Delete
-                                                </button>
-                                            <?php else: ?>
-                                                <span class="text-muted small">(<?= $barangay['student_count'] ?> students)</span>
-                                            <?php endif; ?>
-                                        </td>
-                                    </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                    
-                    <!-- Pagination Controls -->
-                    <div class="d-flex justify-content-between align-items-center mt-3">
-                        <div>
-                            <select id="barangaysPerPage" class="form-select form-select-sm" style="width: auto;">
-                                <option value="10">10 per page</option>
-                                <option value="25" selected>25 per page</option>
-                                <option value="50">50 per page</option>
-                                <option value="100">100 per page</option>
-                            </select>
+                </div>
+
+                <!-- Barangays Management -->
+                <div class="tab-pane fade" id="tab-barangays" role="tabpanel" aria-labelledby="barangays-tab">
+                    <div class="card card-gradient mb-4">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">Barangays</h5>
+                            <div class="d-flex align-items-center gap-2 section-actions">
+                                <span class="badge bg-light text-dark"><?= count($barangays) ?> total</span>
+                                <button type="button" class="btn btn-light" data-bs-toggle="modal" data-bs-target="#addBarangayModal">Add Barangay</button>
+                            </div>
                         </div>
-                        <div>
-                            <span id="barangaysInfo" class="text-muted"></span>
-                        </div>
-                        <div>
-                            <nav>
-                                <ul class="pagination pagination-sm mb-0" id="barangaysPagination"></ul>
-                            </nav>
+                        <div class="card-body p-4">
+                            <div class="row mb-3 g-2">
+                                <div class="col-md-6">
+                                    <div class="input-group">
+                                        <input type="text" class="form-control" id="barangaySearch" placeholder="Search barangays...">
+                                        <span class="input-group-text">Search</span>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 text-md-end">
+                                    <select id="barangaysPerPage" class="form-select form-select-sm" style="display:inline-block; width:auto;">
+                                        <option value="10">10 per page</option>
+                                        <option value="25" selected>25 per page</option>
+                                        <option value="50">50 per page</option>
+                                        <option value="100">100 per page</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="table-responsive">
+                                <table class="table table-hover mb-0" id="barangaysTable">
+                                    <thead class="table-dark">
+                                        <tr>
+                                            <th style="width: 50px;">#</th>
+                                            <th>Barangay Name</th>
+                                            <th>Students</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php 
+                                        $displayNumber = 1;
+                                        foreach ($barangays as $barangay): ?>
+                                            <tr>
+                                                <td data-label="#" class="fw-semibold text-muted"><?= $displayNumber++ ?></td>
+                                                <td data-label="Barangay Name"><?= htmlspecialchars($barangay['name']) ?></td>
+                                                <td data-label="Students"><?= $barangay['student_count'] ?> students</td>
+                                                <td data-label="Actions">
+                                                    <button type="button" class="btn btn-sm btn-outline-primary me-1" onclick="showEditBarangayModal(<?= $barangay['barangay_id'] ?>, '<?= htmlspecialchars($barangay['name'], ENT_QUOTES) ?>')">Edit</button>
+                                                    <?php if ($barangay['student_count'] == 0): ?>
+                                                        <button type="button" class="btn btn-sm btn-outline-danger" onclick="showDeleteBarangayModal(<?= $barangay['barangay_id'] ?>, '<?= htmlspecialchars($barangay['name'], ENT_QUOTES) ?>')">Delete</button>
+                                                    <?php else: ?>
+                                                        <span class="text-muted small">(<?= $barangay['student_count'] ?> students)</span>
+                                                    <?php endif; ?>
+                                                </td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div class="d-flex justify-content-between align-items-center mt-3">
+                                <div><span id="barangaysInfo" class="text-muted"></span></div>
+                                <nav><ul class="pagination pagination-sm mb-0" id="barangaysPagination"></ul></nav>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
-            
-            <!-- Year Levels (Read-only) -->
-            <div class="card mt-5">
-                <div class="modern-card-header">
-                    <h5 class="mb-0"><i class="bi bi-layers me-2"></i>Year Levels (System Defined)</h5>
-                </div>
-                <div class="card-body p-4">
-                    <div class="table-responsive">
-                        <table class="table table-hover mb-0">
-                            <thead class="table-dark">
-                                <tr>
-                                    <th>Year Level</th>
-                                    <th>Code</th>
-                                    <th>Order</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach ($yearLevels as $yearLevel): ?>
-                                    <tr>
-                                        <td data-label="Year Level"><?= htmlspecialchars($yearLevel['name']) ?></td>
-                                        <td data-label="Code"><span class="badge bg-secondary"><?= htmlspecialchars($yearLevel['code']) ?></span></td>
-                                        <td data-label="Order"><?= $yearLevel['sort_order'] ?></td>
-                                    </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
+
+                <!-- Year Levels (Read-only) -->
+                <div class="tab-pane fade" id="tab-yearlevels" role="tabpanel" aria-labelledby="yearlevels-tab">
+                    <div class="card card-gradient mb-4">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">Year Levels (System Defined)</h5>
+                        </div>
+                        <div class="card-body p-4">
+                            <div class="table-responsive">
+                                <table class="table table-hover mb-0">
+                                    <thead class="table-dark">
+                                        <tr>
+                                            <th>Year Level</th>
+                                            <th>Code</th>
+                                            <th>Order</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach ($yearLevels as $yearLevel): ?>
+                                            <tr>
+                                                <td data-label="Year Level"><?= htmlspecialchars($yearLevel['name']) ?></td>
+                                                <td data-label="Code"><span class="badge text-bg-secondary"><?= htmlspecialchars($yearLevel['code']) ?></span></td>
+                                                <td data-label="Order"><?= $yearLevel['sort_order'] ?></td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <small class="text-muted">Year levels are system-defined and cannot be modified to maintain data integrity.</small>
+                        </div>
                     </div>
-                    <small class="text-muted">Year levels are system-defined and cannot be modified to maintain data integrity.</small>
                 </div>
             </div>
         </div><!-- /.container-fluid -->
@@ -628,11 +641,11 @@ if (isset($_GET['error'])) {
 </div>
 
 <!-- Add University Modal -->
-<div class="modal fade" id="addUniversityModal" tabindex="-1" aria-labelledby="addUniversityModalLabel" aria-hidden="true">
+<div class="modal fade modal-mobile-compact" id="addUniversityModal" tabindex="-1" aria-labelledby="addUniversityModalLabel" aria-hidden="true">
     <div class="modal-dialog">
-        <div class="modal-content modern-modal-content">
-            <div class="modal-header modern-modal-header">
-                <h5 class="modal-title" id="addUniversityModalLabel"><i class="bi bi-building me-2"></i>Add New University</h5>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addUniversityModalLabel">Add New University</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form method="POST" id="addUniversityForm">
@@ -649,9 +662,7 @@ if (isset($_GET['error'])) {
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" name="add_university" class="btn btn-primary">
-                        <i class="bi bi-plus"></i> Add University
-                    </button>
+                    <button type="submit" name="add_university" class="btn btn-primary">Add University</button>
                 </div>
             </form>
         </div>
@@ -659,11 +670,11 @@ if (isset($_GET['error'])) {
 </div>
 
 <!-- Edit University Modal -->
-<div class="modal fade" id="editUniversityModal" tabindex="-1" aria-labelledby="editUniversityModalLabel" aria-hidden="true">
+<div class="modal fade modal-mobile-compact" id="editUniversityModal" tabindex="-1" aria-labelledby="editUniversityModalLabel" aria-hidden="true">
     <div class="modal-dialog">
-        <div class="modal-content modern-modal-content">
-            <div class="modal-header modern-modal-header">
-                <h5 class="modal-title" id="editUniversityModalLabel"><i class="bi bi-pencil me-2"></i>Edit University</h5>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editUniversityModalLabel">Edit University</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form method="POST" id="editUniversityForm">
@@ -681,9 +692,7 @@ if (isset($_GET['error'])) {
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" name="edit_university" class="btn btn-primary">
-                        <i class="bi bi-save"></i> Save Changes
-                    </button>
+                    <button type="submit" name="edit_university" class="btn btn-primary">Save Changes</button>
                 </div>
             </form>
         </div>
@@ -691,11 +700,11 @@ if (isset($_GET['error'])) {
 </div>
 
 <!-- Add Barangay Modal -->
-<div class="modal fade" id="addBarangayModal" tabindex="-1" aria-labelledby="addBarangayModalLabel" aria-hidden="true">
+<div class="modal fade modal-mobile-compact" id="addBarangayModal" tabindex="-1" aria-labelledby="addBarangayModalLabel" aria-hidden="true">
     <div class="modal-dialog">
-        <div class="modal-content modern-modal-content">
-            <div class="modal-header modern-modal-header">
-                <h5 class="modal-title" id="addBarangayModalLabel"><i class="bi bi-geo-alt me-2"></i>Add New Barangay</h5>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addBarangayModalLabel">Add New Barangay</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form method="POST" id="addBarangayForm">
@@ -707,9 +716,7 @@ if (isset($_GET['error'])) {
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" name="add_barangay" class="btn btn-success">
-                        <i class="bi bi-plus"></i> Add Barangay
-                    </button>
+                    <button type="submit" name="add_barangay" class="btn btn-success">Add Barangay</button>
                 </div>
             </form>
         </div>
@@ -717,11 +724,11 @@ if (isset($_GET['error'])) {
 </div>
 
 <!-- Edit Barangay Modal -->
-<div class="modal fade" id="editBarangayModal" tabindex="-1" aria-labelledby="editBarangayModalLabel" aria-hidden="true">
+<div class="modal fade modal-mobile-compact" id="editBarangayModal" tabindex="-1" aria-labelledby="editBarangayModalLabel" aria-hidden="true">
     <div class="modal-dialog">
-        <div class="modal-content modern-modal-content">
-            <div class="modal-header modern-modal-header">
-                <h5 class="modal-title" id="editBarangayModalLabel"><i class="bi bi-pencil me-2"></i>Edit Barangay</h5>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editBarangayModalLabel">Edit Barangay</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form method="POST" id="editBarangayForm">
@@ -734,9 +741,7 @@ if (isset($_GET['error'])) {
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" name="edit_barangay" class="btn btn-success">
-                        <i class="bi bi-save"></i> Save Changes
-                    </button>
+                    <button type="submit" name="edit_barangay" class="btn btn-success">Save Changes</button>
                 </div>
             </form>
         </div>
@@ -744,27 +749,22 @@ if (isset($_GET['error'])) {
 </div>
 
 <!-- Delete University Modal -->
-<div class="modal fade" id="deleteUniversityModal" tabindex="-1" aria-labelledby="deleteUniversityModalLabel" aria-hidden="true">
+<div class="modal fade modal-mobile-compact" id="deleteUniversityModal" tabindex="-1" aria-labelledby="deleteUniversityModalLabel" aria-hidden="true">
     <div class="modal-dialog">
-        <div class="modal-content modern-modal-content">
-            <div class="modal-header modern-modal-header">
-                <h5 class="modal-title" id="deleteUniversityModalLabel"><i class="bi bi-exclamation-triangle me-2 text-danger"></i>Confirm Deletion</h5>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteUniversityModalLabel">Confirm Deletion</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form method="POST" id="deleteUniversityForm">
                 <div class="modal-body">
-                    <div class="modern-alert modern-alert-warning">
-                        <i class="bi bi-exclamation-triangle me-2"></i>
-                        <strong>Warning:</strong> This action cannot be undone.
-                    </div>
+                    <div class="alert alert-warning"><strong>Warning:</strong> This action cannot be undone.</div>
                     <p>Are you sure you want to delete the university <strong id="deleteUniversityName"></strong>?</p>
                     <input type="hidden" id="deleteUniversityId" name="university_id">
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" name="delete_university" class="btn btn-danger">
-                        <i class="bi bi-trash"></i> Delete University
-                    </button>
+                    <button type="submit" name="delete_university" class="btn btn-danger">Delete University</button>
                 </div>
             </form>
         </div>
@@ -772,27 +772,22 @@ if (isset($_GET['error'])) {
 </div>
 
 <!-- Delete Barangay Modal -->
-<div class="modal fade" id="deleteBarangayModal" tabindex="-1" aria-labelledby="deleteBarangayModalLabel" aria-hidden="true">
+<div class="modal fade modal-mobile-compact" id="deleteBarangayModal" tabindex="-1" aria-labelledby="deleteBarangayModalLabel" aria-hidden="true">
     <div class="modal-dialog">
-        <div class="modal-content modern-modal-content">
-            <div class="modal-header modern-modal-header">
-                <h5 class="modal-title" id="deleteBarangayModalLabel"><i class="bi bi-exclamation-triangle me-2 text-danger"></i>Confirm Deletion</h5>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteBarangayModalLabel">Confirm Deletion</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form method="POST" id="deleteBarangayForm">
                 <div class="modal-body">
-                    <div class="modern-alert modern-alert-warning">
-                        <i class="bi bi-exclamation-triangle me-2"></i>
-                        <strong>Warning:</strong> This action cannot be undone.
-                    </div>
+                    <div class="alert alert-warning"><strong>Warning:</strong> This action cannot be undone.</div>
                     <p>Are you sure you want to delete the barangay <strong id="deleteBarangayName"></strong>?</p>
                     <input type="hidden" id="deleteBarangayId" name="barangay_id">
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" name="delete_barangay" class="btn btn-danger">
-                        <i class="bi bi-trash"></i> Delete Barangay
-                    </button>
+                    <button type="submit" name="delete_barangay" class="btn btn-danger">Delete Barangay</button>
                 </div>
             </form>
         </div>

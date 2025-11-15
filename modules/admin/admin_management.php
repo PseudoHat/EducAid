@@ -98,8 +98,24 @@ $admins = pg_fetch_all($adminsResult) ?: [];
 ?>
 
 <?php $page_title='Admin Management'; include __DIR__ . '/../../includes/admin/admin_head.php'; ?>
-<link rel="stylesheet" href="../../assets/css/admin/modern-ui.css">
 <link rel="stylesheet" href="../../assets/css/admin/table_core.css">
+<style>
+/* Mobile-only compact modal size (consistent with Manage Applicants) */
+@media (max-width: 576px) {
+    .modal-mobile-compact .modal-dialog { max-width: 420px; width: 88%; margin: 1rem auto; }
+    .modal-mobile-compact .modal-body { max-height: 60vh; overflow-y: auto; }
+}
+
+/* Header actions alignment */
+.section-header .actions { display: flex; align-items: center; gap: .5rem; }
+
+/* Role permissions styling */
+.role-permissions .role-col { border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,.06); padding: 16px; border-left: 4px solid transparent; border: 1px solid #eef2f4; }
+.role-permissions .role-super { border-left-color: var(--bs-success); background: #f6fffb; border-color: rgba(25,135,84,.25); }
+.role-permissions .role-sub { border-left-color: var(--bs-info); background: #f5fbff; border-color: rgba(13,202,240,.25); }
+.role-permissions .role-title { font-weight: 600; margin-bottom: .5rem; }
+.role-permissions ul li { margin-bottom: .35rem; }
+</style>
 </head>
 <body>
 <?php include __DIR__ . '/../../includes/admin/admin_topbar.php'; ?>
@@ -108,35 +124,30 @@ $admins = pg_fetch_all($adminsResult) ?: [];
     <?php include __DIR__ . '/../../includes/admin/admin_header.php'; ?>
     <section class="home-section" id="mainContent">
         <div class="container-fluid py-4 px-4">
-            <div class="modern-page-header mb-4"><h1 class="modern-page-title"><i class="bi bi-people-fill me-2 text-gradient"></i>Admin Management</h1><p class="modern-page-subtitle">Manage administrator accounts and permissions</p></div>
-            
-            <?php if (isset($success)): ?>
-                <div class="modern-alert modern-alert-success"><?= htmlspecialchars($success) ?></div>
-            <?php endif; ?>
-            <?php if (isset($error)): ?>
-                <div class="modern-alert modern-alert-danger"><?= htmlspecialchars($error) ?></div>
-            <?php endif; ?>
-            
-            <!-- Create New Admin -->
-            <div class="modern-card mb-4">
-                <div class="modern-card-header">
-                    <h5 class="mb-0"><i class="bi bi-person-plus me-2"></i>Create New Admin</h5>
-                </div>
-                <div class="card-body p-4">
-                    <button type="button" class="modern-btn modern-btn-success" data-bs-toggle="modal" data-bs-target="#createAdminModal">
-                        <i class="bi bi-person-plus"></i> Create New Admin
-                    </button>
+            <div class="section-header mb-4 d-flex justify-content-between align-items-center">
+                <h2 class="fw-bold text-dark mb-0">Admin Management</h2>
+                <div class="actions">
+                    <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#createAdminModal">Create New Admin</button>
                 </div>
             </div>
             
+            <?php if (isset($success)): ?>
+                <div class="alert alert-success"><?= htmlspecialchars($success) ?></div>
+            <?php endif; ?>
+            <?php if (isset($error)): ?>
+                <div class="alert alert-danger"><?= htmlspecialchars($error) ?></div>
+            <?php endif; ?>
+            
+            <!-- Create New Admin -->
+            
+            
             <!-- Admin List -->
-            <div class="modern-card">
-                <div class="modern-card-header">
-                    <h5 class="mb-0"><i class="bi bi-list-ul me-2"></i>Existing Admins</h5>
+            <div class="mb-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="mb-0 fw-bold">Existing Admins</h5>
                 </div>
-                <div class="card-body p-4">
-                    <div class="table-responsive">
-                        <table class="table table-hover mb-0" id="adminsTable">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0" id="adminsTable">
                             <thead class="table-dark">
                                 <tr>
                                     <th>Name</th>
@@ -170,7 +181,6 @@ $admins = pg_fetch_all($adminsResult) ?: [];
                                         <td data-label="Actions">
                                             <?php if ($admin['admin_id'] != ($_SESSION['admin_id'] ?? 0)): ?>
                                                 <button type="button" class="btn btn-sm <?= $admin['is_active'] === 't' ? 'btn-outline-danger' : 'btn-outline-success' ?>" onclick="showToggleStatusModal(<?= $admin['admin_id'] ?>, '<?= htmlspecialchars($admin['first_name'] . ' ' . $admin['last_name'], ENT_QUOTES) ?>', '<?= $admin['is_active'] === 't' ? 'deactivate' : 'activate' ?>')">
-                                                    <i class="bi <?= $admin['is_active'] === 't' ? 'bi-person-x' : 'bi-person-check' ?>"></i>
                                                     <?= $admin['is_active'] === 't' ? 'Deactivate' : 'Activate' ?>
                                                 </button>
                                             <?php else: ?>
@@ -181,41 +191,44 @@ $admins = pg_fetch_all($adminsResult) ?: [];
                                 <?php endforeach; ?>
                             </tbody>
                         </table>
-                    </div>
                 </div>
             </div>
             
             <!-- Role Permissions Info -->
-            <div class="card mt-4">
-                <div class="card-header bg-info text-white">
-                    <h5 class="mb-0"><i class="bi bi-info-circle me-2"></i>Role Permissions</h5>
+            <div class="card mt-4 role-permissions border-0 shadow-sm" style="border-radius: 12px;">
+                <div class="card-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 1rem;">
+                    <h5 class="mb-0 text-white fw-bold" style="font-size: 1.1rem;">Role Permissions</h5>
                 </div>
-                <div class="card-body p-4">
-                    <div class="row">
+                <div class="card-body" style="background: white; padding: 1.5rem;">
+                    <div class="row g-3">
                         <div class="col-md-6">
-                            <h6 class="text-success"><i class="bi bi-shield-check me-1"></i>Super Admin</h6>
-                            <ul class="list-unstyled">
-                                <li><i class="bi bi-check-circle text-success me-1"></i> Full system access</li>
-                                <li><i class="bi bi-check-circle text-success me-1"></i> Manage all students</li>
-                                <li><i class="bi bi-check-circle text-success me-1"></i> Slot management</li>
-                                <li><i class="bi bi-check-circle text-success me-1"></i> Schedule publishing</li>
-                                <li><i class="bi bi-check-circle text-success me-1"></i> Admin management</li>
-                                <li><i class="bi bi-check-circle text-success me-1"></i> System settings</li>
-                                <li><i class="bi bi-check-circle text-success me-1"></i> Data management</li>
-                            </ul>
+                            <div class="role-col role-super">
+                                <div class="role-title text-success">Super Admin</div>
+                                <ul class="list-unstyled mb-0">
+                                    <li><i class="bi bi-check-circle text-success me-1"></i> Full system access</li>
+                                    <li><i class="bi bi-check-circle text-success me-1"></i> Manage all students</li>
+                                    <li><i class="bi bi-check-circle text-success me-1"></i> Slot management</li>
+                                    <li><i class="bi bi-check-circle text-success me-1"></i> Schedule publishing</li>
+                                    <li><i class="bi bi-check-circle text-success me-1"></i> Admin management</li>
+                                    <li><i class="bi bi-check-circle text-success me-1"></i> System settings</li>
+                                    <li><i class="bi bi-check-circle text-success me-1"></i> Data management</li>
+                                </ul>
+                            </div>
                         </div>
                         <div class="col-md-6">
-                            <h6 class="text-info"><i class="bi bi-shield me-1"></i>Sub Admin</h6>
-                            <ul class="list-unstyled">
-                                <li><i class="bi bi-check-circle text-success me-1"></i> View dashboard</li>
-                                <li><i class="bi bi-check-circle text-success me-1"></i> Review registrations</li>
-                                <li><i class="bi bi-check-circle text-success me-1"></i> Manage applicants</li>
-                                <li><i class="bi bi-check-circle text-success me-1"></i> View notifications</li>
-                                <li><i class="bi bi-x-circle text-danger me-1"></i> Slot management</li>
-                                <li><i class="bi bi-x-circle text-danger me-1"></i> Schedule publishing</li>
-                                <li><i class="bi bi-x-circle text-danger me-1"></i> Admin management</li>
-                                <li><i class="bi bi-x-circle text-danger me-1"></i> System settings</li>
-                            </ul>
+                            <div class="role-col role-sub">
+                                <div class="role-title text-info">Sub Admin</div>
+                                <ul class="list-unstyled mb-0">
+                                    <li><i class="bi bi-check-circle text-success me-1"></i> View dashboard</li>
+                                    <li><i class="bi bi-check-circle text-success me-1"></i> Review registrations</li>
+                                    <li><i class="bi bi-check-circle text-success me-1"></i> Manage applicants</li>
+                                    <li><i class="bi bi-check-circle text-success me-1"></i> View notifications</li>
+                                    <li><i class="bi bi-x-circle text-danger me-1"></i> Slot management</li>
+                                    <li><i class="bi bi-x-circle text-danger me-1"></i> Schedule publishing</li>
+                                    <li><i class="bi bi-x-circle text-danger me-1"></i> Admin management</li>
+                                    <li><i class="bi bi-x-circle text-danger me-1"></i> System settings</li>
+                                </ul>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -225,11 +238,11 @@ $admins = pg_fetch_all($adminsResult) ?: [];
 </div>
 
 <!-- Create Admin Modal -->
-<div class="modal fade" id="createAdminModal" tabindex="-1" aria-labelledby="createAdminModalLabel" aria-hidden="true">
+<div class="modal fade modal-mobile-compact" id="createAdminModal" tabindex="-1" aria-labelledby="createAdminModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
-        <div class="modal-content modern-modal-content modern-modal-content">
-            <div class="modal-header modern-modal-header modern-modal-header">
-                <h5 class="modal-title" id="createAdminModalLabel"><i class="bi bi-person-plus me-2"></i>Create New Admin</h5>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="createAdminModalLabel">Create New Admin</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form method="POST" id="createAdminForm">
@@ -238,43 +251,43 @@ $admins = pg_fetch_all($adminsResult) ?: [];
                     <div class="row">
                         <div class="col-md-4">
                             <div class="mb-3">
-                                <label for="first_name" class="modern-form-label">First Name <span class="text-danger">*</span></label>
-                                <input type="text" class="modern-modern-form-control" id="first_name" name="first_name" required>
+                                <label for="first_name" class="form-label">First Name <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="first_name" name="first_name" required>
                             </div>
                         </div>
                         <div class="col-md-4">
                             <div class="mb-3">
-                                <label for="middle_name" class="modern-form-label">Middle Name</label>
-                                <input type="text" class="modern-modern-form-control" id="middle_name" name="middle_name">
+                                <label for="middle_name" class="form-label">Middle Name</label>
+                                <input type="text" class="form-control" id="middle_name" name="middle_name">
                             </div>
                         </div>
                         <div class="col-md-4">
                             <div class="mb-3">
-                                <label for="last_name" class="modern-form-label">Last Name <span class="text-danger">*</span></label>
-                                <input type="text" class="modern-modern-form-control" id="last_name" name="last_name" required>
+                                <label for="last_name" class="form-label">Last Name <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="last_name" name="last_name" required>
                             </div>
                         </div>
                     </div>
                     <div class="row">
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label for="email" class="modern-form-label">Email <span class="text-danger">*</span></label>
-                                <input type="email" class="modern-modern-form-control" id="email" name="email" required>
+                                <label for="email" class="form-label">Email <span class="text-danger">*</span></label>
+                                <input type="email" class="form-control" id="email" name="email" required>
                             </div>
                         </div>
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label for="username" class="modern-form-label">Username <span class="text-danger">*</span></label>
-                                <input type="text" class="modern-modern-form-control" id="username" name="username" required>
+                                <label for="username" class="form-label">Username <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="username" name="username" required>
                             </div>
                         </div>
                     </div>
                     <div class="row">
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label for="password" class="modern-form-label">Password <span class="text-danger">*</span></label>
+                                <label for="password" class="form-label">Password <span class="text-danger">*</span></label>
                                 <div class="input-group">
-                                    <input type="password" class="modern-modern-form-control" id="password" name="password" required minlength="6">
+                                    <input type="password" class="form-control" id="password" name="password" required minlength="6">
                                     <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility('password', 'passwordIcon')">
                                         <i class="bi bi-eye" id="passwordIcon"></i>
                                     </button>
@@ -284,9 +297,9 @@ $admins = pg_fetch_all($adminsResult) ?: [];
                         </div>
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label for="confirm_password" class="modern-form-label">Confirm Password <span class="text-danger">*</span></label>
+                                <label for="confirm_password" class="form-label">Confirm Password <span class="text-danger">*</span></label>
                                 <div class="input-group">
-                                    <input type="password" class="modern-modern-form-control" id="confirm_password" required minlength="6">
+                                    <input type="password" class="form-control" id="confirm_password" required minlength="6">
                                     <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility('confirm_password', 'confirmPasswordIcon')">
                                         <i class="bi bi-eye" id="confirmPasswordIcon"></i>
                                     </button>
@@ -297,8 +310,8 @@ $admins = pg_fetch_all($adminsResult) ?: [];
                     <div class="row">
                         <div class="col-md-12">
                             <div class="mb-3">
-                                <label for="role" class="modern-form-label">Role <span class="text-danger">*</span></label>
-                                <select class="form-select modern-form-control modern-form-control" id="role" name="role" required>
+                                <label for="role" class="form-label">Role <span class="text-danger">*</span></label>
+                                <select class="form-select" id="role" name="role" required>
                                     <option value="sub_admin">Sub Admin (Limited Access)</option>
                                     <option value="super_admin">Super Admin (Full Access)</option>
                                 </select>
@@ -309,8 +322,8 @@ $admins = pg_fetch_all($adminsResult) ?: [];
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" name="create_admin" class="modern-btn modern-btn-success">
-                        <i class="bi bi-person-plus me-1"></i> Create Admin
+                    <button type="submit" name="create_admin" class="btn btn-success">
+                        Create Admin
                     </button>
                 </div>
             </form>
@@ -319,20 +332,17 @@ $admins = pg_fetch_all($adminsResult) ?: [];
 </div>
 
 <!-- Toggle Status Modal -->
-<div class="modal fade" id="toggleStatusModal" tabindex="-1" aria-labelledby="toggleStatusModalLabel" aria-hidden="true">
+<div class="modal fade modal-mobile-compact" id="toggleStatusModal" tabindex="-1" aria-labelledby="toggleStatusModalLabel" aria-hidden="true">
     <div class="modal-dialog">
-        <div class="modal-content modern-modal-content modern-modal-content">
-            <div class="modal-header modern-modal-header modern-modal-header">
-                <h5 class="modal-title" id="toggleStatusModalLabel"><i class="bi bi-exclamation-triangle me-2 text-warning"></i>Confirm Action</h5>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="toggleStatusModalLabel">Confirm Action</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form method="POST" id="toggleStatusForm">
                 <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfTokenToggleStatus) ?>">
                 <div class="modal-body">
-                    <div class="alert alert-info">
-                        <i class="bi bi-info-circle me-2"></i>
-                        <span id="statusMessage"></span>
-                    </div>
+                    <div class="alert alert-info"><span id="statusMessage"></span></div>
                     <p id="confirmationText"></p>
                     <input type="hidden" id="toggleAdminId" name="admin_id">
                     <input type="hidden" id="toggleNewStatus" name="new_status">
@@ -340,7 +350,7 @@ $admins = pg_fetch_all($adminsResult) ?: [];
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                     <button type="submit" name="toggle_status" class="btn" id="confirmActionBtn">
-                        <i id="confirmActionIcon"></i> <span id="confirmActionText"></span>
+                        <span id="confirmActionText"></span>
                     </button>
                 </div>
             </form>
@@ -378,20 +388,17 @@ function showToggleStatusModal(adminId, adminName, action) {
     const statusMessage = document.getElementById('statusMessage');
     const confirmationText = document.getElementById('confirmationText');
     const confirmBtn = document.getElementById('confirmActionBtn');
-    const confirmIcon = document.getElementById('confirmActionIcon');
     const confirmText = document.getElementById('confirmActionText');
     
     if (isDeactivate) {
         statusMessage.textContent = 'This will prevent the admin from logging in and accessing the system.';
         confirmationText.innerHTML = `Are you sure you want to <strong>deactivate</strong> ${adminName}?`;
         confirmBtn.className = 'btn btn-danger';
-        confirmIcon.className = 'bi bi-person-x';
         confirmText.textContent = 'Deactivate';
     } else {
         statusMessage.textContent = 'This will allow the admin to log in and access the system again.';
         confirmationText.innerHTML = `Are you sure you want to <strong>activate</strong> ${adminName}?`;
         confirmBtn.className = 'btn btn-success';
-        confirmIcon.className = 'bi bi-person-check';
         confirmText.textContent = 'Activate';
     }
     
