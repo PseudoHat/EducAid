@@ -293,7 +293,8 @@ if (!$confirm) {
         'documents' => "SELECT COUNT(*) as count FROM documents",
         'distribution_records' => "SELECT COUNT(*) as count FROM distribution_student_records",
         'student_snapshots' => "SELECT COUNT(*) as count FROM distribution_student_snapshot",
-        'distribution_snapshots' => "SELECT COUNT(*) as count FROM distribution_snapshots"
+        'distribution_snapshots' => "SELECT COUNT(*) as count FROM distribution_snapshots",
+        'signup_slots' => "SELECT COUNT(*) as count FROM signup_slots"
     ];
     
     foreach ($queries as $key => $query) {
@@ -338,6 +339,11 @@ if (!$confirm) {
     echo '<div class="stat-box">';
     echo '<div class="stat-number">' . $stats['distribution_snapshots'] . '</div>';
     echo '<div class="stat-label">Distribution Snapshots</div>';
+    echo '</div>';
+    
+    echo '<div class="stat-box">';
+    echo '<div class="stat-number">' . $stats['signup_slots'] . '</div>';
+    echo '<div class="stat-label">Signup Slots</div>';
     echo '</div>';
     echo '</div>';
     
@@ -411,6 +417,11 @@ if (!$confirm) {
                 'name' => 'Delete Distribution Snapshots',
                 'query' => 'DELETE FROM distribution_snapshots',
                 'description' => 'Remove all distribution snapshot records'
+            ],
+            [
+                'name' => 'Delete Signup Slots (Past Releases)',
+                'query' => 'DELETE FROM signup_slots',
+                'description' => 'Remove all signup slot records (semester/academic year slots)'
             ],
             [
                 'name' => 'Delete Student Notifications',
@@ -489,7 +500,8 @@ if (!$confirm) {
         $sequences = [
             'students_student_id_seq' => 'students',
             'student_notifications_notification_id_seq' => 'student_notifications',
-            'documents_document_id_seq' => 'documents'
+            'documents_document_id_seq' => 'documents',
+            'signup_slots_slot_id_seq' => 'signup_slots'
         ];
         
         foreach ($sequences as $seq => $table) {
