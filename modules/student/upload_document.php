@@ -1,10 +1,13 @@
 <?php
-session_start();
+// Start session only if not already started
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
-// Cache-busting headers to prevent browser from caching this page
-header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
-header("Cache-Control: post-check=0, pre-check=0", false);
-header("Pragma: no-cache");
+// Disable output buffering to prevent header issues
+if (ob_get_level()) {
+    ob_end_clean();
+}
 
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../services/UnifiedFileService.php';
@@ -23,26 +26,17 @@ if (!isset($_SESSION['student_id'])) {
 }
 
 $student_id = $_SESSION['student_id'];
+
+// Initialize services
 $fileService = new UnifiedFileService($connection);
 $reuploadService = new DocumentReuploadService($connection);
 
-// Get student information and upload permission
-$student_query = pg_query_params($connection,
+// Get student information including year level details
+$student_query = pg_query_params($connection, 
     "SELECT s.*, 
-            COALESCE(s.needs_document_upload, FALSE) as needs_upload,
-            s.documents_to_reupload,
-            s.document_rejection_reasons,
-            s.current_year_level,
-            s.is_graduating,
-            s.status_academic_year,
-            s.admin_review_required,
-            s.university_id,
-            s.year_level_id,
-            s.mothers_maiden_name,
-            s.school_student_id,
-            b.name as barangay_name,
-            u.name as university_name,
-            yl.name as year_level_name
+            b.barangay_name, 
+            u.university_name, 
+            yl.year_level_name as current_year_level
      FROM students s
      LEFT JOIN barangays b ON s.barangay_id = b.barangay_id
      LEFT JOIN universities u ON s.university_id = u.university_id
@@ -85,6 +79,17 @@ if (!$current_academic_year) {
     if ($config_query && pg_num_rows($config_query) > 0) {
         $config_row = pg_fetch_assoc($config_query);
         $current_academic_year = $config_row['value'];
+    }
+}
+
+// If still no academic year, generate one based on current date (July = start of new AY)
+if (!$current_academic_year) {
+    $current_year = date('Y');
+    $current_month = date('n');
+    if ($current_month >= 7) {
+        $current_academic_year = $current_year . '-' . ($current_year + 1);
+    } else {
+        $current_academic_year = ($current_year - 1) . '-' . $current_year;
     }
 }
 
@@ -277,9 +282,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_year_level']))
         $new_password = isset($_POST['new_password']) ? trim($_POST['new_password']) : null;
         $confirm_password = isset($_POST['confirm_password']) ? trim($_POST['confirm_password']) : null;
         
-        if (empty($year_level) || empty($academic_year)) {
-            echo json_encode(['success' => false, 'message' => 'Please fill in all required fields.']);
+        // Validate required fields
+        if (empty($year_level)) {
+            echo json_encode(['success' => false, 'message' => 'Please select your current year level.']);
             exit;
+        }
+        
+        // For academic year, if empty, try to get current year or use default
+        if (empty($academic_year)) {
+            // Try to get from database
+            $ay_query = pg_query($connection, "SELECT academic_year FROM signup_slots WHERE is_active = TRUE LIMIT 1");
+            if ($ay_query && pg_num_rows($ay_query) > 0) {
+                $ay_row = pg_fetch_assoc($ay_query);
+                $academic_year = $ay_row['academic_year'];
+            } else {
+                // Check config table
+                $config_query = pg_query($connection, "SELECT value FROM config WHERE key = 'current_academic_year'");
+                if ($config_query && pg_num_rows($config_query) > 0) {
+                    $config_row = pg_fetch_assoc($config_query);
+                    $academic_year = $config_row['value'];
+                } else {
+                    // Generate current academic year based on date (July = start of new AY)
+                    $current_year = date('Y');
+                    $current_month = date('n');
+                    if ($current_month >= 7) {
+                        $academic_year = $current_year . '-' . ($current_year + 1);
+                    } else {
+                        $academic_year = ($current_year - 1) . '-' . $current_year;
+                    }
+                }
+            }
         }
         
         // Check if this is a migrated student needing university selection
@@ -287,7 +319,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_year_level']))
             "SELECT status, university_id, year_level_id, mothers_maiden_name, school_student_id, admin_review_required FROM students WHERE student_id = $1",
             [$student_id]
         );
+        
+        if (!$student_check_query) {
+            $db_error = pg_last_error($connection);
+            error_log("Student check query failed for {$student_id}: {$db_error}");
+            echo json_encode(['success' => false, 'message' => 'Database error: Unable to retrieve student information.']);
+            exit;
+        }
+        
         $student_check = pg_fetch_assoc($student_check_query);
+        
+        if (!$student_check) {
+            error_log("Student not found: {$student_id}");
+            echo json_encode(['success' => false, 'message' => 'Student record not found.']);
+            exit;
+        }
         
         // Check if migrated student (admin_review_required = TRUE)
         $is_migrated_student = ($student_check['admin_review_required'] === 't' || $student_check['admin_review_required'] === true);
@@ -330,7 +376,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_year_level']))
             "SELECT current_year_level, is_graduating, status_academic_year FROM students WHERE student_id = $1",
             [$student_id]
         );
+        
+        if (!$current_info_query) {
+            $db_error = pg_last_error($connection);
+            error_log("Current info query failed for {$student_id}: {$db_error}");
+            echo json_encode(['success' => false, 'message' => 'Database error: Unable to retrieve current information.']);
+            exit;
+        }
+        
         $current_info = pg_fetch_assoc($current_info_query);
+        
+        if (!$current_info) {
+            error_log("Current info not found for student: {$student_id}");
+            echo json_encode(['success' => false, 'message' => 'Unable to retrieve your current academic information.']);
+            exit;
+        }
         
         // CRITICAL CHECK: Prevent students who already graduated from claiming graduation again
         if ($is_graduating && 
@@ -783,8 +843,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_year_level']))
                 "SELECT year_level_id FROM year_levels WHERE name = $1",
                 [$year_level]
             );
+            
+            if (!$yl_query) {
+                $db_error = pg_last_error($connection);
+                error_log("Year level lookup failed for '{$year_level}': {$db_error}");
+                echo json_encode(['success' => false, 'message' => 'Database error: Unable to lookup year level.']);
+                exit;
+            }
+            
             $yl_row = pg_fetch_assoc($yl_query);
             $year_level_id = $yl_row ? intval($yl_row['year_level_id']) : null;
+            
+            if (!$year_level_id) {
+                error_log("Year level ID not found for: {$year_level}");
+                echo json_encode(['success' => false, 'message' => 'Invalid year level selected.']);
+                exit;
+            }
             
             // Hash the new password if provided
             $hashed_password = null;
@@ -841,6 +915,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_year_level']))
                     $student_id
                 ]);
             }
+            
+            if (!$update_result) {
+                $db_error = pg_last_error($connection);
+                error_log("Update query failed for student {$student_id}: {$db_error}");
+                error_log("Query params: year_level={$year_level}, is_graduating={$is_graduating}, academic_year={$academic_year}, university_id={$university_id}, year_level_id={$year_level_id}");
+                echo json_encode(['success' => false, 'message' => 'Database error: Failed to update student record. Error: ' . $db_error]);
+                exit;
+            }
         } else {
             $update_query = "UPDATE students 
                             SET current_year_level = $1,
@@ -855,6 +937,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_year_level']))
                 $academic_year,
                 $student_id
             ]);
+            
+            if (!$update_result) {
+                $db_error = pg_last_error($connection);
+                error_log("Simple update query failed for student {$student_id}: {$db_error}");
+                echo json_encode(['success' => false, 'message' => 'Database error: Failed to update. Error: ' . $db_error]);
+                exit;
+            }
         }
         
         if ($update_result) {
@@ -877,7 +966,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_year_level']))
             ]);
             
             // If migrated student is completing their profile (university_id present), add audit log
-            if (!empty($university_id) && !empty($current_info['admin_review_required']) && $current_info['admin_review_required']) {
+            if (!empty($university_id) && !empty($student_check['admin_review_required']) && $student_check['admin_review_required']) {
+                // Use NULL for user_id since student_id is a string, store actual ID in metadata
                 $audit_query = "INSERT INTO audit_logs 
                                (user_id, user_type, username, event_type, event_category, 
                                 action_description, status, ip_address, user_agent, 
@@ -897,11 +987,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_year_level']))
                 $metadata = json_encode([
                     'migration_completion' => true,
                     'academic_year' => $academic_year,
-                    'previous_year_level' => $current_info['current_year_level'] ?? null
+                    'previous_year_level' => $current_info['current_year_level'] ?? null,
+                    'actual_student_id' => $student_id // Store string ID here
                 ]);
                 
-                pg_query_params($connection, $audit_query, [
-                    $student_id,
+                $audit_result = pg_query_params($connection, $audit_query, [
+                    null, // user_id set to NULL for string-based student IDs
                     'student',
                     $student_id, // username = student_id
                     'profile_completion',
@@ -916,6 +1007,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_year_level']))
                     $new_values,
                     $metadata
                 ]);
+                
+                if (!$audit_result) {
+                    // Log audit failure but don't fail the whole operation
+                    error_log("Audit log insert failed for student {$student_id}: " . pg_last_error($connection));
+                }
             }
             
             // If student marked themselves as graduating, notify admin
@@ -3237,6 +3333,9 @@ $page_title = 'Upload Documents';
                     try {
                         const response = await fetch('upload_document.php', {
                             method: 'POST',
+                            headers: {
+                                'X-Requested-With': 'XMLHttpRequest'
+                            },
                             body: formData
                         });
                         

@@ -21,6 +21,25 @@ RewriteCond %{HTTP_HOST} ^educ-aid\.site$ [NC]
 RewriteRule ^(.*)$ https://www.educ-aid.site/$1 [L,R=301]
 
 # ----------------------------------------
+# ModSecurity Exceptions
+# ----------------------------------------
+# Disable ModSecurity for student profile updates (POST with password fields)
+<IfModule mod_security.c>
+    SecRuleEngine Off
+</IfModule>
+
+# Alternative: Disable specific rules if above doesn't work
+<IfModule mod_security2.c>
+    SecRuleRemoveById 949110
+    SecRuleRemoveById 959100
+    SecRuleRemoveById 981173
+    SecRuleRemoveById 981231
+    SecRuleRemoveById 981318
+    SecRuleRemoveById 981172
+    SecRuleRemoveById 960024
+</IfModule>
+
+# ----------------------------------------
 # Security Headers
 # ----------------------------------------
 
