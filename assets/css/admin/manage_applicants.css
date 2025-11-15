@@ -540,15 +540,18 @@ h1.fw-bold, h2.fw-bold {
   }
   
   .modal-fullscreen-sm-down .modal-footer {
-    padding: 0.75rem;
+    padding: 0.5rem;
     position: sticky;
     bottom: 0;
     background: #fff;
     z-index: 1;
     border-top: 1px solid #e0e0e0;
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
     gap: 8px;
+    justify-items: stretch;
+    align-items: center;
+    grid-auto-flow: row dense;
   }
   
   .modal-fullscreen-sm-down .modal-title {
@@ -561,38 +564,76 @@ h1.fw-bold, h2.fw-bold {
     padding: 2px 6px;
   }
   
-  /* Compact and stack modal buttons on mobile */
+  /* Icon-only buttons on mobile - hide text */
   .modal-footer .btn {
     width: 100%;
-    padding: 10px 12px;
-    font-size: 0.85rem;
+    min-width: 48px;
+    height: 48px;
+    padding: 0;
+    font-size: 0; /* hide text, show only icons */
     margin: 0 !important;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 6px;
+    border-radius: 0.5rem;
   }
   
   .modal-footer .btn i {
-    font-size: 1rem;
+    font-size: 1.3rem;
+    margin: 0;
   }
   
-  /* Button order and styling */
-  .modal-footer .btn-success {
-    order: 1;
+  /* Show only icons, hide text */
+  .modal-footer .btn * {
+    font-size: 0;
   }
   
-  .modal-footer .btn-danger {
-    order: 2;
+  .modal-footer .btn i,
+  .modal-footer .btn .bi {
+    font-size: 1.3rem !important;
+  }
+
+  /* Center the incomplete documents message above the buttons */
+  .modal-footer .incomplete-message {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    text-align: center;
+    width: 100%;
+    margin: 4px 0 6px 0;
+    font-size: 0.9rem;
+  }
+
+  /* Flatten the admin tools wrapper so its children become grid items */
+  .modal-footer .ms-auto {
+    display: contents !important;
+    margin-left: 0 !important;
   }
   
-  .modal-footer .btn-warning,
-  .modal-footer .btn-outline-warning {
-    order: 3;
+  /* Flatten the verify form wrapper so button participates in grid */
+  .modal-footer form,
+  .modal-footer .verify-form,
+  .modal-footer form.d-inline {
+    display: contents !important;
+    margin: 0 !important;
   }
-  
-  .modal-footer .btn-outline-danger {
-    order: 4;
+
+  /* Enforce button positions in the grid: blacklist | archive | reject | verify */
+  .modal-footer .btn-outline-danger.btn-sm { 
+    grid-column: 1; 
+    grid-row: 2; 
+  }
+  .modal-footer .btn-outline-warning.btn-sm { 
+    grid-column: 2; 
+    grid-row: 2; 
+  }
+  .modal-footer .btn-danger.btn-sm { 
+    grid-column: 3; 
+    grid-row: 2; 
+  }
+  .modal-footer .btn-success.btn-sm { 
+    grid-column: 4; 
+    grid-row: 2; 
+    width: 100%;
   }
 }
 
