@@ -59,6 +59,14 @@ include __DIR__ . '/../../includes/admin/admin_head.php';
 <link rel="stylesheet" href="../../assets/css/admin/table_core.css">
 <link rel="stylesheet" href="../../assets/css/admin/reports.css">
 <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<style>
+    .page-title { font-weight: 700; color: #111; }
+    .page-subtitle { color: #6c757d; }
+    .card-gradient .card-header {
+        background: linear-gradient(135deg, #6f42c1 0%, #0d6efd 100%);
+        color: #fff;
+    }
+</style>
 </head>
 <body>
   <?php include __DIR__ . '/../../includes/admin/admin_topbar.php'; ?>
@@ -70,32 +78,21 @@ include __DIR__ . '/../../includes/admin/admin_head.php';
     <section class="home-section" id="mainContent">
       <div class="container-fluid py-4">
     <!-- Header -->
-    <div class="modern-page-header">
-        <div class="d-flex justify-content-between align-items-center">
-            <div>
-                <h1 class="modern-page-title">
-                    <i class="bi bi-file-earmark-bar-graph-fill text-gradient"></i>
-                    Reports & Analytics
-                </h1>
-                <p class="modern-page-subtitle">Generate comprehensive reports with advanced filtering options</p>
-            </div>
-            <div>
-                <button class="modern-btn modern-btn-info" onclick="resetFilters()">
-                    <i class="bi bi-arrow-clockwise"></i> Reset All Filters
-                </button>
-            </div>
+    <div class="mb-4 d-flex justify-content-between align-items-center flex-wrap">
+        <div>
+            <h4 class="page-title mb-1">Reports & Analytics</h4>
+            <div class="page-subtitle">Generate comprehensive reports with advanced filtering options</div>
+        </div>
+        <div class="mt-3 mt-md-0">
+            <button class="btn btn-outline-secondary" onclick="resetFilters()">Reset All Filters</button>
         </div>
     </div>
 
     <!-- Filter Panel -->
-    <div class="modern-card mb-4">
-        <div class="modern-card-header">
-            <div class="d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">
-                    <i class="bi bi-funnel-fill me-2"></i> Report Filters
-                </h5>
-                <span id="filterBadge" class="modern-badge modern-badge-info">0 filters applied</span>
-            </div>
+    <div class="card card-gradient mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Report Filters</h5>
+            <span id="filterBadge" class="badge bg-light text-dark">0 filters applied</span>
         </div>
         <div class="card-body p-4">
             <form id="reportFiltersForm">
@@ -104,10 +101,8 @@ include __DIR__ . '/../../includes/admin/admin_head.php';
                 <div class="row g-3">
                     <!-- Student Status -->
                     <div class="col-md-3">
-                        <label class="modern-form-label">
-                            <i class="bi bi-person-badge"></i> Student Status
-                        </label>
-                        <select name="status[]" class="form-select modern-form-control multi-select" multiple>
+                        <label class="form-label">Student Status</label>
+                        <select name="status[]" class="form-select multi-select" multiple>
                             <option value="active">Active</option>
                             <option value="applicant">Applicant</option>
                             <option value="under_registration">Under Registration</option>
@@ -123,10 +118,8 @@ include __DIR__ . '/../../includes/admin/admin_head.php';
 
                     <!-- Gender -->
                     <div class="col-md-3">
-                        <label class="modern-form-label">
-                            <i class="bi bi-gender-ambiguous"></i> Gender
-                        </label>
-                        <select name="gender" class="form-select modern-form-control">
+                        <label class="form-label">Gender</label>
+                        <select name="gender" class="form-select">
                             <option value="">All</option>
                             <option value="Male">Male</option>
                             <option value="Female">Female</option>
@@ -135,9 +128,7 @@ include __DIR__ . '/../../includes/admin/admin_head.php';
 
                     <!-- Municipality -->
                     <div class="col-md-3">
-                        <label class="modern-form-label">
-                            <i class="bi bi-building"></i> Municipality
-                        </label>
+                        <label class="form-label">Municipality</label>
                         <?php 
                         // Get municipality name for display
                         pg_result_seek($municipalities, 0);
@@ -149,17 +140,15 @@ include __DIR__ . '/../../includes/admin/admin_head.php';
                             }
                         }
                         ?>
-                        <input type="text" class="modern-form-control" value="<?php echo htmlspecialchars($municipalityName); ?>" readonly>
+                        <input type="text" class="form-control" value="<?php echo htmlspecialchars($municipalityName); ?>" readonly>
                         <input type="hidden" name="municipality_id" value="<?php echo $adminMunicipalityId; ?>" id="municipalityFilterValue">
                         <small class="text-muted">Your assigned municipality</small>
                     </div>
 
                     <!-- Barangay -->
                     <div class="col-md-3">
-                        <label class="modern-form-label">
-                            <i class="bi bi-geo-alt"></i> Barangay
-                        </label>
-                        <select name="barangay_id[]" class="form-select modern-form-control multi-select" multiple id="barangayFilter">
+                        <label class="form-label">Barangay</label>
+                        <select name="barangay_id[]" class="form-select multi-select" multiple id="barangayFilter">
                             <?php 
                             // Reset pointer to read barangays
                             pg_result_seek($barangays, 0);
@@ -174,10 +163,8 @@ include __DIR__ . '/../../includes/admin/admin_head.php';
 
                     <!-- University -->
                     <div class="col-md-3">
-                        <label class="modern-form-label">
-                            <i class="bi bi-mortarboard"></i> University
-                        </label>
-                        <select name="university_id[]" class="form-select modern-form-control multi-select" multiple>
+                        <label class="form-label">University</label>
+                        <select name="university_id[]" class="form-select multi-select" multiple>
                             <?php while ($u = pg_fetch_assoc($universities)): ?>
                                 <option value="<?php echo $u['university_id']; ?>">
                                     <?php echo htmlspecialchars($u['name']); ?>
@@ -188,10 +175,8 @@ include __DIR__ . '/../../includes/admin/admin_head.php';
 
                     <!-- Year Level -->
                     <div class="col-md-3">
-                        <label class="modern-form-label">
-                            <i class="bi bi-calendar-range"></i> Year Level
-                        </label>
-                        <select name="year_level_id[]" class="form-select modern-form-control multi-select" multiple>
+                        <label class="form-label">Year Level</label>
+                        <select name="year_level_id[]" class="form-select multi-select" multiple>
                             <?php while ($yl = pg_fetch_assoc($yearLevels)): ?>
                                 <option value="<?php echo $yl['year_level_id']; ?>">
                                     <?php echo htmlspecialchars($yl['name']); ?>
@@ -202,10 +187,8 @@ include __DIR__ . '/../../includes/admin/admin_head.php';
 
                     <!-- Academic Year -->
                     <div class="col-md-3">
-                        <label class="modern-form-label">
-                            <i class="bi bi-calendar3"></i> Academic Year
-                        </label>
-                        <select name="academic_year" class="form-select modern-form-control">
+                        <label class="form-label">Academic Year</label>
+                        <select name="academic_year" class="form-select">
                             <option value="">All Years</option>
                             <?php while ($ay = pg_fetch_assoc($academicYears)): ?>
                                 <option value="<?php echo htmlspecialchars($ay['current_academic_year']); ?>">
@@ -217,10 +200,8 @@ include __DIR__ . '/../../includes/admin/admin_head.php';
 
                     <!-- Distribution -->
                     <div class="col-md-3">
-                        <label class="modern-form-label">
-                            <i class="bi bi-box-seam"></i> Distribution
-                        </label>
-                        <select name="distribution_id" class="form-select modern-form-control">
+                        <label class="form-label">Distribution</label>
+                        <select name="distribution_id" class="form-select">
                             <option value="">All Distributions</option>
                             <?php while ($d = pg_fetch_assoc($distributions)): ?>
                                 <option value="<?php echo $d['snapshot_id']; ?>">
@@ -236,32 +217,24 @@ include __DIR__ . '/../../includes/admin/admin_head.php';
 
                     <!-- Date Range -->
                     <div class="col-md-3">
-                        <label class="modern-form-label">
-                            <i class="bi bi-calendar-check"></i> Registration Date From
-                        </label>
-                        <input type="date" name="date_from" class="modern-form-control">
+                        <label class="form-label">Registration Date From</label>
+                        <input type="date" name="date_from" class="form-control">
                     </div>
 
                     <div class="col-md-3">
-                        <label class="modern-form-label">
-                            <i class="bi bi-calendar-x"></i> Registration Date To
-                        </label>
-                        <input type="date" name="date_to" class="modern-form-control">
+                        <label class="form-label">Registration Date To</label>
+                        <input type="date" name="date_to" class="form-control">
                     </div>
 
                     <!-- Confidence Score Range -->
                     <div class="col-md-3">
-                        <label class="modern-form-label">
-                            <i class="bi bi-speedometer2"></i> Min Confidence Score
-                        </label>
-                        <input type="number" name="confidence_min" class="modern-form-control" min="0" max="100" placeholder="0-100">
+                        <label class="form-label">Min Confidence Score</label>
+                        <input type="number" name="confidence_min" class="form-control" min="0" max="100" placeholder="0-100">
                     </div>
 
                     <div class="col-md-3">
-                        <label class="modern-form-label">
-                            <i class="bi bi-speedometer"></i> Max Confidence Score
-                        </label>
-                        <input type="number" name="confidence_max" class="modern-form-control" min="0" max="100" placeholder="0-100">
+                        <label class="form-label">Max Confidence Score</label>
+                        <input type="number" name="confidence_max" class="form-control" min="0" max="100" placeholder="0-100">
                     </div>
                 </div>
 
@@ -270,15 +243,11 @@ include __DIR__ . '/../../includes/admin/admin_head.php';
                 <!-- Action Buttons -->
                 <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center">
                     <div class="d-flex flex-wrap gap-2">
-                        <button type="button" class="btn btn-primary btn-lg" onclick="previewReport()">
-                            <i class="bi bi-eye-fill"></i> Preview Report
-                        </button>
+                        <button type="button" class="btn btn-primary btn-lg" onclick="previewReport()">Preview Report</button>
                         <button type="button" class="btn btn-danger" onclick="exportPDF()">
-                            <i class="bi bi-file-pdf-fill"></i> Export PDF
+                            Export PDF
                         </button>
-                        <button type="button" class="modern-btn modern-btn-success" onclick="exportExcel()">
-                            <i class="bi bi-file-excel-fill"></i> Export Excel
-                        </button>
+                        <button type="button" class="btn btn-success" onclick="exportExcel()">Export Excel</button>
                     </div>
                     <div>
                         <small class="text-muted" id="filterSummary">Select filters and click Preview</small>
@@ -370,7 +339,7 @@ include __DIR__ . '/../../includes/admin/admin_head.php';
                 <strong>Preview Mode:</strong> Showing up to 50 records. Export to PDF/Excel for complete dataset.
             </div>
             <div class="table-responsive">
-                <table class="table table-hover" id="previewTable">
+                <table class="table table-hover compact-cards" id="previewTable">
                     <thead class="table-dark">
                         <tr>
                             <th style="width: 5%;">No.</th>

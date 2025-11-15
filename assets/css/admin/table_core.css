@@ -126,6 +126,13 @@
   }
   .table td > * { display: inline; vertical-align: top; }
 
+  /* Graceful handling for placeholder/empty-state rows using colspan */
+  .table td[colspan] {
+    padding: 12px 15px !important;
+    text-align: center !important;
+  }
+  .table td[colspan]::before { content: '' !important; display: none !important; }
+
   /* Action column full width (handles Action/Actions label) */
   .table td[data-label="Action"],
   .table td[data-label="Actions"] {
@@ -178,28 +185,34 @@
 /* ==================== COMPACT CARD VARIANT (labels inline) ==================== */
 @media (max-width: 767px) {
   /* Use on tables with class .compact-cards for tighter, inline label-value rows */
+  .table.compact-cards { --label-col: 130px; }
   .table.compact-cards tr { padding: 0.75rem; }
   .table.compact-cards td {
-    display: flex !important;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 10px;
+    /* Grid guarantees labels align and values wrap on the right */
+    display: grid !important;
+    grid-template-columns: var(--label-col) 1fr;
+    align-items: start;
+    gap: 8px 12px;
     padding: 10px 15px !important;
-    /* remove reserved left space from default layout */
-    padding-left: 15px !important;
+    padding-left: 15px !important; /* remove large left reserve from default */
+    text-align: left !important; /* override any .text-center on cells */
+    word-break: break-word;
+    overflow-wrap: anywhere;
   }
   .table.compact-cards td::before {
-    /* move label into normal flow, inline on the left */
+    /* Label sits in the first grid column */
     position: static !important;
-    display: inline-block !important;
-    width: auto !important;
-    min-width: 120px; /* keeps labels readable */
-    margin-right: 10px;
+    display: block !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    grid-column: 1;
+    grid-row: 1;
   }
-  /* Allow multi-line content on the value side without shifting label */
-  .table.compact-cards td > * { display: inline; }
-  .table.compact-cards td[data-label="Date & Time"],
-  .table.compact-cards td[data-label="Scanned By"] {
-    align-items: flex-start;
+  /* Content flows in second grid column */
+  .table.compact-cards td > * {
+    display: block !important;
+    grid-column: 2;
+    grid-row: 1;
   }
 }
