@@ -1,0 +1,14 @@
+# Disable ModSecurity for student module (contains password/profile update forms)
+<IfModule mod_security.c>
+    SecRuleEngine Off
+</IfModule>
+
+<IfModule mod_security2.c>
+    SecRuleEngine Off
+</IfModule>
+
+# Allow POST requests with form data
+<Limit POST>
+    Order allow,deny
+    Allow from all
+</Limit>

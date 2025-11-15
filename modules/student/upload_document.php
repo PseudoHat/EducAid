@@ -1,10 +1,13 @@
 <?php
-session_start();
+// Start session only if not already started
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
-// Cache-busting headers to prevent browser from caching this page
-header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
-header("Cache-Control: post-check=0, pre-check=0", false);
-header("Pragma: no-cache");
+// Disable output buffering to prevent header issues
+if (ob_get_level()) {
+    ob_end_clean();
+}
 
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../services/UnifiedFileService.php';
@@ -23,26 +26,17 @@ if (!isset($_SESSION['student_id'])) {
 }
 
 $student_id = $_SESSION['student_id'];
+
+// Initialize services
 $fileService = new UnifiedFileService($connection);
 $reuploadService = new DocumentReuploadService($connection);
 
-// Get student information and upload permission
-$student_query = pg_query_params($connection,
+// Get student information including year level details
+$student_query = pg_query_params($connection, 
     "SELECT s.*, 
-            COALESCE(s.needs_document_upload, FALSE) as needs_upload,
-            s.documents_to_reupload,
-            s.document_rejection_reasons,
-            s.current_year_level,
-            s.is_graduating,
-            s.status_academic_year,
-            s.admin_review_required,
-            s.university_id,
-            s.year_level_id,
-            s.mothers_maiden_name,
-            s.school_student_id,
-            b.name as barangay_name,
-            u.name as university_name,
-            yl.name as year_level_name
+            b.name as barangay_name, 
+            u.name as university_name, 
+            yl.name as current_year_level
      FROM students s
      LEFT JOIN barangays b ON s.barangay_id = b.barangay_id
      LEFT JOIN universities u ON s.university_id = u.university_id
@@ -85,6 +79,17 @@ if (!$current_academic_year) {
     if ($config_query && pg_num_rows($config_query) > 0) {
         $config_row = pg_fetch_assoc($config_query);
         $current_academic_year = $config_row['value'];
+    }
+}
+
+// If still no academic year, generate one based on current date (July = start of new AY)
+if (!$current_academic_year) {
+    $current_year = date('Y');
+    $current_month = date('n');
+    if ($current_month >= 7) {
+        $current_academic_year = $current_year . '-' . ($current_year + 1);
+    } else {
+        $current_academic_year = ($current_year - 1) . '-' . $current_year;
     }
 }
 
@@ -273,13 +278,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_year_level']))
         $mothers_maiden_name = isset($_POST['mothers_maiden_name']) ? trim($_POST['mothers_maiden_name']) : null;
         $school_student_id = isset($_POST['school_student_id']) ? trim($_POST['school_student_id']) : null;
         
-        // Password update for migrated students (required)
+        // Debug log
+        error_log("UPDATE REQUEST - student_id: {$student_id}, university_id: {$university_id}, mothers_maiden_name: " . ($mothers_maiden_name ?: 'NULL') . ", school_student_id: " . ($school_student_id ?: 'NULL') . ", year_level: {$year_level}, is_graduating: " . ($is_graduating ? 'YES' : 'NO') . ", academic_year: {$academic_year}");
+        
+        // Password update for migrated students (optional - only required if provided or if completing profile for first time)
         $new_password = isset($_POST['new_password']) ? trim($_POST['new_password']) : null;
         $confirm_password = isset($_POST['confirm_password']) ? trim($_POST['confirm_password']) : null;
         
-        if (empty($year_level) || empty($academic_year)) {
-            echo json_encode(['success' => false, 'message' => 'Please fill in all required fields.']);
+        // Validate required fields
+        if (empty($year_level)) {
+            echo json_encode(['success' => false, 'message' => 'Please select your current year level.']);
             exit;
+        }
+        
+        // For academic year, if empty, try to get current year or use default
+        if (empty($academic_year)) {
+            // Try to get from database
+            $ay_query = pg_query($connection, "SELECT academic_year FROM signup_slots WHERE is_active = TRUE LIMIT 1");
+            if ($ay_query && pg_num_rows($ay_query) > 0) {
+                $ay_row = pg_fetch_assoc($ay_query);
+                $academic_year = $ay_row['academic_year'];
+            } else {
+                // Check config table
+                $config_query = pg_query($connection, "SELECT value FROM config WHERE key = 'current_academic_year'");
+                if ($config_query && pg_num_rows($config_query) > 0) {
+                    $config_row = pg_fetch_assoc($config_query);
+                    $academic_year = $config_row['value'];
+                } else {
+                    // Generate current academic year based on date (July = start of new AY)
+                    $current_year = date('Y');
+                    $current_month = date('n');
+                    if ($current_month >= 7) {
+                        $academic_year = $current_year . '-' . ($current_year + 1);
+                    } else {
+                        $academic_year = ($current_year - 1) . '-' . $current_year;
+                    }
+                }
+            }
         }
         
         // Check if this is a migrated student needing university selection
@@ -287,7 +322,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_year_level']))
             "SELECT status, university_id, year_level_id, mothers_maiden_name, school_student_id, admin_review_required FROM students WHERE student_id = $1",
             [$student_id]
         );
+        
+        if (!$student_check_query) {
+            $db_error = pg_last_error($connection);
+            error_log("Student check query failed for {$student_id}: {$db_error}");
+            echo json_encode(['success' => false, 'message' => 'Database error: Unable to retrieve student information.']);
+            exit;
+        }
+        
         $student_check = pg_fetch_assoc($student_check_query);
+        
+        if (!$student_check) {
+            error_log("Student not found: {$student_id}");
+            echo json_encode(['success' => false, 'message' => 'Student record not found.']);
+            exit;
+        }
         
         // Check if migrated student (admin_review_required = TRUE)
         $is_migrated_student = ($student_check['admin_review_required'] === 't' || $student_check['admin_review_required'] === true);
@@ -307,18 +356,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_year_level']))
                 exit;
             }
             
-            // Validate password for migrated students
-            if (empty($new_password)) {
-                echo json_encode(['success' => false, 'message' => 'Please create a new password.']);
-                exit;
-            }
-            if (strlen($new_password) < 8) {
-                echo json_encode(['success' => false, 'message' => 'Password must be at least 8 characters long.']);
-                exit;
-            }
-            if ($new_password !== $confirm_password) {
-                echo json_encode(['success' => false, 'message' => 'Passwords do not match.']);
-                exit;
+            // Validate password for migrated students ONLY if provided
+            // Password is optional if they already completed profile before
+            if (!empty($new_password) || !empty($confirm_password)) {
+                if (empty($new_password)) {
+                    echo json_encode(['success' => false, 'message' => 'Please enter your new password in both fields.']);
+                    exit;
+                }
+                if (strlen($new_password) < 8) {
+                    echo json_encode(['success' => false, 'message' => 'Password must be at least 8 characters long.']);
+                    exit;
+                }
+                if ($new_password !== $confirm_password) {
+                    echo json_encode(['success' => false, 'message' => 'Passwords do not match.']);
+                    exit;
+                }
             }
         }
         
@@ -327,7 +379,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_year_level']))
             "SELECT current_year_level, is_graduating, status_academic_year FROM students WHERE student_id = $1",
             [$student_id]
         );
+        
+        if (!$current_info_query) {
+            $db_error = pg_last_error($connection);
+            error_log("Current info query failed for {$student_id}: {$db_error}");
+            echo json_encode(['success' => false, 'message' => 'Database error: Unable to retrieve current information.']);
+            exit;
+        }
+        
         $current_info = pg_fetch_assoc($current_info_query);
+        
+        if (!$current_info) {
+            error_log("Current info not found for student: {$student_id}");
+            echo json_encode(['success' => false, 'message' => 'Unable to retrieve your current academic information.']);
+            exit;
+        }
         
         // CRITICAL CHECK: Prevent students who already graduated from claiming graduation again
         if ($is_graduating && 
@@ -517,16 +583,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_year_level']))
         // Define year level hierarchy for comparison
         $year_levels = ['1st Year' => 1, '2nd Year' => 2, '3rd Year' => 3, '4th Year' => 4, '5th Year' => 5];
         
+        error_log("YEAR LEVEL ADVANCEMENT CHECK - current: {$current_info['current_year_level']}, new: {$year_level}, is_graduating: " . ($is_graduating ? 'YES' : 'NO'));
+        
         // Check if student is trying to stay in same year level or go down
         // This requires admin verification - archive the account
         $confirm_archive = isset($_POST['confirm_archive']) && $_POST['confirm_archive'] === '1';
+        error_log("YEAR LEVEL ADVANCEMENT CHECK - confirm_archive: " . ($confirm_archive ? 'YES' : 'NO'));
         
-        if (!empty($current_info['current_year_level']) && 
+        // SKIP year repetition check for students who never confirmed their year level before
+        // (status_academic_year is NULL means they're setting it for the first time)
+        $is_first_year_confirmation = empty($current_info['status_academic_year']);
+        error_log("YEAR LEVEL ADVANCEMENT CHECK - is_first_year_confirmation: " . ($is_first_year_confirmation ? 'YES' : 'NO') . ", status_academic_year: " . ($current_info['status_academic_year'] ?: 'NULL'));
+        
+        if (!$is_first_year_confirmation && 
+            !empty($current_info['current_year_level']) && 
             isset($year_levels[$current_info['current_year_level']]) && 
             isset($year_levels[$year_level])) {
             
             $previous_level_num = $year_levels[$current_info['current_year_level']];
             $new_level_num = $year_levels[$year_level];
+            
+            error_log("YEAR LEVEL COMPARISON - previous_num: {$previous_level_num}, new_num: {$new_level_num}, requires_admin: " . (($new_level_num <= $previous_level_num && !$is_graduating) ? 'YES' : 'NO'));
             
             // If same or lower year level (not advancing), require admin verification
             if ($new_level_num <= $previous_level_num && !$is_graduating) {
@@ -775,13 +852,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_year_level']))
         // Update student year level credentials
         // For migrated students, also update university_id, year_level_id, mothers_maiden_name, school_student_id, AND password
         if (!empty($university_id)) {
+            error_log("YEAR LEVEL LOOKUP - Searching for: '{$year_level}'");
             // Get year_level_id from year level name
             $yl_query = pg_query_params($connection,
                 "SELECT year_level_id FROM year_levels WHERE name = $1",
                 [$year_level]
             );
+            
+            if (!$yl_query) {
+                $db_error = pg_last_error($connection);
+                error_log("Year level lookup failed for '{$year_level}': {$db_error}");
+                echo json_encode(['success' => false, 'message' => 'Database error: Unable to lookup year level.']);
+                exit;
+            }
+            
             $yl_row = pg_fetch_assoc($yl_query);
             $year_level_id = $yl_row ? intval($yl_row['year_level_id']) : null;
+            error_log("YEAR LEVEL LOOKUP RESULT - year_level_id: " . ($year_level_id ?: 'NULL') . ", row data: " . json_encode($yl_row));
+            
+            if (!$year_level_id) {
+                error_log("Year level ID not found for: {$year_level}");
+                echo json_encode(['success' => false, 'message' => 'Invalid year level selected.']);
+                exit;
+            }
             
             // Hash the new password if provided
             $hashed_password = null;
@@ -838,6 +931,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_year_level']))
                     $student_id
                 ]);
             }
+            
+            if (!$update_result) {
+                $db_error = pg_last_error($connection);
+                error_log("Update query failed for student {$student_id}: {$db_error}");
+                error_log("Query params: year_level={$year_level}, is_graduating={$is_graduating}, academic_year={$academic_year}, university_id={$university_id}, year_level_id={$year_level_id}");
+                echo json_encode(['success' => false, 'message' => 'Database error: Failed to update student record. Error: ' . $db_error]);
+                exit;
+            }
+            error_log("UPDATE SUCCESS - student_id: {$student_id}, rows affected: " . pg_affected_rows($update_result));
         } else {
             $update_query = "UPDATE students 
                             SET current_year_level = $1,
@@ -852,9 +954,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_year_level']))
                 $academic_year,
                 $student_id
             ]);
+            
+            if (!$update_result) {
+                $db_error = pg_last_error($connection);
+                error_log("Simple update query failed for student {$student_id}: {$db_error}");
+                echo json_encode(['success' => false, 'message' => 'Database error: Failed to update. Error: ' . $db_error]);
+                exit;
+            }
         }
         
         if ($update_result) {
+            error_log("UPDATE RESULT CHECK PASSED - Proceeding to history logging");
             // Log the change in student_status_history
             $history_query = "INSERT INTO student_status_history 
                              (student_id, year_level, is_graduating, academic_year, updated_at, update_source, notes)
@@ -865,16 +975,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_year_level']))
                 $note .= " - Same year level as previous year (possibly repeating)";
             }
             
-            pg_query_params($connection, $history_query, [
+            $history_result = pg_query_params($connection, $history_query, [
                 $student_id,
                 $year_level,
                 $is_graduating ? 'true' : 'false',
                 $academic_year,
                 $note
             ]);
+            if (!$history_result) {
+                error_log("History insert failed for student {$student_id}: " . pg_last_error($connection));
+            } else {
+                error_log("History insert SUCCESS for student {$student_id}");
+            }
             
             // If migrated student is completing their profile (university_id present), add audit log
-            if (!empty($university_id) && !empty($current_info['admin_review_required']) && $current_info['admin_review_required']) {
+            if (!empty($university_id) && !empty($student_check['admin_review_required']) && $student_check['admin_review_required']) {
+                // Use NULL for user_id since student_id is a string, store actual ID in metadata
                 $audit_query = "INSERT INTO audit_logs 
                                (user_id, user_type, username, event_type, event_category, 
                                 action_description, status, ip_address, user_agent, 
@@ -894,11 +1010,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_year_level']))
                 $metadata = json_encode([
                     'migration_completion' => true,
                     'academic_year' => $academic_year,
-                    'previous_year_level' => $current_info['current_year_level'] ?? null
+                    'previous_year_level' => $current_info['current_year_level'] ?? null,
+                    'actual_student_id' => $student_id // Store string ID here
                 ]);
                 
-                pg_query_params($connection, $audit_query, [
-                    $student_id,
+                $audit_result = pg_query_params($connection, $audit_query, [
+                    null, // user_id set to NULL for string-based student IDs
                     'student',
                     $student_id, // username = student_id
                     'profile_completion',
@@ -913,8 +1030,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_year_level']))
                     $new_values,
                     $metadata
                 ]);
+                
+                if (!$audit_result) {
+                    // Log audit failure but don't fail the whole operation
+                    error_log("Audit log insert failed for student {$student_id}: " . pg_last_error($connection));
+                }
             }
             
+            error_log("AUDIT LOG SECTION COMPLETE - Checking graduation status: " . ($is_graduating ? 'YES' : 'NO'));
             // If student marked themselves as graduating, notify admin
             if ($is_graduating) {
                 $notification_query = "INSERT INTO admin_notifications 
@@ -927,16 +1050,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_year_level']))
                 ]);
             }
             
+            error_log("SENDING SUCCESS RESPONSE to student {$student_id}");
             echo json_encode([
                 'success' => true,
                 'message' => 'Year level updated successfully! You can now upload documents.'
             ]);
         } else {
-            echo json_encode(['success' => false, 'message' => 'Failed to update year level. Please try again.']);
+            error_log("UPDATE RESULT FALSE - This should not happen");
+            echo json_encode(['success' => false, 'message' => 'Failed to update year level. Database update failed.']);
         }
     } catch (Exception $e) {
+        error_log('Year level update EXCEPTION for student ' . $student_id . ': ' . $e->getMessage());
+        error_log('Stack trace: ' . $e->getTraceAsString());
         echo json_encode(['success' => false, 'message' => 'Error: ' . $e->getMessage()]);
     }
+    error_log("UPDATE HANDLER COMPLETE - exiting");
     exit;
 }
 
@@ -2898,27 +3026,26 @@ $page_title = 'Upload Documents';
                             </div>
                         </div>
                         
-                        <!-- New Password (Migrated Students Only) -->
+                        <!-- New Password (Migrated Students Only - Optional) -->
                         <div class="mb-4">
                             <label class="form-label fw-bold mb-3" style="color: #1f2937; font-size: 1rem;">
-                                <i class="bi bi-shield-lock me-2" style="color: #667eea;"></i> New Password <span class="text-danger">*</span>
+                                <i class="bi bi-shield-lock me-2" style="color: #667eea;"></i> New Password <span class="text-muted">(Optional)</span>
                             </label>
                             <div class="position-relative">
                                 <input type="password" class="form-control form-control-lg" id="newPassword" name="new_password" 
-                                       required 
                                        minlength="8"
-                                       placeholder="Create a new secure password"
+                                       placeholder="Leave blank to keep current password"
                                        style="border-radius: 12px; border: 2px solid #e5e7eb; padding: 14px 48px 14px 18px; font-size: 1rem; transition: all 0.2s;">
                                 <button type="button" class="btn btn-link position-absolute" id="toggleNewPassword" 
                                         style="right: 8px; top: 50%; transform: translateY(-50%); padding: 4px 8px; color: #6b7280;">
                                     <i class="bi bi-eye" id="newPasswordIcon"></i>
                                 </button>
                             </div>
-                            <div class="mt-2" style="background: #fef2f2; border-left: 3px solid #dc2626; padding: 12px 16px; border-radius: 8px;">
+                            <div class="mt-2" style="background: #e0f2fe; border-left: 3px solid #3b82f6; padding: 12px 16px; border-radius: 8px;">
                                 <div class="d-flex align-items-start">
-                                    <i class="bi bi-exclamation-triangle me-2 flex-shrink-0" style="color: #dc2626; font-size: 18px; margin-top: 2px;"></i>
-                                    <small style="color: #991b1b; line-height: 1.5;">
-                                        <strong>Required:</strong> You are currently using a temporary generated password. Please create a new secure password (minimum 8 characters).
+                                    <i class="bi bi-info-circle me-2 flex-shrink-0" style="color: #1e40af; font-size: 18px; margin-top: 2px;"></i>
+                                    <small style="color: #1e3a8a; line-height: 1.5;">
+                                        <strong>Optional:</strong> If you want to change your password, enter a new one (minimum 8 characters). Otherwise, leave it blank to continue with your current password.
                                     </small>
                                 </div>
                             </div>
@@ -2927,11 +3054,10 @@ $page_title = 'Upload Documents';
                         <!-- Confirm Password -->
                         <div class="mb-4">
                             <label class="form-label fw-bold mb-3" style="color: #1f2937; font-size: 1rem;">
-                                <i class="bi bi-shield-check me-2" style="color: #667eea;"></i> Confirm Password <span class="text-danger">*</span>
+                                <i class="bi bi-shield-check me-2" style="color: #667eea;"></i> Confirm Password <span class="text-muted">(If changing)</span>
                             </label>
                             <div class="position-relative">
                                 <input type="password" class="form-control form-control-lg" id="confirmPassword" name="confirm_password" 
-                                       required 
                                        minlength="8"
                                        placeholder="Re-enter your new password"
                                        style="border-radius: 12px; border: 2px solid #e5e7eb; padding: 14px 48px 14px 18px; font-size: 1rem; transition: all 0.2s;">
@@ -3201,19 +3327,25 @@ $page_title = 'Upload Documents';
                 form.addEventListener('submit', async function(e) {
                     e.preventDefault();
                     
-                    // Validate passwords match for migrated students
+                    // Validate passwords match for migrated students (only if password is being changed)
                     const newPasswordInput = document.getElementById('newPassword');
                     const confirmPasswordInput = document.getElementById('confirmPassword');
                     
                     if (newPasswordInput && confirmPasswordInput) {
-                        if (newPasswordInput.value !== confirmPasswordInput.value) {
-                            alert('Passwords do not match. Please check and try again.');
-                            return;
-                        }
+                        const newPwd = newPasswordInput.value.trim();
+                        const confirmPwd = confirmPasswordInput.value.trim();
                         
-                        if (newPasswordInput.value.length < 8) {
-                            alert('Password must be at least 8 characters long.');
-                            return;
+                        // Only validate if user is trying to change password
+                        if (newPwd || confirmPwd) {
+                            if (newPwd !== confirmPwd) {
+                                alert('Passwords do not match. Please check and try again.');
+                                return;
+                            }
+                            
+                            if (newPwd.length < 8) {
+                                alert('Password must be at least 8 characters long.');
+                                return;
+                            }
                         }
                     }
                     
@@ -3228,10 +3360,29 @@ $page_title = 'Upload Documents';
                     try {
                         const response = await fetch('upload_document.php', {
                             method: 'POST',
+                            headers: {
+                                'X-Requested-With': 'XMLHttpRequest'
+                            },
                             body: formData
                         });
                         
-                        const result = await response.json();
+                        // Check if response is OK
+                        if (!response.ok) {
+                            throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+                        }
+                        
+                        // Try to parse JSON
+                        const text = await response.text();
+                        console.log('Raw response:', text);
+                        
+                        let result;
+                        try {
+                            result = JSON.parse(text);
+                        } catch (jsonError) {
+                            console.error('JSON parse error:', jsonError);
+                            console.error('Response text:', text);
+                            throw new Error('Server returned invalid response. Please check the console for details.');
+                        }
                         
                         if (result.success) {
                             if (result.archived && result.logout_required) {
