@@ -2549,7 +2549,7 @@ if ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '' === 'XMLHttpRequest' || (isset($_GET
 <!-- Removed - Password confirmation disabled for archive -->
 
 <!-- Migration Modal -->
-<div class="modal fade" id="migrationModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+<div class="modal fade modal-mobile-compact" id="migrationModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog modal-xl modal-dialog-scrollable">
         <div class="modal-content">
                     <div class="modal-header">
@@ -3980,6 +3980,23 @@ document.addEventListener('DOMContentLoaded', function() {
     .badge { font-size: .55rem; }
         .doc-viewer-toolbar { flex-wrap: wrap; gap: 8px; }
         .doc-viewer-toolbar .btn { padding: 6px 10px; font-size: .85rem; }
+}
+/* CSV Migration modal: compact mobile layout similar to detail modals */
+@media (max-width: 576px) {
+    #migrationModal .modal-dialog { max-width: 420px; width: 90%; margin: 1rem auto; }
+    #migrationModal .modal-content { border-radius: 12px; }
+    #migrationModal .modal-header, 
+    #migrationModal .modal-footer { padding-top: .55rem; padding-bottom: .55rem; }
+    #migrationModal .modal-body { padding: .75rem; }
+    #migrationModal .alert { padding: .5rem .6rem; margin-bottom: .5rem; }
+    #migrationModal .alert .small, 
+    #migrationModal .form-text { font-size: .75rem; }
+    #migrationModal h5.modal-title { font-size: 1rem; }
+    #migrationModal .preview-scroll-controls { display: none !important; }
+    #migrationModal .migration-preview { max-height: 55vh; }
+    #migrationModal .migration-preview .preview-table tbody tr { gap: 6px 8px; padding: 10px; }
+    #migrationModal .migration-preview .preview-table tbody td { padding: 4px 0; font-size: .9rem; }
+    #migrationModal .sticky-confirm { padding: .5rem 0; }
 }
 
 /* Compact view for very small heights (mobile browser chrome visible) */

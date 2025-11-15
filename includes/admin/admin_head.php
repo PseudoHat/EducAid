@@ -50,6 +50,25 @@ if (!isset($page_title) || trim($page_title) === '') {
   <!-- Admin JavaScript -->
   <script src="../../assets/js/admin/sidebar.js"></script>
   <script src="../../assets/js/admin/notification_bell.js"></script>
+
+  <!-- Admin-wide mobile image preview tuning: reduce aggressive crop on small screens -->
+  <style>
+    @media (max-width: 576px) {
+      /* Common admin preview containers */
+      .image-preview img,
+      .inline-preview img,
+      .preview-img,
+      .doc-preview img,
+      .logo-preview img {
+        max-width: 100%;
+        height: auto;
+        max-height: 180px;
+        object-fit: contain !important; /* avoid aggressive crop */
+      }
+      /* Optional: make preview figures breathe less on mobile */
+      .image-preview figure { margin: 0.25rem 0.4rem; }
+    }
+  </style>
   
   <!-- Show page once CSS is loaded -->
   <script>
