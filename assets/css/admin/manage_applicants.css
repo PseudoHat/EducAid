@@ -635,6 +635,84 @@ h1.fw-bold, h2.fw-bold {
     grid-row: 2; 
     width: 100%;
   }
+  
+  /* ==================== ARCHIVE & BLACKLIST MODAL OPTIMIZATION ==================== */
+  /* Apply same compact sizing to archive and blacklist modals */
+  #archiveModal .modal-dialog,
+  #blacklistModal .modal-dialog {
+    max-width: 95% !important;
+    margin: 1.5rem auto !important;
+  }
+  
+  #archiveModal .modal-content,
+  #blacklistModal .modal-content {
+    max-height: 85vh !important;
+    border-radius: 1rem !important;
+    display: flex;
+    flex-direction: column;
+  }
+  
+  #archiveModal .modal-header,
+  #blacklistModal .modal-header {
+    padding: 0.75rem 1rem;
+    border-radius: 1rem 1rem 0 0;
+    flex-shrink: 0;
+  }
+  
+  #archiveModal .modal-title,
+  #blacklistModal .modal-title {
+    font-size: 1rem;
+    line-height: 1.3;
+  }
+  
+  #archiveModal .modal-body,
+  #blacklistModal .modal-body {
+    padding: 0.75rem;
+    overflow-y: auto;
+    flex: 1;
+    max-height: calc(85vh - 140px);
+  }
+  
+  #archiveModal .modal-footer,
+  #blacklistModal .modal-footer {
+    padding: 0.75rem;
+    border-top: 1px solid #e0e0e0;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  /* Stack buttons vertically in archive/blacklist modals */
+  #archiveModal .modal-footer .btn,
+  #blacklistModal .modal-footer .btn {
+    width: 100%;
+    padding: 10px 12px;
+    font-size: 0.85rem;
+    margin: 0 !important;
+  }
+  
+  /* Compact form elements */
+  #archiveModal .form-select,
+  #archiveModal .form-control,
+  #archiveModal .form-label,
+  #blacklistModal .form-select,
+  #blacklistModal .form-control,
+  #blacklistModal .form-label {
+    font-size: 0.9rem;
+  }
+  
+  #archiveModal .alert,
+  #blacklistModal .alert {
+    font-size: 0.85rem;
+    padding: 0.5rem;
+  }
+  
+  #archiveModal .alert ul,
+  #blacklistModal .alert ul {
+    margin-bottom: 0.5rem;
+    padding-left: 1.2rem;
+  }
 }
 
 /* ==================== SMALL MOBILE (<576px) ==================== */

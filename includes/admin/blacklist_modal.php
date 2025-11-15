@@ -4,116 +4,64 @@
         <div class="modal-content">
             <div class="modal-header bg-danger text-white">
                 <h5 class="modal-title" id="blacklistModalLabel">
-                    <i class="bi bi-shield-exclamation"></i> PERMANENT BLACKLIST WARNING
+                    <i class="bi bi-shield-exclamation"></i> Blacklist Student
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <div class="alert alert-danger border-danger">
-                    <i class="bi bi-exclamation-triangle-fill"></i>
-                    <strong>CRITICAL ACTION:</strong> You are about to permanently blacklist a student from the EducAid system.
-                    This action is <strong>IRREVERSIBLE</strong> and will:
-                    <ul class="mb-0 mt-2">
-                        <li>Permanently disable the student's account</li>
-                        <li>Prevent all future registrations and access</li>
-                        <li>Create a permanent record in the system</li>
-                        <li>Require Office of the Mayor intervention to resolve</li>
-                    </ul>
-                </div>
-
                 <form id="blacklistForm">
                     <input type="hidden" id="blacklist_student_id" name="student_id">
                     <input type="hidden" name="csrf_token" value="<?php echo CSRFProtection::generateToken('blacklist_operation'); ?>">
                     
-                    <div class="row mb-3">
-                        <div class="col-12">
-                            <h6 class="fw-bold text-danger">Student Information</h6>
-                            <div id="studentInfo" class="p-3 bg-light border rounded">
-                                <!-- Student info will be populated here -->
-                            </div>
-                        </div>
+                    <p class="mb-3">
+                        You are about to blacklist: <strong id="studentInfo"></strong>
+                    </p>
+
+                    <div class="mb-3">
+                        <label for="reason_category" class="form-label">
+                            Reason for Blacklisting <span class="text-danger">*</span>
+                        </label>
+                        <select class="form-select" id="reason_category" name="reason_category" required>
+                            <option value="">-- Select Reason --</option>
+                            <option value="fraudulent_activity">Fraudulent Activity</option>
+                            <option value="academic_misconduct">Academic Misconduct</option>
+                            <option value="system_abuse">System Abuse</option>
+                            <option value="duplicate">Duplicate Account</option>
+                            <option value="other">Other</option>
+                        </select>
                     </div>
 
-                    <div class="row mb-3">
-                        <div class="col-12">
-                            <label for="reason_category" class="form-label fw-bold text-danger">
-                                <i class="bi bi-exclamation-circle"></i> Reason for Blacklisting *
-                            </label>
-                            <select class="form-select" id="reason_category" name="reason_category">
-                                <option value="">Select a reason...</option>
-                                <option value="fraudulent_activity">Fraudulent Activity</option>
-                                <option value="academic_misconduct">Academic Misconduct</option>
-                                <option value="system_abuse">System Abuse</option>
-                                <option value="other">Other</option>
-                            </select>
-                        </div>
+                    <div class="mb-3">
+                        <label for="detailed_reason" class="form-label">
+                            Details <span class="text-danger">*</span>
+                        </label>
+                        <textarea class="form-control" id="detailed_reason" name="detailed_reason" 
+                                  rows="3" placeholder="Provide details about why this student is being blacklisted..." required></textarea>
                     </div>
 
-                    <div class="row mb-3">
-                        <div class="col-12">
-                            <label for="detailed_reason" class="form-label fw-bold">
-                                <i class="bi bi-file-text"></i> Detailed Explanation
-                            </label>
-                            <textarea class="form-control" id="detailed_reason" name="detailed_reason" 
-                                      rows="4" placeholder="Provide specific details about the violation..."></textarea>
-                            <div class="form-text">Be specific about the incident, evidence, and policy violations.</div>
-                        </div>
+                    <div class="mb-3">
+                        <label for="admin_password" class="form-label">
+                            Your Admin Password <span class="text-danger">*</span>
+                        </label>
+                        <input type="password" class="form-control" id="admin_password" 
+                               name="admin_password" placeholder="Enter your password to confirm" required>
                     </div>
 
-                    <div class="row mb-3">
-                        <div class="col-12">
-                            <label for="admin_notes" class="form-label fw-bold">
-                                <i class="bi bi-sticky"></i> Internal Admin Notes
-                            </label>
-                            <textarea class="form-control" id="admin_notes" name="admin_notes" 
-                                      rows="3" placeholder="Internal notes for admin reference..."></textarea>
-                            <div class="form-text">These notes are for internal use only and will not be visible to students.</div>
-                        </div>
-                    </div>
-
-                    <div class="row mb-4">
-                        <div class="col-12">
-                            <h6 class="fw-bold text-danger">Security Verification Required</h6>
-                            <div class="alert alert-warning">
-                                <i class="bi bi-shield-lock"></i>
-                                To prevent unauthorized blacklisting, you must:
-                                <ol class="mb-0 mt-2">
-                                    <li>Enter your admin password</li>
-                                    <li>Verify with email OTP (sent to your admin email)</li>
-                                </ol>
-                            </div>
-                            
-                            <label for="admin_password" class="form-label fw-bold">
-                                <i class="bi bi-key"></i> Your Admin Password *
-                            </label>
-                            <input type="password" class="form-control" id="admin_password" 
-                                   name="admin_password" placeholder="Enter your admin password">
-                        </div>
-                    </div>
-
-                    <div id="otpSection" class="row mb-3" style="display: none;">
-                        <div class="col-12">
-                            <label for="blacklist_otp" class="form-label fw-bold text-primary">
-                                <i class="bi bi-shield-check"></i> Email Verification Code *
-                            </label>
-                            <input type="text" class="form-control" id="blacklist_otp" name="otp" 
-                                   placeholder="Enter 6-digit code from email" maxlength="6">
-                            <div class="form-text">Check your email for the verification code (expires in 5 minutes).</div>
-                        </div>
+                    <div id="otpSection" class="mb-3" style="display: none;">
+                        <label for="blacklist_otp" class="form-label">
+                            Verification Code <span class="text-danger">*</span>
+                        </label>
+                        <input type="text" class="form-control" id="blacklist_otp" name="otp" 
+                               placeholder="Enter 6-digit code from email" maxlength="6">
+                        <small class="form-text text-muted">Check your email for the verification code.</small>
                     </div>
                 </form>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                    <i class="bi bi-x"></i> Cancel
-                </button>
-                <button type="button" class="btn btn-warning" id="sendOtpBtn" onclick="initiateBlacklist(); return false;">
-                    <i class="bi bi-send"></i> Send Verification Code
-                </button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-warning" id="sendOtpBtn" onclick="initiateBlacklist(); return false;">Send Code</button>
                 <button type="button" class="btn btn-danger" id="confirmBlacklistBtn" 
-                        onclick="completeBlacklist(); return false;" style="display: none;">
-                    <i class="bi bi-shield-exclamation"></i> CONFIRM BLACKLIST
-                </button>
+                        onclick="completeBlacklist(); return false;" style="display: none;">Confirm Blacklist</button>
             </div>
         </div>
     </div>
