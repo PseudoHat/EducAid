@@ -16,6 +16,7 @@
  */
 
 class SessionTimeoutMiddleware {
+    private $db;
     private $connection;
     private $idleTimeoutMinutes;
     private $absoluteTimeoutHours;
