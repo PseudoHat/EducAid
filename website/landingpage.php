@@ -407,12 +407,48 @@ $pageType = $seoData['type'];
         </div>
         <div class="col-lg-6">
           <div class="soft-card p-4">
-            <h5 class="fw-bold">At a glance</h5>
-            <div class="row text-center g-3 mt-1">
-              <div class="col-6 col-md-3"><div class="p-3 rounded-2xl bg-body-tertiary"><div class="h4 mb-0">50+</div><small class="text-body-secondary">Barangays</small></div></div>
-              <div class="col-6 col-md-3"><div class="p-3 rounded-2xl bg-body-tertiary"><div class="h4 mb-0">5k+</div><small class="text-body-secondary">Beneficiaries</small></div></div>
-              <div class="col-6 col-md-3"><div class="p-3 rounded-2xl bg-body-tertiary"><div class="h4 mb-0">100%</div><small class="text-body-secondary">Transparency</small></div></div>
-              <div class="col-6 col-md-3"><div class="p-3 rounded-2xl bg-body-tertiary"><div class="h4 mb-0">24/7</div><small class="text-body-secondary">Access</small></div></div>
+            <h5 class="fw-bold">What you can do</h5>
+            <div class="row g-3 mt-1">
+              <div class="col-sm-6">
+                <div class="d-flex align-items-start gap-3 p-3 rounded-2xl bg-body-tertiary h-100">
+                  <i class="bi bi-journal-text text-primary fs-4"></i>
+                  <div>
+                    <div class="fw-semibold">Apply online</div>
+                    <small class="text-body-secondary">Create an account and submit your application securely.</small>
+                  </div>
+                </div>
+              </div>
+              <div class="col-sm-6">
+                <div class="d-flex align-items-start gap-3 p-3 rounded-2xl bg-body-tertiary h-100">
+                  <i class="bi bi-bell text-success fs-4"></i>
+                  <div>
+                    <div class="fw-semibold">Get updates</div>
+                    <small class="text-body-secondary">Receive notifications on status, schedules, and reminders.</small>
+                  </div>
+                </div>
+              </div>
+              <div class="col-sm-6">
+                <div class="d-flex align-items-start gap-3 p-3 rounded-2xl bg-body-tertiary h-100">
+                  <i class="bi bi-box-arrow-in-right text-info fs-4"></i>
+                  <div>
+                    <div class="fw-semibold">Track application</div>
+                    <small class="text-body-secondary">Sign in anytime to view progress and required actions.</small>
+                  </div>
+                </div>
+              </div>
+              <div class="col-sm-6">
+                <div class="d-flex align-items-start gap-3 p-3 rounded-2xl bg-body-tertiary h-100">
+                  <i class="bi bi-qr-code text-warning fs-4"></i>
+                  <div>
+                    <div class="fw-semibold">QR-based claiming</div>
+                    <small class="text-body-secondary">Fast, secure verification on distribution day.</small>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="mt-3 d-flex gap-2">
+              <a href="<?php echo $base_path; ?>register.php" class="btn btn-primary btn-sm"><i class="bi bi-rocket-takeoff me-1"></i>Apply Now</a>
+              <a href="<?php echo $base_path; ?>unified_login.php" class="btn btn-outline-primary btn-sm"><i class="bi bi-box-arrow-in-right me-1"></i>Track Application</a>
             </div>
           </div>
         </div>

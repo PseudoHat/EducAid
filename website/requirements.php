@@ -148,16 +148,16 @@ $pageType = $seoData['type'];
     <div class="container">
       <h2 class="section-title text-center mb-5" data-lp-key="req_checklist_title"<?php echo req_block_style('req_checklist_title'); ?>><?php echo req_block('req_checklist_title','Complete Requirements Checklist'); ?></h2>
       
-      <!-- Primary Requirements -->
+      <!-- Requirements -->
       <div class="row g-5">
-        <div class="col-lg-6">
+        <div class="col-lg-8 mx-auto">
           <div class="soft-card p-4">
             <div class="d-flex align-items-center gap-3 mb-4">
               <div class="bg-primary rounded p-3">
                 <i class="bi bi-star-fill text-white fs-4"></i>
               </div>
               <div>
-                <h4 class="fw-bold mb-0" data-lp-key="req_primary_title"<?php echo req_block_style('req_primary_title'); ?>><?php echo req_block('req_primary_title','Primary Requirements'); ?></h4>
+                <h4 class="fw-bold mb-0" data-lp-key="req_primary_title"<?php echo req_block_style('req_primary_title'); ?>><?php echo req_block('req_primary_title','Requirements'); ?></h4>
                 <p class="text-body-secondary mb-0" data-lp-key="req_primary_subtitle"<?php echo req_block_style('req_primary_subtitle'); ?>><?php echo req_block('req_primary_subtitle','Essential documents for all applicants'); ?></p>
               </div>
             </div>
@@ -253,37 +253,7 @@ $pageType = $seoData['type'];
           </div>
         </div>
       </div>
-    </div>
-  </section>
-
-  <!-- Document Preparation Tips -->
-  <section id="preparation" class="py-5 bg-body-tertiary">
-    <div class="container">
-      <div class="text-center mb-5">
-        <h2 class="section-title" data-lp-key="req_prep_title"<?php echo req_block_style('req_prep_title'); ?>><?php echo req_block('req_prep_title','Document Preparation Guide'); ?></h2>
-        <p class="section-lead mx-auto" style="max-width: 700px;" data-lp-key="req_prep_lead"<?php echo req_block_style('req_prep_lead'); ?>><?php echo req_block('req_prep_lead','How to properly prepare and upload your documents'); ?></p>
-      </div>
-      
-      <div class="row g-4">
-        <div class="col-lg-8">
-          <div class="soft-card p-4">
-            <h4 class="fw-bold mb-4" data-lp-key="req_photo_title"<?php echo req_block_style('req_photo_title'); ?>>
-              <i class="bi bi-camera text-primary me-2"></i><?php echo req_block('req_photo_title','Photography Guidelines'); ?>
-            </h4>
-            
-            <div class="row g-4">
-              <div class="col-md-6">
-                <h6 class="fw-semibold text-success mb-3">✅ Do This</h6>
-                <ul class="list-unstyled d-grid gap-2">
-                  <li class="d-flex gap-2">
-                    <i class="bi bi-check text-success mt-1"></i>
-                    <span class="small">Use good lighting (natural light is best)</span>
-                  </li>
-                  <li class="d-flex gap-2">
-                    <i class="bi bi-check text-success mt-1"></i>
-                    <span class="small">Take photos straight-on, not at angles</span>
-                  </li>
-                  <li class="d-flex gap-2">
+        </div>
                     <i class="bi bi-check text-success mt-1"></i>
                     <span class="small">Ensure all text is clearly readable</span>
                   </li>
