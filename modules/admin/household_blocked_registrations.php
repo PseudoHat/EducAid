@@ -434,17 +434,11 @@ while ($row = pg_fetch_assoc($barangaysResult)) {
     <section class="home-section" id="mainContent">
         <div class="container-fluid py-4">
             <!-- Page Header -->
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <div>
-                    <h1 class="fw-bold mb-2">
-                        Household Blocked Registrations
-                    </h1>
-                    <p class="text-muted mb-0">View and manage registration attempts blocked by household duplicate prevention</p>
-                </div>
-                <a href="homepage.php" class="btn btn-outline-secondary d-flex align-items-center gap-2">
-                    <i class="bi bi-arrow-left"></i>
-                    <span>Back to Dashboard</span>
-                </a>
+            <div class="mb-4">
+                <h1 class="fw-bold mb-2">
+                    Household Blocked Registrations
+                </h1>
+                <p class="text-muted mb-0">View and manage registration attempts blocked by household duplicate prevention</p>
             </div>
 
                 <!-- Statistics Cards -->

@@ -50,7 +50,7 @@ $storagePercent = ($totalStorage / $maxStorageBytes) * 100;
 
 $pageTitle = "Storage Dashboard";
 ?>
-<?php $page_title='Storage Dashboard'; include __DIR__ . '/../../includes/admin/admin_head.php'; ?>
+<?php $page_title='Storage Dashboard'; $extra_css=['../../assets/css/admin/table_core.css']; include __DIR__ . '/../../includes/admin/admin_head.php'; ?>
 <body>
 <?php include __DIR__ . '/../../includes/admin/admin_topbar.php'; ?>
     <div id="wrapper" class="admin-wrapper">
@@ -227,7 +227,7 @@ $pageTitle = "Storage Dashboard";
                     </div>
                     <div class="card-body p-0">
                         <div class="table-responsive">
-                            <table class="table table-hover align-middle mb-0">
+                            <table class="table table-hover align-middle mb-0 compact-cards">
                                 <thead style="background-color: #f8f9fa;">
                                     <tr>
                                         <th class="fw-semibold px-4 py-3">Category</th>
@@ -242,7 +242,7 @@ $pageTitle = "Storage Dashboard";
                                         $percentage = $totalStorage > 0 ? ($stat['total_size'] / $totalStorage) * 100 : 0;
                                     ?>
                                     <tr>
-                                        <td class="px-4 py-3">
+                                        <td class="px-4 py-3" data-label="Category">
                                             <span class="badge" style="background-color: <?php 
                                                 echo $stat['category'] === 'active' ? 'rgba(34, 197, 94, 0.15)' : 
                                                     ($stat['category'] === 'distributions' ? 'rgba(59, 130, 246, 0.15)' :
@@ -261,7 +261,7 @@ $pageTitle = "Storage Dashboard";
                                                 ?>
                                             </span>
                                         </td>
-                                        <td class="text-end py-3">
+                                        <td class="text-end py-3" data-label="Students">
                                             <?php 
                                                 if ($stat['category'] === 'distributions') {
                                                     echo '<span class="text-muted">' . number_format($stat['student_count']) . ' unique</span>';
@@ -270,11 +270,11 @@ $pageTitle = "Storage Dashboard";
                                                 }
                                             ?>
                                         </td>
-                                        <td class="text-end py-3"><?php echo number_format($stat['file_count']); ?></td>
-                                        <td class="text-end py-3">
+                                        <td class="text-end py-3" data-label="Files"><?php echo number_format($stat['file_count']); ?></td>
+                                        <td class="text-end py-3" data-label="Storage Size">
                                             <strong><?php echo number_format($stat['total_size'] / (1024*1024), 2); ?> MB</strong>
                                         </td>
-                                        <td class="text-end px-4 py-3">
+                                        <td class="text-end px-4 py-3" data-label="% of Total">
                                             <span class="badge bg-light text-dark border"><?php echo number_format($percentage, 1); ?>%</span>
                                         </td>
                                     </tr>
@@ -301,7 +301,7 @@ $pageTitle = "Storage Dashboard";
                     </div>
                     <div class="card-body p-0">
                         <div class="table-responsive">
-                            <table class="table table-hover align-middle mb-0">
+                            <table class="table table-hover align-middle mb-0 compact-cards">
                                 <thead style="background-color: #f8f9fa;">
                                     <tr>
                                         <th class="fw-semibold px-4 py-3">Timestamp</th>
@@ -315,15 +315,15 @@ $pageTitle = "Storage Dashboard";
                                 <tbody>
                                     <?php foreach ($recentLogs as $log): ?>
                                     <tr>
-                                        <td class="px-4 py-3">
+                                        <td class="px-4 py-3" data-label="Timestamp">
                                             <small class="text-muted"><?php echo date('M d, Y H:i', strtotime($log['performed_at'] ?? 'now')); ?></small>
                                         </td>
-                                        <td class="py-3">
+                                        <td class="py-3" data-label="Operation">
                                             <span class="badge" style="background-color: rgba(6, 182, 212, 0.15); color: #0e7490; font-weight: 500;">
                                                 <?php echo strtoupper($log['operation'] ?? 'UNKNOWN'); ?>
                                             </span>
                                         </td>
-                                        <td class="py-3">
+                                        <td class="py-3" data-label="Student">
                                             <?php if (!empty($log['student_name'])): ?>
                                                 <div class="fw-medium"><?php echo htmlspecialchars($log['student_name']); ?></div>
                                                 <small class="text-muted"><?php echo htmlspecialchars($log['lrn'] ?? ''); ?></small>
@@ -331,10 +331,10 @@ $pageTitle = "Storage Dashboard";
                                                 <small class="text-muted">—</small>
                                             <?php endif; ?>
                                         </td>
-                                        <td class="py-3">
+                                        <td class="py-3" data-label="Performed By">
                                             <small><?php echo htmlspecialchars($log['admin_name'] ?? 'System'); ?></small>
                                         </td>
-                                        <td class="py-3">
+                                        <td class="py-3" data-label="Status">
                                             <span class="badge" style="background-color: <?php 
                                                 $status = strtoupper($log['operation_status'] ?? 'UNKNOWN');
                                                 echo $status === 'SUCCESS' ? 'rgba(34, 197, 94, 0.15)' : 
@@ -346,16 +346,18 @@ $pageTitle = "Storage Dashboard";
                                                 <?php echo $status; ?>
                                             </span>
                                         </td>
-                                        <td class="text-end px-4 py-3">
+                                        <td class="text-end px-4 py-3" data-label="Size">
                                             <small class="text-muted"><?php echo number_format(($log['total_size_before'] ?? 0) / (1024*1024), 2); ?> MB</small>
                                         </td>
                                     </tr>
                                     <?php endforeach; ?>
                                     <?php if (empty($recentLogs)): ?>
                                     <tr>
-                                        <td colspan="6" class="text-center text-muted py-5">
-                                            <i class="bi bi-inbox fs-1 d-block mb-2 opacity-50"></i>
-                                            No archive operations recorded
+                                        <td colspan="6" class="text-center text-muted py-5" style="display: table-cell !important;">
+                                            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center;">
+                                                <i class="bi bi-inbox fs-1 mb-2 opacity-50"></i>
+                                                <span>No archive operations recorded</span>
+                                            </div>
                                         </td>
                                     </tr>
                                     <?php endif; ?>

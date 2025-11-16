@@ -463,14 +463,10 @@ if ($totalSlotsQuery) {
   <section class="home-section" id="mainContent">
     <div class="container-fluid py-4 px-4">
       <!-- Page Header - Clean style -->
-      <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
-          <h1 class="fw-bold mb-1">Manage Signup Slots</h1>
-          <p class="text-muted mb-0">Create and manage registration slots for student sign-ups</p>
-        </div>
-        <div class="text-end">
-          <span class="badge bg-primary fs-6"><?= $totalSlots ?> Total Slots</span>
-        </div>
+      <div class="mb-4">
+        <h1 class="fw-bold mb-1">Manage Signup Slots</h1>
+        <p class="text-muted mb-2">Create and manage registration slots for student sign-ups</p>
+        <span class="badge bg-primary fs-6"><?= $totalSlots ?> Total Slots</span>
       </div>
 
       <?php

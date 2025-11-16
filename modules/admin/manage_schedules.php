@@ -641,49 +641,49 @@ if ($usedDatesResult) {
                 <!-- Current Schedule Display -->
                 <div class="card border-0 shadow-sm mb-4" style="border-radius: 12px; overflow: hidden; border-left: 5px solid <?= $schedulePublished ? '#10b981' : '#f59e0b' ?>;">
                     <div class="card-header" style="background: <?= $schedulePublished ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' ?>; padding: 1.25rem;">
-                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
-                            <div>
-                                <h5 class="mb-0 text-white fw-bold">
-                                    <i class="bi bi-calendar-check me-2"></i> Current Schedule
-                                    <?php if ($schedulePublished): ?>
-                                        <span class="badge bg-white text-success ms-2" style="padding: 0.5rem 1rem; font-size: 0.85rem; box-shadow: 0 2px 8px rgba(0,0,0,0.15);">
-                                            <i class="bi bi-eye me-1"></i> Visible to Students
-                                        </span>
-                                    <?php else: ?>
-                                        <span class="badge bg-white text-warning ms-2" style="padding: 0.5rem 1rem; font-size: 0.85rem; box-shadow: 0 2px 8px rgba(0,0,0,0.15);">
-                                            <i class="bi bi-eye-slash me-1"></i> Hidden from Students
-                                        </span>
-                                    <?php endif; ?>
-                                </h5>
-                            </div>
-                            <div class="d-flex flex-wrap gap-2 align-items-center">
+                        <div class="d-flex flex-column gap-3">
+                            <h5 class="mb-0 text-white fw-bold">
+                                <i class="bi bi-calendar-check me-2"></i> Current Schedule
+                            </h5>
+                            <div class="d-flex flex-wrap align-items-center gap-2">
+                                <?php if ($schedulePublished): ?>
+                                    <span class="badge rounded-pill bg-white text-success fw-semibold px-3 py-2 shadow-sm">
+                                        <i class="bi bi-eye me-1"></i> Visible to Students
+                                    </span>
+                                <?php else: ?>
+                                    <span class="badge rounded-pill bg-white text-warning fw-semibold px-3 py-2 shadow-sm">
+                                        <i class="bi bi-eye-slash me-1"></i> Hidden from Students
+                                    </span>
+                                <?php endif; ?>
+
                                 <?php if (!$schedulePublished): ?>
                                     <form method="POST" class="mb-0">
                                         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
-                                        <button type="submit" name="publish_schedule" class="btn btn-light fw-bold" 
-                                                style="padding: 0.6rem 1.5rem; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); transition: all 0.3s ease; color: <?= $schedulePublished ? '#059669' : '#d97706' ?>;"
-                                                onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.25)';"
-                                                onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 2px 8px rgba(0,0,0,0.15)';">
+                                        <button type="submit" name="publish_schedule" class="btn btn-light fw-bold w-100 w-sm-auto"
+                                                style="padding: 0.55rem 1.25rem; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.12); color: #d97706;">
                                             <i class="bi bi-send me-2"></i> Publish
                                         </button>
                                     </form>
                                 <?php else: ?>
-                                    <form method="POST" class="mb-0">
-                                        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
-                                        <button type="submit" name="unpublish_schedule" class="btn btn-light fw-bold" 
-                                                <?= !$can_unpublish ? 'disabled title="' . htmlspecialchars($unpublish_reason) . '"' : '' ?>
-                                                style="padding: 0.6rem 1.5rem; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); transition: all 0.3s ease; color: <?= $can_unpublish ? '#059669' : '#9ca3af' ?>; <?= !$can_unpublish ? 'opacity: 0.5; cursor: not-allowed;' : '' ?>"
-                                                <?= $can_unpublish ? 'onmouseover="this.style.transform=\'translateY(-2px)\'; this.style.boxShadow=\'0 4px 12px rgba(0,0,0,0.25)\';" onmouseout="this.style.transform=\'translateY(0)\'; this.style.boxShadow=\'0 2px 8px rgba(0,0,0,0.15)\';"' : '' ?>
-                                                <?= $can_unpublish ? 'onclick="return confirm(\'This will hide the schedule from students but preserve all data. Continue?\')"' : '' ?>>
-                                            <i class="bi bi-<?= $can_unpublish ? 'eye-slash' : 'lock' ?> me-2"></i> <?= $can_unpublish ? 'Hide' : 'Locked' ?>
-                                        </button>
-                                    </form>
+                                    <?php if ($can_unpublish): ?>
+                                        <form method="POST" class="mb-0">
+                                            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
+                                            <button type="submit" name="unpublish_schedule" class="btn btn-light fw-bold w-100 w-sm-auto"
+                                                    style="padding: 0.55rem 1.25rem; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.12); color: #059669;"
+                                                    onclick="return confirm('This will hide the schedule from students but preserve all data. Continue?')">
+                                                <i class="bi bi-eye-slash me-2"></i> Hide
+                                            </button>
+                                        </form>
+                                    <?php else: ?>
+                                        <span class="badge rounded-pill bg-light text-muted border fw-semibold px-3 py-2" title="<?= htmlspecialchars($unpublish_reason) ?>">
+                                            <i class="bi bi-lock me-1"></i> Locked
+                                        </span>
+                                    <?php endif; ?>
                                 <?php endif; ?>
-                                <button type="button" class="btn btn-light fw-bold" 
+
+                                <button type="button" class="btn btn-light fw-bold w-100 w-sm-auto" 
                                         onclick="clearSchedule()"
-                                        style="padding: 0.6rem 1.5rem; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); transition: all 0.3s ease; color: #dc2626;"
-                                        onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.25)';"
-                                        onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 2px 8px rgba(0,0,0,0.15)';">
+                                        style="padding: 0.55rem 1.25rem; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.12); color: #dc2626;">
                                     <i class="bi bi-trash me-2"></i> Clear Data
                                 </button>
                             </div>
