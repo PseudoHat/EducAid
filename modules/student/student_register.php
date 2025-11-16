@@ -6295,7 +6295,7 @@ if (!$isAjaxRequest) {
                             <i class="bi bi-info-circle ms-1" data-bs-toggle="tooltip" data-bs-placement="right" 
                                title="This helps us identify if another student from your household is already registered. Only one student per household can receive assistance."></i>
                         </label>
-                        <input type="text" class="form-control" name="mothers_fullname" id="mothersMaidenNameInput" 
+                        <input type="text" class="form-control" name="mothers_maiden_name" id="mothersMaidenNameInput" 
                                placeholder="e.g., Maria Cruz Santos, Ana Rose Reyes" 
                                pattern="[A-Za-z\s\-]+" 
                                maxlength="100"

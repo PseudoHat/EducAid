@@ -364,15 +364,15 @@ $updated = isset($_GET['updated']);
           <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfTokenPost) ?>">
           <div class="mb-3">
             <label class="form-label">Title</label>
-            <input type="text" name="title" class="form-control form-control-lg" placeholder="Scholarship Orientation" required>
+            <input type="text" name="title" id="title" class="form-control form-control-lg" placeholder="Scholarship Orientation" required>
           </div>
           <div class="event-block mb-3">
             <h6><i class="bi bi-calendar-event me-1"></i> Event Schedule (Optional)</h6>
             <div class="event-inline mb-2">
               <input type="date" name="event_date" class="form-control" aria-label="Event Date" id="eventDate" min="<?= date('Y-m-d') ?>">
-              <input type="time" name="event_time" class="form-control" aria-label="Event Time">
+              <input type="time" name="event_time" class="form-control" aria-label="Event Time" id="eventTime">
             </div>
-            <input type="text" name="location" class="form-control" placeholder="Location / Venue" aria-label="Location">
+            <input type="text" name="location" class="form-control" placeholder="Location / Venue" aria-label="Location" id="location">
           </div>
           <div class="mb-3">
             <label class="form-label">Remarks / Description</label>
@@ -650,34 +650,58 @@ if(dropZone && imgInput && inlinePreview){
 // Edit announcement function
 function editAnnouncement(id) {
   const announcement = announcements.find(a => a.announcement_id === id);
-  if (!announcement) return;
+  if (!announcement) {
+    console.error('Announcement not found:', id);
+    return;
+  }
+  
+  // Get the form
+  const form = document.getElementById('announcementForm');
+  if (!form) {
+    console.error('Form not found');
+    return;
+  }
+  
+  // Reset form first to clear any previous state
+  resetForm();
   
   // Populate form fields
-  document.getElementById('title').value = announcement.title;
-  document.getElementById('eventDate').value = announcement.event_date || '';
-  document.getElementById('eventTime').value = announcement.event_time || '';
-  document.getElementById('location').value = announcement.location || '';
+  const titleInput = document.getElementById('title');
+  const eventDateInput = document.getElementById('eventDate');
+  const eventTimeInput = document.getElementById('eventTime');
+  const locationInput = document.getElementById('location');
+  
+  if (titleInput) titleInput.value = announcement.title;
+  if (eventDateInput) eventDateInput.value = announcement.event_date || '';
+  if (eventTimeInput) eventTimeInput.value = announcement.event_time || '';
+  if (locationInput) locationInput.value = announcement.location || '';
   
   // Update TinyMCE content
-  tinymce.get('remarksEditor').setContent(announcement.remarks);
+  if (tinymce.get('remarksEditor')) {
+    tinymce.get('remarksEditor').setContent(announcement.remarks);
+  }
   
   // Change form to edit mode
-  const form = document.querySelector('form[method="POST"]');
   const submitBtn = form.querySelector('button[type="submit"]');
+  if (!submitBtn) {
+    console.error('Submit button not found');
+    return;
+  }
+  
   submitBtn.innerHTML = '<i class="bi bi-check-circle me-1"></i> Update Announcement';
   
-  // Add hidden field for announcement_id and change action
+  // Remove post_announcement name attribute from submit button
+  submitBtn.removeAttribute('name');
+  
+  // Add hidden field for announcement_id
   let editIdInput = form.querySelector('input[name="announcement_id"]');
   if (!editIdInput) {
     editIdInput = document.createElement('input');
     editIdInput.type = 'hidden';
     editIdInput.name = 'announcement_id';
-    form.appendChild(editIdInput);
+    form.insertBefore(editIdInput, form.firstChild);
   }
   editIdInput.value = id;
-  
-  // Change submit button name to edit_announcement
-  submitBtn.name = 'edit_announcement';
   
   // Add hidden input to ensure edit_announcement is submitted
   let editActionInput = form.querySelector('input[name="edit_announcement"]');
@@ -686,8 +710,12 @@ function editAnnouncement(id) {
     editActionInput.type = 'hidden';
     editActionInput.name = 'edit_announcement';
     editActionInput.value = '1';
-    form.appendChild(editActionInput);
+    form.insertBefore(editActionInput, form.firstChild);
   }
+  
+  console.log('Edit mode enabled for announcement:', id);
+  
+  console.log('Edit mode enabled for announcement:', id);
   
   // Add cancel button if not exists
   let cancelBtn = form.querySelector('.cancel-edit-btn');
@@ -705,14 +733,23 @@ function editAnnouncement(id) {
 }
 
 function resetForm() {
-  const form = document.querySelector('form[method="POST"]');
+  const form = document.getElementById('announcementForm');
+  if (!form) return;
+  
   form.reset();
-  tinymce.get('remarksEditor').setContent('');
+  
+  // Reset TinyMCE
+  if (tinymce.get('remarksEditor')) {
+    tinymce.get('remarksEditor').setContent('');
+  }
   
   const submitBtn = form.querySelector('button[type="submit"]');
-  submitBtn.innerHTML = '<i class="bi bi-send me-1"></i> Post Announcement';
-  submitBtn.name = 'post_announcement';
+  if (submitBtn) {
+    submitBtn.innerHTML = '<i class="bi bi-send me-1"></i> Post Announcement';
+    submitBtn.name = 'post_announcement';
+  }
   
+  // Remove edit-specific inputs
   const editIdInput = form.querySelector('input[name="announcement_id"]');
   if (editIdInput) editIdInput.remove();
   
@@ -750,6 +787,26 @@ tinymce.init({
     editor.on('change', function() {
       editor.save(); // Save content back to textarea
     });
+  }
+});
+
+// Add form submit event listener for debugging
+document.getElementById('announcementForm').addEventListener('submit', function(e) {
+  const formData = new FormData(this);
+  console.log('Form submission data:');
+  for (let [key, value] of formData.entries()) {
+    console.log(key + ':', value);
+  }
+  
+  // Check if we're in edit mode
+  const editMode = formData.has('edit_announcement');
+  console.log('Edit mode:', editMode);
+  
+  if (editMode && !formData.has('announcement_id')) {
+    console.error('Missing announcement_id in edit mode!');
+    alert('Error: Missing announcement ID. Please try again.');
+    e.preventDefault();
+    return false;
   }
 });
 </script>
