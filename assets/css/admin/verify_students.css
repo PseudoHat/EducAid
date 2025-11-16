@@ -34,6 +34,37 @@ body {
   color: rgba(255, 255, 255, 0.8);
 }
 
+/* Workflow chips layout */
+.quick-actions .status-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+@media (max-width: 576px) {
+  .quick-actions .status-grid { grid-template-columns: 1fr; }
+}
+
+.quick-actions .status-chip {
+  background: #ffffff;
+  color: #1f2937;
+  border-radius: 9999px;
+  padding: 10px 14px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+}
+
+.quick-actions .status-chip .bi { font-size: 1rem; }
+
+.quick-actions .status-chip--alert {
+  background: #ffc107;
+  color: #111827;
+  border-radius: 12px;
+}
+
 /* Card Style */
 .card {
   border-radius: 8px;

@@ -327,44 +327,38 @@ while ($row = pg_fetch_assoc($barangayResult)) {
   <?php include __DIR__ . '/../../includes/admin/admin_header.php'; ?>
   <section class="home-section" id="mainContent">
     <div class="container-fluid py-4 px-4">
-      <!-- Page Header - Clean style -->
-      <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
-          <h1 class="fw-bold mb-1">Manage Student Status</h1>
-          <p class="text-muted mb-0">Lock the active list for payroll generation, or revert students back to applicants.</p>
-        </div>
-        <div class="text-end">
-          <span class="badge bg-primary fs-6"><?= $student_counts['active_count'] ?> Active</span>
-        </div>
+      <!-- Page Header - Clean, stacked for mobile -->
+      <div class="mb-4">
+        <h1 class="fw-bold mb-1">Manage Student Status</h1>
+        <p class="text-muted mb-2">Lock the active list for payroll generation, or revert students back to applicants.</p>
+        <span class="badge bg-primary fs-6"><?= $student_counts['active_count'] ?> Active</span>
       </div>
         
       <!-- Workflow Status Indicators -->
       <div class="quick-actions mb-4">
-        <div class="d-flex justify-content-between align-items-center">
-          <div>
-            <h5 class="mb-1"><i class="bi bi-info-circle-fill me-2"></i>Workflow Status</h5>
-            <small>Current verification and payroll status</small>
+        <div class="qa-header mb-2">
+          <h5 class="mb-1 d-flex align-items-center"><i class="bi bi-info-circle-fill me-2"></i>Workflow Status</h5>
+          <small>Current verification and payroll status</small>
+        </div>
+        <div class="status-grid">
+          <div class="status-chip">
+            <i class="bi <?= $workflow_status['list_finalized'] ? 'bi-lock-fill' : 'bi-unlock' ?>"></i>
+            <span>List <?= $workflow_status['list_finalized'] ? 'Locked' : 'Not Locked' ?></span>
           </div>
-          <div class="d-flex flex-wrap gap-2">
-            <span class="badge <?= $workflow_status['list_finalized'] ? 'bg-light' : 'bg-white' ?> text-dark p-2" style="border: 1px solid rgba(255,255,255,0.3);">
-              <i class="bi <?= $workflow_status['list_finalized'] ? 'bi-lock-fill' : 'bi-unlock' ?> me-1"></i>
-              List <?= $workflow_status['list_finalized'] ? 'Locked' : 'Not Locked' ?>
-            </span>
-            <span class="badge <?= $workflow_status['has_payroll_qr'] ? 'bg-light' : 'bg-white' ?> text-dark p-2" style="border: 1px solid rgba(255,255,255,0.3);">
-              <i class="bi <?= $workflow_status['has_payroll_qr'] ? 'bi-check-circle' : 'bi-clock' ?> me-1"></i>
-              Payroll & QR <?= $workflow_status['has_payroll_qr'] ? 'Generated' : 'Pending' ?>
-            </span>
-            <span class="badge <?= $workflow_status['has_schedules'] ? 'bg-light' : 'bg-white' ?> text-dark p-2" style="border: 1px solid rgba(255,255,255,0.3);">
-              <i class="bi <?= $workflow_status['has_schedules'] ? 'bi-calendar-check' : 'bi-calendar' ?> me-1"></i>
-              Schedules <?= $workflow_status['has_schedules'] ? 'Created' : 'Not Created' ?>
-            </span>
-            <?php if ($workflow_status['has_schedules']): ?>
-            <span class="badge bg-warning text-dark p-2">
-              <i class="bi bi-exclamation-triangle me-1"></i>
-              Payroll locked due to schedules
-            </span>
-            <?php endif; ?>
+          <div class="status-chip">
+            <i class="bi <?= $workflow_status['has_payroll_qr'] ? 'bi-check-circle' : 'bi-clock' ?>"></i>
+            <span>Payroll & QR <?= $workflow_status['has_payroll_qr'] ? 'Generated' : 'Pending' ?></span>
           </div>
+          <div class="status-chip">
+            <i class="bi <?= $workflow_status['has_schedules'] ? 'bi-calendar-check' : 'bi-calendar' ?>"></i>
+            <span>Schedules <?= $workflow_status['has_schedules'] ? 'Created' : 'Not Created' ?></span>
+          </div>
+          <?php if ($workflow_status['has_schedules']): ?>
+          <div class="status-chip status-chip--alert">
+            <i class="bi bi-exclamation-triangle"></i>
+            <span>Payroll locked due to schedules</span>
+          </div>
+          <?php endif; ?>
         </div>
       </div>
 
