@@ -416,7 +416,7 @@ $isCMSActive = in_array($current, $cmsFiles, true);
 
 <!-- Logout Confirmation Modal -->
 <div class="modal fade" id="logoutModal" tabindex="-1" aria-labelledby="logoutModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
+  <div class="modal-dialog modal-dialog-scrollable" style="margin-top: 80px;">
     <div class="modal-content" style="border-radius: 16px; border: none; box-shadow: 0 10px 40px rgba(0,0,0,0.2);">
       <div class="modal-header border-0" style="background: linear-gradient(135deg, #0d6efd 0%, #0b5ed7 100%); color: white; padding: 24px 28px; border-radius: 16px 16px 0 0;">
         <div class="d-flex align-items-center gap-3">

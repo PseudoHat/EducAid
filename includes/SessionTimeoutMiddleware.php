@@ -36,7 +36,7 @@ class SessionTimeoutMiddleware {
         }
         
         // Load timeout settings from environment
-        $this->idleTimeoutMinutes = (int) (getenv('SESSION_IDLE_TIMEOUT_MINUTES') ?: 30);
+        $this->idleTimeoutMinutes = (int) (getenv('SESSION_IDLE_TIMEOUT_MINUTES') ?: 15);
         $this->absoluteTimeoutHours = (int) (getenv('SESSION_ABSOLUTE_TIMEOUT_HOURS') ?: 8);
         $this->warningBeforeLogoutSeconds = (int) (getenv('SESSION_WARNING_BEFORE_LOGOUT_SECONDS') ?: 120);
     }
@@ -51,11 +51,6 @@ class SessionTimeoutMiddleware {
         // Only process if user is logged in
         if (!$this->isAuthenticated()) {
             return ['status' => 'not_authenticated'];
-        }
-        
-        // Skip timeout enforcement for admin sessions (admins have their own session management)
-        if (isset($_SESSION['admin_id'])) {
-            return ['status' => 'admin_session', 'skip_timeout' => true];
         }
         
         // Check if "Remember Me" is active (skip timeouts)
@@ -131,50 +126,57 @@ class SessionTimeoutMiddleware {
      * Get session data from database
      */
     private function getSessionData() {
-        if (!isset($_SESSION['student_id'])) {
+        // Determine if this is a student or admin session
+        $isStudent = isset($_SESSION['student_id']);
+        $isAdmin = isset($_SESSION['admin_id']);
+        
+        if (!$isStudent && !$isAdmin) {
             return null;
         }
         
         try {
-            $result = pg_query_params($this->db, 
-                "SELECT session_id, student_id, created_at, last_activity, expires_at
-                FROM student_active_sessions
-                WHERE student_id = $1 
-                AND session_id = $2
-                LIMIT 1",
-                [$_SESSION['student_id'], session_id()]
-            );
-            
-            if ($result === false) {
-                error_log("Session timeout middleware error: " . pg_last_error($this->db));
-                return null;
+            // For now, only student sessions are tracked in database
+            // Admin session tracking will be added later
+            if ($isStudent) {
+                $result = pg_query_params($this->db, 
+                    "SELECT session_id, student_id as user_id, created_at, last_activity, expires_at
+                    FROM student_active_sessions
+                    WHERE student_id = $1 
+                    AND session_id = $2
+                    LIMIT 1",
+                    [$_SESSION['student_id'], session_id()]
+                );
+                
+                if ($result === false) {
+                    error_log("Session timeout middleware error: " . pg_last_error($this->db));
+                    return null;
+                }
+                
+                return pg_fetch_assoc($result);
+            } else if ($isAdmin) {
+                // Admin sessions: use session creation time from PHP session
+                // This provides basic timeout without database tracking
+                if (!isset($_SESSION['session_created_at'])) {
+                    $_SESSION['session_created_at'] = date('Y-m-d H:i:s');
+                }
+                if (!isset($_SESSION['session_last_activity'])) {
+                    $_SESSION['session_last_activity'] = date('Y-m-d H:i:s');
+                }
+                
+                return [
+                    'session_id' => session_id(),
+                    'user_id' => $_SESSION['admin_id'],
+                    'created_at' => $_SESSION['session_created_at'],
+                    'last_activity' => $_SESSION['session_last_activity'],
+                    'expires_at' => null
+                ];
             }
-            
-            return pg_fetch_assoc($result);
         } catch (Exception $e) {
             error_log("Session timeout middleware error: " . $e->getMessage());
             return null;
         }
         
-        $query = "
-            SELECT session_id, student_id, created_at, last_activity, expires_at
-            FROM student_active_sessions
-            WHERE student_id = $1 
-            AND session_id = $2
-            LIMIT 1
-        ";
-        
-        $result = @pg_query_params($this->connection, $query, [
-            $_SESSION['student_id'],
-            session_id()
-        ]);
-        
-        if (!$result) {
-            error_log("Session timeout middleware error: " . pg_last_error($this->connection));
-            return null;
-        }
-        
-        return pg_fetch_assoc($result);
+        return null;
     }
     
     /**
@@ -233,21 +235,23 @@ class SessionTimeoutMiddleware {
      * Update last_activity timestamp in database
      */
     private function updateActivity() {
-        if (!isset($_SESSION['student_id']) || !$this->connection) {
-            return;
-        }
-        
         try {
-            $result = pg_query_params($this->db,
-                "UPDATE student_active_sessions
-                SET last_activity = NOW()
-                WHERE student_id = $1 
-                AND session_id = $2",
-                [$_SESSION['student_id'], session_id()]
-            );
-            
-            if ($result === false) {
-                error_log("Failed to update activity: " . pg_last_error($this->db));
+            if (isset($_SESSION['student_id'])) {
+                // Update student session in database
+                $result = pg_query_params($this->db,
+                    "UPDATE student_active_sessions
+                    SET last_activity = NOW()
+                    WHERE student_id = $1 
+                    AND session_id = $2",
+                    [$_SESSION['student_id'], session_id()]
+                );
+                
+                if ($result === false) {
+                    error_log("Failed to update activity: " . pg_last_error($this->db));
+                }
+            } else if (isset($_SESSION['admin_id'])) {
+                // Update admin session in PHP session (no database tracking yet)
+                $_SESSION['session_last_activity'] = date('Y-m-d H:i:s');
             }
         } catch (Exception $e) {
             error_log("Failed to update activity: " . $e->getMessage());
@@ -260,10 +264,13 @@ class SessionTimeoutMiddleware {
      * @param string $reason Reason for logout (for logging)
      */
     private function forceLogout($reason) {
-        // Log the timeout event
-        error_log("Session timeout - Reason: {$reason}, Student ID: " . ($_SESSION['student_id'] ?? 'unknown'));
+        $userType = isset($_SESSION['admin_id']) ? 'Admin' : 'Student';
+        $userId = $_SESSION['admin_id'] ?? $_SESSION['student_id'] ?? 'unknown';
         
-        // Remove session from database
+        // Log the timeout event
+        error_log("Session timeout - Reason: {$reason}, {$userType} ID: {$userId}");
+        
+        // Remove session from database (students only for now)
         if (isset($_SESSION['student_id'])) {
             try {
                 $result = pg_query_params($this->db,

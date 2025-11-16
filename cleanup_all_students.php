@@ -400,14 +400,69 @@ if (!$confirm) {
                 'description' => 'Remove all uploaded document records'
             ],
             [
+                'name' => 'Delete Household Block Attempts',
+                'query' => 'DELETE FROM household_block_attempts',
+                'description' => 'Remove all household blocking records'
+            ],
+            [
+                'name' => 'Delete Admin Blacklist Verifications',
+                'query' => 'DELETE FROM admin_blacklist_verifications',
+                'description' => 'Remove all admin blacklist verification records'
+            ],
+            [
                 'name' => 'Delete Blacklisted Students',
                 'query' => 'DELETE FROM blacklisted_students',
                 'description' => 'Remove all blacklist records'
             ],
             [
+                'name' => 'Delete Student Notification Preferences',
+                'query' => 'DELETE FROM student_notification_preferences',
+                'description' => 'Remove all notification preference settings'
+            ],
+            [
+                'name' => 'Delete Student Status History',
+                'query' => 'DELETE FROM student_status_history',
+                'description' => 'Remove all student status change history records'
+            ],
+            [
+                'name' => 'Delete Student Data Export Requests',
+                'query' => 'DELETE FROM student_data_export_requests',
+                'description' => 'Remove all data export request records'
+            ],
+            [
+                'name' => 'Delete School Student ID Audit',
+                'query' => 'DELETE FROM school_student_id_audit',
+                'description' => 'Remove all school student ID audit logs'
+            ],
+            [
+                'name' => 'Delete School Student IDs',
+                'query' => 'DELETE FROM school_student_ids',
+                'description' => 'Remove all school student ID mappings'
+            ],
+            [
+                'name' => 'Delete QR Codes',
+                'query' => 'DELETE FROM qr_codes',
+                'description' => 'Remove all student QR codes (must be deleted before students)'
+            ],
+            [
+                'name' => 'Delete Student Active Sessions',
+                'query' => 'DELETE FROM student_active_sessions',
+                'description' => 'Remove all active session records'
+            ],
+            [
+                'name' => 'Delete Student Login History',
+                'query' => 'DELETE FROM student_login_history',
+                'description' => 'Remove all login history records'
+            ],
+            [
                 'name' => 'Delete Student Accounts',
                 'query' => 'DELETE FROM students',
                 'description' => 'Remove all student account records'
+            ],
+            [
+                'name' => 'Delete Signup Slots',
+                'query' => 'DELETE FROM signup_slots',
+                'description' => 'Remove all signup slot records (must be deleted after students)'
             ]
         ];
         
