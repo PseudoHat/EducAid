@@ -253,6 +253,9 @@ nav.navbar.fixed-header .container-fluid {
 nav.navbar.fixed-header .navbar-brand {
   gap: 0.75rem;
   flex-wrap: nowrap;
+  /* Prevent brand from forcing a second row; allow it to shrink */
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
 nav.navbar.fixed-header .navbar-brand .brand-logo {
@@ -265,6 +268,15 @@ nav.navbar.fixed-header .navbar-brand .brand-text {
   font-size: 1.05rem;
   font-weight: 600;
   line-height: 1.2;
+  /* Keep a single line and ellipsize to preserve space for toggler */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Ensure the hamburger doesn't shrink oddly under pressure */
+nav.navbar.fixed-header .navbar-toggler {
+  flex: 0 0 auto;
 }
 
 nav.navbar.fixed-header .navbar-nav.spread-nav {
@@ -317,6 +329,11 @@ nav.navbar.fixed-header .navbar-collapse {
   width: 100%;
   align-items: center;
   gap: 0.75rem;
+}
+
+/* On very narrow screens, hide the municipality badge to save width */
+@media (max-width: 380px) {
+  nav.navbar.fixed-header .municipality-badge-navbar { display: none; }
 }
 
 .navbar-actions {
