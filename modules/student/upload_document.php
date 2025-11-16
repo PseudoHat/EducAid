@@ -27,6 +27,11 @@ if (!isset($_SESSION['student_id'])) {
 
 $student_id = $_SESSION['student_id'];
 
+// Enforce session timeout via middleware
+require_once __DIR__ . '/../../includes/SessionTimeoutMiddleware.php';
+$timeoutMiddleware = new SessionTimeoutMiddleware();
+$timeoutStatus = $timeoutMiddleware->handle();
+
 // Initialize services
 $fileService = new UnifiedFileService($connection);
 $reuploadService = new DocumentReuploadService($connection);
@@ -123,8 +128,15 @@ if ($needs_university_selection) {
     }
 }
 
-// PostgreSQL returns 'f'/'t' strings for booleans
-$needs_upload = ($student['needs_upload'] === 't' || $student['needs_upload'] === true);
+// PostgreSQL returns 'f'/'t' strings for booleans.
+// Guard against missing column/key (e.g., older schema without needs_upload) to prevent warnings.
+$needs_upload = isset($student['needs_upload']) && (
+    $student['needs_upload'] === 't' ||
+    $student['needs_upload'] === true ||
+    $student['needs_upload'] === 1 ||
+    $student['needs_upload'] === '1' ||
+    $student['needs_upload'] === 'true'
+);
 $student_status = $student['status'] ?? 'applicant';
 
 // IMPORTANT: Migrated students ALWAYS need to upload documents (treat them like re-upload mode)

@@ -1,7 +1,12 @@
 <?php
 include __DIR__ . '/../../config/database.php';
-session_start();
+if (session_status() === PHP_SESSION_NONE) { session_start(); }
 if (!isset($_SESSION['student_username'])) { header("Location: ../../unified_login.php"); exit; }
+
+// Enforce session timeout via middleware
+require_once __DIR__ . '/../../includes/SessionTimeoutMiddleware.php';
+$timeoutMiddleware = new SessionTimeoutMiddleware();
+$timeoutStatus = $timeoutMiddleware->handle();
 $student_id = $_SESSION['student_id'];
 
 // Require year level update before accessing this page

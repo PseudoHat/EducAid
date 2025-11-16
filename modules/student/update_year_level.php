@@ -1,5 +1,5 @@
 <?php
-session_start();
+if (session_status() === PHP_SESSION_NONE) { session_start(); }
 
 require_once __DIR__ . '/../../config/database.php';
 
@@ -10,6 +10,12 @@ if (!isset($_SESSION['student_id'])) {
 }
 
 $student_id = $_SESSION['student_id'];
+
+// Enforce session timeout via middleware
+require_once __DIR__ . '/../../includes/SessionTimeoutMiddleware.php';
+$timeoutMiddleware = new SessionTimeoutMiddleware();
+$timeoutStatus = $timeoutMiddleware->handle();
+
 $error_message = $_SESSION['error_message'] ?? '';
 $success_message = '';
 unset($_SESSION['error_message']);

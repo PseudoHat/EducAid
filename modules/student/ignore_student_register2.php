@@ -2,7 +2,7 @@
 include_once '../../config/database.php';
 // Include reCAPTCHA v3 configuration (site key + secret key constants)
 include_once __DIR__ . '/../../config/recaptcha_config.php';
-session_start();
+if (session_status() === PHP_SESSION_NONE) { session_start(); }
 
 // Start output buffering to prevent any early HTML from leaking into JSON responses
 if (ob_get_level() === 0) {
@@ -1643,7 +1643,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processGradesOcr'])) 
         $failingGrades = [];
         $allPassing = true;
 
-        for ($i = 0; $i < count($matches[0]); $i++) {
+        $matchedSubjects = isset($matches[0]) ? (is_array($matches[0]) ? $matches[0] : [$matches[0]]) : [];
+        $loopCount = count($matchedSubjects);
+        for ($i = 0; $i < $loopCount; $i++) {
             $subject = trim($matches[1][$i]);
             $gradeRaw = $matches[2][$i];
             $grade = floatval(str_replace(',', '.', $gradeRaw));

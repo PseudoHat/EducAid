@@ -2,12 +2,17 @@ Student Profile.php
 <?php
 /** @phpstan-ignore-file */
 include __DIR__ . '/../../config/database.php';
-session_start();
+if (session_status() === PHP_SESSION_NONE) { session_start(); }
 if (!isset($_SESSION['student_username'])) {
     header("Location: ../../unified_login.php");
     exit;
 }
 $student_id = $_SESSION['student_id'];
+
+// Enforce session timeout via middleware
+require_once __DIR__ . '/../../includes/SessionTimeoutMiddleware.php';
+$timeoutMiddleware = new SessionTimeoutMiddleware();
+$timeoutStatus = $timeoutMiddleware->handle();
 
 // Require year level update before accessing this page
 include __DIR__ . '/../../includes/require_year_level_update.php';

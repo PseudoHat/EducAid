@@ -10,6 +10,11 @@ if (!isset($_SESSION['student_username'])) {
 }
 $student_id = $_SESSION['student_id'];
 
+// Enforce session timeout via middleware
+require_once __DIR__ . '/../../includes/SessionTimeoutMiddleware.php';
+$timeoutMiddleware = new SessionTimeoutMiddleware();
+$timeoutStatus = $timeoutMiddleware->handle();
+
 // Track session activity
 include __DIR__ . '/../../includes/student_session_tracker.php';
 ?>

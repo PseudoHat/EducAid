@@ -679,6 +679,16 @@ function editAnnouncement(id) {
   // Change submit button name to edit_announcement
   submitBtn.name = 'edit_announcement';
   
+  // Add hidden input to ensure edit_announcement is submitted
+  let editActionInput = form.querySelector('input[name="edit_announcement"]');
+  if (!editActionInput) {
+    editActionInput = document.createElement('input');
+    editActionInput.type = 'hidden';
+    editActionInput.name = 'edit_announcement';
+    editActionInput.value = '1';
+    form.appendChild(editActionInput);
+  }
+  
   // Add cancel button if not exists
   let cancelBtn = form.querySelector('.cancel-edit-btn');
   if (!cancelBtn) {
@@ -705,6 +715,9 @@ function resetForm() {
   
   const editIdInput = form.querySelector('input[name="announcement_id"]');
   if (editIdInput) editIdInput.remove();
+  
+  const editActionInput = form.querySelector('input[name="edit_announcement"]');
+  if (editActionInput) editActionInput.remove();
   
   const cancelBtn = form.querySelector('.cancel-edit-btn');
   if (cancelBtn) cancelBtn.remove();

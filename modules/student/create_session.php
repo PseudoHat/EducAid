@@ -4,7 +4,7 @@
  * Visit this page in your browser while logged in
  */
 if (session_status() === PHP_SESSION_NONE) {
-    session_start();
+    if (session_status() === PHP_SESSION_NONE) { session_start(); }
 }
 include __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../includes/SessionManager.php';

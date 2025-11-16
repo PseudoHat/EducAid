@@ -11,7 +11,7 @@ if (isset($_POST['processIdPictureOcr']) || isset($_POST['processGradesOcr']) ||
 include_once '../../config/database.php';
 // Include reCAPTCHA v3 configuration (site key + secret key constants)
 include_once __DIR__ . '/../../config/recaptcha_config.php';
-session_start();
+if (session_status() === PHP_SESSION_NONE) { session_start(); }
 
 $municipality_id = $_SESSION['active_municipality_id'] ?? 1;
 $municipality_logo = null;
@@ -1446,7 +1446,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processIdPictureOcr']
         if (!$idFound) {
             // Extract potential ID numbers from OCR text
             preg_match_all('/\b[\d\-]+\b/', $ocrText, $matches);
-            foreach ($matches[0] as $potentialId) {
+            $possibleIds = isset($matches[0]) ? (array)$matches[0] : [];
+            foreach ($possibleIds as $potentialId) {
                 $cleanPotentialId = preg_replace('/[^A-Z0-9]/i', '', $potentialId);
                 if (strlen($cleanPotentialId) >= 4) {
                     similar_text($cleanSchoolId, $cleanPotentialId, $percent);
@@ -3436,7 +3437,8 @@ function validateSchoolStudentId($ocrText, $schoolStudentId) {
     $maxSimilarity = 0;
     $bestMatch = '';
     
-    foreach ($matches[0] as $potentialId) {
+    $potentialIds = isset($matches[0]) ? (array)$matches[0] : [];
+    foreach ($potentialIds as $potentialId) {
         // Only check strings that have at least 4 characters
         if (strlen($potentialId) >= 4) {
             $cleanPotentialId = preg_replace('/[^A-Z0-9]/i', '', $potentialId);

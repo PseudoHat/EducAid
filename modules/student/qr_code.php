@@ -12,6 +12,11 @@ if (!isset($_SESSION['student_username']) || !isset($_SESSION['student_id'])) {
 
 $student_id = $_SESSION['student_id'];
 
+// Enforce session timeout via middleware
+require_once __DIR__ . '/../../includes/SessionTimeoutMiddleware.php';
+$timeoutMiddleware = new SessionTimeoutMiddleware();
+$timeoutStatus = $timeoutMiddleware->handle();
+
 // Get student information including QR code data
 $query = "
     SELECT s.student_id, s.first_name, s.middle_name, s.last_name, 

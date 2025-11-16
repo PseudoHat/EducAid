@@ -14,6 +14,11 @@ if (!isset($_SESSION['student_id'])) {
 
 $student_id = $_SESSION['student_id'];
 
+// Enforce session timeout via middleware (handles AJAX timeout detection)
+require_once __DIR__ . '/../../includes/SessionTimeoutMiddleware.php';
+$timeoutMiddleware = new SessionTimeoutMiddleware();
+$timeoutStatus = $timeoutMiddleware->handle();
+
 // Detect if is_read column exists to avoid runtime errors if migration not yet applied
 $hasReadColumn = false;
 $colCheckSql = "SELECT 1 FROM information_schema.columns WHERE table_name='notifications' AND column_name='is_read' LIMIT 1";

@@ -1,12 +1,17 @@
   <?php
 /** @phpstan-ignore-file */
 include __DIR__ . '/../../config/database.php';
-session_start();
+if (session_status() === PHP_SESSION_NONE) { session_start(); }
 if (!isset($_SESSION['student_username'])) {
     header("Location: ../../unified_login.php");
     exit;
 }
 $student_id = $_SESSION['student_id'];
+
+// Enforce session timeout via middleware
+require_once __DIR__ . '/../../includes/SessionTimeoutMiddleware.php';
+$timeoutMiddleware = new SessionTimeoutMiddleware();
+$timeoutStatus = $timeoutMiddleware->handle();
 
 // Track session activity
 include __DIR__ . '/../../includes/student_session_tracker.php';

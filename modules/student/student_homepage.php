@@ -8,6 +8,12 @@ if (!isset($_SESSION['student_username'])) {
 }
 // Include database connection
 include __DIR__ . '/../../config/database.php';
+
+// Enforce session timeout via middleware
+require_once __DIR__ . '/../../includes/SessionTimeoutMiddleware.php';
+$timeoutMiddleware = new SessionTimeoutMiddleware();
+$timeoutStatus = $timeoutMiddleware->handle();
+
 include __DIR__ . '/../../includes/workflow_control.php';
 
 // Track session activity
