@@ -109,7 +109,7 @@ $pageType = $seoData['type'];
               <i class="bi bi-person-vcard text-primary fs-3"></i>
             </div>
             <h5 class="fw-bold" data-lp-key="req_cat1_title"<?php echo req_block_style('req_cat1_title'); ?>><?php echo req_block('req_cat1_title','Identity Documents'); ?></h5>
-            <p class="text-body-secondary small" data-lp-key="req_cat1_desc"<?php echo req_block_style('req_cat1_desc'); ?>><?php echo req_block('req_cat1_desc','School ID, birth certificate, and valid government ID'); ?></p>
+            <p class="text-body-secondary small" data-lp-key="req_cat1_desc"<?php echo req_block_style('req_cat1_desc'); ?>><?php echo req_block('req_cat1_desc','School ID and school certifications'); ?></p>
           </div>
         </div>
         <div class="col-md-6 col-lg-3">
@@ -127,7 +127,7 @@ $pageType = $seoData['type'];
               <i class="bi bi-file-earmark-text text-warning fs-3"></i>
             </div>
             <h5 class="fw-bold" data-lp-key="req_cat3_title"<?php echo req_block_style('req_cat3_title'); ?>><?php echo req_block('req_cat3_title','Financial Documents'); ?></h5>
-            <p class="text-body-secondary small" data-lp-key="req_cat3_desc"<?php echo req_block_style('req_cat3_desc'); ?>><?php echo req_block('req_cat3_desc','Income statements, certificates of indigency'); ?></p>
+            <p class="text-body-secondary small" data-lp-key="req_cat3_desc"<?php echo req_block_style('req_cat3_desc'); ?>><?php echo req_block('req_cat3_desc','Certificate of indigency (if requested)'); ?></p>
           </div>
         </div>
         <div class="col-md-6 col-lg-3">
@@ -135,8 +135,8 @@ $pageType = $seoData['type'];
             <div class="bg-info bg-opacity-10 rounded-circle p-3 d-inline-flex mb-3">
               <i class="bi bi-house text-info fs-3"></i>
             </div>
-            <h5 class="fw-bold" data-lp-key="req_cat4_title"<?php echo req_block_style('req_cat4_title'); ?>><?php echo req_block('req_cat4_title','Residency Proof'); ?></h5>
-            <p class="text-body-secondary small" data-lp-key="req_cat4_desc"<?php echo req_block_style('req_cat4_desc'); ?>><?php echo req_block('req_cat4_desc','Barangay certificates and utility bills'); ?></p>
+            <h5 class="fw-bold" data-lp-key="req_cat4_title"<?php echo req_block_style('req_cat4_title'); ?>><?php echo req_block('req_cat4_title','Residency'); ?></h5>
+            <p class="text-body-secondary small" data-lp-key="req_cat4_desc"<?php echo req_block_style('req_cat4_desc'); ?>><?php echo req_block('req_cat4_desc','Residency verification is handled by the LGU during evaluation'); ?></p>
           </div>
         </div>
       </div>
@@ -207,27 +207,7 @@ $pageType = $seoData['type'];
                 </div>
               </div>
               
-              <div class="requirement-item">
-                <div class="d-flex gap-3">
-                  <i class="bi bi-check-circle text-success fs-5 mt-1"></i>
-                  <div>
-                    <h6 class="fw-bold mb-1" data-lp-key="req_item5_title"<?php echo req_block_style('req_item5_title'); ?>><?php echo req_block('req_item5_title','Birth Certificate (PSA)'); ?></h6>
-                    <p class="text-body-secondary small mb-1" data-lp-key="req_item5_desc"<?php echo req_block_style('req_item5_desc'); ?>><?php echo req_block('req_item5_desc','Original PSA-issued birth certificate'); ?></p>
-                    <span class="badge text-bg-primary-subtle">Required</span>
-                  </div>
-                </div>
-              </div>
               
-              <div class="requirement-item">
-                <div class="d-flex gap-3">
-                  <i class="bi bi-check-circle text-success fs-5 mt-1"></i>
-                  <div>
-                    <h6 class="fw-bold mb-1" data-lp-key="req_item6_title"<?php echo req_block_style('req_item6_title'); ?>><?php echo req_block('req_item6_title','Barangay Certificate'); ?></h6>
-                    <p class="text-body-secondary small mb-1" data-lp-key="req_item6_desc"<?php echo req_block_style('req_item6_desc'); ?>><?php echo req_block('req_item6_desc','Proof of residency in General Trias'); ?></p>
-                    <span class="badge text-bg-primary-subtle">Required</span>
-                  </div>
-                </div>
-              </div>
             </div>
           </div>
         </div>
@@ -245,49 +225,7 @@ $pageType = $seoData['type'];
               </div>
             </div>
             
-            <div class="d-grid gap-3">
-              <div class="requirement-item">
-                <div class="d-flex gap-3">
-                  <i class="bi bi-exclamation-circle text-warning fs-5 mt-1"></i>
-                  <div>
-                    <h6 class="fw-bold mb-1" data-lp-key="req_add1_title"<?php echo req_block_style('req_add1_title'); ?>><?php echo req_block('req_add1_title','Certificate of Indigency'); ?></h6>
-                    <p class="text-body-secondary small mb-1" data-lp-key="req_add1_desc"<?php echo req_block_style('req_add1_desc'); ?>><?php echo req_block('req_add1_desc','From your barangay (required after initial approval)'); ?></p>
-                    <span class="badge text-bg-warning-subtle">Conditional</span>
-                  </div>
-                </div>
-              </div>
               
-              <div class="requirement-item">
-                <div class="d-flex gap-3">
-                  <i class="bi bi-info-circle text-info fs-5 mt-1"></i>
-                  <div>
-                    <h6 class="fw-bold mb-1" data-lp-key="req_add2_title"<?php echo req_block_style('req_add2_title'); ?>><?php echo req_block('req_add2_title','Parent/Guardian Income Statement'); ?></h6>
-                    <p class="text-body-secondary small mb-1" data-lp-key="req_add2_desc"<?php echo req_block_style('req_add2_desc'); ?>><?php echo req_block('req_add2_desc','ITR, Certificate of Employment, or Affidavit of Income'); ?></p>
-                    <span class="badge text-bg-info-subtle">If Applicable</span>
-                  </div>
-                </div>
-              </div>
-              
-              <div class="requirement-item">
-                <div class="d-flex gap-3">
-                  <i class="bi bi-info-circle text-info fs-5 mt-1"></i>
-                  <div>
-                    <h6 class="fw-bold mb-1">Previous Semester Grades</h6>
-                    <p class="text-body-secondary small mb-1">For continuing students (transcript or report card)</p>
-                    <span class="badge text-bg-info-subtle">Continuing Students</span>
-                  </div>
-                </div>
-              </div>
-              
-              <div class="requirement-item">
-                <div class="d-flex gap-3">
-                  <i class="bi bi-info-circle text-info fs-5 mt-1"></i>
-                  <div>
-                    <h6 class="fw-bold mb-1">Graduation Certificate</h6>
-                    <p class="text-body-secondary small mb-1">For college freshmen (SHS diploma)</p>
-                    <span class="badge text-bg-info-subtle">New College Students</span>
-                  </div>
-                </div>
               </div>
               
               <div class="requirement-item">
@@ -520,7 +458,7 @@ $pageType = $seoData['type'];
               </h2>
               <div id="faq3" class="accordion-collapse collapse" data-bs-parent="#requirementsFaq">
                 <div class="accordion-body">
-                  Most documents should be current for the academic year you're applying for. Barangay certificates and certificates of indigency should be issued within 30 days of application. Income statements should be from the most recent available period.
+                  Most documents should be current for the academic year you're applying for. Certificates of indigency, when requested, should be issued within 30 days of application.
                 </div>
               </div>
             </div>
