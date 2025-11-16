@@ -903,41 +903,56 @@ $stats = pg_fetch_assoc($statsResult);
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        // Guard and reusable modal instance for details
+        let detailsRequestInFlight = false;
+        const detailsModalEl = document.getElementById('detailsModal');
+        const detailsModal = detailsModalEl ? bootstrap.Modal.getOrCreateInstance(detailsModalEl, { backdrop: true, keyboard: true, focus: true }) : null;
+
+        function cleanupExtraBackdrops() {
+            const openModals = document.querySelectorAll('.modal.show').length;
+            const backdrops = Array.from(document.querySelectorAll('.modal-backdrop'));
+            if (backdrops.length > openModals) {
+                for (let i = 0; i < backdrops.length - openModals; i++) {
+                    const bd = backdrops[i];
+                    bd.parentNode && bd.parentNode.removeChild(bd);
+                }
+            }
+            if (openModals === 0) {
+                document.body.classList.remove('modal-open');
+                document.body.style.removeProperty('padding-right');
+                document.body.style.removeProperty('overflow');
+            }
+        }
+
+        if (detailsModalEl) {
+            detailsModalEl.addEventListener('shown.bs.modal', cleanupExtraBackdrops);
+            detailsModalEl.addEventListener('hidden.bs.modal', cleanupExtraBackdrops);
+        }
         function clearFilters() {
             window.location.href = 'archived_students.php';
         }
 
         function viewDetails(studentId) {
-            const modalEl = document.getElementById('detailsModal');
+            if (detailsRequestInFlight) return;
+            if (detailsModalEl && detailsModalEl.classList.contains('show')) return;
+
+            detailsRequestInFlight = true;
             const content = document.getElementById('detailsContent');
-            
-            // Clean up any existing modal instances and backdrops
-            const existingBackdrops = document.querySelectorAll('.modal-backdrop');
-            existingBackdrops.forEach(backdrop => backdrop.remove());
-            document.body.classList.remove('modal-open');
-            document.body.style.removeProperty('overflow');
-            document.body.style.removeProperty('padding-right');
-            
-            // Dispose of any existing modal instance
-            const existingModal = bootstrap.Modal.getInstance(modalEl);
-            if (existingModal) {
-                existingModal.dispose();
+            if (content) {
+                content.innerHTML = '<div class="text-center py-4"><div class="spinner-border" role="status"></div><p class="mt-2">Loading...</p></div>';
             }
-            
-            // Create fresh modal instance
-            const modal = new bootstrap.Modal(modalEl);
-            
-            content.innerHTML = '<div class="text-center"><div class="spinner-border" role="status"></div><p>Loading...</p></div>';
-            modal.show();
-            
-            // Fetch student details
+            if (detailsModal) detailsModal.show();
+
             fetch(`get_archived_student_details.php?student_id=${encodeURIComponent(studentId)}`)
                 .then(response => response.text())
                 .then(html => {
-                    content.innerHTML = html;
+                    if (content) content.innerHTML = html;
                 })
-                .catch(error => {
-                    content.innerHTML = '<div class="alert alert-danger">Error loading student details.</div>';
+                .catch(() => {
+                    if (content) content.innerHTML = '<div class="alert alert-danger">Error loading student details.</div>';
+                })
+                .finally(() => {
+                    detailsRequestInFlight = false;
                 });
         }
         

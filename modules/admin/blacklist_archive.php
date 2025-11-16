@@ -411,33 +411,65 @@ $reasonCategories = [
 <script src="../../assets/js/admin/sidebar.js"></script>
 
 <script>
+    // Guard and reusable details modal
+    let detailsRequestInFlight = false;
+    const detailsModalEl = document.getElementById('detailsModal');
+    const detailsModal = detailsModalEl ? bootstrap.Modal.getOrCreateInstance(detailsModalEl, { backdrop: true, keyboard: true, focus: true }) : null;
+
+    function cleanupExtraBackdrops() {
+        const openModals = document.querySelectorAll('.modal.show').length;
+        const backdrops = Array.from(document.querySelectorAll('.modal-backdrop'));
+        if (backdrops.length > openModals) {
+            for (let i = 0; i < backdrops.length - openModals; i++) {
+                const bd = backdrops[i];
+                bd.parentNode && bd.parentNode.removeChild(bd);
+            }
+        }
+        if (openModals === 0) {
+            document.body.classList.remove('modal-open');
+            document.body.style.removeProperty('padding-right');
+        }
+    }
+    if (detailsModalEl) {
+        detailsModalEl.addEventListener('shown.bs.modal', cleanupExtraBackdrops);
+        detailsModalEl.addEventListener('hidden.bs.modal', cleanupExtraBackdrops);
+    }
+
     function viewDetails(studentId) {
-        // Show loading state
-        document.getElementById('detailsContent').innerHTML = `
-            <div class="text-center py-4">
-                <div class="spinner-border text-danger" role="status">
-                    <span class="visually-hidden">Loading...</span>
+        if (detailsRequestInFlight) return;
+        if (detailsModalEl && detailsModalEl.classList.contains('show')) return;
+
+        detailsRequestInFlight = true;
+        const contentEl = document.getElementById('detailsContent');
+        if (contentEl) {
+            contentEl.innerHTML = `
+                <div class="text-center py-4">
+                    <div class="spinner-border text-danger" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2">Loading details...</p>
                 </div>
-                <p class="mt-2">Loading details...</p>
-            </div>
-        `;
-        
-        // Show modal
-        new bootstrap.Modal(document.getElementById('detailsModal')).show();
-        
-        // Fetch details via AJAX
-        fetch('blacklist_details.php?student_id=' + studentId)
+            `;
+        }
+        if (detailsModal) detailsModal.show();
+
+        fetch('blacklist_details.php?student_id=' + encodeURIComponent(studentId))
             .then(response => response.text())
             .then(html => {
-                document.getElementById('detailsContent').innerHTML = html;
+                if (contentEl) contentEl.innerHTML = html;
             })
-            .catch(error => {
-                document.getElementById('detailsContent').innerHTML = `
-                    <div class="alert alert-danger">
-                        <i class="bi bi-exclamation-triangle"></i>
-                        Error loading details. Please try again.
-                    </div>
-                `;
+            .catch(() => {
+                if (contentEl) {
+                    contentEl.innerHTML = `
+                        <div class="alert alert-danger">
+                            <i class="bi bi-exclamation-triangle"></i>
+                            Error loading details. Please try again.
+                        </div>
+                    `;
+                }
+            })
+            .finally(() => {
+                detailsRequestInFlight = false;
             });
     }
     
