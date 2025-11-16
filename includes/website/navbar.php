@@ -221,8 +221,6 @@ nav.navbar.fixed-header .container-fluid {
   padding-left: 1rem;
   padding-right: 1rem;
   box-sizing: border-box;
-  /* Keep brand and toggler on one row when menu is collapsed */
-  flex-wrap: nowrap;
 }
 
 @media (min-width: 992px) {
@@ -255,9 +253,10 @@ nav.navbar.fixed-header .container-fluid {
 nav.navbar.fixed-header .navbar-brand {
   gap: 0.75rem;
   flex-wrap: nowrap;
-  /* Prevent brand from forcing a second row; allow it to shrink */
+  /* Keep brand and toggler on the same row */
   min-width: 0;
-  flex: 1 1 auto;
+  flex: 0 1 auto;
+  max-width: calc(100% - 56px);
 }
 
 nav.navbar.fixed-header .navbar-brand .brand-logo {
@@ -279,6 +278,12 @@ nav.navbar.fixed-header .navbar-brand .brand-text {
 /* Ensure the hamburger doesn't shrink oddly under pressure */
 nav.navbar.fixed-header .navbar-toggler {
   flex: 0 0 auto;
+}
+
+/* Slightly reduce brand sizing on extra-narrow widths to avoid wrap on Android */
+@media (max-width: 430px) {
+  nav.navbar.fixed-header .navbar-brand .brand-logo { height: 40px; }
+  nav.navbar.fixed-header .navbar-brand .brand-text { font-size: 1rem; }
 }
 
 nav.navbar.fixed-header .navbar-nav.spread-nav {
@@ -333,22 +338,9 @@ nav.navbar.fixed-header .navbar-collapse {
   gap: 0.75rem;
 }
 
-/* When menu is open, allow wrapping so the collapse drops below */
-nav.navbar.fixed-header.menu-open .container-fluid {
-  flex-wrap: wrap;
-}
-
-/* On very narrow screens, hide the municipality badge to save width */
-@media (max-width: 380px) {
+/* On narrow screens, hide the municipality badge to save width */
+@media (max-width: 430px) {
   nav.navbar.fixed-header .municipality-badge-navbar { display: none; }
-}
-
-/* Extra safety on very small Android widths */
-@media (max-width: 420px) {
-  nav.navbar.fixed-header .navbar-brand .brand-logo { height: 36px; }
-  nav.navbar.fixed-header .navbar-brand .brand-text {
-    font-size: clamp(0.9rem, 4.2vw, 1rem);
-  }
 }
 
 .navbar-actions {
@@ -641,16 +633,9 @@ nav.navbar.fixed-header.menu-open .container-fluid {
     observeElements();
 
     const navbarCollapse = document.getElementById('nav');
-    const navbar = document.querySelector('nav.navbar.fixed-header');
     if (navbarCollapse) {
       ['shown.bs.collapse', 'hidden.bs.collapse'].forEach(eventName => {
         navbarCollapse.addEventListener(eventName, updateOffsets);
-      });
-      navbarCollapse.addEventListener('show.bs.collapse', () => {
-        if (navbar) navbar.classList.add('menu-open');
-      });
-      navbarCollapse.addEventListener('hide.bs.collapse', () => {
-        if (navbar) navbar.classList.remove('menu-open');
       });
     }
   });
