@@ -7052,7 +7052,9 @@ if (!$isAjaxRequest) {
     </style>
     
     <!-- Bootstrap JavaScript -->
-<script src="../../assets/js/bootstrap.bundle.min.js"></script>
+    <script src="../../assets/js/bootstrap.bundle.min.js"></script>
+    <!-- Consistent mobile navbar behavior (burger → X, body.navbar-open) -->
+    <script src="../../assets/js/website/mobile-navbar.js"></script>
 
 <!-- ✅ Load user_registration.js BEFORE inline scripts to prevent conflicts -->
 <script src="../../assets/js/student/user_registration.js?v=<?php echo time(); ?>"></script>

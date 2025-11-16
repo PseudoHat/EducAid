@@ -362,6 +362,8 @@ $pageType = $seoData['type'];
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<!-- Ensure consistent mobile navbar behavior across pages -->
+<script src="../assets/js/website/mobile-navbar.js"></script>
 <script>
 // Newsletter (reused logic simplified)
 const nf = document.getElementById('newsletterForm');

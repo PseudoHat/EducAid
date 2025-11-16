@@ -234,6 +234,8 @@ $custom_nav_links = [
 <?php include __DIR__ . '/../includes/website/footer.php'; ?>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<!-- Ensure consistent mobile navbar behavior across pages -->
+<script src="../assets/js/website/mobile-navbar.js"></script>
 <script>
   // Year
   document.getElementById('year').textContent = new Date().getFullYear();

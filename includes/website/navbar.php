@@ -375,7 +375,6 @@ nav.navbar.fixed-header .navbar-collapse {
   width: 24px;
   height: 2px;
   background-color: currentColor;
-  background-image: none !important; /* neutralize Bootstrap's default icon image */
   transition: all 0.3s ease;
   margin: auto;
 }

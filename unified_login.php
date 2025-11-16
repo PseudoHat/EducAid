@@ -2021,6 +2021,8 @@ $pageType = $seoData['type'];
     </div> <!-- Close login-content-container -->
 
     <script src="assets/js/bootstrap.bundle.min.js"></script>
+    <!-- Consistent mobile navbar behavior (burger → X, body.navbar-open) -->
+    <script src="assets/js/website/mobile-navbar.js"></script>
     <script src="assets/js/login.js"></script>
     
     <!-- reCAPTCHA v2 modal + integration -->
