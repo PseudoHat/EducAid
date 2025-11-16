@@ -1296,6 +1296,33 @@ $yearLevels = pg_fetch_all(pg_query($connection, "SELECT year_level_id, name FRO
     <script src="../../assets/js/admin/sidebar.js"></script>
     
     <script>
+        // Guard to prevent double-click/rapid re-entry on details fetch
+        let detailsRequestInFlight = false;
+        // Prepare a reusable modal instance and cleanup handlers
+        const detailsModalEl = document.getElementById('studentDetailsModal');
+        const detailsModal = detailsModalEl ? bootstrap.Modal.getOrCreateInstance(detailsModalEl, { backdrop: true, keyboard: true, focus: true }) : null;
+
+        function cleanupExtraBackdrops() {
+            // Keep at most the number of currently shown modals worth of backdrops
+            const openModals = document.querySelectorAll('.modal.show').length;
+            const backdrops = Array.from(document.querySelectorAll('.modal-backdrop'));
+            if (backdrops.length > openModals) {
+                // Remove oldest extras first
+                for (let i = 0; i < backdrops.length - openModals; i++) {
+                    const bd = backdrops[i];
+                    bd.parentNode && bd.parentNode.removeChild(bd);
+                }
+            }
+            if (openModals === 0) {
+                document.body.classList.remove('modal-open');
+                document.body.style.removeProperty('padding-right');
+            }
+        }
+
+        if (detailsModalEl) {
+            detailsModalEl.addEventListener('shown.bs.modal', cleanupExtraBackdrops);
+            detailsModalEl.addEventListener('hidden.bs.modal', cleanupExtraBackdrops);
+        }
         let selectedStudents = [];
         
         function toggleSelectAll() {
@@ -1372,14 +1399,22 @@ $yearLevels = pg_fetch_all(pg_query($connection, "SELECT year_level_id, name FRO
         }
 
         function viewDetails(studentId) {
+            if (detailsRequestInFlight) return; // prevent rapid double-clicks
+            if (detailsModalEl && detailsModalEl.classList.contains('show')) return; // already open
+
+            detailsRequestInFlight = true;
             fetch(`get_registrant_details.php?id=${studentId}`)
                 .then(response => response.text())
                 .then(html => {
-                    document.getElementById('studentDetailsContent').innerHTML = html;
-                    new bootstrap.Modal(document.getElementById('studentDetailsModal')).show();
+                    const target = document.getElementById('studentDetailsContent');
+                    if (target) target.innerHTML = html;
+                    if (detailsModal) detailsModal.show();
                 })
-                .catch(error => {
+                .catch(() => {
                     alert('Error loading registrant details. Please try again.');
+                })
+                .finally(() => {
+                    detailsRequestInFlight = false;
                 });
         }
 
