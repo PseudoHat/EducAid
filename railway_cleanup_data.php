@@ -419,11 +419,6 @@ if (!$confirm) {
                 'description' => 'Remove all distribution snapshot records'
             ],
             [
-                'name' => 'Delete Signup Slots (Past Releases)',
-                'query' => 'DELETE FROM signup_slots',
-                'description' => 'Remove all signup slot records (semester/academic year slots)'
-            ],
-            [
                 'name' => 'Delete Student Notifications',
                 'query' => 'DELETE FROM student_notifications',
                 'description' => 'Remove all student notification records'
@@ -457,6 +452,11 @@ if (!$confirm) {
                 'name' => 'Delete Student Accounts',
                 'query' => 'DELETE FROM students',
                 'description' => 'Remove all student account records (final step)'
+            ],
+            [
+                'name' => 'Delete Signup Slots',
+                'query' => 'DELETE FROM signup_slots',
+                'description' => 'Remove all signup slot records (semester/academic year slots)'
             ]
         ];
         

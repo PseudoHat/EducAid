@@ -137,6 +137,7 @@ function formatChatbotResponse(text){
     const progressPercent = document.getElementById('distProgressPercent');
     const lastUpdated = document.getElementById('distLastUpdated');
     const applyBtn = document.getElementById('distApplyBtn');
+    const closedNote = document.getElementById('distClosedNote');
     
     if (!section || !statusBadge || !period || !slotsLeft) return;
 
@@ -183,6 +184,9 @@ function formatChatbotResponse(text){
           if (applyBtn) {
             applyBtn.classList.add('disabled');
             applyBtn.innerHTML = '<i class="bi bi-lock me-2"></i>Applications Closed';
+          }
+          if (closedNote) {
+            closedNote.classList.remove('d-none');
           }
           return;
         }
@@ -249,6 +253,10 @@ function formatChatbotResponse(text){
             applyBtn.classList.add('disabled');
             applyBtn.innerHTML = '<i class="bi bi-exclamation-triangle me-2"></i>Slots Full';
           }
+        }
+
+        if (closedNote) {
+          closedNote.classList.add('d-none');
         }
 
         // Pulse animation on slot change

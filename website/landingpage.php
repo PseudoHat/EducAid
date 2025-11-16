@@ -108,6 +108,8 @@ $pageType = $seoData['type'];
   <?php endif; ?>
 
   <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
   <!-- Bootstrap 5 -->
   <link href="../assets/css/bootstrap.min.css" rel="stylesheet" />
@@ -287,6 +289,11 @@ $pageType = $seoData['type'];
                 <i class="bi bi-calendar3"></i>
                 <span id="distPeriod" class="fw-semibold">—</span>
               </div>
+            </div>
+            <!-- Closed notice (shown only when distribution is closed) -->
+            <div id="distClosedNote" class="alert alert-info mt-3 py-2 px-3 d-none" role="status">
+              <i class="bi bi-exclamation-circle me-1"></i>
+              No active distribution at the moment. Please check Announcements for updates.
             </div>
           </div>
 

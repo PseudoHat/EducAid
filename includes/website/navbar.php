@@ -210,6 +210,8 @@ nav.navbar.fixed-header {
   right: 0;
   width: 100%;
   z-index: 1040;
+  /* Ensure consistent font metrics across public pages */
+  font-family: 'Manrope', 'Segoe UI', system-ui, -apple-system, Roboto, Arial, sans-serif;
 }
 
 /* Critical: Force container-fluid to respect max-width */
@@ -639,6 +641,10 @@ nav.navbar.fixed-header .navbar-collapse {
       });
     }
   });
+
+  // Perform an immediate calculation as soon as the script runs
+  // This reduces initial layout shift before DOMContentLoaded
+  try { updateOffsets(); } catch (e) {}
 
   window.addEventListener('load', updateOffsets);
   window.addEventListener('resize', updateOffsets);
