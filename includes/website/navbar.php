@@ -221,6 +221,8 @@ nav.navbar.fixed-header .container-fluid {
   padding-left: 1rem;
   padding-right: 1rem;
   box-sizing: border-box;
+  /* Keep brand and toggler on one row when menu is collapsed */
+  flex-wrap: nowrap;
 }
 
 @media (min-width: 992px) {
@@ -331,9 +333,22 @@ nav.navbar.fixed-header .navbar-collapse {
   gap: 0.75rem;
 }
 
+/* When menu is open, allow wrapping so the collapse drops below */
+nav.navbar.fixed-header.menu-open .container-fluid {
+  flex-wrap: wrap;
+}
+
 /* On very narrow screens, hide the municipality badge to save width */
 @media (max-width: 380px) {
   nav.navbar.fixed-header .municipality-badge-navbar { display: none; }
+}
+
+/* Extra safety on very small Android widths */
+@media (max-width: 420px) {
+  nav.navbar.fixed-header .navbar-brand .brand-logo { height: 36px; }
+  nav.navbar.fixed-header .navbar-brand .brand-text {
+    font-size: clamp(0.9rem, 4.2vw, 1rem);
+  }
 }
 
 .navbar-actions {
@@ -626,9 +641,16 @@ nav.navbar.fixed-header .navbar-collapse {
     observeElements();
 
     const navbarCollapse = document.getElementById('nav');
+    const navbar = document.querySelector('nav.navbar.fixed-header');
     if (navbarCollapse) {
       ['shown.bs.collapse', 'hidden.bs.collapse'].forEach(eventName => {
         navbarCollapse.addEventListener(eventName, updateOffsets);
+      });
+      navbarCollapse.addEventListener('show.bs.collapse', () => {
+        if (navbar) navbar.classList.add('menu-open');
+      });
+      navbarCollapse.addEventListener('hide.bs.collapse', () => {
+        if (navbar) navbar.classList.remove('menu-open');
       });
     }
   });

@@ -107,11 +107,62 @@ $recent_notifications = getRecentNotifications($connection, $admin_id);
     </div>
 </div>
 
+<!-- Mobile Modal fallback: opens instead of dropdown on small screens -->
+<div class="modal fade" id="notificationsModal" tabindex="-1" aria-labelledby="notificationsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable modal-fullscreen-sm-down">
+        <div class="modal-content">
+            <div class="modal-header py-2">
+                <h5 class="modal-title" id="notificationsModalLabel">Notifications</h5>
+                <?php if ($unread_count > 0): ?>
+                    <button class="btn btn-sm btn-outline-primary me-2" onclick="markAllAsRead()">Mark all read</button>
+                <?php endif; ?>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-0">
+                <?php if (empty($recent_notifications)): ?>
+                    <div class="p-4 text-center text-muted">
+                        <i class="bi bi-bell-slash fs-4 d-block mb-2"></i>
+                        No notifications
+                    </div>
+                <?php else: ?>
+                    <div class="list-group list-group-flush">
+                        <?php foreach ($recent_notifications as $notification): ?>
+                            <a class="list-group-item list-group-item-action notification-item <?= !$notification['is_read'] ? 'unread' : '' ?>"
+                                 href="<?= htmlspecialchars($notification['action_url'] ?? '#') ?>"
+                                 onclick="markAsRead(<?= $notification['notification_id'] ?>)" data-bs-dismiss="modal">
+                                <div class="d-flex">
+                                    <div class="flex-shrink-0 me-2">
+                                        <i class="bi bi-<?= getNotificationIcon($notification['type']) ?> text-<?= getNotificationColor($notification['priority']) ?>"></i>
+                                    </div>
+                                    <div class="flex-grow-1">
+                                        <h6 class="mb-1 fs-6"><?= htmlspecialchars($notification['title']) ?></h6>
+                                        <p class="mb-1 small text-muted">
+                                            <?= htmlspecialchars(substr($notification['message'], 0, 100)) ?>
+                                            <?= strlen($notification['message']) > 100 ? '...' : '' ?>
+                                        </p>
+                                        <small class="text-muted">
+                                            <?= timeAgo($notification['created_at']) ?>
+                                        </small>
+                                    </div>
+                                </div>
+                            </a>
+                        <?php endforeach; ?>
+                        <div class="p-2 text-center">
+                            <a href="notifications.php" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">View all notifications</a>
+                        </div>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+    </div>
+
 <style>
 .notification-dropdown {
     width: 350px;
     max-height: 400px;
     overflow-y: auto;
+    overscroll-behavior: contain; /* prevent background scroll chaining */
 }
 
 .notification-item {
@@ -131,25 +182,32 @@ $recent_notifications = getRecentNotifications($connection, $admin_id);
 .dropdown-header {
     padding: 0.75rem 1rem;
     background-color: #f8f9fa;
+    position: sticky;
+    top: 0;
+    z-index: 1;
 }
 
 /* Compact mobile presentation */
 @media (max-width: 576px) {
     .notification-dropdown {
-        width: min(92vw, 360px);
-        max-height: 70vh;
+        width: min(90vw, 340px);
+        max-height: 50vh; /* stricter vertical footprint on phones */
         padding: 0;
     }
     .notification-item {
-        padding: 0.5rem 0.75rem;
+        padding: 0.45rem 0.65rem; /* tighter vertical spacing */
     }
     .notification-item .flex-shrink-0 i {
-        font-size: 1rem;
+        font-size: 0.95rem;
     }
     .notification-item h6 {
-        font-size: 0.95rem;
+        font-size: 0.92rem;
         line-height: 1.2;
         margin-bottom: 0.125rem;
+        display: -webkit-box;
+        -webkit-line-clamp: 1;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
     }
     .notification-item p {
         font-size: 0.8rem;
@@ -161,7 +219,7 @@ $recent_notifications = getRecentNotifications($connection, $admin_id);
         overflow: hidden;
     }
     .notification-item small {
-        font-size: 0.75rem;
+        font-size: 0.72rem;
     }
     .dropdown-header {
         padding: 0.5rem 0.75rem;
@@ -180,6 +238,39 @@ $recent_notifications = getRecentNotifications($connection, $admin_id);
 </style>
 
 <script>
+// Switch to modal on small screens; use dropdown on larger
+function setupNotificationTrigger() {
+    var bellBtn = document.getElementById('notificationDropdown');
+    if (!bellBtn) return;
+    var isPhone = window.matchMedia('(max-width: 576px)').matches;
+    if (isPhone) {
+        bellBtn.removeAttribute('data-bs-toggle');
+        bellBtn.setAttribute('data-mobile-modal', '1');
+    } else {
+        if (!bellBtn.getAttribute('data-bs-toggle')) {
+            bellBtn.setAttribute('data-bs-toggle', 'dropdown');
+        }
+        bellBtn.removeAttribute('data-mobile-modal');
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    setupNotificationTrigger();
+    window.addEventListener('resize', setupNotificationTrigger);
+    var bellBtn = document.getElementById('notificationDropdown');
+    var modalEl = document.getElementById('notificationsModal');
+    if (bellBtn && modalEl) {
+        bellBtn.addEventListener('click', function(e) {
+            if (bellBtn.hasAttribute('data-mobile-modal')) {
+                e.preventDefault();
+                e.stopPropagation();
+                var modal = new bootstrap.Modal(modalEl);
+                modal.show();
+            }
+        });
+    }
+});
+
 // Mark single notification as read
 function markAsRead(notificationId) {
     fetch('mark_notification_read.php', {
