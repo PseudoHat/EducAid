@@ -1202,30 +1202,74 @@ $csrf_complete_token = CSRFProtection::generateToken('complete_distribution');
       return new URLSearchParams(params).toString();
     }
     
-    // Initialize camera selection
-    Html5Qrcode.getCameras().then(cameras => {
-      if (!cameras.length) {
-        alert("No cameras found.");
-        return;
+    // Request camera permissions and initialize camera selection
+    async function initializeCameraSelection() {
+      try {
+        // CRITICAL: Request camera permission first before enumerating devices
+        console.log('Requesting camera permission...');
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        
+        // Stop the stream immediately after getting permission
+        stream.getTracks().forEach(track => track.stop());
+        console.log('Camera permission granted');
+        
+        // Now enumerate cameras (will work because permission is granted)
+        const cameras = await Html5Qrcode.getCameras();
+        
+        if (!cameras.length) {
+          alert("No cameras found on your device.");
+          return;
+        }
+        
+        console.log(`Found ${cameras.length} camera(s)`);
+        
+        cameras.forEach(camera => {
+          const option = document.createElement('option');
+          option.value = camera.id;
+          option.text = camera.label || `Camera ${camera.id}`;
+          cameraSelect.appendChild(option);
+        });
+        
+        // Prefer back camera (for mobile devices)
+        const backCam = cameras.find(cam => cam.label.toLowerCase().includes('back'));
+        if (backCam) {
+          cameraSelect.value = backCam.id;
+          currentCameraId = backCam.id;
+          console.log('Selected back camera:', backCam.label);
+        } else if (cameras.length > 0) {
+          cameraSelect.value = cameras[0].id;
+          currentCameraId = cameras[0].id;
+          console.log('Selected first camera:', cameras[0].label);
+        }
+        
+        // Enable start button after successful initialization
+        startButton.disabled = false;
+        
+      } catch (err) {
+        console.error("Error initializing camera:", err);
+        
+        if (err.name === 'NotAllowedError') {
+          alert("Camera permission denied. Please allow camera access in your browser settings and refresh the page.");
+        } else if (err.name === 'NotFoundError') {
+          alert("No camera found on your device. Please connect a camera and refresh the page.");
+        } else if (err.name === 'NotReadableError') {
+          alert("Camera is already in use by another application. Please close other apps using the camera and try again.");
+        } else {
+          alert("Error accessing camera: " + err.message + ". Please check your browser permissions and try again.");
+        }
+        
+        startButton.disabled = true;
       }
-      cameras.forEach(camera => {
-        const option = document.createElement('option');
-        option.value = camera.id;
-        option.text = camera.label || `Camera ${camera.id}`;
-        cameraSelect.appendChild(option);
-      });
+    }
+    
+    // Initialize on page load
+    document.addEventListener('DOMContentLoaded', () => {
+      // Disable start button until camera is initialized
+      startButton.disabled = true;
+      startButton.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Initializing...';
       
-      // Prefer back camera
-      const backCam = cameras.find(cam => cam.label.toLowerCase().includes('back'));
-      if (backCam) {
-        cameraSelect.value = backCam.id;
-        currentCameraId = backCam.id;
-      } else if (cameras.length > 0) {
-        cameraSelect.value = cameras[0].id;
-        currentCameraId = cameras[0].id;
-      }
-    }).catch(err => {
-      console.error("Error getting cameras:", err);
+      // Initialize camera selection with permission request
+      initializeCameraSelection();
     });
     
     cameraSelect.addEventListener('change', () => {
@@ -1241,9 +1285,11 @@ $csrf_complete_token = CSRFProtection::generateToken('complete_distribution');
       }
       
       if (!currentCameraId) {
-        alert("Please select a camera.");
+        alert("Please select a camera from the dropdown first.");
         return;
       }
+      
+      console.log('Starting scanner with camera:', currentCameraId);
       
       html5QrCode.start(
         currentCameraId,
@@ -1318,24 +1364,47 @@ $csrf_complete_token = CSRFProtection::generateToken('complete_distribution');
         }
       ).then(() => {
         startButton.disabled = true;
+        startButton.innerHTML = '<i class="bi bi-stop-circle me-1"></i>Scanner Running...';
         stopButton.disabled = false;
         console.log("Scanner started successfully");
       }).catch(err => {
         console.error("Failed to start scanning:", err);
-        alert("Failed to start camera. Please check permissions and try again.");
+        
+        let errorMessage = "Failed to start camera. ";
+        
+        if (err.name === 'NotAllowedError' || err.message.includes('Permission')) {
+          errorMessage += "Camera permission was denied. Please allow camera access in your browser settings.";
+        } else if (err.name === 'NotFoundError') {
+          errorMessage += "Camera not found. Please check if your camera is connected.";
+        } else if (err.name === 'NotReadableError' || err.message.includes('in use')) {
+          errorMessage += "Camera is already in use by another application. Please close other apps using the camera.";
+        } else if (err.message.includes('secure context')) {
+          errorMessage += "Camera access requires HTTPS. Please use a secure connection.";
+        } else {
+          errorMessage += err.message || "Unknown error occurred.";
+        }
+        
+        alert(errorMessage);
         startButton.disabled = false;
+        startButton.innerHTML = '<i class="bi bi-play-circle me-1"></i>Start Scanner';
         stopButton.disabled = true;
       });
     });
 
     // Stop scanner
     stopButton.addEventListener('click', () => {
+      console.log('Stopping scanner...');
       html5QrCode.stop()
         .then(() => {
           startButton.disabled = false;
+          startButton.innerHTML = '<i class="bi bi-play-circle me-1"></i>Start Scanner';
           stopButton.disabled = true;
+          console.log("Scanner stopped successfully");
         })
-        .catch(err => console.error("Failed to stop scanning:", err));
+        .catch(err => {
+          console.error("Failed to stop scanning:", err);
+          alert("Failed to stop camera: " + err.message);
+        });
     });
 
     // Lookup QR code

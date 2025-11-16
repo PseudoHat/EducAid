@@ -1,20 +1,30 @@
 <?php
-include __DIR__ . '/../../config/database.php';
-require_once __DIR__ . '/../../includes/CSRFProtection.php';
-require_once __DIR__ . '/../../services/BlacklistService.php';
+// CRITICAL: Start session BEFORE any output
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+// CRITICAL: Clean any output buffers before JSON response
+while (ob_get_level()) {
+    ob_end_clean();
+}
+
+// Suppress any PHP errors from appearing in JSON response
+error_reporting(E_ALL);
+ini_set('display_errors', 0);
+ini_set('log_errors', 1);
+
+// Set JSON header IMMEDIATELY before any other code
+header('Content-Type: application/json');
+
+// Now include dependencies
+include __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../../includes/CSRFProtection.php';
+require_once __DIR__ . '/../../services/BlacklistService.php';
+
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
 require_once '../../phpmailer/vendor/autoload.php';
-
-// Enable error reporting for debugging
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
-
-header('Content-Type: application/json');
 
 // Better error handling
 try {
@@ -311,6 +321,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 echo json_encode(['status' => 'error', 'message' => 'Invalid request']);
 
 } catch (Exception $e) {
+    // Log the error but don't expose internal details
+    error_log("Blacklist service error: " . $e->getMessage());
+    error_log("Stack trace: " . $e->getTraceAsString());
+    
     echo json_encode(['status' => 'error', 'message' => 'System error: ' . $e->getMessage()]);
 }
-?>
+
+// Ensure clean exit
+exit;
