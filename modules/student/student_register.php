@@ -1153,6 +1153,78 @@ if (!$isAjaxRequest) {
         #householdWarning i {
             font-size: 1.1rem;
         }
+        
+        /* Tablet Responsive Optimization (768px - 991px) */
+        @media (min-width: 768px) and (max-width: 991.98px) {
+            body.registration-page {
+                font-size: 1rem;
+            }
+            
+            .step-progress-text .step-counter {
+                font-size: 1rem;
+            }
+            
+            .step-progress-text .step-title {
+                font-size: 1.4rem;
+            }
+            
+            .form-label {
+                font-size: 1rem;
+            }
+            
+            .form-control,
+            .form-select {
+                padding: 0.85rem;
+                font-size: 1rem;
+            }
+            
+            .btn {
+                padding: 0.85rem 1.5rem;
+                font-size: 1.05rem;
+            }
+            
+            .card {
+                padding: 2rem 1.75rem;
+            }
+            
+            h2 {
+                font-size: 1.75rem;
+            }
+            
+            h3 {
+                font-size: 1.35rem;
+            }
+            
+            h4 {
+                font-size: 1.2rem;
+            }
+            
+            .container {
+                max-width: 720px;
+            }
+            
+            #nameDuplicateWarning,
+            #householdWarning {
+                font-size: 0.95rem;
+                padding: 0.85rem 1.25rem;
+            }
+        }
+        
+        /* Mobile Responsive (below 768px) */
+        @media (max-width: 767.98px) {
+            .step-progress-text .step-title {
+                font-size: 1.1rem;
+            }
+            
+            .form-control,
+            .form-select {
+                font-size: 0.95rem;
+            }
+            
+            .btn {
+                font-size: 0.95rem;
+            }
+        }
         </style>
         <!-- reCAPTCHA v3 -->
         <script src="https://www.google.com/recaptcha/api.js?render=<?php echo RECAPTCHA_SITE_KEY; ?>" async defer></script>

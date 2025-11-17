@@ -384,6 +384,7 @@ body.navbar-open {
 }
 
 .hero h1 {
+  font-family: var(--thm-font) !important;
   font-weight: 800;
   letter-spacing: .2px;
   opacity: 0;
