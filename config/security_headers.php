@@ -1,15 +1,10 @@
 <?php
 /**
- * Security Headers Configuration
+ * Security Headers Utilities
  * 
- * Implements recommended HTTP security headers to protect against:
- * - XSS attacks
- * - Clickjacking
- * - MIME sniffing
- * - Information leakage
- * - Referrer leakage
+ * NOTE: Primary security headers (CSP, HSTS, X-Frame-Options, etc.) are managed by Cloudflare.
+ * This file provides helper functions for special cases and localhost development.
  * 
- * Include this file at the top of entry points (before any output).
  * Usage: require_once __DIR__ . '/config/security_headers.php';
  */
 
@@ -20,8 +15,8 @@ if (!defined('SECURITY_HEADERS_LOADED')) {
     return; // Already loaded
 }
 
-// DISABLED: All security headers are managed by Cloudflare
-// If you need to re-enable PHP headers, uncomment the code below
+// NOTE: Main security headers disabled - managed by Cloudflare in production
+// For localhost development without Cloudflare, uncomment the block below
 
 /*
 // Only set headers if not already sent
