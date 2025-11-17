@@ -932,9 +932,17 @@ $csrf_complete_token = CSRFProtection::generateToken('complete_distribution');
   <script>
     (async function(){
       try {
-        const res = await fetch(window.location.href, { method: 'HEAD', cache: 'no-store' });
+        const res = await fetch(window.location.href + '?probe=' + Date.now(), { method: 'GET', cache: 'no-store' });
         const pol = res.headers.get('permissions-policy');
         console.log('Response Permissions-Policy header:', pol);
+        if (pol && pol.includes('camera=()')) {
+          console.error('🚨 CLOUDFLARE RULE STILL ACTIVE: camera=() detected in header');
+          console.log('Wait 2-3 minutes after deleting Cloudflare rule, then hard refresh (Ctrl+Shift+R)');
+        } else if (pol && pol.includes('camera=(self)')) {
+          console.log('✅ Header correct: camera=(self) - permission should work');
+        } else {
+          console.log('⚠️ No Permissions-Policy header found (browser will use permissive default)');
+        }
       } catch(e){ console.log('Header probe failed:', e.message); }
     })();
   </script>
@@ -1322,6 +1330,18 @@ $csrf_complete_token = CSRFProtection::generateToken('complete_distribution');
       stopButton.disabled = true;
 
       try {
+        // Check if Permissions-Policy is blocking camera before attempting
+        if (document.featurePolicy && !document.featurePolicy.allowsFeature('camera')) {
+          console.error('🚨 BLOCKED: Permissions-Policy header is denying camera access');
+          console.error('The HTTP response header still contains camera=()');
+          console.error('Solutions:');
+          console.error('1. Wait 5 minutes after deleting Cloudflare rule');
+          console.error('2. Purge Cloudflare cache: Cache → Configuration → Purge Everything');
+          console.error('3. Try incognito/private browsing mode');
+          console.error('4. Clear browser cache and hard refresh (Ctrl+Shift+Delete)');
+          throw new Error('Camera blocked by Permissions-Policy header. See console for solutions.');
+        }
+
         // Request camera permission first
         console.log('Requesting camera permission...');
         let stream;
