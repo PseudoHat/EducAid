@@ -21,6 +21,12 @@ if (!isset($page_title) || trim($page_title) === '') {
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title><?= htmlspecialchars($page_title) ?> - EducAid Admin</title>
   
+  <?php if (defined('ALLOW_CAMERA') && ALLOW_CAMERA === true): ?>
+  <!-- CAMERA PERMISSION: This page requires camera access -->
+  <meta http-equiv="Permissions-Policy" content="camera=(self)" />
+  <!-- Debug: ALLOW_CAMERA is TRUE, camera access should be permitted -->
+  <?php endif; ?>
+  
   <!-- Prevent Flash of Unstyled Content (FOUC) -->
   <style>
     /* Hide body initially to prevent layout shift */

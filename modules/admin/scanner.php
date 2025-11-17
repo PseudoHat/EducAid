@@ -99,6 +99,22 @@ $qr_count = pg_num_rows($qr_res);
     </style>
 </head>
 <body>
+    <!-- Camera Permission Debug Info -->
+    <script>
+        console.log('=== Camera Permission Debug (scanner.php) ===');
+        console.log('ALLOW_CAMERA constant:', <?php echo defined('ALLOW_CAMERA') && ALLOW_CAMERA ? 'true' : 'false'; ?>);
+        console.log('Page:', window.location.pathname);
+        
+        if (navigator.permissions && navigator.permissions.query) {
+            navigator.permissions.query({name: 'camera'}).then(function(result) {
+                console.log('Camera permission state:', result.state);
+            }).catch(function(err) {
+                console.log('Permissions API check failed:', err.message);
+            });
+        }
+        console.log('===============================');
+    </script>
+    
     <div id="wrapper">
         <?php include __DIR__ . '/../../includes/admin/admin_sidebar.php'; ?>
         <div class="sidebar-backdrop d-none" id="sidebar-backdrop"></div>
@@ -130,8 +146,8 @@ $qr_count = pg_num_rows($qr_res);
                     </div>
                 </div>
 
-                                <!-- Load QR library from CSP-allowed CDN with fallback (CDN -> unpkg -> local) -->
-                                <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/minified/html5-qrcode.min.js"></script>
+                                <!-- Load QR library from CSP-allowed CDN with fallback (unpkg -> jsDelivr -> local) -->
+                                <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
                                 <script>
                                     (function ensureHtml5Qrcode(){
                                         function hasLib(){ return typeof window.Html5Qrcode !== 'undefined'; }
@@ -139,7 +155,7 @@ $qr_count = pg_num_rows($qr_res);
                                         if (hasLib()) return;
 
                                         var sources = [
-                                            'https://unpkg.com/html5-qrcode@2.3.8/minified/html5-qrcode.min.js',
+                                            'https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js',
                                             '../../assets/vendor/html5-qrcode/html5-qrcode.min.js'
                                         ];
                                         var idx = 0; var start = Date.now();
@@ -163,7 +179,7 @@ $qr_count = pg_num_rows($qr_res);
 
                     let currentCameraId = null;
 
-                    // Initialize camera selection WITHOUT requesting permission; enumerate if possible
+                    // Initialize library wait only - NO camera enumeration until Start is clicked
                                         async function initializeCameraSelection() {
                         startButton.disabled = true;
                         startButton.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Initializing...';
@@ -174,8 +190,8 @@ $qr_count = pg_num_rows($qr_res);
                                 const start = Date.now();
                                 (function waitLib(){
                                     if (typeof window.Html5Qrcode !== 'undefined') return resolve();
-                                    if (Date.now() - start > 7000) return reject(new Error('Scanner library failed to load'));
-                                    setTimeout(waitLib, 150);
+                                    if (Date.now() - start > 10000) return reject(new Error('Scanner library failed to load'));
+                                    setTimeout(waitLib, 200);
                                 })();
                             });
                         } catch (e) {
@@ -186,36 +202,10 @@ $qr_count = pg_num_rows($qr_res);
                             return;
                         }
 
-                        // Try to enumerate cameras (may return empty labels before permission)
-                        try {
-                            const cameras = await Html5Qrcode.getCameras();
-                            if (cameras && cameras.length > 0) {
-                                console.log(`Found ${cameras.length} camera(s)`);
-                                cameraSelect.innerHTML = '<option value="">Select Camera</option>';
-                                cameras.forEach(camera => {
-                                    const option = document.createElement('option');
-                                    option.value = camera.id;
-                                    option.text = camera.label || `Camera ${camera.id}`;
-                                    cameraSelect.appendChild(option);
-                                });
-
-                                const backCam = cameras.find(cam => cam.label && cam.label.toLowerCase().includes('back'));
-                                if (backCam) {
-                                    cameraSelect.value = backCam.id;
-                                    currentCameraId = backCam.id;
-                                    console.log('Selected back camera:', backCam.label);
-                                } else {
-                                    cameraSelect.value = cameras[0].id;
-                                    currentCameraId = cameras[0].id;
-                                    console.log('Selected first camera:', cameras[0].label || cameras[0].id);
-                                }
-                            } else {
-                                console.warn('No cameras found during initial enumeration (permission may be required).');
-                            }
-                        } catch (err) {
-                            console.warn('Camera list unavailable until permission is granted:', err);
-                            // It's fine; we'll request permission on Start
-                        }
+                        console.log('Scanner library loaded successfully');
+                        
+                        // DO NOT enumerate cameras here - requires permission!
+                        // Camera enumeration will happen on Start button after permission is granted
 
                         startButton.disabled = false;
                         startButton.textContent = 'Start Scanner';

@@ -64,22 +64,39 @@ if (!headers_sent()) {
     
     // 6. Permissions-Policy (replaces Feature-Policy)
     // Restricts access to browser features and APIs
-    // Default: deny sensitive features. Allow camera for pages that explicitly opt-in.
-    // Use constant() to avoid notices if ALLOW_CAMERA is not defined
+    // Strategy:
+    //  - On camera pages (ALLOW_CAMERA=true): explicitly ALLOW camera for same-origin and replace any prior header
+    //  - On all other pages: explicitly DENY camera
     $allowCamera = defined('ALLOW_CAMERA') && constant('ALLOW_CAMERA') === true;
-    $permissionsDirectives = [
-        'geolocation=()',
-        'microphone=()',
-        // If ALLOW_CAMERA is defined and true BEFORE this file is included, enable camera on same-origin
-        $allowCamera ? 'camera=(self)' : 'camera=()',
-        'payment=()',
-        'usb=()',
-        'magnetometer=()',
-        'gyroscope=()',
-        'accelerometer=()'
-    ];
-    $permissions = implode(', ', $permissionsDirectives);
-    header("Permissions-Policy: {$permissions}");
+
+    // Remove any previously set Permissions-Policy header from PHP before setting ours
+    if (function_exists('header_remove')) { @header_remove('Permissions-Policy'); }
+
+    if ($allowCamera) {
+        $permissions = implode(', ', [
+            'geolocation=()',
+            'microphone=()',
+            'camera=(self)',
+            'payment=()',
+            'usb=()',
+            'magnetometer=()',
+            'gyroscope=()',
+            'accelerometer=()'
+        ]);
+        header("Permissions-Policy: {$permissions}", true);
+    } else {
+        $permissions = implode(', ', [
+            'geolocation=()',
+            'microphone=()',
+            'camera=()',
+            'payment=()',
+            'usb=()',
+            'magnetometer=()',
+            'gyroscope=()',
+            'accelerometer=()'
+        ]);
+        header("Permissions-Policy: {$permissions}", true);
+    }
     
     // BONUS: Additional security headers
     

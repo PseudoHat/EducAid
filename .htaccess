@@ -76,15 +76,19 @@ RewriteRule ^(.*)$ https://www.educ-aid.site/$1 [L,R=301]
 </IfModule>
 
 # Permissions Policy (Feature Policy)
-<IfModule mod_headers.c>
-    # Default: deny sensitive features everywhere, but only if not already set by PHP
-    Header setifempty Permissions-Policy "geolocation=(), microphone=(), camera=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=()"
-
-    # Allow camera only on the QR scanner admin page using env flag
-    SetEnvIf Request_URI "^/modules/admin/scan_qr\.php$" allow_camera
-    SetEnvIf Request_URI "^/modules/admin/scanner\.php$" allow_camera
-    Header set Permissions-Policy "geolocation=(), microphone=(), camera=(self), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=()" env=allow_camera
-</IfModule>
+# NOTE: Permissions-Policy is now handled by PHP (config/security_headers.php)
+# which checks ALLOW_CAMERA constant on each page
+# Leaving Apache rules here as backup/documentation only (commented out)
+#
+# <IfModule mod_headers.c>
+#     # Default: deny sensitive features everywhere
+#     Header set Permissions-Policy "geolocation=(), microphone=(), camera=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=()"
+#
+#     # Allow camera only on the QR scanner admin pages (override default)
+#     SetEnvIf Request_URI "^/modules/admin/scan_qr\.php" allow_camera
+#     SetEnvIf Request_URI "^/modules/admin/scanner\.php" allow_camera
+#     Header always set Permissions-Policy "geolocation=(), microphone=(), camera=(self), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=()" env=allow_camera
+# </IfModule>
 
 # ----------------------------------------
 # File Access Protection
