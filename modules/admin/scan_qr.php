@@ -928,6 +928,16 @@ $csrf_complete_token = CSRFProtection::generateToken('complete_distribution');
     };
     console.log('===============================');
   </script>
+  <!-- Inspect actual response headers (async) -->
+  <script>
+    (async function(){
+      try {
+        const res = await fetch(window.location.href, { method: 'HEAD', cache: 'no-store' });
+        const pol = res.headers.get('permissions-policy');
+        console.log('Response Permissions-Policy header:', pol);
+      } catch(e){ console.log('Header probe failed:', e.message); }
+    })();
+  </script>
   
   <?php include __DIR__ . '/../../includes/admin/admin_topbar.php'; ?>
   <div id="wrapper" class="admin-wrapper">

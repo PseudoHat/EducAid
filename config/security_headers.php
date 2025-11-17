@@ -64,14 +64,28 @@ if (!headers_sent()) {
     
     // 6. Permissions-Policy (replaces Feature-Policy)
     // Restricts access to browser features and APIs
-    // Default: deny sensitive features. Allow camera for pages that explicitly opt-in.
-    // CRITICAL: If ALLOW_CAMERA is true, we SKIP setting Permissions-Policy entirely
-    // to avoid any conflicts. Browser defaults to permissive for same-origin.
+    // Strategy:
+    //  - On camera pages (ALLOW_CAMERA=true): explicitly ALLOW camera for same-origin and replace any prior header
+    //  - On all other pages: explicitly DENY camera
     $allowCamera = defined('ALLOW_CAMERA') && constant('ALLOW_CAMERA') === true;
-    
-    if (!$allowCamera) {
-        // Only set restrictive policy on non-camera pages
-        $permissionsDirectives = [
+
+    // Remove any previously set Permissions-Policy header from PHP before setting ours
+    if (function_exists('header_remove')) { @header_remove('Permissions-Policy'); }
+
+    if ($allowCamera) {
+        $permissions = implode(', ', [
+            'geolocation=()',
+            'microphone=()',
+            'camera=(self)',
+            'payment=()',
+            'usb=()',
+            'magnetometer=()',
+            'gyroscope=()',
+            'accelerometer=()'
+        ]);
+        header("Permissions-Policy: {$permissions}", true);
+    } else {
+        $permissions = implode(', ', [
             'geolocation=()',
             'microphone=()',
             'camera=()',
@@ -80,11 +94,9 @@ if (!headers_sent()) {
             'magnetometer=()',
             'gyroscope=()',
             'accelerometer=()'
-        ];
-        $permissions = implode(', ', $permissionsDirectives);
-        header("Permissions-Policy: {$permissions}");
+        ]);
+        header("Permissions-Policy: {$permissions}", true);
     }
-    // else: Camera pages get NO Permissions-Policy header = browser allows camera by default
     
     // BONUS: Additional security headers
     
