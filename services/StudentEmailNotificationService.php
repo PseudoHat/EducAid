@@ -116,7 +116,18 @@ class StudentEmailNotificationService {
     private function formatHtmlBody($title, $message, $type, $actionUrl) {
         $safeTitle = htmlspecialchars($title, ENT_QUOTES);
         $safeMsg = nl2br(htmlspecialchars($message, ENT_QUOTES));
-        $cta = $actionUrl ? '<p><a href="' . htmlspecialchars($actionUrl, ENT_QUOTES) . '" style="display:inline-block;padding:10px 16px;background:#2563eb;color:#fff;text-decoration:none;border-radius:6px;">View Details</a></p>' : '';
+        $cta = '';
+        if ($actionUrl) {
+            require_once __DIR__ . '/../includes/env_url_helper.php';
+            // Build environment-aware absolute URL if relative
+            $finalUrl = preg_match('#^https?://#i', $actionUrl) ? $actionUrl : buildAbsoluteUrl($actionUrl);
+            // Button label adjustments: use Login Now for document rejection scenario
+            $btnLabel = 'View Details';
+            if ($type === 'error' && stripos($title, 'Document Rejected') !== false) {
+                $btnLabel = 'Login Now';
+            }
+            $cta = '<p><a href="' . htmlspecialchars($finalUrl, ENT_QUOTES) . '" style="display:inline-block;padding:10px 16px;background:#2563eb;color:#fff;text-decoration:none;border-radius:6px;font-weight:600;">' . htmlspecialchars($btnLabel, ENT_QUOTES) . '</a></p>';    
+        }
         return "<div style='font-family:Arial,sans-serif;color:#111;line-height:1.6'>
             <h2 style='margin:0 0 8px'>{$safeTitle}</h2>
             <div style='font-size:14px'>{$safeMsg}</div>
