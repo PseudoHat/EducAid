@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 /**
  * DocumentReuploadService - Handles document re-upload for rejected applicants
  * 
@@ -2195,15 +2195,35 @@ class DocumentReuploadService {
         try {
             $description = "Student re-uploaded {$docTypeName} (Confidence: " . ($ocrData['ocr_confidence'] ?? 0) . "%)";
             
-            $query = "INSERT INTO audit_logs (user_id, student_id, action, description, ip_address, created_at)
-                      VALUES ($1, $2, $3, $4, $5, NOW())";
+            $query = "INSERT INTO audit_logs 
+                     (user_id, user_type, username, event_type, event_category, 
+                      action_description, status, ip_address, user_agent, 
+                      request_method, affected_table, affected_record_id, 
+                      metadata, created_at)
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW())";
+            
+            $metadata = json_encode([
+                'document_type' => $docTypeName,
+                'ocr_confidence' => $ocrData['ocr_confidence'] ?? 0,
+                'verification_score' => $ocrData['verification_score'] ?? 0,
+                'verification_status' => $ocrData['verification_status'] ?? 'unknown',
+                'student_id' => $studentId
+            ]);
             
             pg_query_params($this->db, $query, [
-                null,
-                $studentId,
-                'student_document_reupload',
+                null, // user_id (null for student actions)
+                'student',
+                $studentId, // username = student_id
+                'document_reupload',
+                'document_management',
                 $description,
-                $_SERVER['REMOTE_ADDR'] ?? 'unknown'
+                'success',
+                $_SERVER['REMOTE_ADDR'] ?? 'unknown',
+                $_SERVER['HTTP_USER_AGENT'] ?? 'unknown',
+                $_SERVER['REQUEST_METHOD'] ?? 'POST',
+                'documents',
+                null, // affected_record_id (will be document_id if needed)
+                $metadata
             ]);
         } catch (Exception $e) {
             error_log("DocumentReuploadService::logAudit error: " . $e->getMessage());

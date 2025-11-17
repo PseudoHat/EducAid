@@ -252,8 +252,8 @@ try {
     file_put_contents($targetPath . '.verify.json', json_encode($verification));
     file_put_contents($targetPath . '.ocr.txt', $ocr['text']);
     
-    // Save confidence to JSON file
-    $confidenceFile = $uploadDir . 'id_picture_confidence.json';
+    // Save confidence to JSON file using the .confidence.json pattern (matches .ocr.txt and .verify.json)
+    $confidenceFile = $targetPath . '.confidence.json';
     file_put_contents($confidenceFile, json_encode([
         'ocr_confidence' => $ocr['confidence'],
         'verification' => $verification,
