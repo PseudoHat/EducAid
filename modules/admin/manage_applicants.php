@@ -1321,11 +1321,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         }
         
-        $sid = trim($_POST['student_id']); // Remove intval for TEXT student_id
+        $sid = trim($_POST['student_id']); // TEXT student_id
         
-        // Get student name for notification
-        $studentQuery = pg_query_params($connection, "SELECT first_name, last_name, email FROM students WHERE student_id = $1", [$sid]);
+        // Get student info (including current status before promotion)
+        $studentQuery = pg_query_params(
+            $connection,
+            "SELECT first_name, last_name, email, status FROM students WHERE student_id = $1",
+            [$sid]
+        );
         $student = pg_fetch_assoc($studentQuery);
+        $previousStatus = $student['status'] ?? null;
         
         /** @phpstan-ignore-next-line */
         pg_query_params($connection, 
@@ -1337,27 +1342,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             [$sid]
         );
         
-        // Check if student has temp documents that need to be moved
-        // (Skip if files were already moved during registration approval or are re-uploads)
-        $tempDocsCheck = pg_query_params($connection,
-            "SELECT COUNT(*) FROM documents WHERE student_id = $1 AND status = 'temp'",
-            [$sid]
-        );
-        $hasTempDocs = pg_fetch_result($tempDocsCheck, 0, 0) > 0;
-        
-        if ($hasTempDocs) {
-            // Move files from temp to permanent storage AND update documents table
-            require_once __DIR__ . '/../../services/UnifiedFileService.php';
-            $fileService = new UnifiedFileService($connection);
-            $fileMoveResult = $fileService->moveToPermStorage($sid, $_SESSION['admin_id']);
-            
-            if (!$fileMoveResult['success']) {
-                error_log("UnifiedFileService: Error moving files for student $sid: " . implode(', ', $fileMoveResult['errors'] ?? []));
+        // Only perform temp -> permanent move if previous status indicates registration flow.
+        // Applicants already have their documents in permanent, so skip to avoid creating flat folder.
+        $eligibleForMove = $previousStatus && !in_array($previousStatus, ['applicant','active'], true);
+        if ($eligibleForMove) {
+            $tempDocsCheck = pg_query_params(
+                $connection,
+                "SELECT COUNT(*) FROM documents WHERE student_id = $1 AND status = 'temp'",
+                [$sid]
+            );
+            $hasTempDocs = pg_fetch_result($tempDocsCheck, 0, 0) > 0;
+            if ($hasTempDocs) {
+                require_once __DIR__ . '/../../services/UnifiedFileService.php';
+                $fileService = new UnifiedFileService($connection);
+                $fileMoveResult = $fileService->moveToPermStorage($sid, $_SESSION['admin_id']);
+                if (!$fileMoveResult['success']) {
+                    error_log("UnifiedFileService: Error moving files for student $sid: " . implode(', ', $fileMoveResult['errors'] ?? []));
+                } else {
+                    error_log("UnifiedFileService: Successfully moved temp files to permanent for student $sid (previous status: $previousStatus)");
+                }
             } else {
-                error_log("UnifiedFileService: Successfully moved temp files to permanent for student $sid");
+                error_log("UnifiedFileService: Skipping file move for student $sid - no temp documents found (previous status: $previousStatus)");
             }
         } else {
-            error_log("UnifiedFileService: Skipping file move for student $sid - no temp documents found (files likely already permanent)");
+            error_log("UnifiedFileService: Skipping file move for student $sid - previous status '$previousStatus' not eligible (already applicant or active)");
         }
         
         // Add admin notification
