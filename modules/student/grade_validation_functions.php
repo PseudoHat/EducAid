@@ -411,51 +411,103 @@ if (!function_exists('validatePerSubjectGrades')) {
         global $connection;
 
         try {
-            // Fetch grading system for this university
-            $gradingQuery = pg_query_params($connection,
-                "SELECT gs.*, u.name as university_name
-                 FROM grading_systems gs
-                 JOIN universities u ON gs.university_id = u.university_id
-                 WHERE u.code = $1",
-                [$universityKey]
-            );
+            // Ensure new policy table/function exists
+            $policyTableRes = @pg_query($connection, "SELECT to_regclass('grading.university_passing_policy') AS regclass");
+            $policyTableExists = false;
+            if ($policyTableRes) {
+                $row = pg_fetch_assoc($policyTableRes);
+                $policyTableExists = !empty($row) && !empty($row['regclass']);
+            }
 
-            if (!$gradingQuery || pg_num_rows($gradingQuery) === 0) {
+            // Optional: existence check for helper function
+            $fnRes = @pg_query($connection, "SELECT to_regproc('grading.grading_is_passing(text,text)') AS fn");
+            $fnExists = false;
+            if ($fnRes) {
+                $row = pg_fetch_assoc($fnRes);
+                $fnExists = !empty($row) && !empty($row['fn']);
+            }
+
+            if (!$policyTableExists) {
+                // Fallback to legacy threshold path in caller
                 return [
                     'success' => false,
                     'eligible' => false,
-                    'error' => 'No grading system found for university: ' . $universityKey
+                    'warning' => 'grading.university_passing_policy missing; using legacy validation',
                 ];
             }
 
-            $gradingSystem = pg_fetch_assoc($gradingQuery);
-            $passingGrade = floatval($gradingSystem['passing_grade']);
-            $minGrade = floatval($gradingSystem['min_grade']);
-            $maxGrade = floatval($gradingSystem['max_grade']);
-            $isLowerBetter = ($gradingSystem['is_lower_better'] === 't' || $gradingSystem['is_lower_better'] === true);
+            // Load the active policy for this university
+            $policyQuery = pg_query_params($connection,
+                "SELECT policy_id, university_key, scale_type, higher_is_better, highest_value, passing_value, letter_order
+                 FROM grading.university_passing_policy
+                 WHERE university_key = $1 AND is_active = TRUE
+                 ORDER BY updated_at DESC, policy_id DESC
+                 LIMIT 1",
+                [$universityKey]
+            );
+
+            if (!$policyQuery || pg_num_rows($policyQuery) === 0) {
+                return [
+                    'success' => false,
+                    'eligible' => false,
+                    'error' => 'No active passing policy found for university_key: ' . $universityKey
+                ];
+            }
+
+            $policy = pg_fetch_assoc($policyQuery);
+
+            // Get university display name (optional)
+            $uniName = $universityKey;
+            $uniRes = @pg_query_params($connection, "SELECT name FROM universities WHERE code = $1", [$universityKey]);
+            if ($uniRes && pg_num_rows($uniRes) > 0) {
+                $uniRow = pg_fetch_assoc($uniRes);
+                if (!empty($uniRow['name'])) $uniName = $uniRow['name'];
+            }
 
             $failedSubjects = [];
-            $totalSubjects = count($subjects);
+            $totalSubjects = is_array($subjects) ? count($subjects) : 0;
 
-            foreach ($subjects as $subject) {
+            foreach ((array)$subjects as $subject) {
                 $rawGrade = $subject['rawGrade'] ?? $subject['grade'] ?? null;
                 if ($rawGrade === null) continue;
 
-                $numericGrade = floatval($rawGrade);
-
-                // Check if grade is within valid range
-                if ($numericGrade < $minGrade || $numericGrade > $maxGrade) {
-                    $failedSubjects[] = $subject['name'] . ': ' . $rawGrade . ' (out of range)';
-                    continue;
+                $isPassing = false;
+                if ($fnExists) {
+                    $passRes = @pg_query_params($connection,
+                        "SELECT grading.grading_is_passing($1, $2) AS pass",
+                        [$universityKey, strval($rawGrade)]
+                    );
+                    if ($passRes && pg_num_rows($passRes) > 0) {
+                        $passRow = pg_fetch_assoc($passRes);
+                        $val = $passRow['pass'] ?? null;
+                        $isPassing = ($val === 't' || $val === true || $val === 1 || $val === '1');
+                    }
+                } else {
+                    // Lightweight inline evaluation as last resort using policy metadata
+                    $scale = strtoupper($policy['scale_type'] ?? '');
+                    $higherBetter = ($policy['higher_is_better'] === 't' || $policy['higher_is_better'] === true);
+                    $passingVal = $policy['passing_value'];
+                    if ($scale === 'NUMERIC_1_TO_5' || $scale === 'NUMERIC_0_TO_4' || $scale === 'PERCENT') {
+                        $g = floatval(str_replace('%','',strval($rawGrade)));
+                        $p = floatval(str_replace('%','',strval($passingVal)));
+                        $isPassing = $higherBetter ? ($g >= $p) : ($g <= $p);
+                    } elseif ($scale === 'LETTER') {
+                        $letters = $policy['letter_order'];
+                        if (is_string($letters)) {
+                            // If returned as string like {A,B,C}, normalize
+                            $letters = trim($letters, '{}');
+                            $letters = $letters === '' ? [] : array_map('trim', explode(',', $letters));
+                        }
+                        $idx = array_search(strtoupper(trim($rawGrade)), array_map('strtoupper', (array)$letters));
+                        $pidx = array_search(strtoupper(trim($passingVal)), array_map('strtoupper', (array)$letters));
+                        if ($idx !== false && $pidx !== false) {
+                            $isPassing = $higherBetter ? ($idx <= $pidx) : ($idx >= $pidx);
+                        }
+                    }
                 }
 
-                // Check passing status
-                $isPassing = $isLowerBetter ? 
-                    ($numericGrade <= $passingGrade) : 
-                    ($numericGrade >= $passingGrade);
-
                 if (!$isPassing) {
-                    $failedSubjects[] = $subject['name'] . ': ' . $rawGrade;
+                    $failedSubjects[] = ($subject['name'] ?? 'Subject') . ': ' . $rawGrade;
                 }
             }
 
@@ -467,10 +519,13 @@ if (!function_exists('validatePerSubjectGrades')) {
                 'failed_subjects' => $failedSubjects,
                 'total_subjects' => $totalSubjects,
                 'grading_system' => [
-                    'university' => $gradingSystem['university_name'],
-                    'passing_grade' => $passingGrade,
-                    'range' => "$minGrade - $maxGrade",
-                    'is_lower_better' => $isLowerBetter
+                    'university' => $uniName,
+                    'policy' => [
+                        'scale_type' => $policy['scale_type'] ?? null,
+                        'higher_is_better' => ($policy['higher_is_better'] === 't' || $policy['higher_is_better'] === true),
+                        'passing_value' => $policy['passing_value'] ?? null,
+                        'highest_value' => $policy['highest_value'] ?? null
+                    ]
                 ]
             ];
 
