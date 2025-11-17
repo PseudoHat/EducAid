@@ -1250,7 +1250,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['process_document'])) 
                     'middle_name' => $student['middle_name'] ?? '',
                     'last_name' => $student['last_name'] ?? '',
                     'university_name' => $student['university_name'] ?? '',
-                    'year_level' => $student['year_level_name'] ?? ''
+                    'year_level' => $student['current_year_level'] ?? ''
                 ];
                 
                 $ocrResult = $enrollmentOCR->processEnrollmentForm($tempPath, $studentData);
@@ -1269,10 +1269,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['process_document'])) 
                 
                 // Process course if found - simplified, no database lookup
                 $courseData = null;
-                if ($extracted['course']['found']) {
+                if (!empty($extracted['course']) && !empty($extracted['course']['found'])) {
                     $courseData = [
-                        'raw_course' => $extracted['course']['raw'],
-                        'normalized_course' => $extracted['course']['normalized']
+                        'raw_course' => $extracted['course']['raw'] ?? null,
+                        'normalized_course' => $extracted['course']['normalized'] ?? null
                     ];
                 }
                 
@@ -1302,12 +1302,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['process_document'])) 
                     'verification_passed' => $ocrResult['verification_passed'],
                     'tsv_quality' => $tsvQuality,
                     'fields' => [
-                        'first_name' => $extracted['first_name'],
-                        'middle_name' => $extracted['middle_name'],
-                        'last_name' => $extracted['last_name'],
-                        'university' => $extracted['university'],
-                        'year_level' => $extracted['year_level'],
-                        'course' => $extracted['course']
+                        'first_name' => $extracted['first_name'] ?? null,
+                        'middle_name' => $extracted['middle_name'] ?? null,
+                        'last_name' => $extracted['last_name'] ?? null,
+                        'university' => $extracted['university'] ?? null,
+                        'year_level' => $extracted['year_level'] ?? null,
+                        // include full course block if available, else null
+                        'course' => $extracted['course'] ?? null
                     ],
                     'timestamp' => date('Y-m-d H:i:s')
                 ];
@@ -1367,7 +1368,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['process_document'])) 
                 'university_id' => $student['university_id'] ?? null,
                 'year_level_id' => $student['year_level_id'] ?? null,
                 'university_name' => $student['university_name'] ?? '',
-                'year_level_name' => $student['year_level_name'] ?? '',
+                'year_level_name' => $student['current_year_level'] ?? '',
                 'barangay_name' => $student['barangay_name'] ?? ''
             ]
         );
@@ -1474,10 +1475,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_upload'])) {
             $file['name'],
             [
                 'student_id' => $student_id,
-                'first_name' => $student['first_name'],
-                'last_name' => $student['last_name'],
-                'university_id' => $student['university_id'],
-                'year_level_id' => $student['year_level_id']
+                'first_name' => $student['first_name'] ?? '',
+                'last_name' => $student['last_name'] ?? '',
+                'university_id' => $student['university_id'] ?? null,
+                'year_level_id' => $student['year_level_id'] ?? null
             ]
         );
         
@@ -1541,10 +1542,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $can_upload) {
                 $file['name'],
                 [
                     'student_id' => $student_id,
-                    'first_name' => $student['first_name'],
-                    'last_name' => $student['last_name'],
-                    'university_id' => $student['university_id'],
-                    'year_level_id' => $student['year_level_id']
+                    'first_name' => $student['first_name'] ?? '',
+                    'last_name' => $student['last_name'] ?? '',
+                    'university_id' => $student['university_id'] ?? null,
+                    'year_level_id' => $student['year_level_id'] ?? null
                 ]
             );
             
@@ -1632,12 +1633,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $can_upload) {
                         // STRICT: Require 60% similarity (matching EnrollmentFormOCRService)
                         // first_name_found is already calculated with 60% threshold in OCR service
                         if (!$first_name_found) {
-                            $errors[] = "• ❌ FIRST NAME MISMATCH: Expected '{$student['first_name']}' but found different name (Similarity: {$first_name_similarity}%)";
-                            error_log("UPLOAD BLOCKED: First name mismatch - Expected '{$student['first_name']}', Similarity: {$first_name_similarity}%");
+                            $errors[] = "• ❌ FIRST NAME MISMATCH: Expected '" . ($student['first_name'] ?? 'Unknown') . "' but found different name (Similarity: {$first_name_similarity}%)";
+                            error_log("UPLOAD BLOCKED: First name mismatch - Expected '" . ($student['first_name'] ?? 'Unknown') . "', Similarity: {$first_name_similarity}%");
                         }
                     } else {
                         // If no student_name data at all, it's a critical failure
-                        $errors[] = "• ❌ FIRST NAME NOT FOUND: Expected '{$student['first_name']}' but document has no readable name";
+                        $errors[] = "• ❌ FIRST NAME NOT FOUND: Expected '" . ($student['first_name'] ?? 'Unknown') . "' but document has no readable name";
                         error_log("UPLOAD BLOCKED: No student_name data in extracted_data");
                     }
                     
@@ -1649,12 +1650,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $can_upload) {
                         // STRICT: Require 70% similarity (matching EnrollmentFormOCRService)
                         // last_name_found is already calculated with 70% threshold in OCR service
                         if (!$last_name_found) {
-                            $errors[] = "• ❌ LAST NAME MISMATCH: Expected '{$student['last_name']}' but found different name (Similarity: {$last_name_similarity}%)";
-                            error_log("UPLOAD BLOCKED: Last name mismatch - Expected '{$student['last_name']}', Similarity: {$last_name_similarity}%");
+                            $errors[] = "• ❌ LAST NAME MISMATCH: Expected '" . ($student['last_name'] ?? 'Unknown') . "' but found different name (Similarity: {$last_name_similarity}%)";
+                            error_log("UPLOAD BLOCKED: Last name mismatch - Expected '" . ($student['last_name'] ?? 'Unknown') . "', Similarity: {$last_name_similarity}%");
                         }
                     } else {
                         // If no student_name data at all, it's a critical failure
-                        $errors[] = "• ❌ LAST NAME NOT FOUND: Expected '{$student['last_name']}' but document has no readable name";
+                        $errors[] = "• ❌ LAST NAME NOT FOUND: Expected '" . ($student['last_name'] ?? 'Unknown') . "' but document has no readable name";
                         error_log("UPLOAD BLOCKED: No student_name data in extracted_data");
                     }
                     
@@ -1690,10 +1691,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $can_upload) {
                         
                         if ($university_found && !$university_matched) {
                             // University was found in document but doesn't match expected value
-                            $errors[] = "• University mismatch: Expected '{$student['university_name']}', found '" . ($extracted_data['university']['raw'] ?? 'Not found') . "'";
+                            $errors[] = "• University mismatch: Expected '" . ($student['university_name'] ?? 'Unknown') . "', found '" . ($extracted_data['university']['raw'] ?? 'Not found') . "'";
                         } elseif (!$university_found) {
                             // University not found in document at all
-                            $errors[] = "• University not found in document. Expected '{$student['university_name']}'";
+                            $errors[] = "• University not found in document. Expected '" . ($student['university_name'] ?? 'Unknown') . "'";
                         }
                     }
                     
@@ -1717,8 +1718,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $can_upload) {
                     
                     // Check Name (first or last name should appear)
                     $name_found = false;
-                    if (stripos($ocr_text, strtolower($student['first_name'])) !== false || 
-                        stripos($ocr_text, strtolower($student['last_name'])) !== false) {
+                    if (stripos($ocr_text, strtolower($student['first_name'] ?? '')) !== false || 
+                        stripos($ocr_text, strtolower($student['last_name'] ?? '')) !== false) {
                         $name_found = true;
                     }
                     
@@ -1737,7 +1738,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $can_upload) {
                     }
                     
                     if (!$university_found) {
-                        $errors[] = "• University name not found in document (Expected: {$student['university_name']})";
+                        $errors[] = "• University name not found in document (Expected: " . ($student['university_name'] ?? 'Unknown') . ")";
                     }
                     
                     // Check Keywords (grade, grades, academic)
@@ -1760,7 +1761,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $can_upload) {
                     
                     // Check Student Name
                     $name_found = false;
-                    if (stripos($ocr_text, strtolower($student['last_name'])) !== false) {
+                    if (stripos($ocr_text, strtolower($student['last_name'] ?? '')) !== false) {
                         $name_found = true;
                     }
                     
@@ -1793,7 +1794,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $can_upload) {
                     
                     // Check Student Name
                     $name_found = false;
-                    if (stripos($ocr_text, strtolower($student['last_name'])) !== false) {
+                    if (stripos($ocr_text, strtolower($student['last_name'] ?? '')) !== false) {
                         $name_found = true;
                     }
                     
@@ -1808,7 +1809,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $can_upload) {
                     
                     // Check Barangay
                     $barangay_found = false;
-                    if ($student['barangay_name']) {
+                    if ($student['barangay_name'] ?? null) {
                         $barangay_keywords = explode(' ', strtolower($student['barangay_name']));
                         foreach ($barangay_keywords as $keyword) {
                             if (strlen($keyword) > 3 && stripos($ocr_text, $keyword) !== false) {
@@ -1818,8 +1819,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $can_upload) {
                         }
                     }
                     
-                    if (!$barangay_found && $student['barangay_name']) {
-                        $errors[] = "• Barangay '{$student['barangay_name']}' not found";
+                    if (!$barangay_found && ($student['barangay_name'] ?? null)) {
+                        $errors[] = "• Barangay '" . ($student['barangay_name'] ?? 'Unknown') . "' not found";
                     }
                     
                     // Check Keywords (indigency, indigent, certificate)
@@ -2715,7 +2716,7 @@ $page_title = 'Upload Documents';
                                                 $last_name_similarity = $extracted_data['student_name']['last_name_similarity'] ?? 0;
                                                 
                                                 if (!$first_name_found) {
-                                                    $warnings[] = "❌ <strong>FIRST NAME MISMATCH:</strong> Expected '{$student['first_name']}' but found different name (Match: " . round($first_name_similarity, 1) . "%)";
+                                                    $warnings[] = "❌ <strong>FIRST NAME MISMATCH:</strong> Expected '" . ($student['first_name'] ?? 'Unknown') . "' but found different name (Match: " . round($first_name_similarity, 1) . "%)";
                                                 }
                                                 
                                                 if (!$last_name_found) {
@@ -2753,7 +2754,7 @@ $page_title = 'Upload Documents';
                                             
                                             // Check individual field validations
                                             if (isset($verifyData['first_name']) && !$verifyData['first_name']) {
-                                                $warnings[] = "❌ <strong>NAME MISMATCH:</strong> Your first name '{$student['first_name']}' was not found in the letter";
+                                                $warnings[] = "❌ <strong>NAME MISMATCH:</strong> Your first name '" . ($student['first_name'] ?? 'Unknown') . "' was not found in the letter";
                                             }
                                             
                                             if (isset($verifyData['last_name']) && !$verifyData['last_name']) {
@@ -2794,7 +2795,7 @@ $page_title = 'Upload Documents';
                                             }
                                             
                                             if (isset($verifyData['first_name']) && !$verifyData['first_name']) {
-                                                $warnings[] = "❌ <strong>NAME MISMATCH:</strong> Your first name '{$student['first_name']}' was not found in the certificate";
+                                                $warnings[] = "❌ <strong>NAME MISMATCH:</strong> Your first name '" . ($student['first_name'] ?? 'Unknown') . "' was not found in the certificate";
                                             }
                                             
                                             if (isset($verifyData['last_name']) && !$verifyData['last_name']) {
