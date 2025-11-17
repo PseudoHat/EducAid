@@ -305,7 +305,7 @@ class UnifiedFileService {
                 ['temp' => 'grades', 'permanent' => 'grades'],
                 ['temp' => 'id_pictures', 'permanent' => 'id_pictures'],
                 ['temp' => 'indigency', 'permanent' => 'indigency'],
-                ['temp' => 'letter_mayor', 'permanent' => 'letter_mayor']
+                ['temp' => 'letter_to_mayor', 'permanent' => 'letter_to_mayor']
             ];
             
             // Check temp folders first (for rejected applicants who never got approved)

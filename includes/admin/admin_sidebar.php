@@ -115,6 +115,14 @@ $cmsFiles = [
     'municipality_content.php',
 ];
 $isCMSActive = in_array($current, $cmsFiles, true);
+
+// Load schedule publish state (for user-friendly gating of Scan QR access)
+$settingsPath = __DIR__ . '/../../data/municipal_settings.json';
+$settingsData = file_exists($settingsPath) ? json_decode(@file_get_contents($settingsPath), true) : [];
+$schedulePublished = !empty($settingsData['schedule_published']);
+
+// Refine Scan QR capability: must have workflow can_scan_qr AND schedule published
+$canScanQRPublished = $canScanQR && $schedulePublished;
 ?>
 
 <!-- admin_sidebar.php -->
@@ -252,14 +260,18 @@ $isCMSActive = in_array($current, $cmsFiles, true);
             <?php endif; ?>
           </li>
           <li>
-            <?php if ($canScanQR): ?>
+            <?php if ($canScanQRPublished): ?>
               <a class="submenu-link <?= is_active('scan_qr.php', $current) ? 'active' : '' ?>" href="scan_qr.php">
                 <i class="bi bi-qr-code-scan me-2"></i> Scan QR
                 <span class="badge bg-success ms-2">Ready</span>
               </a>
+            <?php elseif(!$schedulePublished): ?>
+              <a class="submenu-link text-muted" href="#" onclick="alert('Schedules are still not published. Please publish the schedule first.'); return false;">
+                <i class="bi bi-qr-code-scan me-2"></i> Scan QR
+                <span class="badge bg-warning text-dark ms-2">Not Published</span>
+              </a>
             <?php else: ?>
-              <a class="submenu-link text-muted" href="#"
-                 onclick="alert('Please generate payroll numbers and QR codes first before scanning.'); return false;">
+              <a class="submenu-link text-muted" href="#" onclick="alert('Please generate payroll numbers and QR codes first before scanning.'); return false;">
                 <i class="bi bi-qr-code-scan me-2"></i> Scan QR
                 <span class="badge bg-secondary ms-2">Locked</span>
               </a>
@@ -304,8 +316,10 @@ $isCMSActive = in_array($current, $cmsFiles, true);
 
     <!-- Scan QR (sub_admin access) -->
     <?php if ($admin_role === 'sub_admin' || $admin_role === 'admin'): ?>
-      <?php if ($canScanQR): ?>
+      <?php if ($canScanQRPublished): ?>
         <?= menu_link('scan_qr.php', 'bi bi-qr-code-scan', 'Scan QR', is_active('scan_qr.php', $current), ['text' => 'Ready', 'class' => 'bg-success']); ?>
+      <?php elseif(!$schedulePublished): ?>
+        <?= menu_link('#', 'bi bi-qr-code-scan', 'Scan QR', '', ['text' => 'Not Published', 'class' => 'bg-warning text-dark'], true, 'Schedules are still not published. Please publish the schedule first.'); ?>
       <?php else: ?>
         <?= menu_link('#', 'bi bi-qr-code-scan', 'Scan QR', '', ['text' => 'Locked', 'class' => 'bg-secondary'], true, 'Please generate payroll numbers and QR codes first before scanning.'); ?>
       <?php endif; ?>
