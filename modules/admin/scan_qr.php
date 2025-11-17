@@ -5,6 +5,11 @@ if (!defined('ALLOW_CAMERA')) { define('ALLOW_CAMERA', true); }
 // CRITICAL: Include security headers BEFORE any output to set Permissions-Policy with camera=(self)
 require_once __DIR__ . '/../../config/security_headers.php';
 
+// Prevent caching of this page (camera permission pages should always be fresh)
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+header('Pragma: no-cache');
+header('Expires: 0');
+
 // Load secure session configuration (must be before session_start)
 require_once __DIR__ . '/../../config/session_config.php';
 

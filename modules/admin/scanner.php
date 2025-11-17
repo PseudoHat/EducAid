@@ -5,6 +5,11 @@ if (!defined('ALLOW_CAMERA')) { define('ALLOW_CAMERA', true); }
 // Load security headers before any output
 require_once __DIR__ . '/../../config/security_headers.php';
 
+// Prevent caching of this page (camera permission pages should always be fresh)
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+header('Pragma: no-cache');
+header('Expires: 0');
+
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -113,6 +118,26 @@ $qr_count = pg_num_rows($qr_res);
             });
         }
         console.log('===============================');
+    </script>
+    
+    <!-- Inspect actual response headers (async) -->
+    <script>
+        (async function(){
+            try {
+                const res = await fetch(window.location.href + '?probe=' + Date.now(), { method: 'GET', cache: 'no-store' });
+                const pol = res.headers.get('permissions-policy');
+                console.log('Response Permissions-Policy header:', pol);
+                if (pol && pol.includes('camera=()')) {
+                    console.error('🚨 CLOUDFLARE CACHE STILL ACTIVE: camera=() detected');
+                    console.error('The cached header is still being served by Cloudflare edge servers');
+                    console.error('Try: Development Mode in Cloudflare (bypasses cache for 3 hours)');
+                } else if (pol && pol.includes('camera=(self)')) {
+                    console.log('✅ Header correct: camera=(self)');
+                } else {
+                    console.log('⚠️ No Permissions-Policy header (should be permissive)');
+                }
+            } catch(e){ console.log('Header probe failed:', e.message); }
+        })();
     </script>
     
     <div id="wrapper">
