@@ -1162,34 +1162,90 @@ $csrf_complete_token = CSRFProtection::generateToken('complete_distribution');
       return new URLSearchParams(params).toString();
     }
     
-    // Initialize camera selection
-    Html5Qrcode.getCameras().then(cameras => {
-      if (!cameras.length) {
-        alert("No cameras found.");
-        return;
+    // Initialize camera selection with proper permission request
+    async function initializeCameraSelection() {
+      try {
+        startButton.disabled = true;
+        startButton.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Initializing...';
+        
+        // CRITICAL: Request camera permission first before enumerating devices
+        console.log('Requesting camera permission...');
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        
+        // Stop the stream immediately after getting permission
+        stream.getTracks().forEach(track => track.stop());
+        console.log('Camera permission granted');
+        
+        // Now enumerate cameras (will work because permission is granted)
+        const cameras = await Html5Qrcode.getCameras();
+        
+        if (!cameras || cameras.length === 0) {
+          throw new Error('No cameras found on your device');
+        }
+        
+        console.log(`Found ${cameras.length} camera(s)`);
+        
+        // Clear existing options except the first placeholder
+        cameraSelect.innerHTML = '<option value="">Select Camera</option>';
+        
+        cameras.forEach(camera => {
+          const option = document.createElement('option');
+          option.value = camera.id;
+          option.text = camera.label || `Camera ${camera.id}`;
+          cameraSelect.appendChild(option);
+        });
+        
+        // Prefer back camera (for mobile devices)
+        const backCam = cameras.find(cam => 
+          cam.label && cam.label.toLowerCase().includes('back')
+        );
+        
+        if (backCam) {
+          cameraSelect.value = backCam.id;
+          currentCameraId = backCam.id;
+          console.log('Selected back camera:', backCam.label);
+        } else if (cameras.length > 0) {
+          cameraSelect.value = cameras[0].id;
+          currentCameraId = cameras[0].id;
+          console.log('Selected first camera:', cameras[0].label || cameras[0].id);
+        }
+        
+        // Enable start button after successful initialization
+        startButton.disabled = false;
+        startButton.textContent = 'Start Scanner';
+        
+      } catch (err) {
+        console.error("Error initializing camera:", err);
+        
+        let errorMessage = 'Failed to initialize camera. ';
+        
+        if (err.name === 'NotAllowedError') {
+          errorMessage += 'Camera permission denied. Please allow camera access in your browser settings and refresh the page.';
+        } else if (err.name === 'NotFoundError') {
+          errorMessage += 'No camera found on your device. Please connect a camera and refresh the page.';
+        } else if (err.name === 'NotReadableError') {
+          errorMessage += 'Camera is already in use by another application. Please close other apps using the camera and try again.';
+        } else if (err.message && err.message.includes('secure')) {
+          errorMessage += 'Camera access requires HTTPS. Please use a secure connection.';
+        } else {
+          errorMessage += err.message || 'Unknown error occurred.';
+        }
+        
+        alert(errorMessage);
+        
+        startButton.disabled = true;
+        startButton.textContent = 'Camera Error';
       }
-      cameras.forEach(camera => {
-        const option = document.createElement('option');
-        option.value = camera.id;
-        option.text = camera.label || `Camera ${camera.id}`;
-        cameraSelect.appendChild(option);
-      });
-      
-      // Prefer back camera
-      const backCam = cameras.find(cam => cam.label.toLowerCase().includes('back'));
-      if (backCam) {
-        cameraSelect.value = backCam.id;
-        currentCameraId = backCam.id;
-      } else if (cameras.length > 0) {
-        cameraSelect.value = cameras[0].id;
-        currentCameraId = cameras[0].id;
-      }
-    }).catch(err => {
-      console.error("Error getting cameras:", err);
+    }
+    
+    // Initialize on page load
+    document.addEventListener('DOMContentLoaded', () => {
+      initializeCameraSelection();
     });
     
     cameraSelect.addEventListener('change', () => {
       currentCameraId = cameraSelect.value;
+      console.log('Camera changed to:', currentCameraId);
     });
 
     // Start scanner
@@ -1278,11 +1334,27 @@ $csrf_complete_token = CSRFProtection::generateToken('complete_distribution');
         }
       ).then(() => {
         startButton.disabled = true;
+        startButton.textContent = 'Scanner Running...';
         stopButton.disabled = false;
         console.log("Scanner started successfully");
       }).catch(err => {
         console.error("Failed to start scanning:", err);
-        alert("Failed to start camera. Please check permissions and try again.");
+        
+        let errorMessage = "Failed to start camera. ";
+        
+        if (err.name === 'NotAllowedError' || (err.message && err.message.includes('Permission'))) {
+          errorMessage += "Camera permission was denied. Please allow camera access in your browser settings.";
+        } else if (err.name === 'NotFoundError') {
+          errorMessage += "Camera not found. Please check if your camera is connected.";
+        } else if (err.name === 'NotReadableError' || (err.message && err.message.includes('in use'))) {
+          errorMessage += "Camera is already in use by another application. Please close other apps using the camera.";
+        } else if (err.message && err.message.includes('secure context')) {
+          errorMessage += "Camera access requires HTTPS. Please use a secure connection.";
+        } else {
+          errorMessage += err.message || "Unknown error occurred.";
+        }
+        
+        alert(errorMessage);
         startButton.disabled = false;
         stopButton.disabled = true;
       });
