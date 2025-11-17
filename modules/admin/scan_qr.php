@@ -1179,19 +1179,11 @@ $csrf_complete_token = CSRFProtection::generateToken('complete_distribution');
       return new URLSearchParams(params).toString();
     }
     
-    // Initialize camera selection with proper permission request
-    async function initializeCameraSelection() {
+  // Initialize camera selection without prompting permission (do that on Start)
+  async function initializeCameraSelection() {
       try {
         startButton.disabled = true;
         startButton.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Initializing...';
-        
-        // CRITICAL: Request camera permission first before enumerating devices
-        console.log('Requesting camera permission...');
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-        
-        // Stop the stream immediately after getting permission
-        stream.getTracks().forEach(track => track.stop());
-        console.log('Camera permission granted');
         
         // Wait until the scanner library is available (handle slow CDN)
         await new Promise((resolve, reject) => {
@@ -1204,7 +1196,7 @@ $csrf_complete_token = CSRFProtection::generateToken('complete_distribution');
         });
 
         // Now enumerate cameras (will work because permission is granted)
-        const cameras = await Html5Qrcode.getCameras();
+    const cameras = await Html5Qrcode.getCameras();
         
         if (!cameras || cameras.length === 0) {
           throw new Error('No cameras found on your device');
@@ -1237,18 +1229,16 @@ $csrf_complete_token = CSRFProtection::generateToken('complete_distribution');
           console.log('Selected first camera:', cameras[0].label || cameras[0].id);
         }
         
-        // Enable start button after successful initialization
-        startButton.disabled = false;
-        startButton.textContent = 'Start Scanner';
+  // Enable start button after successful initialization
+  startButton.disabled = false;
+  startButton.textContent = 'Start Scanner';
         
       } catch (err) {
         console.error("Error initializing camera:", err);
         
-        let errorMessage = 'Failed to initialize camera. ';
+  let errorMessage = 'Failed to initialize camera. ';
         
-        if (err.name === 'NotAllowedError') {
-          errorMessage += 'Camera permission denied. Please allow camera access in your browser settings and refresh the page.';
-        } else if (err.name === 'NotFoundError') {
+  if (err.name === 'NotFoundError') {
           errorMessage += 'No camera found on your device. Please connect a camera and refresh the page.';
         } else if (err.name === 'NotReadableError') {
           errorMessage += 'Camera is already in use by another application. Please close other apps using the camera and try again.';
@@ -1276,7 +1266,7 @@ $csrf_complete_token = CSRFProtection::generateToken('complete_distribution');
     });
 
     // Start scanner
-    startButton.addEventListener('click', () => {
+    startButton.addEventListener('click', async () => {
       // Prevent starting if distribution is completed
       if (distributionCompleted) {
         alert("Scanner is disabled. The distribution has been completed and finalized.");
@@ -1301,6 +1291,26 @@ $csrf_complete_token = CSRFProtection::generateToken('complete_distribution');
           alert('Failed to initialize scanner.');
           return;
         }
+      }
+
+      // Request permission on user gesture (best compatibility), then release stream
+      try {
+        const tempStream = await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: currentCameraId } } });
+        tempStream.getTracks().forEach(t => t.stop());
+      } catch (err) {
+        console.error('Permission/start preflight error:', err);
+        let errorMessage = "Failed to start camera. ";
+        if (err.name === 'NotAllowedError' || (err.message && err.message.includes('Permission'))) {
+          errorMessage += "Camera permission was denied. Click the lock icon near the address bar → Site settings → Camera → Allow, then reload.";
+        } else if (err.name === 'NotFoundError') {
+          errorMessage += "Camera not found. Please check if your camera is connected.";
+        } else if (err.name === 'NotReadableError' || (err.message && err.message.includes('in use'))) {
+          errorMessage += "Camera is already in use by another application. Close other apps using the camera.";
+        } else {
+          errorMessage += err.message || "Unknown error occurred.";
+        }
+        alert(errorMessage);
+        return;
       }
       
       html5QrCode.start(
