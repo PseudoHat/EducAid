@@ -384,6 +384,7 @@ body.navbar-open {
 }
 
 .hero h1 {
+  font-family: var(--thm-font) !important;
   font-weight: 800;
   letter-spacing: .2px;
   opacity: 0;
@@ -739,8 +740,42 @@ body.navbar-open {
   50% { transform: translateY(-4px) scale(1.01); }
 }
 
+/* Tablet Responsive (768px - 991px) */
+@media (min-width: 768px) and (max-width: 991.98px) {
+  .distribution-status-section {
+    padding: 70px 0;
+  }
+  
+  .dist-card-inner {
+    padding: 2.5rem 2rem;
+  }
+  
+  .dist-slots-showcase,
+  .dist-progress-wrapper {
+    margin-bottom: 1.5rem;
+  }
+  
+  .dist-icon-wrapper {
+    width: 70px;
+    height: 70px;
+  }
+  
+  .dist-icon {
+    font-size: 2.25rem;
+  }
+  
+  .dist-status-banner {
+    font-size: 1.1rem;
+    padding: 1.25rem 1.5rem;
+  }
+  
+  #distSlotsLeft {
+    font-size: 3rem;
+  }
+}
+
 /* Mobile Responsive */
-@media (max-width: 991px) {
+@media (max-width: 767.98px) {
   .distribution-status-section {
     padding: 60px 0;
   }
@@ -938,6 +973,84 @@ section {
 /* Requirements */
 .check {
   color: var(--thm-green);
+}
+
+/* Tablet Responsive - Cards and Content Sections */
+@media (min-width: 768px) and (max-width: 991.98px) {
+  .mayor-section {
+    padding: 48px 0;
+  }
+  
+  .mayor-photo {
+    width: 110px;
+    height: 110px;
+  }
+  
+  .mayor-sign {
+    max-height: 40px;
+  }
+  
+  .step {
+    gap: 1.125rem;
+  }
+  
+  .step-badge {
+    flex: 0 0 44px;
+    height: 44px;
+    font-size: 1.05rem;
+  }
+  
+  .ann-card {
+    margin-bottom: 1.5rem;
+  }
+  
+  .ann-card img {
+    height: 200px;
+    object-fit: cover;
+  }
+  
+  .soft-card {
+    padding: 1.75rem;
+  }
+}
+
+/* Mobile Responsive - Cards and Content */
+@media (max-width: 767.98px) {
+  .mayor-section {
+    padding: 40px 0;
+  }
+  
+  .mayor-photo {
+    width: 90px;
+    height: 90px;
+  }
+  
+  .mayor-sign {
+    max-height: 36px;
+  }
+  
+  .step {
+    gap: 0.875rem;
+  }
+  
+  .step-badge {
+    flex: 0 0 38px;
+    height: 38px;
+    font-size: 0.95rem;
+  }
+  
+  .ann-card {
+    margin-bottom: 1.25rem;
+  }
+  
+  .ann-card img {
+    height: 180px;
+    object-fit: cover;
+  }
+  
+  .soft-card {
+    padding: 1.25rem;
+  }
 }
 
 /* Footer */
@@ -1200,7 +1313,35 @@ footer a {
   30% { opacity: 1; transform: translateY(-8px); }
 }
 
+/* Tablet Responsive - Chatbot */
+@media (min-width: 768px) and (max-width: 991.98px) {
+  .chatbot-window {
+    width: 420px;
+    height: 550px;
+  }
+  
+  .chatbot-toggle {
+    width: 65px;
+    height: 65px;
+    font-size: 1.5rem;
+  }
+}
+
 /* Mobile Responsive */
+@media (max-width: 767.98px) {
+  .chatbot-window {
+    width: calc(100vw - 30px);
+    right: -15px;
+    height: 500px;
+  }
+  
+  .chatbot-toggle {
+    width: 60px;
+    height: 60px;
+    font-size: 1.4rem;
+  }
+}
+
 @media (max-width: 576px) {
   .chatbot-window {
     width: calc(100vw - 20px);
@@ -1407,7 +1548,40 @@ footer a {
   50% { transform: scale(1.5); }
 }
 
+/* Tablet responsive - Enhanced Chatbot */
+@media (min-width: 768px) and (max-width: 991.98px) {
+  .ea-chat__panel {
+    width: 420px;
+    height: 550px;
+  }
+  
+  .ea-chat__toggle {
+    padding: 12px 18px;
+    font-size: 1rem;
+  }
+  
+  .ea-chat__header {
+    padding: 1.25rem;
+  }
+  
+  .ea-chat__messages {
+    padding: 1.25rem;
+  }
+}
+
 /* Mobile responsive */
+@media (max-width: 767.98px) {
+  .ea-chat__panel {
+    width: calc(100vw - 30px);
+    right: -15px;
+  }
+  
+  .ea-chat__toggle {
+    padding: 11px 16px;
+    font-size: 0.95rem;
+  }
+}
+
 @media (max-width: 576px) { 
   .ea-chat__panel {
     width: calc(100vw - 20px);
@@ -1738,8 +1912,82 @@ footer a {
   font-style: italic;
 }
 
-/* Responsive Design - Hero and Quick Links Spacing */
-@media (max-width: 768px) {
+/* Tablet Responsive Design (768px - 991px) */
+@media (min-width: 768px) and (max-width: 991.98px) {
+  /* Ensure images stay responsive */
+  img {
+    max-width: 100%;
+    height: auto;
+  }
+  
+  .hero {
+    min-height: 55vh;
+    padding: 3.5rem 0;
+  }
+  
+  .hero-card {
+    padding: 2.5rem 1.75rem;
+    max-width: 850px;
+  }
+  
+  .hero h1 {
+    font-size: 2.5rem;
+    margin-bottom: 1.25rem;
+  }
+  
+  .hero p {
+    font-size: 1.1rem;
+    margin-bottom: 1.75rem;
+  }
+  
+  .hero .btn {
+    padding: 0.9rem 1.5rem;
+    font-size: 1.05rem;
+  }
+  
+  /* Quick links optimization for tablet */
+  .quick-links {
+    margin-top: 1rem;
+    margin-bottom: 3rem;
+    padding: 0 1rem;
+  }
+  
+  .ql-card {
+    padding: 1rem;
+    gap: 0.875rem;
+  }
+  
+  .ql-icon {
+    width: 45px;
+    height: 45px;
+    font-size: 1.1rem;
+  }
+  
+  .ql-card h4 {
+    font-size: 1.1rem;
+  }
+  
+  .ql-card p {
+    font-size: 0.95rem;
+  }
+  
+  /* Section spacing for tablet */
+  section {
+    padding: 3.5rem 0;
+  }
+  
+  .section-title {
+    font-size: 2.25rem;
+    margin-bottom: 1.5rem;
+  }
+  
+  .section-lead {
+    font-size: 1.1rem;
+  }
+}
+
+/* Responsive Design - Mobile and Small Tablet (below 768px) */
+@media (max-width: 767.98px) {
   /* CRITICAL: Prevent all images from overflowing */
   img {
     max-width: 100%;

@@ -93,8 +93,8 @@ include __DIR__ . '/../includes/website/critical_css.php';
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 
 <!-- Google Fonts (async) -->
-<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'" />
-<noscript><link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700&display=swap" rel="stylesheet" /></noscript>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700&display=swap&v=2" rel="stylesheet" media="print" onload="this.media='all'" />
+<noscript><link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700&display=swap&v=2" rel="stylesheet" /></noscript>
 
 <link href="../assets/css/bootstrap.min.css" rel="stylesheet" />
 <link href="../assets/css/bootstrap-icons.css" rel="stylesheet" />
@@ -126,14 +126,14 @@ include __DIR__ . '/../includes/website/critical_css.php';
   /* Past list */
   .past-section { padding:2.5rem 0 4rem; }
   .past-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(270px,1fr)); gap:1.15rem; }
-  .ann-card-link { text-decoration:none; color:inherit; display:block; }
-  .ann-card { background:#fff; border:1px solid #e5e7eb; border-radius:1rem; overflow:hidden; display:flex; flex-direction:column; box-shadow:0 4px 16px -6px rgba(0,0,0,.06); transition:all .25s; }
+  .ann-card-link { text-decoration:none; color:inherit; display:block; height:100%; }
+  .ann-card { background:#fff; border:1px solid #e5e7eb; border-radius:1rem; overflow:hidden; display:flex; flex-direction:column; box-shadow:0 4px 16px -6px rgba(0,0,0,.06); transition:all .25s; height:100%; }
   .ann-card-link:hover .ann-card { border-color:#93c5fd; box-shadow:0 6px 20px -6px rgba(0,0,0,.08); transform:translateY(-3px); }
-  .ann-card img { width:100%; aspect-ratio:16/9; object-fit:cover; background:#f1f5f9; }
-  .ann-card-body { padding:.85rem .95rem 1.05rem; display:flex; flex-direction:column; gap:.4rem; }
+  .ann-card img { width:100%; aspect-ratio:16/9; object-fit:cover; background:#f1f5f9; flex-shrink:0; }
+  .ann-card-body { padding:.85rem .95rem 1.05rem; display:flex; flex-direction:column; gap:.4rem; flex-grow:1; }
   .ann-date { font-size:.6rem; font-weight:600; letter-spacing:.5px; text-transform:uppercase; color:#2563eb; }
   .ann-title { font-size:.85rem; font-weight:700; line-height:1.15; margin:0; }
-  .ann-remarks { font-size:.7rem; color:#475569; line-height:1.35; }
+  .ann-remarks { font-size:.7rem; color:#475569; line-height:1.35; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
   @media (max-width: 576px){ .featured-card .featured-img { aspect-ratio:16/10; } }
 </style>
  </head>

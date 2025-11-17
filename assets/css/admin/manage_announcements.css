@@ -125,3 +125,14 @@ h2.fw-bold.mb-4 i {
   color: #3399FF;
   margin-right: 0.5rem;
 }
+
+/* Tablet adjustments (768px-991px) */
+@media (min-width: 768px) and (max-width: 991.98px) {
+  .container-fluid { padding-left: 1.25rem; padding-right: 1.25rem; }
+  .card { padding: 1.25rem; }
+  .card h2 { font-size: 1.25rem; }
+  h2.fw-bold.mb-4 { font-size: 1.85rem; }
+  h2.fw-bold.mb-4 i { font-size: 1.85rem; }
+  .btn { font-size: 0.9rem; padding: 0.45rem 0.85rem; }
+  #prev-btn, #next-btn { padding: 0.35rem 0.65rem; }
+}

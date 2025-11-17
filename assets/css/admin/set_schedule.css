@@ -61,6 +61,43 @@ input[type="number"] {
 }
 
 /* Responsive tweaks */
+/* Tablet Optimization (768px-991px) */
+@media (min-width: 768px) and (max-width: 991px) {
+  .home-section {
+    padding: 1.5rem;
+  }
+  
+  .home-section h2 {
+    font-size: 1.75rem;
+  }
+  
+  .home-section h4 {
+    font-size: 1.25rem;
+  }
+  
+  .table th,
+  .table td {
+    font-size: 0.95rem;
+    padding: 0.65rem;
+  }
+  
+  .btn {
+    min-width: 120px;
+    font-size: 0.9rem;
+  }
+  
+  /* CMS Edit Restrictions on Tablet */
+  .edit-mode-toggle,
+  .edit-btn,
+  .edit-btn-inline,
+  .cms-editor-btn,
+  [class*="edit-"]:not(.editable-content) {
+    pointer-events: none !important;
+    opacity: 0.5 !important;
+    cursor: not-allowed !important;
+  }
+}
+
 @media (max-width: 767.98px) {
   .row > .col-md-6,
   .row > .col-md-5,

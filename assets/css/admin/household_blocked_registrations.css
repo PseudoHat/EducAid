@@ -30,6 +30,33 @@
   .blocked-attempts-table th, .blocked-attempts-table td { padding:10px 11px; }
 }
 
+/* Tablet Optimization (768px-991px) */
+@media screen and (min-width: 768px) and (max-width: 991px) {
+  .blocked-attempts-table th, .blocked-attempts-table td {
+    padding: 11px 12px;
+    font-size: 0.95rem;
+  }
+  
+  .blocked-attempts-table thead th {
+    font-size: 1rem;
+  }
+  
+  .blocked-attempts-header h5 {
+    font-size: 1.1rem;
+  }
+  
+  /* CMS Edit Restrictions on Tablet */
+  .edit-mode-toggle,
+  .edit-btn,
+  .edit-btn-inline,
+  .cms-editor-btn,
+  [class*="edit-"]:not(.editable-content) {
+    pointer-events: none !important;
+    opacity: 0.5 !important;
+    cursor: not-allowed !important;
+  }
+}
+
 /* Badges tweak to match sizing from applicants */
 .blocked-attempts-table .badge { font-size:0.78rem; padding:4px 8px; }
 

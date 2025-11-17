@@ -179,6 +179,16 @@ $__hdr = educaid_get_header_theme($connection ?? null);
 .admin-header-actions .dropdown-item-text {font-size: 0.9rem;}
 .badge-sm {font-size: 0.7rem; padding: 0.25em 0.5em;}
 
+/* Tablet adjustments (768px-991px) */
+@media (min-width: 768px) and (max-width: 991.98px) {
+  .admin-main-header { padding: .45rem 0; }
+  .admin-header-actions { gap: 0.85rem; }
+  .admin-icon-btn { padding: .5rem .6rem; }
+  .admin-icon-btn .bi { font-size: 1rem; }
+  .admin-header-actions .dropdown-menu { min-width: 300px; max-width: 350px; }
+  .notification-content .fw-medium { font-size: 0.875rem; }
+}
+
 @media (max-width: 576px){
   .admin-main-header{padding:.25rem 0;}
   #menu-toggle{font-size:24px;}

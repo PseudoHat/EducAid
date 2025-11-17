@@ -234,6 +234,26 @@ $b = hexdec(substr($text_color, 5, 2));
   font-size: 0.8rem;
 }
 
+/* Tablet optimization for municipality badge (768px-991px) */
+@media (min-width: 768px) and (max-width: 991.98px) {
+  .admin-topbar .municipality-badge {
+    padding: 3px 8px 3px 3px;
+  }
+  .admin-topbar .municipality-logo {
+    width: 26px;
+    height: 26px;
+  }
+  .admin-topbar .municipality-name {
+    font-size: 0.75rem;
+  }
+  .admin-topbar-info {
+    font-size: 0.8rem;
+  }
+  .admin-topbar-info i {
+    font-size: 0.85rem;
+  }
+}
+
 /* Mobile optimization for municipality badge */
 @media (max-width: 767.98px) {
   .admin-topbar .municipality-badge {

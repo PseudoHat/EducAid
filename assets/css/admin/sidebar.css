@@ -330,6 +330,57 @@ html.sidebar-closed-initial .home-section {
   display: none;
 }
 
+/* === TABLET RESPONSIVE (768px-991px) === */
+@media (min-width: 768px) and (max-width: 991.98px) {
+  .sidebar {
+    width: 220px;
+  }
+  
+  .sidebar.close {
+    width: 65px;
+  }
+  
+  .home-section,
+  #mainContent {
+    margin-left: 220px;
+    width: calc(100% - 220px);
+  }
+  
+  .sidebar.close ~ .home-section,
+  .sidebar.close ~ #mainContent {
+    margin-left: 65px;
+    width: calc(100% - 65px);
+  }
+  
+  .nav-item a {
+    padding: 10px 14px;
+    font-size: 0.9rem;
+  }
+  
+  .nav-item a .icon {
+    font-size: 1.15rem;
+    min-width: 45px;
+  }
+  
+  .sidebar-profile-link {
+    padding: 10px;
+  }
+  
+  .sidebar-profile .avatar-circle {
+    width: 45px;
+    height: 45px;
+    font-size: 1.1rem;
+  }
+  
+  .sidebar-profile .name {
+    font-size: 0.95rem;
+  }
+  
+  .sidebar-profile .role {
+    font-size: 0.75rem;
+  }
+}
+
 /* === MOBILE RESPONSIVE === */
 @media (max-width: 768px) {
   .sidebar {

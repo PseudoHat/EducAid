@@ -974,8 +974,45 @@ $pageType = $seoData['type'];
             word-wrap: break-word;
         }
         
-        /* Tablets and below */
-        @media (max-width: 991.98px) {
+        /* Tablet Devices (768px - 991px) */
+        @media (min-width: 768px) and (max-width: 991.98px) {
+            .brand-section,
+            .col-lg-6:not(.brand-section) {
+                padding-top: 1.5rem;
+                padding-bottom: 1.5rem;
+            }
+            
+            .login-page-isolated .form-section {
+                padding: 1.5rem 1.25rem;
+            }
+            
+            .login-page-isolated .login-card {
+                max-height: calc(100vh - var(--navbar-height) - 3rem);
+                max-width: 600px;
+                margin: 0 auto;
+            }
+            
+            .login-page-isolated .form-control {
+                padding: 0.85rem;
+                font-size: 1rem;
+            }
+            
+            .login-page-isolated .btn {
+                padding: 0.85rem 1.5rem;
+                font-size: 1.05rem;
+            }
+            
+            .login-page-isolated h2 {
+                font-size: 1.75rem;
+            }
+            
+            .login-page-isolated h3 {
+                font-size: 1.35rem;
+            }
+        }
+        
+        /* Mobile Devices (below 768px) */
+        @media (max-width: 767.98px) {
             .brand-section,
             .col-lg-6:not(.brand-section) {
                 padding-top: 1rem;
@@ -2057,8 +2094,10 @@ $pageType = $seoData['type'];
             if (loading) {
                 button.disabled = true;
                 button.innerHTML = `
-                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                    <span>Processing...</span>
+                    <div class="d-flex align-items-center justify-content-center gap-2">
+                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                        <span>Processing...</span>
+                    </div>
                 `;
             } else {
                 button.disabled = false;

@@ -485,6 +485,51 @@ $csrf_password_token = CSRFProtection::generateToken('password_otp_request');
   }
   
   /* Modal responsive sizing */
+  /* Tablet optimization (768px-991px) */
+  @media (min-width: 768px) and (max-width: 991.98px) {
+    #changeEmailModal .modal-dialog,
+    #changePasswordModal .modal-dialog {
+      max-width: 600px !important;
+      margin: 2rem auto !important;
+    }
+    
+    #changeEmailModal .modal-content,
+    #changePasswordModal .modal-content {
+      border-radius: 1rem;
+    }
+    
+    #changeEmailModal .modal-header,
+    #changePasswordModal .modal-header {
+      padding: 1.25rem;
+    }
+    
+    #changeEmailModal .modal-body,
+    #changePasswordModal .modal-body {
+      padding: 1rem 1.25rem;
+    }
+    
+    #changeEmailModal .modal-footer,
+    #changePasswordModal .modal-footer {
+      padding: 1rem 1.25rem;
+    }
+    
+    #changeEmailModal .modal-title,
+    #changePasswordModal .modal-title {
+      font-size: 1.1rem;
+    }
+    
+    #changeEmailModal .form-control,
+    #changePasswordModal .form-control {
+      font-size: 0.95rem;
+    }
+    
+    #changeEmailModal .btn,
+    #changePasswordModal .btn {
+      font-size: 0.9rem;
+      padding: 0.65rem 1.25rem;
+    }
+  }
+  
   @media (max-width: 767px) {
     /* Apply compact sizing similar to manage_applicants */
     #changeEmailModal .modal-dialog,

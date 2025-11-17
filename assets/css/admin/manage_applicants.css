@@ -604,6 +604,57 @@ h1.fw-bold, h2.fw-bold {
     box-shadow: none;
   }
   
+  /* ==================== TABLET MODAL OPTIMIZATION (768px-991px) ==================== */
+  @media (min-width: 768px) and (max-width: 991.98px) {
+    .modal-fullscreen-sm-down {
+      max-width: 90% !important;
+      margin: 2rem auto !important;
+    }
+    
+    .modal-fullscreen-sm-down .modal-content {
+      max-height: 80vh !important;
+      border-radius: 1rem !important;
+    }
+    
+    .modal-fullscreen-sm-down .modal-header {
+      padding: 1rem 1.25rem;
+    }
+    
+    .modal-fullscreen-sm-down .modal-body {
+      padding: 1rem;
+      max-height: calc(80vh - 160px);
+    }
+    
+    .modal-fullscreen-sm-down .modal-footer {
+      padding: 0.75rem 1rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+    
+    .modal-fullscreen-sm-down .modal-title {
+      font-size: 1.1rem;
+    }
+    
+    .modal-footer .btn {
+      font-size: 0.875rem;
+      padding: 0.5rem 1rem;
+      min-width: auto;
+      height: auto;
+    }
+    
+    .modal-footer .btn i {
+      font-size: 1rem;
+      margin-right: 0.35rem;
+    }
+    
+    #archiveModal .modal-dialog,
+    #blacklistModal .modal-dialog {
+      max-width: 85% !important;
+      margin: 2rem auto !important;
+    }
+  }
+  
   /* ==================== MODAL MOBILE OPTIMIZATION ==================== */
   /* Override fullscreen modal behavior */
   .modal-fullscreen-sm-down {

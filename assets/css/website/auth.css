@@ -207,7 +207,30 @@
 }
 
 /* Responsive Design */
-@media (max-width: 768px) {
+
+/* Tablet (768px - 991px) */
+@media (min-width: 768px) and (max-width: 991.98px) {
+  .modal-dialog {
+    max-width: 600px;
+    margin: 1.5rem auto;
+  }
+  
+  .modal-body {
+    padding: 2rem !important;
+  }
+  
+  .auth-form .form-control {
+    padding: 0.85rem;
+    font-size: 1rem;
+  }
+  
+  .auth-form .btn-primary {
+    padding: 0.85rem 1.75rem;
+  }
+}
+
+/* Mobile and Small Tablet */
+@media (max-width: 767.98px) {
   .modal-dialog {
     margin: 1rem;
   }
