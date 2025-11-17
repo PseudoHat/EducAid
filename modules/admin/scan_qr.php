@@ -893,6 +893,42 @@ $csrf_complete_token = CSRFProtection::generateToken('complete_distribution');
   </style>
   </head>
 <body>
+  <!-- Camera Permission Debug Info -->
+  <script>
+    console.log('=== Camera Permission Debug ===');
+    console.log('ALLOW_CAMERA constant:', <?php echo defined('ALLOW_CAMERA') && ALLOW_CAMERA ? 'true' : 'false'; ?>);
+    console.log('Page:', window.location.pathname);
+    
+    // Check if Permissions-Policy header blocks camera
+    if (navigator.permissions && navigator.permissions.query) {
+      navigator.permissions.query({name: 'camera'}).then(function(result) {
+        console.log('Camera permission state:', result.state);
+        if (result.state === 'denied') {
+          console.warn('⚠️ Camera permission is DENIED at browser level');
+        } else if (result.state === 'prompt') {
+          console.log('✅ Camera permission will prompt user');
+        } else {
+          console.log('✅ Camera permission is GRANTED');
+        }
+      }).catch(function(err) {
+        console.log('Permissions API check failed:', err.message);
+      });
+    }
+    
+    // Check for policy violations in real-time
+    const originalError = console.error;
+    console.error = function(...args) {
+      const msg = args.join(' ');
+      if (msg.includes('Permissions policy violation') || msg.includes('camera is not allowed')) {
+        console.log('%c🚨 POLICY VIOLATION DETECTED', 'color: red; font-size: 16px; font-weight: bold');
+        console.log('This means HTTP headers or meta tags are blocking camera');
+        console.log('Check Response Headers in Network tab for Permissions-Policy');
+      }
+      originalError.apply(console, args);
+    };
+    console.log('===============================');
+  </script>
+  
   <?php include __DIR__ . '/../../includes/admin/admin_topbar.php'; ?>
   <div id="wrapper" class="admin-wrapper">
     <?php include __DIR__ . '/../../includes/admin/admin_sidebar.php'; ?>

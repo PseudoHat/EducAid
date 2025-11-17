@@ -99,6 +99,22 @@ $qr_count = pg_num_rows($qr_res);
     </style>
 </head>
 <body>
+    <!-- Camera Permission Debug Info -->
+    <script>
+        console.log('=== Camera Permission Debug (scanner.php) ===');
+        console.log('ALLOW_CAMERA constant:', <?php echo defined('ALLOW_CAMERA') && ALLOW_CAMERA ? 'true' : 'false'; ?>);
+        console.log('Page:', window.location.pathname);
+        
+        if (navigator.permissions && navigator.permissions.query) {
+            navigator.permissions.query({name: 'camera'}).then(function(result) {
+                console.log('Camera permission state:', result.state);
+            }).catch(function(err) {
+                console.log('Permissions API check failed:', err.message);
+            });
+        }
+        console.log('===============================');
+    </script>
+    
     <div id="wrapper">
         <?php include __DIR__ . '/../../includes/admin/admin_sidebar.php'; ?>
         <div class="sidebar-backdrop d-none" id="sidebar-backdrop"></div>
