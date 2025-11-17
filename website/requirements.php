@@ -102,17 +102,17 @@ $pageType = $seoData['type'];
         <h2 class="section-title" data-lp-key="req_overview_title"<?php echo req_block_style('req_overview_title'); ?>><?php echo req_block('req_overview_title','Requirements at a Glance'); ?></h2>
         <p class="section-lead mx-auto" style="max-width: 700px;" data-lp-key="req_overview_lead"<?php echo req_block_style('req_overview_lead'); ?>><?php echo req_block('req_overview_lead','Essential documents you\'ll need to prepare'); ?></p>
       </div>
-      <div class="row g-4">
-        <div class="col-md-6 col-lg-3">
+      <div class="row g-4 justify-content-center">
+        <div class="col-md-6 col-lg-4">
           <div class="soft-card p-4 text-center h-100">
             <div class="bg-primary bg-opacity-10 rounded-circle p-3 d-inline-flex mb-3">
               <i class="bi bi-person-vcard text-primary fs-3"></i>
             </div>
             <h5 class="fw-bold" data-lp-key="req_cat1_title"<?php echo req_block_style('req_cat1_title'); ?>><?php echo req_block('req_cat1_title','Identity Documents'); ?></h5>
-            <p class="text-body-secondary small" data-lp-key="req_cat1_desc"<?php echo req_block_style('req_cat1_desc'); ?>><?php echo req_block('req_cat1_desc','School ID and school certifications'); ?></p>
+            <p class="text-body-secondary small" data-lp-key="req_cat1_desc"<?php echo req_block_style('req_cat1_desc'); ?>><?php echo req_block('req_cat1_desc','Valid School ID'); ?></p>
           </div>
         </div>
-        <div class="col-md-6 col-lg-3">
+        <div class="col-md-6 col-lg-4">
           <div class="soft-card p-4 text-center h-100">
             <div class="bg-success bg-opacity-10 rounded-circle p-3 d-inline-flex mb-3">
               <i class="bi bi-mortarboard text-success fs-3"></i>
@@ -121,7 +121,7 @@ $pageType = $seoData['type'];
             <p class="text-body-secondary small" data-lp-key="req_cat2_desc"<?php echo req_block_style('req_cat2_desc'); ?>><?php echo req_block('req_cat2_desc','Enrollment forms, grades, and school certifications'); ?></p>
           </div>
         </div>
-        <div class="col-md-6 col-lg-3">
+        <div class="col-md-6 col-lg-4">
           <div class="soft-card p-4 text-center h-100">
             <div class="bg-warning bg-opacity-10 rounded-circle p-3 d-inline-flex mb-3">
               <i class="bi bi-file-earmark-text text-warning fs-3"></i>
@@ -130,122 +130,88 @@ $pageType = $seoData['type'];
             <p class="text-body-secondary small" data-lp-key="req_cat3_desc"<?php echo req_block_style('req_cat3_desc'); ?>><?php echo req_block('req_cat3_desc','Certificate of indigency (if requested)'); ?></p>
           </div>
         </div>
-        <div class="col-md-6 col-lg-3">
-          <div class="soft-card p-4 text-center h-100">
-            <div class="bg-info bg-opacity-10 rounded-circle p-3 d-inline-flex mb-3">
-              <i class="bi bi-house text-info fs-3"></i>
-            </div>
-            <h5 class="fw-bold" data-lp-key="req_cat4_title"<?php echo req_block_style('req_cat4_title'); ?>><?php echo req_block('req_cat4_title','Residency'); ?></h5>
-            <p class="text-body-secondary small" data-lp-key="req_cat4_desc"<?php echo req_block_style('req_cat4_desc'); ?>><?php echo req_block('req_cat4_desc','Residency verification is handled by the LGU during evaluation'); ?></p>
-          </div>
-        </div>
       </div>
     </div>
   </section>
 
   <!-- Detailed Requirements -->
-  <section id="checklist" class="py-5">
+  <section id="checklist" class="py-5 bg-body-tertiary">
     <div class="container">
-      <h2 class="section-title text-center mb-5" data-lp-key="req_checklist_title"<?php echo req_block_style('req_checklist_title'); ?>><?php echo req_block('req_checklist_title','Complete Requirements Checklist'); ?></h2>
+      <h2 class="section-title text-center mb-2" data-lp-key="req_checklist_title"<?php echo req_block_style('req_checklist_title'); ?>><?php echo req_block('req_checklist_title','Complete Requirements Checklist'); ?></h2>
+      <p class="text-center text-body-secondary mb-5">Everything you need to prepare for your application</p>
       
       <!-- Requirements -->
-      <div class="row g-5">
-        <div class="col-lg-8 mx-auto">
-          <div class="soft-card p-4">
-            <div class="d-flex align-items-center gap-3 mb-4">
-              <div class="bg-primary rounded p-3">
-                <i class="bi bi-star-fill text-white fs-4"></i>
+      <div class="row justify-content-center mb-5">
+        <!-- Primary Requirements -->
+        <div class="col-lg-10">
+          <div class="soft-card p-4 shadow-sm border-0">
+            <div class="d-flex align-items-center gap-3 mb-4 pb-3 border-bottom">
+              <div class="bg-primary rounded-3 p-3">
+                <i class="bi bi-clipboard-check text-white fs-3"></i>
               </div>
               <div>
-                <h4 class="fw-bold mb-0" data-lp-key="req_primary_title"<?php echo req_block_style('req_primary_title'); ?>><?php echo req_block('req_primary_title','Requirements'); ?></h4>
-                <p class="text-body-secondary mb-0" data-lp-key="req_primary_subtitle"<?php echo req_block_style('req_primary_subtitle'); ?>><?php echo req_block('req_primary_subtitle','Essential documents for all applicants'); ?></p>
+                <h4 class="fw-bold mb-1" data-lp-key="req_primary_title"<?php echo req_block_style('req_primary_title'); ?>><?php echo req_block('req_primary_title','Primary Requirements'); ?></h4>
+                <p class="text-body-secondary mb-0 small" data-lp-key="req_primary_subtitle"<?php echo req_block_style('req_primary_subtitle'); ?>><?php echo req_block('req_primary_subtitle','Essential documents for all applicants'); ?></p>
               </div>
             </div>
             
-            <div class="d-grid gap-3">
-              <div class="requirement-item">
-                <div class="d-flex gap-3">
-                  <i class="bi bi-check-circle text-success fs-5 mt-1"></i>
-                  <div>
-                    <h6 class="fw-bold mb-1" data-lp-key="req_item1_title"<?php echo req_block_style('req_item1_title'); ?>><?php echo req_block('req_item1_title','Valid School ID'); ?></h6>
-                    <p class="text-body-secondary small mb-1" data-lp-key="req_item1_desc"<?php echo req_block_style('req_item1_desc'); ?>><?php echo req_block('req_item1_desc','Current academic year school identification card'); ?></p>
-                    <span class="badge text-bg-primary-subtle">Required</span>
+            <div class="row g-3">
+              <div class="col-md-6">
+                <div class="requirement-item p-3 rounded-3 bg-white border h-100">
+                  <div class="d-flex gap-3 align-items-start">
+                    <div class="bg-success bg-opacity-10 rounded-circle p-2 flex-shrink-0" style="width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;">
+                      <i class="bi bi-person-vcard text-success fs-5"></i>
+                    </div>
+                    <div class="flex-grow-1">
+                      <h6 class="fw-bold mb-2" data-lp-key="req_item1_title"<?php echo req_block_style('req_item1_title'); ?>><?php echo req_block('req_item1_title','Valid School ID'); ?></h6>
+                      <p class="text-body-secondary small mb-2" data-lp-key="req_item1_desc"<?php echo req_block_style('req_item1_desc'); ?>><?php echo req_block('req_item1_desc','Current academic year school identification card'); ?></p>
+                      <span class="badge bg-primary bg-opacity-10 text-primary border border-primary">Required</span>
+                    </div>
                   </div>
                 </div>
               </div>
               
-              <div class="requirement-item">
-                <div class="d-flex gap-3">
-                  <i class="bi bi-check-circle text-success fs-5 mt-1"></i>
-                  <div>
-                    <h6 class="fw-bold mb-1" data-lp-key="req_item2_title"<?php echo req_block_style('req_item2_title'); ?>><?php echo req_block('req_item2_title','Certificate of Enrollment'); ?></h6>
-                    <p class="text-body-secondary small mb-1" data-lp-key="req_item2_desc"<?php echo req_block_style('req_item2_desc'); ?>><?php echo req_block('req_item2_desc','Official enrollment certificate from your school'); ?></p>
-                    <span class="badge text-bg-primary-subtle">Required</span>
+              <div class="col-md-6">
+                <div class="requirement-item p-3 rounded-3 bg-white border h-100">
+                  <div class="d-flex gap-3 align-items-start">
+                    <div class="bg-success bg-opacity-10 rounded-circle p-2 flex-shrink-0" style="width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;">
+                      <i class="bi bi-file-earmark-text text-success fs-5"></i>
+                    </div>
+                    <div class="flex-grow-1">
+                      <h6 class="fw-bold mb-2" data-lp-key="req_item2_title"<?php echo req_block_style('req_item2_title'); ?>><?php echo req_block('req_item2_title','Certificate of Enrollment'); ?></h6>
+                      <p class="text-body-secondary small mb-2" data-lp-key="req_item2_desc"<?php echo req_block_style('req_item2_desc'); ?>><?php echo req_block('req_item2_desc','Official enrollment certificate from your school'); ?></p>
+                      <span class="badge bg-primary bg-opacity-10 text-primary border border-primary">Required</span>
+                    </div>
                   </div>
                 </div>
               </div>
               
-              <div class="requirement-item">
-                <div class="d-flex gap-3">
-                  <i class="bi bi-check-circle text-success fs-5 mt-1"></i>
-                  <div>
-                    <h6 class="fw-bold mb-1" data-lp-key="req_item3_title"<?php echo req_block_style('req_item3_title'); ?>><?php echo req_block('req_item3_title','Enrollment Assessment Form'); ?></h6>
-                    <p class="text-body-secondary small mb-1" data-lp-key="req_item3_desc"<?php echo req_block_style('req_item3_desc'); ?>><?php echo req_block('req_item3_desc','Statement of account showing tuition and fees'); ?></p>
-                    <span class="badge text-bg-primary-subtle">Required</span>
+              <div class="col-md-6">
+                <div class="requirement-item p-3 rounded-3 bg-white border h-100">
+                  <div class="d-flex gap-3 align-items-start">
+                    <div class="bg-success bg-opacity-10 rounded-circle p-2 flex-shrink-0" style="width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;">
+                      <i class="bi bi-calculator text-success fs-5"></i>
+                    </div>
+                    <div class="flex-grow-1">
+                      <h6 class="fw-bold mb-2" data-lp-key="req_item3_title"<?php echo req_block_style('req_item3_title'); ?>><?php echo req_block('req_item3_title','Enrollment Assessment Form'); ?></h6>
+                      <p class="text-body-secondary small mb-2" data-lp-key="req_item3_desc"<?php echo req_block_style('req_item3_desc'); ?>><?php echo req_block('req_item3_desc','Statement of account showing tuition and fees'); ?></p>
+                      <span class="badge bg-primary bg-opacity-10 text-primary border border-primary">Required</span>
+                    </div>
                   </div>
                 </div>
               </div>
               
-              <div class="requirement-item">
-                <div class="d-flex gap-3">
-                  <i class="bi bi-check-circle text-success fs-5 mt-1"></i>
-                  <div>
-                    <h6 class="fw-bold mb-1" data-lp-key="req_item4_title"<?php echo req_block_style('req_item4_title'); ?>><?php echo req_block('req_item4_title','Letter to the Mayor'); ?></h6>
-                    <p class="text-body-secondary small mb-1" data-lp-key="req_item4_desc"<?php echo req_block_style('req_item4_desc'); ?>><?php echo req_block('req_item4_desc','Formal application letter explaining your need for assistance'); ?></p>
-                    <span class="badge text-bg-primary-subtle">Required</span>
-                  </div>
-                </div>
-              </div>
-              
-              
-            </div>
-          </div>
-        </div>
-        
-        <!-- Secondary Requirements -->
-        <div class="col-lg-6">
-          <div class="soft-card p-4">
-            <div class="d-flex align-items-center gap-3 mb-4">
-              <div class="bg-warning rounded p-3">
-                <i class="bi bi-plus-circle text-white fs-4"></i>
-              </div>
-              <div>
-                <h4 class="fw-bold mb-0" data-lp-key="req_additional_title"<?php echo req_block_style('req_additional_title'); ?>><?php echo req_block('req_additional_title','Additional Requirements'); ?></h4>
-                <p class="text-body-secondary mb-0" data-lp-key="req_additional_subtitle"<?php echo req_block_style('req_additional_subtitle'); ?>><?php echo req_block('req_additional_subtitle','May be required based on your situation'); ?></p>
-              </div>
-            </div>
-            
-              
-              </div>
-              
-              <div class="requirement-item">
-                <div class="d-flex gap-3">
-                  <i class="bi bi-info-circle text-info fs-5 mt-1"></i>
-                  <div>
-                    <h6 class="fw-bold mb-1">Medical Certificate</h6>
-                    <p class="text-body-secondary small mb-1">For PWD or students with health concerns</p>
-                    <span class="badge text-bg-info-subtle">Special Cases</span>
-                  </div>
-                </div>
-              </div>
-              
-              <div class="requirement-item">
-                <div class="d-flex gap-3">
-                  <i class="bi bi-info-circle text-info fs-5 mt-1"></i>
-                  <div>
-                    <h6 class="fw-bold mb-1">Utility Bills</h6>
-                    <p class="text-body-secondary small mb-1">Recent water/electric bill as additional proof of address</p>
-                    <span class="badge text-bg-info-subtle">Verification</span>
+              <div class="col-md-6">
+                <div class="requirement-item p-3 rounded-3 bg-white border h-100">
+                  <div class="d-flex gap-3 align-items-start">
+                    <div class="bg-success bg-opacity-10 rounded-circle p-2 flex-shrink-0" style="width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;">
+                      <i class="bi bi-envelope-paper text-success fs-5"></i>
+                    </div>
+                    <div class="flex-grow-1">
+                      <h6 class="fw-bold mb-2" data-lp-key="req_item4_title"<?php echo req_block_style('req_item4_title'); ?>><?php echo req_block('req_item4_title','Letter to the Mayor'); ?></h6>
+                      <p class="text-body-secondary small mb-2" data-lp-key="req_item4_desc"<?php echo req_block_style('req_item4_desc'); ?>><?php echo req_block('req_item4_desc','Formal application letter explaining your need for assistance'); ?></p>
+                      <span class="badge bg-primary bg-opacity-10 text-primary border border-primary">Required</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -253,7 +219,20 @@ $pageType = $seoData['type'];
           </div>
         </div>
       </div>
-        </div>
+      
+      <!-- Document Quality Guidelines -->
+      <div class="row g-4">
+        <div class="col-lg-8">
+          <div class="soft-card p-4 h-100">
+            <h5 class="fw-bold mb-4">
+              <i class="bi bi-camera text-success me-2"></i>
+              Document Photography Tips
+            </h5>
+            <div class="row g-4">
+              <div class="col-md-6">
+                <h6 class="fw-semibold text-success mb-3">✓ Do This</h6>
+                <ul class="list-unstyled d-grid gap-2">
+                  <li class="d-flex gap-2">
                     <i class="bi bi-check text-success mt-1"></i>
                     <span class="small">Ensure all text is clearly readable</span>
                   </li>

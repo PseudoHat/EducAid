@@ -1,4 +1,4 @@
-// Global Accessibility Settings Loader
+  // Global Accessibility Settings Loader
 // This script should be included on every page to apply saved accessibility preferences
 
 (function() {

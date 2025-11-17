@@ -15,6 +15,7 @@ class MobileNavbar {
 
   init() {
     this.disableBootstrapCollapse();
+    this.ensureInitialState(); // Ensure burger starts in correct state
     this.setupEventListeners();
     this.setupAutoClose();
     this.setupMobileOptimization();
@@ -29,6 +30,18 @@ class MobileNavbar {
     
     if (this.navbarCollapse) {
       this.navbarCollapse.classList.remove('collapse');
+    }
+  }
+
+  ensureInitialState() {
+    // Ensure burger icon starts in collapsed (closed) state
+    if (this.navbarToggler) {
+      this.navbarToggler.classList.add('collapsed');
+      this.navbarToggler.setAttribute('aria-expanded', 'false');
+    }
+    
+    if (this.navbarCollapse) {
+      this.navbarCollapse.classList.remove('show');
     }
   }
 
@@ -111,7 +124,7 @@ class MobileNavbar {
     // Set states immediately
     this.navbarCollapse.classList.add('show');
     this.navbarToggler.setAttribute('aria-expanded', 'true');
-    this.navbarToggler.classList.add('collapsed');
+    this.navbarToggler.classList.remove('collapsed'); // Remove collapsed when opening
     
     // Add body class to prevent scrolling on mobile
     if (window.innerWidth < 992) {
@@ -135,7 +148,7 @@ class MobileNavbar {
       // Remove classes after animation completes
       this.navbarCollapse.classList.remove('show');
       this.navbarToggler.setAttribute('aria-expanded', 'false');
-      this.navbarToggler.classList.remove('collapsed');
+      this.navbarToggler.classList.add('collapsed'); // Add collapsed when closing
       
       // Remove body class
       document.body.classList.remove('navbar-open');

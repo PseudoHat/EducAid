@@ -163,19 +163,22 @@ html, body {
   top: 0;
 }
 
-/* Also support the collapsed class for backwards compatibility */
-.navbar-toggler.collapsed .navbar-toggler-icon {
-  background: transparent;
+/* Hamburger default state (menu closed) */
+.navbar-toggler[aria-expanded="false"] .navbar-toggler-icon,
+.navbar-toggler:not([aria-expanded="true"]) .navbar-toggler-icon {
+  background: var(--thm-primary);
 }
 
-.navbar-toggler.collapsed .navbar-toggler-icon::before {
-  transform: rotate(45deg);
-  top: 0;
+.navbar-toggler[aria-expanded="false"] .navbar-toggler-icon::before,
+.navbar-toggler:not([aria-expanded="true"]) .navbar-toggler-icon::before {
+  transform: rotate(0);
+  top: -6px;
 }
 
-.navbar-toggler.collapsed .navbar-toggler-icon::after {
-  transform: rotate(-45deg);
-  top: 0;
+.navbar-toggler[aria-expanded="false"] .navbar-toggler-icon::after,
+.navbar-toggler:not([aria-expanded="true"]) .navbar-toggler-icon::after {
+  transform: rotate(0);
+  top: 6px;
 }
 
 /* Prevent body scroll when mobile menu is open */

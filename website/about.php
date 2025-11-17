@@ -241,29 +241,49 @@ include __DIR__ . '/../includes/website/cookie_consent.php';
     </div>
   </section>
 
-  <!-- Statistics -->
+  <!-- Core Values -->
   <section class="py-5 bg-primary text-white">
     <div class="container">
       <div class="text-center mb-5">
-  <h2 class="fw-bold" data-lp-key="about_stats_heading"<?php echo about_block_style('about_stats_heading'); ?>><?php echo about_block('about_stats_heading','EducAid by the Numbers'); ?></h2>
-  <p class="opacity-75" data-lp-key="about_stats_lead"<?php echo about_block_style('about_stats_lead'); ?>><?php echo about_block('about_stats_lead','Making a measurable impact in General Trias education'); ?></p>
+        <h2 class="fw-bold" data-lp-key="about_values_heading"<?php echo about_block_style('about_values_heading'); ?>><?php echo about_block('about_values_heading','Our Core Values'); ?></h2>
+        <p class="opacity-75" data-lp-key="about_values_lead"<?php echo about_block_style('about_values_lead'); ?>><?php echo about_block('about_values_lead','Guiding principles that drive our mission to serve students'); ?></p>
       </div>
-      <div class="row text-center g-4">
-        <div class="col-6 col-md-3">
-          <div class="h1 fw-bold" data-lp-key="about_stat_barangays_num"<?php echo about_block_style('about_stat_barangays_num'); ?>><?php echo about_block('about_stat_barangays_num','50+'); ?></div>
-          <div class="small opacity-75" data-lp-key="about_stat_barangays_label"<?php echo about_block_style('about_stat_barangays_label'); ?>><?php echo about_block('about_stat_barangays_label','Barangays Served'); ?></div>
+      <div class="row g-4">
+        <div class="col-md-6 col-lg-3">
+          <div class="text-center h-100 p-4">
+            <div class="bg-white bg-opacity-10 rounded-circle p-4 d-inline-flex mb-3" style="width: 80px; height: 80px; align-items: center; justify-content: center;">
+              <i class="bi bi-shield-check fs-1"></i>
+            </div>
+            <h5 class="fw-bold mb-3" data-lp-key="about_value1_title"<?php echo about_block_style('about_value1_title'); ?>><?php echo about_block('about_value1_title','Transparency'); ?></h5>
+            <p class="opacity-75 mb-0" data-lp-key="about_value1_desc"<?php echo about_block_style('about_value1_desc'); ?>><?php echo about_block('about_value1_desc','Open and clear processes that build trust and accountability in every transaction.'); ?></p>
+          </div>
         </div>
-        <div class="col-6 col-md-3">
-          <div class="h1 fw-bold" data-lp-key="about_stat_students_num"<?php echo about_block_style('about_stat_students_num'); ?>><?php echo about_block('about_stat_students_num','5,000+'); ?></div>
-          <div class="small opacity-75" data-lp-key="about_stat_students_label"<?php echo about_block_style('about_stat_students_label'); ?>><?php echo about_block('about_stat_students_label','Students Assisted'); ?></div>
+        <div class="col-md-6 col-lg-3">
+          <div class="text-center h-100 p-4">
+            <div class="bg-white bg-opacity-10 rounded-circle p-4 d-inline-flex mb-3" style="width: 80px; height: 80px; align-items: center; justify-content: center;">
+              <i class="bi bi-universal-access fs-1"></i>
+            </div>
+            <h5 class="fw-bold mb-3" data-lp-key="about_value2_title"<?php echo about_block_style('about_value2_title'); ?>><?php echo about_block('about_value2_title','Accessibility'); ?></h5>
+            <p class="opacity-75 mb-0" data-lp-key="about_value2_desc"<?php echo about_block_style('about_value2_desc'); ?>><?php echo about_block('about_value2_desc','Making educational assistance available to all qualified students without barriers.'); ?></p>
+          </div>
         </div>
-        <div class="col-6 col-md-3">
-          <div class="h1 fw-bold" data-lp-key="about_stat_assistance_num"<?php echo about_block_style('about_stat_assistance_num'); ?>><?php echo about_block('about_stat_assistance_num','₱10M+'); ?></div>
-          <div class="small opacity-75" data-lp-key="about_stat_assistance_label"<?php echo about_block_style('about_stat_assistance_label'); ?>><?php echo about_block('about_stat_assistance_label','Total Assistance Distributed'); ?></div>
+        <div class="col-md-6 col-lg-3">
+          <div class="text-center h-100 p-4">
+            <div class="bg-white bg-opacity-10 rounded-circle p-4 d-inline-flex mb-3" style="width: 80px; height: 80px; align-items: center; justify-content: center;">
+              <i class="bi bi-lightning-charge fs-1"></i>
+            </div>
+            <h5 class="fw-bold mb-3" data-lp-key="about_value3_title"<?php echo about_block_style('about_value3_title'); ?>><?php echo about_block('about_value3_title','Efficiency'); ?></h5>
+            <p class="opacity-75 mb-0" data-lp-key="about_value3_desc"<?php echo about_block_style('about_value3_desc'); ?>><?php echo about_block('about_value3_desc','Streamlined digital processes that save time and reduce administrative burden.'); ?></p>
+          </div>
         </div>
-        <div class="col-6 col-md-3">
-          <div class="h1 fw-bold" data-lp-key="about_stat_uptime_num"<?php echo about_block_style('about_stat_uptime_num'); ?>><?php echo about_block('about_stat_uptime_num','99.9%'); ?></div>
-          <div class="small opacity-75" data-lp-key="about_stat_uptime_label"<?php echo about_block_style('about_stat_uptime_label'); ?>><?php echo about_block('about_stat_uptime_label','System Uptime'); ?></div>
+        <div class="col-md-6 col-lg-3">
+          <div class="text-center h-100 p-4">
+            <div class="bg-white bg-opacity-10 rounded-circle p-4 d-inline-flex mb-3" style="width: 80px; height: 80px; align-items: center; justify-content: center;">
+              <i class="bi bi-balance-scale fs-1"></i>
+            </div>
+            <h5 class="fw-bold mb-3" data-lp-key="about_value4_title"<?php echo about_block_style('about_value4_title'); ?>><?php echo about_block('about_value4_title','Equity'); ?></h5>
+            <p class="opacity-75 mb-0" data-lp-key="about_value4_desc"<?php echo about_block_style('about_value4_desc'); ?>><?php echo about_block('about_value4_desc','Fair distribution based on need, ensuring equal opportunities for deserving students.'); ?></p>
+          </div>
         </div>
       </div>
     </div>

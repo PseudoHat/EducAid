@@ -147,29 +147,29 @@ $pageType = $seoData['type'];
               <span class="text-white fw-bold fs-4">1</span>
             </div>
             <div>
-              <h3 class="fw-bold">Registration & Account Verification</h3>
-              <p class="text-primary mb-0">Setting up your secure EducAid account</p>
+              <h3 class="fw-bold" data-lp-key="hiw_step1_detail_title"<?php echo hiw_block_style('hiw_step1_detail_title'); ?>><?php echo hiw_block('hiw_step1_detail_title','Registration & Account Verification'); ?></h3>
+              <p class="text-primary mb-0" data-lp-key="hiw_step1_detail_subtitle"<?php echo hiw_block_style('hiw_step1_detail_subtitle'); ?>><?php echo hiw_block('hiw_step1_detail_subtitle','Setting up your secure EducAid account'); ?></p>
             </div>
           </div>
           
           <div class="ps-5">
-            <h5 class="fw-semibold mb-3">What you'll need:</h5>
+            <h5 class="fw-semibold mb-3" data-lp-key="hiw_step1_needs_title"<?php echo hiw_block_style('hiw_step1_needs_title'); ?>><?php echo hiw_block('hiw_step1_needs_title','What you\'ll need:'); ?></h5>
             <ul class="list-unstyled d-grid gap-2">
-              <li><i class="bi bi-check2-circle text-success me-2"></i>Valid email address</li>
-              <li><i class="bi bi-check2-circle text-success me-2"></i>Active mobile number</li>
-              <li><i class="bi bi-check2-circle text-success me-2"></i>Basic personal information</li>
-              <li><i class="bi bi-check2-circle text-success me-2"></i>Barangay of residence</li>
+              <li data-lp-key="hiw_step1_need1"<?php echo hiw_block_style('hiw_step1_need1'); ?>><?php echo hiw_block('hiw_step1_need1','<i class="bi bi-check2-circle text-success me-2"></i>Valid email address'); ?></li>
+              <li data-lp-key="hiw_step1_need2"<?php echo hiw_block_style('hiw_step1_need2'); ?>><?php echo hiw_block('hiw_step1_need2','<i class="bi bi-check2-circle text-success me-2"></i>Active mobile number'); ?></li>
+              <li data-lp-key="hiw_step1_need3"<?php echo hiw_block_style('hiw_step1_need3'); ?>><?php echo hiw_block('hiw_step1_need3','<i class="bi bi-check2-circle text-success me-2"></i>Basic personal information'); ?></li>
+              <li data-lp-key="hiw_step1_need4"<?php echo hiw_block_style('hiw_step1_need4'); ?>><?php echo hiw_block('hiw_step1_need4','<i class="bi bi-check2-circle text-success me-2"></i>Barangay of residence'); ?></li>
             </ul>
             
-            <h5 class="fw-semibold mb-3 mt-4">The process:</h5>
+            <h5 class="fw-semibold mb-3 mt-4" data-lp-key="hiw_step1_process_title"<?php echo hiw_block_style('hiw_step1_process_title'); ?>><?php echo hiw_block('hiw_step1_process_title','The process:'); ?></h5>
             <div class="d-grid gap-3">
               <div class="d-flex gap-3">
                 <div class="bg-light rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width: 32px; height: 32px;">
                   <i class="bi bi-1-circle text-primary"></i>
                 </div>
                 <div>
-                  <strong>Visit the Registration Page</strong>
-                  <p class="text-body-secondary mb-0 small">Click "Apply Now" from the homepage or go directly to the registration form.</p>
+                  <strong data-lp-key="hiw_step1_sub1_title"<?php echo hiw_block_style('hiw_step1_sub1_title'); ?>><?php echo hiw_block('hiw_step1_sub1_title','Visit the Registration Page'); ?></strong>
+                  <p class="text-body-secondary mb-0 small" data-lp-key="hiw_step1_sub1_desc"<?php echo hiw_block_style('hiw_step1_sub1_desc'); ?>><?php echo hiw_block('hiw_step1_sub1_desc','Click "Apply Now" from the homepage or go directly to the registration form.'); ?></p>
                 </div>
               </div>
               <div class="d-flex gap-3">
@@ -177,8 +177,8 @@ $pageType = $seoData['type'];
                   <i class="bi bi-2-circle text-primary"></i>
                 </div>
                 <div>
-                  <strong>Fill Out Basic Information</strong>
-                  <p class="text-body-secondary mb-0 small">Provide your name, contact details, and select your barangay from the dropdown.</p>
+                  <strong data-lp-key="hiw_step1_sub2_title"<?php echo hiw_block_style('hiw_step1_sub2_title'); ?>><?php echo hiw_block('hiw_step1_sub2_title','Fill Out Basic Information'); ?></strong>
+                  <p class="text-body-secondary mb-0 small" data-lp-key="hiw_step1_sub2_desc"<?php echo hiw_block_style('hiw_step1_sub2_desc'); ?>><?php echo hiw_block('hiw_step1_sub2_desc','Provide your name, contact details, and select your barangay from the dropdown.'); ?></p>
                 </div>
               </div>
               <div class="d-flex gap-3">
@@ -186,8 +186,8 @@ $pageType = $seoData['type'];
                   <i class="bi bi-3-circle text-primary"></i>
                 </div>
                 <div>
-                  <strong>Verify Email & Phone</strong>
-                  <p class="text-body-secondary mb-0 small">Check your email and SMS for verification codes. Enter them to activate your account.</p>
+                  <strong data-lp-key="hiw_step1_sub3_title"<?php echo hiw_block_style('hiw_step1_sub3_title'); ?>><?php echo hiw_block('hiw_step1_sub3_title','Verify Email & Phone'); ?></strong>
+                  <p class="text-body-secondary mb-0 small" data-lp-key="hiw_step1_sub3_desc"<?php echo hiw_block_style('hiw_step1_sub3_desc'); ?>><?php echo hiw_block('hiw_step1_sub3_desc','Check your email and SMS for verification codes. Enter them to activate your account.'); ?></p>
                 </div>
               </div>
               <div class="d-flex gap-3">
@@ -195,8 +195,8 @@ $pageType = $seoData['type'];
                   <i class="bi bi-4-circle text-primary"></i>
                 </div>
                 <div>
-                  <strong>Set Strong Password</strong>
-                  <p class="text-body-secondary mb-0 small">Create a secure password with at least 8 characters, including numbers and symbols.</p>
+                  <strong data-lp-key="hiw_step1_sub4_title"<?php echo hiw_block_style('hiw_step1_sub4_title'); ?>><?php echo hiw_block('hiw_step1_sub4_title','Set Strong Password'); ?></strong>
+                  <p class="text-body-secondary mb-0 small" data-lp-key="hiw_step1_sub4_desc"<?php echo hiw_block_style('hiw_step1_sub4_desc'); ?>><?php echo hiw_block('hiw_step1_sub4_desc','Create a secure password with at least 8 characters, including numbers and symbols.'); ?></p>
                 </div>
               </div>
             </div>
@@ -205,10 +205,7 @@ $pageType = $seoData['type'];
         <div class="col-lg-6">
           <div class="soft-card p-4">
             <img src="https://images.unsplash.com/photo-1516321318423-f06f85e504b3?q=80&w=1000&auto=format&fit=crop" alt="Registration" class="img-fluid rounded mb-3" />
-            <div class="alert alert-info">
-              <i class="bi bi-info-circle me-2"></i>
-              <strong>Security Note:</strong> Your data is protected with encryption and stored securely according to RA 10173 (Data Privacy Act).
-            </div>
+            <div class="alert alert-info" data-lp-key="hiw_step1_security_note"<?php echo hiw_block_style('hiw_step1_security_note'); ?>><?php echo hiw_block('hiw_step1_security_note','<i class="bi bi-info-circle me-2"></i><strong>Security Note:</strong> Your data is protected with encryption and stored securely according to RA 10173 (Data Privacy Act).'); ?></div>
           </div>
         </div>
       </div>
@@ -221,48 +218,36 @@ $pageType = $seoData['type'];
               <span class="text-white fw-bold fs-4">2</span>
             </div>
             <div>
-              <h3 class="fw-bold">Complete Application & Upload Documents</h3>
-              <p class="text-warning mb-0">Providing your academic and financial information</p>
+              <h3 class="fw-bold" data-lp-key="hiw_step2_detail_title"<?php echo hiw_block_style('hiw_step2_detail_title'); ?>><?php echo hiw_block('hiw_step2_detail_title','Complete Application & Upload Documents'); ?></h3>
+              <p class="text-warning mb-0" data-lp-key="hiw_step2_detail_subtitle"<?php echo hiw_block_style('hiw_step2_detail_subtitle'); ?>><?php echo hiw_block('hiw_step2_detail_subtitle','Providing your academic and financial information'); ?></p>
             </div>
           </div>
           
           <div class="ps-5">
-            <h5 class="fw-semibold mb-3">Application Form Sections:</h5>
+            <h5 class="fw-semibold mb-3" data-lp-key="hiw_step2_sections_title"<?php echo hiw_block_style('hiw_step2_sections_title'); ?>><?php echo hiw_block('hiw_step2_sections_title','Application Form Sections:'); ?></h5>
             <div class="accordion" id="applicationSections">
               <div class="accordion-item">
                 <h2 class="accordion-header">
-                  <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#section1">
-                    Personal & Academic Information
-                  </button>
+                  <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#section1" data-lp-key="hiw_step2_accord1_title"<?php echo hiw_block_style('hiw_step2_accord1_title'); ?>><?php echo hiw_block('hiw_step2_accord1_title','Personal & Academic Information'); ?></button>
                 </h2>
                 <div id="section1" class="accordion-collapse collapse show" data-bs-parent="#applicationSections">
-                  <div class="accordion-body small">
-                    School name, course/grade level, year level, student ID, academic year, and semester information.
-                  </div>
+                  <div class="accordion-body small" data-lp-key="hiw_step2_accord1_desc"<?php echo hiw_block_style('hiw_step2_accord1_desc'); ?>><?php echo hiw_block('hiw_step2_accord1_desc','School name, course/grade level, year level, student ID, academic year, and semester information.'); ?></div>
                 </div>
               </div>
               <div class="accordion-item">
                 <h2 class="accordion-header">
-                  <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#section2">
-                    Family & Financial Background
-                  </button>
+                  <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#section2" data-lp-key="hiw_step2_accord2_title"<?php echo hiw_block_style('hiw_step2_accord2_title'); ?>><?php echo hiw_block('hiw_step2_accord2_title','Family & Financial Background'); ?></button>
                 </h2>
                 <div id="section2" class="accordion-collapse collapse" data-bs-parent="#applicationSections">
-                  <div class="accordion-body small">
-                    Parents' information, household income, number of dependents, and other scholarship recipients in the family.
-                  </div>
+                  <div class="accordion-body small" data-lp-key="hiw_step2_accord2_desc"<?php echo hiw_block_style('hiw_step2_accord2_desc'); ?>><?php echo hiw_block('hiw_step2_accord2_desc','Parents\' information, household income, number of dependents, and other scholarship recipients in the family.'); ?></div>
                 </div>
               </div>
               <div class="accordion-item">
                 <h2 class="accordion-header">
-                  <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#section3">
-                    Document Upload
-                  </button>
+                  <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#section3" data-lp-key="hiw_step2_accord3_title"<?php echo hiw_block_style('hiw_step2_accord3_title'); ?>><?php echo hiw_block('hiw_step2_accord3_title','Document Upload'); ?></button>
                 </h2>
                 <div id="section3" class="accordion-collapse collapse" data-bs-parent="#applicationSections">
-                  <div class="accordion-body small">
-                    Clear photos or PDFs of required documents. Maximum 5MB per file. Accepted formats: JPG, PNG, PDF.
-                  </div>
+                  <div class="accordion-body small" data-lp-key="hiw_step2_accord3_desc"<?php echo hiw_block_style('hiw_step2_accord3_desc'); ?>><?php echo hiw_block('hiw_step2_accord3_desc','Clear photos or PDFs of required documents. Maximum 5MB per file. Accepted formats: JPG, PNG, PDF.'); ?></div>
                 </div>
               </div>
             </div>
@@ -271,10 +256,7 @@ $pageType = $seoData['type'];
         <div class="col-lg-6 order-lg-1">
           <div class="soft-card p-4">
             <img src="https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?q=80&w=1000&auto=format&fit=crop" alt="Documents" class="img-fluid rounded mb-3" />
-            <div class="alert alert-warning">
-              <i class="bi bi-exclamation-triangle me-2"></i>
-              <strong>Important:</strong> Ensure all documents are clear, complete, and up-to-date. Blurry or incomplete documents will delay processing.
-            </div>
+            <div class="alert alert-warning" data-lp-key="hiw_step2_important_note"<?php echo hiw_block_style('hiw_step2_important_note'); ?>><?php echo hiw_block('hiw_step2_important_note','<i class="bi bi-exclamation-triangle me-2"></i><strong>Important:</strong> Ensure all documents are clear, complete, and up-to-date. Blurry or incomplete documents will delay processing.'); ?></div>
           </div>
         </div>
       </div>
@@ -287,21 +269,21 @@ $pageType = $seoData['type'];
               <span class="text-white fw-bold fs-4">3</span>
             </div>
             <div>
-              <h3 class="fw-bold">Evaluation & Approval Process</h3>
-              <p class="text-info mb-0">Admin review and verification of your application</p>
+              <h3 class="fw-bold" data-lp-key="hiw_step3_detail_title"<?php echo hiw_block_style('hiw_step3_detail_title'); ?>><?php echo hiw_block('hiw_step3_detail_title','Evaluation & Approval Process'); ?></h3>
+              <p class="text-info mb-0" data-lp-key="hiw_step3_detail_subtitle"<?php echo hiw_block_style('hiw_step3_detail_subtitle'); ?>><?php echo hiw_block('hiw_step3_detail_subtitle','Admin review and verification of your application'); ?></p>
             </div>
           </div>
           
           <div class="ps-5">
-            <h5 class="fw-semibold mb-3">What happens during evaluation:</h5>
+            <h5 class="fw-semibold mb-3" data-lp-key="hiw_step3_during_title"<?php echo hiw_block_style('hiw_step3_during_title'); ?>><?php echo hiw_block('hiw_step3_during_title','What happens during evaluation:'); ?></h5>
             <div class="timeline">
               <div class="d-flex gap-3 mb-3">
                 <div class="bg-light rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width: 40px; height: 40px;">
                   <i class="bi bi-file-earmark-check text-info"></i>
                 </div>
                 <div>
-                  <strong>Document Review (2-3 days)</strong>
-                  <p class="text-body-secondary mb-0 small">Admin staff verify all uploaded documents for completeness and authenticity.</p>
+                  <strong data-lp-key="hiw_step3_timeline1_title"<?php echo hiw_block_style('hiw_step3_timeline1_title'); ?>><?php echo hiw_block('hiw_step3_timeline1_title','Document Review (2-3 days)'); ?></strong>
+                  <p class="text-body-secondary mb-0 small" data-lp-key="hiw_step3_timeline1_desc"<?php echo hiw_block_style('hiw_step3_timeline1_desc'); ?>><?php echo hiw_block('hiw_step3_timeline1_desc','Admin staff verify all uploaded documents for completeness and authenticity.'); ?></p>
                 </div>
               </div>
               <div class="d-flex gap-3 mb-3">
@@ -309,8 +291,8 @@ $pageType = $seoData['type'];
                   <i class="bi bi-search text-info"></i>
                 </div>
                 <div>
-                  <strong>Eligibility Check (1-2 days)</strong>
-                  <p class="text-body-secondary mb-0 small">Cross-reference with eligibility criteria and existing beneficiary database.</p>
+                  <strong data-lp-key="hiw_step3_timeline2_title"<?php echo hiw_block_style('hiw_step3_timeline2_title'); ?>><?php echo hiw_block('hiw_step3_timeline2_title','Eligibility Check (1-2 days)'); ?></strong>
+                  <p class="text-body-secondary mb-0 small" data-lp-key="hiw_step3_timeline2_desc"<?php echo hiw_block_style('hiw_step3_timeline2_desc'); ?>><?php echo hiw_block('hiw_step3_timeline2_desc','Cross-reference with eligibility criteria and existing beneficiary database.'); ?></p>
                 </div>
               </div>
               <div class="d-flex gap-3 mb-3">
@@ -318,36 +300,34 @@ $pageType = $seoData['type'];
                   <i class="bi bi-person-check text-info"></i>
                 </div>
                 <div>
-                  <strong>Final Approval (1 day)</strong>
-                  <p class="text-body-secondary mb-0 small">Supervisor review and final decision on application status.</p>
+                  <strong data-lp-key="hiw_step3_timeline3_title"<?php echo hiw_block_style('hiw_step3_timeline3_title'); ?>><?php echo hiw_block('hiw_step3_timeline3_title','Final Approval (1 day)'); ?></strong>
+                  <p class="text-body-secondary mb-0 small" data-lp-key="hiw_step3_timeline3_desc"<?php echo hiw_block_style('hiw_step3_timeline3_desc'); ?>><?php echo hiw_block('hiw_step3_timeline3_desc','Supervisor review and final decision on application status.'); ?></p>
                 </div>
               </div>
             </div>
             
-            <div class="alert alert-info mt-3">
-              <strong>Status Updates:</strong> You'll receive SMS and email notifications at each stage. Log in to your dashboard to see detailed status.
-            </div>
+            <div class="alert alert-info mt-3" data-lp-key="hiw_step3_status_updates"<?php echo hiw_block_style('hiw_step3_status_updates'); ?>><?php echo hiw_block('hiw_step3_status_updates','<strong>Status Updates:</strong> You\'ll receive SMS and email notifications at each stage. Log in to your dashboard to see detailed status.'); ?></div>
           </div>
         </div>
         <div class="col-lg-6">
           <div class="soft-card p-4">
-            <h5 class="fw-bold mb-3">Possible Application Status</h5>
+            <h5 class="fw-bold mb-3" data-lp-key="hiw_step3_status_title"<?php echo hiw_block_style('hiw_step3_status_title'); ?>><?php echo hiw_block('hiw_step3_status_title','Possible Application Status'); ?></h5>
             <div class="d-grid gap-2">
               <div class="d-flex justify-content-between align-items-center p-2 bg-warning bg-opacity-10 rounded">
-                <span><i class="bi bi-clock text-warning me-2"></i>Under Review</span>
-                <small class="text-body-secondary">In progress</small>
+                <span data-lp-key="hiw_step3_status1"<?php echo hiw_block_style('hiw_step3_status1'); ?>><?php echo hiw_block('hiw_step3_status1','<i class="bi bi-clock text-warning me-2"></i>Under Review'); ?></span>
+                <small class="text-body-secondary" data-lp-key="hiw_step3_status1_label"<?php echo hiw_block_style('hiw_step3_status1_label'); ?>><?php echo hiw_block('hiw_step3_status1_label','In progress'); ?></small>
               </div>
               <div class="d-flex justify-content-between align-items-center p-2 bg-info bg-opacity-10 rounded">
-                <span><i class="bi bi-question-circle text-info me-2"></i>Needs Clarification</span>
-                <small class="text-body-secondary">Action required</small>
+                <span data-lp-key="hiw_step3_status2"<?php echo hiw_block_style('hiw_step3_status2'); ?>><?php echo hiw_block('hiw_step3_status2','<i class="bi bi-question-circle text-info me-2"></i>Needs Clarification'); ?></span>
+                <small class="text-body-secondary" data-lp-key="hiw_step3_status2_label"<?php echo hiw_block_style('hiw_step3_status2_label'); ?>><?php echo hiw_block('hiw_step3_status2_label','Action required'); ?></small>
               </div>
               <div class="d-flex justify-content-between align-items-center p-2 bg-success bg-opacity-10 rounded">
-                <span><i class="bi bi-check-circle text-success me-2"></i>Approved</span>
-                <small class="text-body-secondary">Ready for QR</small>
+                <span data-lp-key="hiw_step3_status3"<?php echo hiw_block_style('hiw_step3_status3'); ?>><?php echo hiw_block('hiw_step3_status3','<i class="bi bi-check-circle text-success me-2"></i>Approved'); ?></span>
+                <small class="text-body-secondary" data-lp-key="hiw_step3_status3_label"<?php echo hiw_block_style('hiw_step3_status3_label'); ?>><?php echo hiw_block('hiw_step3_status3_label','Ready for QR'); ?></small>
               </div>
               <div class="d-flex justify-content-between align-items-center p-2 bg-danger bg-opacity-10 rounded">
-                <span><i class="bi bi-x-circle text-danger me-2"></i>Not Eligible</span>
-                <small class="text-body-secondary">Final decision</small>
+                <span data-lp-key="hiw_step3_status4"<?php echo hiw_block_style('hiw_step3_status4'); ?>><?php echo hiw_block('hiw_step3_status4','<i class="bi bi-x-circle text-danger me-2"></i>Not Eligible'); ?></span>
+                <small class="text-body-secondary" data-lp-key="hiw_step3_status4_label"<?php echo hiw_block_style('hiw_step3_status4_label'); ?>><?php echo hiw_block('hiw_step3_status4_label','Final decision'); ?></small>
               </div>
             </div>
           </div>
@@ -362,34 +342,28 @@ $pageType = $seoData['type'];
               <span class="text-white fw-bold fs-4">4</span>
             </div>
             <div>
-              <h3 class="fw-bold">QR Code Generation & Claiming</h3>
-              <p class="text-success mb-0">Receiving your assistance on distribution day</p>
+              <h3 class="fw-bold" data-lp-key="hiw_step4_detail_title"<?php echo hiw_block_style('hiw_step4_detail_title'); ?>><?php echo hiw_block('hiw_step4_detail_title','QR Code Generation & Claiming'); ?></h3>
+              <p class="text-success mb-0" data-lp-key="hiw_step4_detail_subtitle"<?php echo hiw_block_style('hiw_step4_detail_subtitle'); ?>><?php echo hiw_block('hiw_step4_detail_subtitle','Receiving your assistance on distribution day'); ?></p>
             </div>
           </div>
           
           <div class="ps-5">
-            <h5 class="fw-semibold mb-3">After approval:</h5>
+            <h5 class="fw-semibold mb-3" data-lp-key="hiw_step4_after_title"<?php echo hiw_block_style('hiw_step4_after_title'); ?>><?php echo hiw_block('hiw_step4_after_title','After approval:'); ?></h5>
             <div class="d-grid gap-3">
               <div class="soft-card p-3">
-                <h6 class="fw-bold text-success mb-2">
-                  <i class="bi bi-qr-code me-2"></i>QR Code Ready
-                </h6>
-                <p class="small mb-0">Download your unique QR code from your dashboard. You can also receive it via email.</p>
+                <h6 class="fw-bold text-success mb-2" data-lp-key="hiw_step4_card1_title"<?php echo hiw_block_style('hiw_step4_card1_title'); ?>><?php echo hiw_block('hiw_step4_card1_title','<i class="bi bi-qr-code me-2"></i>QR Code Ready'); ?></h6>
+                <p class="small mb-0" data-lp-key="hiw_step4_card1_desc"<?php echo hiw_block_style('hiw_step4_card1_desc'); ?>><?php echo hiw_block('hiw_step4_card1_desc','Download your unique QR code from your dashboard. You can also receive it via email.'); ?></p>
               </div>
               <div class="soft-card p-3">
-                <h6 class="fw-bold text-primary mb-2">
-                  <i class="bi bi-calendar-event me-2"></i>Distribution Schedule
-                </h6>
-                <p class="small mb-0">You'll receive notification about the date, time, and venue for assistance distribution.</p>
+                <h6 class="fw-bold text-primary mb-2" data-lp-key="hiw_step4_card2_title"<?php echo hiw_block_style('hiw_step4_card2_title'); ?>><?php echo hiw_block('hiw_step4_card2_title','<i class="bi bi-calendar-event me-2"></i>Distribution Schedule'); ?></h6>
+                <p class="small mb-0" data-lp-key="hiw_step4_card2_desc"<?php echo hiw_block_style('hiw_step4_card2_desc'); ?>><?php echo hiw_block('hiw_step4_card2_desc','You\'ll receive notification about the date, time, and venue for assistance distribution.'); ?></p>
               </div>
               <div class="soft-card p-3">
-                <h6 class="fw-bold text-warning mb-2">
-                  <i class="bi bi-card-checklist me-2"></i>What to Bring
-                </h6>
+                <h6 class="fw-bold text-warning mb-2" data-lp-key="hiw_step4_card3_title"<?php echo hiw_block_style('hiw_step4_card3_title'); ?>><?php echo hiw_block('hiw_step4_card3_title','<i class="bi bi-card-checklist me-2"></i>What to Bring'); ?></h6>
                 <ul class="small mb-0 ps-3">
-                  <li>Your QR code (printed or on phone)</li>
-                  <li>Valid school ID</li>
-                  <li>One government-issued ID</li>
+                  <li data-lp-key="hiw_step4_bring1"<?php echo hiw_block_style('hiw_step4_bring1'); ?>><?php echo hiw_block('hiw_step4_bring1','Your QR code (printed or on phone)'); ?></li>
+                  <li data-lp-key="hiw_step4_bring2"<?php echo hiw_block_style('hiw_step4_bring2'); ?>><?php echo hiw_block('hiw_step4_bring2','Valid school ID'); ?></li>
+                  <li data-lp-key="hiw_step4_bring3"<?php echo hiw_block_style('hiw_step4_bring3'); ?>><?php echo hiw_block('hiw_step4_bring3','One government-issued ID'); ?></li>
                 </ul>
               </div>
             </div>
@@ -400,12 +374,9 @@ $pageType = $seoData['type'];
             <div class="bg-success bg-opacity-10 rounded p-4 mb-3">
               <i class="bi bi-qr-code display-1 text-success"></i>
             </div>
-            <h5 class="fw-bold">Sample QR Code</h5>
-            <p class="text-body-secondary small">Each student gets a unique, secure QR code linked to their approved application.</p>
-            <div class="alert alert-success">
-              <i class="bi bi-shield-check me-2"></i>
-              <strong>Secure & Fraud-Proof:</strong> QR codes are encrypted and single-use to prevent duplication or misuse.
-            </div>
+            <h5 class="fw-bold" data-lp-key="hiw_step4_sample_title"<?php echo hiw_block_style('hiw_step4_sample_title'); ?>><?php echo hiw_block('hiw_step4_sample_title','Sample QR Code'); ?></h5>
+            <p class="text-body-secondary small" data-lp-key="hiw_step4_sample_desc"<?php echo hiw_block_style('hiw_step4_sample_desc'); ?>><?php echo hiw_block('hiw_step4_sample_desc','Each student gets a unique, secure QR code linked to their approved application.'); ?></p>
+            <div class="alert alert-success" data-lp-key="hiw_step4_secure_note"<?php echo hiw_block_style('hiw_step4_secure_note'); ?>><?php echo hiw_block('hiw_step4_secure_note','<i class="bi bi-shield-check me-2"></i><strong>Secure & Fraud-Proof:</strong> QR codes are encrypted and single-use to prevent duplication or misuse.'); ?></div>
           </div>
         </div>
       </div>
@@ -416,8 +387,8 @@ $pageType = $seoData['type'];
   <section class="py-5">
     <div class="container">
       <div class="text-center mb-5">
-        <h2 class="section-title">Tips for Success</h2>
-        <p class="section-lead mx-auto" style="max-width: 700px;">Best practices to ensure smooth application processing</p>
+        <h2 class="section-title" data-lp-key="hiw_tips_title"<?php echo hiw_block_style('hiw_tips_title'); ?>><?php echo hiw_block('hiw_tips_title','Tips for Success'); ?></h2>
+        <p class="section-lead mx-auto" style="max-width: 700px;" data-lp-key="hiw_tips_lead"<?php echo hiw_block_style('hiw_tips_lead'); ?>><?php echo hiw_block('hiw_tips_lead','Best practices to ensure smooth application processing'); ?></p>
       </div>
       <div class="row g-4">
         <div class="col-md-6 col-lg-4">
@@ -425,12 +396,12 @@ $pageType = $seoData['type'];
             <div class="text-success mb-3">
               <i class="bi bi-camera fs-2"></i>
             </div>
-            <h5 class="fw-bold">Document Quality</h5>
+            <h5 class="fw-bold" data-lp-key="hiw_tips_card1_title"<?php echo hiw_block_style('hiw_tips_card1_title'); ?>><?php echo hiw_block('hiw_tips_card1_title','Document Quality'); ?></h5>
             <ul class="small text-body-secondary">
-              <li>Use good lighting when taking photos</li>
-              <li>Ensure text is clearly readable</li>
-              <li>Avoid shadows or glare</li>
-              <li>Take photos straight-on, not at angles</li>
+              <li data-lp-key="hiw_tips_card1_item1"<?php echo hiw_block_style('hiw_tips_card1_item1'); ?>><?php echo hiw_block('hiw_tips_card1_item1','Use good lighting when taking photos'); ?></li>
+              <li data-lp-key="hiw_tips_card1_item2"<?php echo hiw_block_style('hiw_tips_card1_item2'); ?>><?php echo hiw_block('hiw_tips_card1_item2','Ensure text is clearly readable'); ?></li>
+              <li data-lp-key="hiw_tips_card1_item3"<?php echo hiw_block_style('hiw_tips_card1_item3'); ?>><?php echo hiw_block('hiw_tips_card1_item3','Avoid shadows or glare'); ?></li>
+              <li data-lp-key="hiw_tips_card1_item4"<?php echo hiw_block_style('hiw_tips_card1_item4'); ?>><?php echo hiw_block('hiw_tips_card1_item4','Take photos straight-on, not at angles'); ?></li>
             </ul>
           </div>
         </div>
@@ -439,12 +410,12 @@ $pageType = $seoData['type'];
             <div class="text-primary mb-3">
               <i class="bi bi-clock fs-2"></i>
             </div>
-            <h5 class="fw-bold">Timing</h5>
+            <h5 class="fw-bold" data-lp-key="hiw_tips_card2_title"<?php echo hiw_block_style('hiw_tips_card2_title'); ?>><?php echo hiw_block('hiw_tips_card2_title','Timing'); ?></h5>
             <ul class="small text-body-secondary">
-              <li>Apply early when slots open</li>
-              <li>Don't wait until deadlines</li>
-              <li>Check announcements regularly</li>
-              <li>Respond quickly to admin requests</li>
+              <li data-lp-key="hiw_tips_card2_item1"<?php echo hiw_block_style('hiw_tips_card2_item1'); ?>><?php echo hiw_block('hiw_tips_card2_item1','Apply early when slots open'); ?></li>
+              <li data-lp-key="hiw_tips_card2_item2"<?php echo hiw_block_style('hiw_tips_card2_item2'); ?>><?php echo hiw_block('hiw_tips_card2_item2','Don\'t wait until deadlines'); ?></li>
+              <li data-lp-key="hiw_tips_card2_item3"<?php echo hiw_block_style('hiw_tips_card2_item3'); ?>><?php echo hiw_block('hiw_tips_card2_item3','Check announcements regularly'); ?></li>
+              <li data-lp-key="hiw_tips_card2_item4"<?php echo hiw_block_style('hiw_tips_card2_item4'); ?>><?php echo hiw_block('hiw_tips_card2_item4','Respond quickly to admin requests'); ?></li>
             </ul>
           </div>
         </div>
@@ -453,12 +424,12 @@ $pageType = $seoData['type'];
             <div class="text-warning mb-3">
               <i class="bi bi-shield-check fs-2"></i>
             </div>
-            <h5 class="fw-bold">Security</h5>
+            <h5 class="fw-bold" data-lp-key="hiw_tips_card3_title"<?php echo hiw_block_style('hiw_tips_card3_title'); ?>><?php echo hiw_block('hiw_tips_card3_title','Security'); ?></h5>
             <ul class="small text-body-secondary">
-              <li>Keep login credentials secure</li>
-              <li>Don't share QR codes</li>
-              <li>Log out after using public computers</li>
-              <li>Report suspicious activity immediately</li>
+              <li data-lp-key="hiw_tips_card3_item1"<?php echo hiw_block_style('hiw_tips_card3_item1'); ?>><?php echo hiw_block('hiw_tips_card3_item1','Keep login credentials secure'); ?></li>
+              <li data-lp-key="hiw_tips_card3_item2"<?php echo hiw_block_style('hiw_tips_card3_item2'); ?>><?php echo hiw_block('hiw_tips_card3_item2','Don\'t share QR codes'); ?></li>
+              <li data-lp-key="hiw_tips_card3_item3"<?php echo hiw_block_style('hiw_tips_card3_item3'); ?>><?php echo hiw_block('hiw_tips_card3_item3','Log out after using public computers'); ?></li>
+              <li data-lp-key="hiw_tips_card3_item4"<?php echo hiw_block_style('hiw_tips_card3_item4'); ?>><?php echo hiw_block('hiw_tips_card3_item4','Report suspicious activity immediately'); ?></li>
             </ul>
           </div>
         </div>
@@ -469,14 +440,14 @@ $pageType = $seoData['type'];
   <!-- CTA Section -->
   <section class="py-5 bg-primary text-white">
     <div class="container text-center">
-      <h2 class="fw-bold mb-3">Ready to Get Started?</h2>
-      <p class="lead mb-4">Join thousands of General Trias students who have successfully received educational assistance through EducAid.</p>
+      <h2 class="fw-bold mb-3" data-lp-key="hiw_cta_title"<?php echo hiw_block_style('hiw_cta_title'); ?>><?php echo hiw_block('hiw_cta_title','Ready to Get Started?'); ?></h2>
+      <p class="lead mb-4" data-lp-key="hiw_cta_lead"<?php echo hiw_block_style('hiw_cta_lead'); ?>><?php echo hiw_block('hiw_cta_lead','Join thousands of General Trias students who have successfully received educational assistance through EducAid.'); ?></p>
       <div class="d-flex gap-3 justify-content-center flex-wrap">
         <a href="landingpage.php#apply" class="btn btn-light btn-lg">
-          <i class="bi bi-journal-text me-2"></i>Start Your Application
+          <span data-lp-key="hiw_cta_btn1"<?php echo hiw_block_style('hiw_cta_btn1'); ?>><?php echo hiw_block('hiw_cta_btn1','<i class="bi bi-journal-text me-2"></i>Start Your Application'); ?></span>
         </a>
         <a href="requirements.php" class="btn btn-outline-light btn-lg">
-          <i class="bi bi-list-check me-2"></i>View Requirements
+          <span data-lp-key="hiw_cta_btn2"<?php echo hiw_block_style('hiw_cta_btn2'); ?>><?php echo hiw_block('hiw_cta_btn2','<i class="bi bi-list-check me-2"></i>View Requirements'); ?></span>
         </a>
       </div>
     </div>

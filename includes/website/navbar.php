@@ -261,6 +261,13 @@ nav.navbar.fixed-header .navbar-brand {
   max-width: calc(100% - 56px);
 }
 
+/* On desktop, remove brand width restriction since toggler is hidden */
+@media (min-width: 992px) {
+  nav.navbar.fixed-header .navbar-brand {
+    max-width: none;
+  }
+}
+
 nav.navbar.fixed-header .navbar-brand .brand-logo {
   height: 44px;
   width: auto;
@@ -275,6 +282,15 @@ nav.navbar.fixed-header .navbar-brand .brand-text {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* On desktop, allow full brand text to display since hamburger is hidden */
+@media (min-width: 992px) {
+  nav.navbar.fixed-header .navbar-brand .brand-text {
+    overflow: visible;
+    text-overflow: clip;
+    max-width: none;
+  }
 }
 
 /* Ensure the hamburger doesn't shrink oddly under pressure */
