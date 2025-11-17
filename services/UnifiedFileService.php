@@ -1184,9 +1184,34 @@ class UnifiedFileService {
             }
         }
         
-        // Note: Confidence files are already handled above in the extensions array
-        // No need for special session-based confidence file handling during approval
-        // because registration already renamed them to student ID-based format
+        // Fallback handling for confidence files saved without original extension in name
+        // Many flows save session-prefixed files like <prefix>[optional_doc].confidence.json
+        // Derive a prefix by stripping a trailing timestamp (_YYYYMMDDHHMMSS) from $baseName
+        $mainExtension = pathinfo($originalFilename, PATHINFO_EXTENSION);
+        $targetConfidence = $targetDir . $baseName . '_' . $timestamp . '.' . $mainExtension . '.confidence.json';
+        if (!file_exists($targetConfidence)) {
+            $prefix = $baseName;
+            if (preg_match('/^(.*)_\d{12,14}$/', $baseName, $m)) {
+                $prefix = $m[1];
+            }
+
+            $candidates = [];
+            $candidates[] = $oldDir . '/' . $originalFilename . '.confidence.json';
+            $candidates[] = $oldDir . '/' . $baseName . '.confidence.json';
+            foreach (glob($oldDir . '/' . $prefix . '*.confidence.json') ?: [] as $g) {
+                $candidates[] = $g;
+            }
+
+            foreach ($candidates as $cand) {
+                if ($cand && file_exists($cand)) {
+                    error_log("UnifiedFileService::moveAssociatedFiles - Fallback moving confidence: $cand -> $targetConfidence");
+                    @rename($cand, $targetConfidence);
+                    if (file_exists($targetConfidence)) {
+                        break;
+                    }
+                }
+            }
+        }
     }
     
     /**
@@ -1203,6 +1228,31 @@ class UnifiedFileService {
             $oldFile = $oldPath . $ext;
             if (file_exists($oldFile)) {
                 rename($oldFile, $newPath . $ext);
+            }
+        }
+
+        // Fallback for confidence files named without original extension in temp folder
+        $oldDir = dirname($oldPath);
+        $baseName = pathinfo($oldPath, PATHINFO_FILENAME);
+        $prefix = $baseName;
+        if (preg_match('/^(.*)_\d{12,14}$/', $baseName, $m)) {
+            $prefix = $m[1];
+        }
+        $targetConfidence = $newPath . '.confidence.json';
+        if (!file_exists($targetConfidence)) {
+            $candidates = [];
+            $candidates[] = $oldDir . '/' . basename($oldPath) . '.confidence.json';
+            $candidates[] = $oldDir . '/' . $baseName . '.confidence.json';
+            foreach (glob($oldDir . '/' . $prefix . '*.confidence.json') ?: [] as $g) {
+                $candidates[] = $g;
+            }
+            foreach ($candidates as $cand) {
+                if ($cand && file_exists($cand)) {
+                    @rename($cand, $targetConfidence);
+                    if (file_exists($targetConfidence)) {
+                        break;
+                    }
+                }
             }
         }
     }
