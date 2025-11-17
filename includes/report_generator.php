@@ -190,13 +190,14 @@ class ReportGenerator {
         $html .= '<table cellpadding="3">';
         $html .= '<thead><tr>
             <th width="5%"><b>No.</b></th>
-            <th width="15%"><b>Student ID</b></th>
+            <th width="12%"><b>Student ID</b></th>
+            <th width="14%"><b>Payroll Number</b></th>
             <th width="20%"><b>Name</b></th>
-            <th width="8%"><b>Gender</b></th>
-            <th width="15%"><b>Barangay</b></th>
-            <th width="15%"><b>University</b></th>
-            <th width="12%"><b>Year Level</b></th>
-            <th width="10%"><b>Status</b></th>
+            <th width="7%"><b>Gender</b></th>
+            <th width="14%"><b>Barangay</b></th>
+            <th width="12%"><b>University</b></th>
+            <th width="8%"><b>Year Level</b></th>
+            <th width="8%"><b>Status</b></th>
         </tr></thead><tbody>';
         
         $no = 1;
@@ -206,6 +207,7 @@ class ReportGenerator {
             $html .= '<tr>
                 <td>' . $no++ . '</td>
                 <td>' . htmlspecialchars($student['student_id']) . '</td>
+                <td>' . htmlspecialchars($student['payroll_no'] ?? '-') . '</td>
                 <td>' . htmlspecialchars($fullName) . '</td>
                 <td>' . htmlspecialchars($student['sex'] ?: '-') . '</td>
                 <td>' . htmlspecialchars($student['barangay'] ?: '-') . '</td>
@@ -402,7 +404,7 @@ class ReportGenerator {
         
         // Title
         $row = 1;
-        $detailSheet->mergeCells('A' . $row . ':P' . $row);
+        $detailSheet->mergeCells('A' . $row . ':Q' . $row);
         $detailSheet->setCellValue('A' . $row, 'COMPLETE STUDENT INFORMATION');
         $detailSheet->getStyle('A' . $row)->getFont()->setSize(16)->setBold(true);
         $detailSheet->getStyle('A' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
@@ -428,7 +430,7 @@ class ReportGenerator {
         
         // Headers
         $headers = [
-            'No.', 'Student ID', 'Last Name', 'First Name', 'Middle Name', 'Extension', 
+            'No.', 'Student ID', 'Payroll Number', 'Last Name', 'First Name', 'Middle Name', 'Extension', 
             'Gender', 'Birth Date', 'Email', 'Mobile', 'Barangay', 'Municipality', 
             'University', 'Course', 'Year Level', 'Status'
         ];
@@ -439,7 +441,7 @@ class ReportGenerator {
         }
         
         // Style headers
-        $headerRange = 'A' . $row . ':P' . $row;
+        $headerRange = 'A' . $row . ':Q' . $row;
         $detailSheet->getStyle($headerRange)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FF4A90E2');
         $detailSheet->getStyle($headerRange)->getFont()->setColor(new \PhpOffice\PhpSpreadsheet\Style\Color('FFFFFFFF'))->setBold(true);
         $detailSheet->getStyle($headerRange)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER)->setVertical(Alignment::VERTICAL_CENTER);
@@ -451,30 +453,32 @@ class ReportGenerator {
         $no = 1;
         foreach ($students as $student) {
             $detailSheet->setCellValue('A' . $row, $no++);
-            
-            // Set Student ID as TEXT to preserve formatting (especially for IDs starting with zeros or hyphens)
-            // Use the student_id directly, fallback to showing available keys if blank for debugging
+
+            // Student ID as TEXT to preserve formatting
             $studentId = $student['student_id'] ?? 'N/A';
             if (empty(trim($studentId))) {
-                // If student_id is blank, show a debug message or use alternative
                 $studentId = 'ERROR: ID Missing';
             }
             $detailSheet->setCellValueExplicit('B' . $row, $studentId, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-            
-            $detailSheet->setCellValue('C' . $row, $student['last_name'] ?? '-');
-            $detailSheet->setCellValue('D' . $row, $student['first_name'] ?? '-');
-            $detailSheet->setCellValue('E' . $row, $student['middle_name'] ?: '-');
-            $detailSheet->setCellValue('F' . $row, $student['extension_name'] ?: '-');
-            $detailSheet->setCellValue('G' . $row, $student['sex'] ?: '-');
-            $detailSheet->setCellValue('H' . $row, $student['bdate'] ?: '-');
-            $detailSheet->setCellValue('I' . $row, $student['email'] ?: '-');
-            $detailSheet->setCellValue('J' . $row, $student['mobile'] ?: '-');
-            $detailSheet->setCellValue('K' . $row, $student['barangay'] ?: '-');
-            $detailSheet->setCellValue('L' . $row, $student['municipality'] ?: '-');
-            $detailSheet->setCellValue('M' . $row, $student['university'] ?: '-');
-            $detailSheet->setCellValue('N' . $row, $student['course'] ?: '-');
-            $detailSheet->setCellValue('O' . $row, $student['year_level'] ?: '-');
-            $detailSheet->setCellValue('P' . $row, $student['status_display'] ?? '-');
+
+            // Payroll Number as TEXT (formatted)
+            $payrollNo = $student['payroll_no'] ?? '';
+            $detailSheet->setCellValueExplicit('C' . $row, $payrollNo !== '' ? $payrollNo : '-', \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+
+            $detailSheet->setCellValue('D' . $row, $student['last_name'] ?? '-');
+            $detailSheet->setCellValue('E' . $row, $student['first_name'] ?? '-');
+            $detailSheet->setCellValue('F' . $row, $student['middle_name'] ?: '-');
+            $detailSheet->setCellValue('G' . $row, $student['extension_name'] ?: '-');
+            $detailSheet->setCellValue('H' . $row, $student['sex'] ?: '-');
+            $detailSheet->setCellValue('I' . $row, $student['bdate'] ?: '-');
+            $detailSheet->setCellValue('J' . $row, $student['email'] ?: '-');
+            $detailSheet->setCellValue('K' . $row, $student['mobile'] ?: '-');
+            $detailSheet->setCellValue('L' . $row, $student['barangay'] ?: '-');
+            $detailSheet->setCellValue('M' . $row, $student['municipality'] ?: '-');
+            $detailSheet->setCellValue('N' . $row, $student['university'] ?: '-');
+            $detailSheet->setCellValue('O' . $row, $student['course'] ?: '-');
+            $detailSheet->setCellValue('P' . $row, $student['year_level'] ?: '-');
+            $detailSheet->setCellValue('Q' . $row, $student['status_display'] ?? '-');
             
             // Alternate row colors
             if ($no % 2 == 0) {
@@ -484,11 +488,11 @@ class ReportGenerator {
         }
         
         // Add borders to all data
-        $dataRange = 'A3:P' . ($row - 1);
+        $dataRange = 'A3:Q' . ($row - 1);
         $detailSheet->getStyle($dataRange)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
         
         // Auto-size columns
-        foreach (range('A', 'P') as $col) {
+        foreach (range('A', 'Q') as $col) {
             $detailSheet->getColumnDimension($col)->setAutoSize(true);
         }
         

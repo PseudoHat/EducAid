@@ -218,8 +218,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         }
         if (isset($_POST['reset_payroll'])) {
-            pg_query($connection, "UPDATE students SET payroll_no = 0 WHERE status = 'active'");
-            $notification_msg = "Student list reverted and payroll numbers reset. All QR code records deleted.";
+          pg_query($connection, "UPDATE students SET payroll_no = NULL WHERE status = 'active'");
+          $notification_msg = "Student list reverted and payroll numbers reset. All QR code records deleted.";
         } else {
             $notification_msg = "Student list reverted (payroll numbers preserved). All QR code records deleted.";
         }
@@ -232,7 +232,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // Generate payroll numbers (sorted A→Z by full name) and QR codes
     if (isset($_POST['generate_payroll'])) {
-        // 1. Assign payroll numbers
+
+      // Gather context for formatted payroll codes
+      $yearRes = pg_query($connection, "SELECT value FROM config WHERE key='current_academic_year'");
+      $semRes  = pg_query($connection, "SELECT value FROM config WHERE key='current_semester'");
+      $currentYear = ($yearRes && ($yr = pg_fetch_assoc($yearRes)) && !empty($yr['value'])) ? $yr['value'] : date('Y') . (date('Y')+1);
+      $currentSemester = ($semRes && ($sm = pg_fetch_assoc($semRes)) && !empty($sm['value'])) ? $sm['value'] : '1';
+      $yearCompact = preg_replace('/[^0-9]/', '', $currentYear); // remove dash
+
+      $adminIdForPayroll = $_SESSION['admin_id'] ?? null;
+      $muniSlug = 'GENERAL';
+      if ($adminIdForPayroll) {
+        $muniRes = pg_query_params($connection, "SELECT m.slug, m.name FROM municipalities m JOIN admins a ON a.municipality_id=m.municipality_id WHERE a.admin_id=$1 LIMIT 1", [$adminIdForPayroll]);
+        if ($muniRes && ($mrow = pg_fetch_assoc($muniRes))) {
+          $rawSlug = !empty($mrow['slug']) ? $mrow['slug'] : $mrow['name'];
+          $muniSlug = strtoupper(preg_replace('/[^A-Z0-9]/', '', strtoupper($rawSlug)));
+        }
+      }
+      // Final prefix (e.g., GENTRIAS-20242025-2-XXXXXX)
+      $prefixBase = $muniSlug . '-' . $yearCompact . '-' . $currentSemester . '-';
+
+      // 1. Assign payroll numbers + formatted codes
         $result = pg_query($connection, "
             SELECT student_id
             FROM students
@@ -244,22 +264,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($result) {
             while ($row = pg_fetch_assoc($result)) {
                 $student_id = $row['student_id'];
-                // Assign payroll number
-                pg_query_params(
-                    $connection,
-                    "UPDATE students SET payroll_no = $1 WHERE student_id = $2",
-                    [$payroll_no, $student_id]
-                );
+          // Build formatted payroll code
+          $formattedCode = $prefixBase . str_pad((string)$payroll_no, 6, '0', STR_PAD_LEFT);
+          // Assign formatted payroll code into payroll_no
+          pg_query_params(
+            $connection,
+            "UPDATE students SET payroll_no = $1 WHERE student_id = $2",
+            [$formattedCode, $student_id]
+          );
                 $student_payrolls[] = [
                     'student_id' => $student_id,
-                    'payroll_no' => $payroll_no
+            'payroll_no' => $formattedCode
                 ];
                 $payroll_no++;
             }
             
             // Add admin notification
             $total_assigned = $payroll_no - 1;
-            $notification_msg = "Payroll numbers generated for " . $total_assigned . " active students";
+        $notification_msg = "Payroll numbers generated for " . $total_assigned . " active students (format: MUNICIPALITY-YYYYYYYY-S-######)";
             pg_query_params($connection, "INSERT INTO admin_notifications (message) VALUES ($1)", [$notification_msg]);
         }
         // 2. Immediately create QR code records for each student/payroll with a unique_id
@@ -278,7 +300,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 );
             }
         }
-        echo "<script>alert('Payroll numbers and QR codes generated successfully!'); window.location.href='verify_students.php';</script>";
+      echo "<script>alert('Payroll numbers and QR codes generated successfully with formatted codes.'); window.location.href='verify_students.php';</script>";
         exit;
     }
 }
@@ -461,7 +483,7 @@ while ($row = pg_fetch_assoc($barangayResult)) {
                         <td data-label="Barangay"><?= $barangay ?></td>
                         <td data-label="Payroll #" class="payroll-col">
                           <?php if ($isFinalized && !empty($payroll)): ?>
-                            <?= $payroll ?>
+                            <div><strong><?= $payroll ?></strong></div>
                           <?php else: ?>
                             <span class="text-muted">N/A</span>
                           <?php endif; ?>

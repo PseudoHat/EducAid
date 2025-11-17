@@ -29,7 +29,7 @@ try {
     echo "🔄 Starting cleanup...\n\n";
     
     // Count current payroll assignments
-    $countResult = pg_query($connection, "SELECT COUNT(*) as count FROM students WHERE payroll_no > 0");
+    $countResult = pg_query($connection, "SELECT COUNT(*) as count FROM students WHERE payroll_no IS NOT NULL AND payroll_no <> ''");
     $countData = pg_fetch_assoc($countResult);
     $currentCount = $countData['count'];
     
@@ -45,7 +45,7 @@ try {
     if ($currentCount > 0 || $qrCount > 0) {
         // Reset payroll numbers
         echo "Resetting payroll numbers...\n";
-        $resetPayroll = pg_query($connection, "UPDATE students SET payroll_no = 0 WHERE status = 'active'");
+        $resetPayroll = pg_query($connection, "UPDATE students SET payroll_no = NULL WHERE status = 'active'");
         if ($resetPayroll) {
             echo "✅ Payroll numbers reset successfully\n";
         } else {

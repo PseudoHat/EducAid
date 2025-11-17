@@ -9,8 +9,8 @@ function hasPayrollAndQR($connection) {
     // Check if there are active OR given students with payroll numbers and QR codes
     // Include 'given' status to prevent locking during active distribution
     $query = "
-        SELECT COUNT(*) as total,
-               COUNT(CASE WHEN s.payroll_no > 0 THEN 1 END) as with_payroll,
+         SELECT COUNT(*) as total,
+             COUNT(CASE WHEN COALESCE(s.payroll_no,'') <> '' THEN 1 END) as with_payroll,
                COUNT(q.qr_id) as with_qr
         FROM students s
         LEFT JOIN qr_codes q ON q.student_id = s.student_id
@@ -140,7 +140,7 @@ function getStudentCounts($connection) {
             SELECT 
                 COUNT(*) as total_students,
                 COUNT(CASE WHEN status = 'active' THEN 1 END) as active_count,
-                COUNT(CASE WHEN status = 'active' AND payroll_no > 0 THEN 1 END) as with_payroll_count,
+                COUNT(CASE WHEN status = 'active' AND COALESCE(payroll_no,'') <> '' THEN 1 END) as with_payroll_count,
                 COUNT(CASE WHEN status = 'applicant' THEN 1 END) as applicant_count,
                 COUNT(CASE WHEN status = 'active' THEN 1 END) as verified_students,
                 COUNT(CASE WHEN status = 'applicant' THEN 1 END) as pending_verification

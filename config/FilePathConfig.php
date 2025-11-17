@@ -42,7 +42,7 @@ class FilePathConfig {
         'archived_students' => [],
         'distributions' => [],
         'announcements' => [],
-        'municipal_logos' => []
+        'municipality_logos' => []
     ];
     
     /**
@@ -233,7 +233,7 @@ class FilePathConfig {
      * Get municipal logos folder path
      */
     public function getMunicipalLogosPath() {
-        return $this->baseUploadsDir . 'municipal_logos';
+        return $this->baseUploadsDir . 'municipality_logos';
     }
     
     /**
