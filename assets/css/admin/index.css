@@ -126,6 +126,38 @@ button[type="submit"]:hover {
 }
 
 /* Responsive Enhancements */
+/* Tablet Optimization (768px-991px) */
+@media (min-width: 768px) and (max-width: 991px) {
+  .right-panel {
+    padding: 45px 32px;
+    max-width: 420px;
+  }
+
+  .title {
+    font-size: 26px;
+  }
+
+  .subtext {
+    font-size: 13.5px;
+  }
+
+  button[type="submit"] {
+    font-size: 14.5px;
+    padding: 11px;
+  }
+  
+  /* CMS Edit Restrictions on Tablet */
+  .edit-mode-toggle,
+  .edit-btn,
+  .edit-btn-inline,
+  .cms-editor-btn,
+  [class*="edit-"]:not(.editable-content) {
+    pointer-events: none !important;
+    opacity: 0.5 !important;
+    cursor: not-allowed !important;
+  }
+}
+
 @media (max-width: 480px) {
   .right-panel {
     padding: 40px 24px;

@@ -884,6 +884,47 @@ $csrf_complete_token = CSRFProtection::generateToken('complete_distribution');
     #qrConfirmModal {
       z-index: 1050;
     }
+    
+    /* Tablet optimization (768px-991px) */
+    @media (min-width: 768px) and (max-width: 991.98px) {
+      #qrConfirmModal .modal-dialog {
+        max-width: 700px;
+        margin: 2rem auto;
+      }
+      
+      #qrConfirmModal .modal-content {
+        border-radius: 1rem;
+      }
+      
+      #qrConfirmModal .modal-header {
+        padding: 1.25rem;
+      }
+      
+      #qrConfirmModal .modal-body {
+        padding: 1rem 1.25rem;
+      }
+      
+      #qrConfirmModal .modal-footer {
+        padding: 1rem 1.25rem;
+      }
+      
+      #qrConfirmModal .modal-title {
+        font-size: 1.1rem;
+      }
+      
+      #qrConfirmModal .btn {
+        font-size: 0.9rem;
+        padding: 0.65rem 1.25rem;
+      }
+      
+      .scanner-section {
+        padding: 25px;
+      }
+      
+      .container {
+        padding: 0 20px;
+      }
+    }
   </style>
   </head>
 <body>

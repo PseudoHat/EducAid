@@ -442,6 +442,51 @@ if ($totalSlotsQuery) {
 <?php $page_title='Manage Signup Slots'; $extra_css=['../../assets/css/admin/manage_slots.css']; include __DIR__ . '/../../includes/admin/admin_head.php'; ?>
 <link rel="stylesheet" href="../../assets/css/admin/table_core.css"/>
 <style>
+  /* Tablet optimization (768px-991px) */
+  @media (min-width: 768px) and (max-width: 991.98px) {
+    #passwordModal .modal-dialog,
+    #finishSlotModal .modal-dialog {
+      max-width: 500px;
+      margin: 2rem auto;
+    }
+    
+    #passwordModal .modal-content,
+    #finishSlotModal .modal-content {
+      border-radius: 1rem;
+    }
+    
+    #passwordModal .modal-header,
+    #finishSlotModal .modal-header {
+      padding: 1.25rem;
+    }
+    
+    #passwordModal .modal-body,
+    #finishSlotModal .modal-body {
+      padding: 1rem 1.25rem;
+    }
+    
+    #passwordModal .modal-footer,
+    #finishSlotModal .modal-footer {
+      padding: 1rem 1.25rem;
+    }
+    
+    #passwordModal .modal-title,
+    #finishSlotModal .modal-title {
+      font-size: 1.1rem;
+    }
+    
+    #passwordModal .form-control,
+    #finishSlotModal .form-control {
+      font-size: 0.95rem;
+    }
+    
+    #passwordModal .btn,
+    #finishSlotModal .btn {
+      font-size: 0.9rem;
+      padding: 0.65rem 1.25rem;
+    }
+  }
+  
   /* Mobile capacity alert fix */
   @media (max-width: 768px) {
     .alert {

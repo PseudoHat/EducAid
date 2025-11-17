@@ -364,9 +364,9 @@ $canScanQRPublished = $canScanQR && $schedulePublished;
       </li>
     <?php endif; ?>
 
-    <!-- Website CMS (super_admin only) -->
+    <!-- Website CMS (super_admin only) - Hidden on mobile and tablet -->
     <?php if ($admin_role === 'super_admin'): ?>
-      <li class="nav-item dropdown d-none d-md-block">
+      <li class="nav-item dropdown cms-section d-none d-lg-block">
         <a href="#submenu-cms" data-bs-toggle="collapse" class="dropdown-toggle">
           <i class="bi bi-palette icon"></i>
           <span class="links_name">Website CMS</span>
@@ -816,7 +816,25 @@ if (!function_exists('adjustColorOpacity')) {
     background: #ffcdd2;
     color: #b71c1c;
 }
-@media (max-width:768px) {
+/* Tablet: Hide CMS section (768px - 991px) */
+@media (min-width: 768px) and (max-width: 991.98px) {
+    .dropdown.cms-section,
+    #submenu-cms {
+        display: none !important;
+    }
+    
+    .admin-sidebar .nav-item a { margin: 3px 10px; padding: 11px 14px; }
+    .admin-sidebar .dropdown > a { margin: 4px 10px; }
+    .admin-sidebar .nav-item.logout a.logout-link { margin: 6px 10px 8px; }
+}
+
+@media (max-width: 767.98px) {
+    /* Mobile: Also hide CMS section */
+    .dropdown.cms-section,
+    #submenu-cms {
+        display: none !important;
+    }
+    
     .admin-sidebar .nav-item a { margin: 2px 8px; }
     .admin-sidebar .dropdown > a { margin: 4px 8px; }
     .admin-sidebar .nav-item.logout a.logout-link { margin: 6px 8px 8px; }

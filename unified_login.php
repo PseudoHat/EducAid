@@ -2094,8 +2094,10 @@ $pageType = $seoData['type'];
             if (loading) {
                 button.disabled = true;
                 button.innerHTML = `
-                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                    <span>Processing...</span>
+                    <div class="d-flex align-items-center justify-content-center gap-2">
+                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                        <span>Processing...</span>
+                    </div>
                 `;
             } else {
                 button.disabled = false;

@@ -418,6 +418,38 @@
 }
 
 /* Responsive Tweaks */
+/* Tablet Optimization (768px-991px) */
+@media (min-width: 768px) and (max-width: 991px) {
+    .municipality-hub-page .muni-hero-card .card-body {
+        padding: 2rem;
+    }
+    
+    .municipality-hub-page .muni-logo-wrapper {
+        width: 90px;
+        height: 90px;
+    }
+    
+    .municipality-hub-page .muni-logo-wrapper img {
+        max-width: 70px;
+        max-height: 70px;
+    }
+    
+    .municipality-hub-page .home-section {
+        padding: calc(var(--admin-topbar-h) + var(--admin-header-h) + 10px) 15px 30px 15px;
+    }
+    
+    /* CMS Edit Restrictions on Tablet */
+    .edit-mode-toggle,
+    .edit-btn,
+    .edit-btn-inline,
+    .cms-editor-btn,
+    [class*="edit-"]:not(.editable-content) {
+        pointer-events: none !important;
+        opacity: 0.5 !important;
+        cursor: not-allowed !important;
+    }
+}
+
 @media (max-width: 768px) {
     .municipality-hub-page .muni-hero-card .card-body {
         padding: 1.5rem;

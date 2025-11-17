@@ -218,6 +218,15 @@ if ($DEMO_MODE) {
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Admin Dashboard</title>
+  
+  <!-- Critical CSS for FOUC prevention -->
+  <style>
+    body { opacity: 0; transition: opacity 0.3s ease; }
+    body.ready { opacity: 1; }
+    .admin-wrapper { min-height: 100vh; }
+    .home-section { background: #f5f5f5; }
+  </style>
+  
   <link rel="stylesheet" href="../../assets/css/bootstrap.min.css" />
   <link rel="stylesheet" href="../../assets/css/bootstrap-icons.css" />
   <link rel="stylesheet" href="../../assets/css/admin/homepage.css" />
@@ -926,6 +935,20 @@ if ($DEMO_MODE) {
         });
       <?php endif; ?>
     });
+  </script>
+  
+  <!-- Anti-FOUC Script -->
+  <script>
+    (function() {
+      document.body.classList.add('ready');
+      
+      // Handle bfcache (back/forward cache)
+      window.addEventListener('pageshow', function(event) {
+        if (event.persisted) {
+          document.body.classList.add('ready');
+        }
+      });
+    })();
   </script>
 </body>
 </html>

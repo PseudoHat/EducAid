@@ -100,6 +100,38 @@ $admins = pg_fetch_all($adminsResult) ?: [];
 <?php $page_title='Admin Management'; include __DIR__ . '/../../includes/admin/admin_head.php'; ?>
 <link rel="stylesheet" href="../../assets/css/admin/table_core.css">
 <style>
+/* Tablet optimization (768px-991px) */
+@media (min-width: 768px) and (max-width: 991.98px) {
+    .modal-mobile-compact .modal-dialog { 
+        max-width: 700px; 
+        margin: 2rem auto; 
+    }
+    .modal-mobile-compact .modal-content {
+        border-radius: 1rem;
+    }
+    .modal-mobile-compact .modal-header {
+        padding: 1.25rem;
+    }
+    .modal-mobile-compact .modal-body { 
+        max-height: 70vh; 
+        overflow-y: auto;
+        padding: 1rem 1.25rem;
+    }
+    .modal-mobile-compact .modal-footer {
+        padding: 1rem 1.25rem;
+    }
+    .modal-mobile-compact .modal-title {
+        font-size: 1.1rem;
+    }
+    .modal-mobile-compact .form-control {
+        font-size: 0.95rem;
+    }
+    .modal-mobile-compact .btn {
+        font-size: 0.9rem;
+        padding: 0.65rem 1.25rem;
+    }
+}
+
 /* Mobile-only compact modal size (consistent with Manage Applicants) */
 @media (max-width: 576px) {
     .modal-mobile-compact .modal-dialog { max-width: 420px; width: 88%; margin: 1rem auto; }

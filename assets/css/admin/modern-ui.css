@@ -266,6 +266,31 @@
     padding: 1.25rem 2rem;
 }
 
+/* Tablet optimization for modern-modal (768px-991px) */
+@media (min-width: 768px) and (max-width: 991.98px) {
+    .modern-modal .modal-dialog {
+        max-width: 650px;
+        margin: 2rem auto;
+    }
+    
+    .modern-modal .modal-content {
+        border-radius: 14px;
+    }
+    
+    .modern-modal .modal-header {
+        padding: 1.25rem;
+        border-radius: 14px 14px 0 0;
+    }
+    
+    .modern-modal .modal-body {
+        padding: 1.5rem;
+    }
+    
+    .modern-modal .modal-footer {
+        padding: 1rem 1.5rem;
+    }
+}
+
 /* Enhanced Alerts */
 .modern-alert {
     border-radius: 12px;
@@ -422,6 +447,17 @@
 }
 
 /* Responsive Adjustments */
+/* Tablet adjustments (768px-991px) */
+@media (min-width: 768px) and (max-width: 991.98px) {
+  .modern-card { padding: 1rem; }
+  .modern-card-header { padding: 1rem 1.25rem; }
+  .modern-table thead th { padding: 0.85rem; font-size: 0.7rem; }
+  .modern-table tbody td { padding: 0.85rem; font-size: 0.9rem; }
+  .action-buttons { gap: 0.5rem; }
+  .action-buttons .btn { padding: 0.45rem 0.75rem; font-size: 0.875rem; }
+  .modern-search input { padding-left: 2.25rem; font-size: 0.9rem; }
+}
+
 @media (max-width: 768px) {
     .modern-page-title {
         font-size: 1.5rem;
