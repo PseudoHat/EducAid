@@ -33,7 +33,7 @@ if (!headers_sent()) {
     // Adjust this based on your actual third-party services
     $csp = implode('; ', [
         "default-src 'self'",
-        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.google.com https://www.gstatic.com https://cdn.jsdelivr.net",
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.google.com https://www.gstatic.com https://cdn.jsdelivr.net https://unpkg.com",
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net",
         "font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net data:",
         "img-src 'self' data: https: blob:",
@@ -64,17 +64,21 @@ if (!headers_sent()) {
     
     // 6. Permissions-Policy (replaces Feature-Policy)
     // Restricts access to browser features and APIs
-    // Denies access to sensitive features unless explicitly needed
-    $permissions = implode(', ', [
+    // Default: deny sensitive features. Allow camera for pages that explicitly opt-in.
+    // Use constant() to avoid notices if ALLOW_CAMERA is not defined
+    $allowCamera = defined('ALLOW_CAMERA') && constant('ALLOW_CAMERA') === true;
+    $permissionsDirectives = [
         'geolocation=()',
         'microphone=()',
-        'camera=()',
+        // If ALLOW_CAMERA is defined and true BEFORE this file is included, enable camera on same-origin
+        $allowCamera ? 'camera=(self)' : 'camera=()',
         'payment=()',
         'usb=()',
         'magnetometer=()',
         'gyroscope=()',
         'accelerometer=()'
-    ]);
+    ];
+    $permissions = implode(', ', $permissionsDirectives);
     header("Permissions-Policy: {$permissions}");
     
     // BONUS: Additional security headers
@@ -114,7 +118,7 @@ function generateCSPNonce() {
         if (!headers_sent()) {
             // Note: This is a simplified version. For production, you'd want to
             // regenerate the entire CSP header with the nonce included.
-            header("Content-Security-Policy: script-src 'nonce-{$nonce}' 'self' 'unsafe-inline' https://www.google.com https://www.gstatic.com https://cdn.jsdelivr.net; default-src 'self'", true);
+            header("Content-Security-Policy: script-src 'nonce-{$nonce}' 'self' 'unsafe-inline' https://www.google.com https://www.gstatic.com https://cdn.jsdelivr.net https://unpkg.com; default-src 'self'", true);
         }
     }
     return $nonce;

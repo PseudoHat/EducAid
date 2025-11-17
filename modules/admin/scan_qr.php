@@ -1,4 +1,6 @@
 <?php 
+// Opt-in to camera access for this page (Permissions-Policy override)
+if (!defined('ALLOW_CAMERA')) { define('ALLOW_CAMERA', true); }
 // Load secure session configuration (must be before session_start)
 require_once __DIR__ . '/../../config/session_config.php';
 
@@ -522,131 +524,131 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm_distribution'
     ]);
     exit;
   }
-
+  
   $student_id = $_POST['student_id'];
   $admin_id = $_SESSION['admin_id'] ?? 1;
     
-    try {
-        // Start transaction
-        pg_query($connection, "BEGIN");
-        
-        // Get current active snapshot (or create a temporary one)
-        $snapshot_query = "
-            SELECT snapshot_id, academic_year, semester 
-            FROM distribution_snapshots 
-            WHERE finalized_at IS NULL OR finalized_at >= CURRENT_DATE - INTERVAL '7 days'
-            ORDER BY finalized_at DESC NULLS FIRST
-            LIMIT 1
-        ";
-        $snapshot_result = pg_query($connection, $snapshot_query);
-        $snapshot_id = null;
-        
-        if ($snapshot_result && pg_num_rows($snapshot_result) > 0) {
-            $snapshot = pg_fetch_assoc($snapshot_result);
-            $snapshot_id = $snapshot['snapshot_id'];
-        } else {
-            // Create a temporary snapshot for ongoing distribution
-            // CRITICAL: Set finalized_at = NULL explicitly to prevent auto-completion
-            $temp_snapshot_query = "
-                INSERT INTO distribution_snapshots 
-                (distribution_date, location, total_students_count, academic_year, semester, 
-                 finalized_by, finalized_at, notes, distribution_id)
-                VALUES (CURRENT_DATE, 'Ongoing', 0, 
-                    (SELECT value FROM config WHERE key = 'current_academic_year'),
-                    (SELECT value FROM config WHERE key = 'current_semester'),
-                    $1, NULL, 'Auto-created during QR scanning', 
-                    'TEMP-' || TO_CHAR(NOW(), 'YYYY-MM-DD-HH24MISS'))
-                RETURNING snapshot_id
-            ";
-            $temp_result = pg_query_params($connection, $temp_snapshot_query, [$admin_id]);
-            if ($temp_result) {
-                $temp_row = pg_fetch_assoc($temp_result);
-                $snapshot_id = $temp_row['snapshot_id'];
-                error_log("Created temporary distribution snapshot: $snapshot_id (finalized_at = NULL - ongoing)");
-            }
-        }
-        
-        // Update student status to 'given'
-        $update_query = "UPDATE students SET status = 'given' WHERE student_id = $1";
-        $update_result = pg_query_params($connection, $update_query, [$student_id]);
-        
-        if (!$update_result) {
-            throw new Exception('Failed to update student status');
-        }
-        
-        // Get QR code for this student
-        $qr_query = "SELECT unique_id FROM qr_codes WHERE student_id = $1";
-        $qr_result = pg_query_params($connection, $qr_query, [$student_id]);
-        $qr_data = $qr_result ? pg_fetch_assoc($qr_result) : null;
-        $qr_code_used = $qr_data['unique_id'] ?? null;
-        
-        // Update QR code status to 'Done' (must match CHECK constraint: 'Pending' or 'Done')
-        $qr_update_query = "UPDATE qr_codes SET status = 'Done' WHERE student_id = $1";
-        $qr_update_result = pg_query_params($connection, $qr_update_query, [$student_id]);
-        
-        if (!$qr_update_result) {
-            throw new Exception('Failed to update QR code status');
-        }
-        
-        // Create distribution record linking student to snapshot
-        if ($snapshot_id) {
-            $record_query = "
-                INSERT INTO distribution_student_records 
-                (snapshot_id, student_id, qr_code_used, scanned_by, verification_method, notes)
-                VALUES ($1, $2, $3, $4, 'qr_scan', 'Scanned via QR code scanner')
-                ON CONFLICT (snapshot_id, student_id) DO UPDATE 
-                SET scanned_at = NOW(), scanned_by = EXCLUDED.scanned_by
-            ";
-            $record_result = pg_query_params($connection, $record_query, [
-                $snapshot_id, $student_id, $qr_code_used, $admin_id
-            ]);
-            
-            if (!$record_result) {
-                error_log("Warning: Failed to create distribution record for student $student_id in snapshot $snapshot_id");
-            } else {
-                error_log("Created distribution record: Student $student_id linked to snapshot $snapshot_id");
-            }
-        }
-        
-        // Log QR scan to qr_logs table for tracking
-        $log_query = "INSERT INTO qr_logs (student_id, scanned_at, scanned_by) VALUES ($1, NOW(), $2)";
-        $log_result = pg_query_params($connection, $log_query, [$student_id, $admin_id]);
-        
-        if (!$log_result) {
-            error_log("Warning: Failed to log QR scan for student $student_id: " . pg_last_error($connection));
-        }
-        
-        // Add student notification for successful distribution
-        createStudentNotification(
-            $connection,
-            $student_id,
-            'Scholarship Aid Distributed!',
-            'Your scholarship aid has been successfully distributed. Thank you for participating in the EducAid program.',
-            'success',
-            'high',
-            'student_dashboard.php'
-        );
-        
-        // Commit transaction
-        pg_query($connection, "COMMIT");
-        
-        echo json_encode([
-            'success' => true,
-            'message' => 'Distribution confirmed successfully',
-            'next_token' => CSRFProtection::generateToken('confirm_distribution')
-        ]);
-    } catch (Exception $e) {
-        // Rollback on any error
-        pg_query($connection, "ROLLBACK");
-        error_log("Distribution confirmation error: " . $e->getMessage());
-        
-        echo json_encode([
-            'success' => false,
-            'message' => 'Failed to confirm distribution: ' . $e->getMessage(),
-            'next_token' => CSRFProtection::generateToken('confirm_distribution')
-        ]);
+  try {
+    // Start transaction
+    pg_query($connection, "BEGIN");
+    
+    // Get current active snapshot (or create a temporary one)
+    $snapshot_query = "
+      SELECT snapshot_id, academic_year, semester 
+      FROM distribution_snapshots 
+      WHERE finalized_at IS NULL OR finalized_at >= CURRENT_DATE - INTERVAL '7 days'
+      ORDER BY finalized_at DESC NULLS FIRST
+      LIMIT 1
+    ";
+    $snapshot_result = pg_query($connection, $snapshot_query);
+    $snapshot_id = null;
+    
+    if ($snapshot_result && pg_num_rows($snapshot_result) > 0) {
+      $snapshot = pg_fetch_assoc($snapshot_result);
+      $snapshot_id = $snapshot['snapshot_id'];
+    } else {
+      // Create a temporary snapshot for ongoing distribution
+      // CRITICAL: Set finalized_at = NULL explicitly to prevent auto-completion
+      $temp_snapshot_query = "
+        INSERT INTO distribution_snapshots 
+        (distribution_date, location, total_students_count, academic_year, semester, 
+         finalized_by, finalized_at, notes, distribution_id)
+        VALUES (CURRENT_DATE, 'Ongoing', 0, 
+          (SELECT value FROM config WHERE key = 'current_academic_year'),
+          (SELECT value FROM config WHERE key = 'current_semester'),
+          $1, NULL, 'Auto-created during QR scanning', 
+          'TEMP-' || TO_CHAR(NOW(), 'YYYY-MM-DD-HH24MISS'))
+        RETURNING snapshot_id
+      ";
+      $temp_result = pg_query_params($connection, $temp_snapshot_query, [$admin_id]);
+      if ($temp_result) {
+        $temp_row = pg_fetch_assoc($temp_result);
+        $snapshot_id = $temp_row['snapshot_id'];
+        error_log("Created temporary distribution snapshot: $snapshot_id (finalized_at = NULL - ongoing)");
+      }
     }
-    exit;
+    
+    // Update student status to 'given'
+    $update_query = "UPDATE students SET status = 'given' WHERE student_id = $1";
+    $update_result = pg_query_params($connection, $update_query, [$student_id]);
+    
+    if (!$update_result) {
+      throw new Exception('Failed to update student status');
+    }
+    
+    // Get QR code for this student
+    $qr_query = "SELECT unique_id FROM qr_codes WHERE student_id = $1";
+    $qr_result = pg_query_params($connection, $qr_query, [$student_id]);
+    $qr_data = $qr_result ? pg_fetch_assoc($qr_result) : null;
+    $qr_code_used = $qr_data['unique_id'] ?? null;
+    
+    // Update QR code status to 'Done' (must match CHECK constraint: 'Pending' or 'Done')
+    $qr_update_query = "UPDATE qr_codes SET status = 'Done' WHERE student_id = $1";
+    $qr_update_result = pg_query_params($connection, $qr_update_query, [$student_id]);
+    
+    if (!$qr_update_result) {
+      throw new Exception('Failed to update QR code status');
+    }
+    
+    // Create distribution record linking student to snapshot
+    if ($snapshot_id) {
+      $record_query = "
+        INSERT INTO distribution_student_records 
+        (snapshot_id, student_id, qr_code_used, scanned_by, verification_method, notes)
+        VALUES ($1, $2, $3, $4, 'qr_scan', 'Scanned via QR code scanner')
+        ON CONFLICT (snapshot_id, student_id) DO UPDATE 
+        SET scanned_at = NOW(), scanned_by = EXCLUDED.scanned_by
+      ";
+      $record_result = pg_query_params($connection, $record_query, [
+        $snapshot_id, $student_id, $qr_code_used, $admin_id
+      ]);
+      
+      if (!$record_result) {
+        error_log("Warning: Failed to create distribution record for student $student_id in snapshot $snapshot_id");
+      } else {
+        error_log("Created distribution record: Student $student_id linked to snapshot $snapshot_id");
+      }
+    }
+    
+    // Log QR scan to qr_logs table for tracking
+    $log_query = "INSERT INTO qr_logs (student_id, scanned_at, scanned_by) VALUES ($1, NOW(), $2)";
+    $log_result = pg_query_params($connection, $log_query, [$student_id, $admin_id]);
+    
+    if (!$log_result) {
+      error_log("Warning: Failed to log QR scan for student $student_id: " . pg_last_error($connection));
+    }
+    
+    // Add student notification for successful distribution
+    createStudentNotification(
+      $connection,
+      $student_id,
+      'Scholarship Aid Distributed!',
+      'Your scholarship aid has been successfully distributed. Thank you for participating in the EducAid program.',
+      'success',
+      'high',
+      'student_dashboard.php'
+    );
+    
+    // Commit transaction
+    pg_query($connection, "COMMIT");
+    
+    echo json_encode([
+      'success' => true,
+      'message' => 'Distribution confirmed successfully',
+      'next_token' => CSRFProtection::generateToken('confirm_distribution')
+    ]);
+  } catch (Exception $e) {
+    // Rollback on any error
+    pg_query($connection, "ROLLBACK");
+    error_log("Distribution confirmation error: " . $e->getMessage());
+    
+    echo json_encode([
+      'success' => false,
+      'message' => 'Failed to confirm distribution: ' . $e->getMessage(),
+      'next_token' => CSRFProtection::generateToken('confirm_distribution')
+    ]);
+  }
+  exit;
 }
 
 // Handle QR code lookup
@@ -1134,14 +1136,39 @@ $csrf_complete_token = CSRFProtection::generateToken('complete_distribution');
     </div>
   </div>
 
-  <script src="https://unpkg.com/html5-qrcode"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/minified/html5-qrcode.min.js"></script>
+  <script>
+    (function ensureHtml5Qrcode(){
+      function hasLib(){ return typeof window.Html5Qrcode !== 'undefined'; }
+      function load(src, cb){ var s=document.createElement('script'); s.src=src; s.async=false; s.onload=cb; s.onerror=cb; document.head.appendChild(s); }
+      if (hasLib()) return;
+
+      // Try multiple sources in order: unpkg -> local vendor copy
+      var sources = [
+        'https://unpkg.com/html5-qrcode@2.3.8/minified/html5-qrcode.min.js',
+        '../../assets/vendor/html5-qrcode/html5-qrcode.min.js'
+      ];
+
+      var idx = 0; var start = Date.now();
+      (function attempt(){
+        if (hasLib()) return; // already loaded
+        if (idx >= sources.length) {
+          // Wait a bit longer in case first static tag loads late
+          if (!hasLib() && (Date.now() - start) < 8000) { return setTimeout(attempt, 250); }
+          if (!hasLib()) console.error('Failed to load html5-qrcode from CDNs and local fallback.');
+          return;
+        }
+        load(sources[idx++], function(){ setTimeout(attempt, 200); });
+      })();
+    })();
+  </script>
   <script src="../../assets/js/admin/sidebar.js"></script>
   <script src="../../assets/js/bootstrap.bundle.min.js"></script>
   <script>
-    const startButton = document.getElementById('start-button');
-    const stopButton = document.getElementById('stop-button');
-    const cameraSelect = document.getElementById('camera-select');
-    const html5QrCode = new Html5Qrcode("reader");
+  const startButton = document.getElementById('start-button');
+  const stopButton = document.getElementById('stop-button');
+  const cameraSelect = document.getElementById('camera-select');
+  let html5QrCode = null; // create instance only when library is loaded
     let currentCameraId = null;
     let currentStudentData = null;
     const distributionCompleted = <?= $distribution_completed ? 'true' : 'false' ?>;
@@ -1160,22 +1187,24 @@ $csrf_complete_token = CSRFProtection::generateToken('complete_distribution');
       return new URLSearchParams(params).toString();
     }
     
-    // Initialize camera selection with proper permission request
-    async function initializeCameraSelection() {
+  // Initialize camera selection without prompting permission (do that on Start)
+  async function initializeCameraSelection() {
       try {
         startButton.disabled = true;
         startButton.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Initializing...';
         
-        // CRITICAL: Request camera permission first before enumerating devices
-        console.log('Requesting camera permission...');
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-        
-        // Stop the stream immediately after getting permission
-        stream.getTracks().forEach(track => track.stop());
-        console.log('Camera permission granted');
-        
+        // Wait until the scanner library is available (handle slow CDN)
+        await new Promise((resolve, reject) => {
+          const start = Date.now();
+          (function waitLib(){
+            if (typeof window.Html5Qrcode !== 'undefined') return resolve();
+            if (Date.now() - start > 7000) return reject(new Error('Scanner library failed to load'));
+            setTimeout(waitLib, 150);
+          })();
+        });
+
         // Now enumerate cameras (will work because permission is granted)
-        const cameras = await Html5Qrcode.getCameras();
+    const cameras = await Html5Qrcode.getCameras();
         
         if (!cameras || cameras.length === 0) {
           throw new Error('No cameras found on your device');
@@ -1208,18 +1237,16 @@ $csrf_complete_token = CSRFProtection::generateToken('complete_distribution');
           console.log('Selected first camera:', cameras[0].label || cameras[0].id);
         }
         
-        // Enable start button after successful initialization
-        startButton.disabled = false;
-        startButton.textContent = 'Start Scanner';
+  // Enable start button after successful initialization
+  startButton.disabled = false;
+  startButton.textContent = 'Start Scanner';
         
       } catch (err) {
         console.error("Error initializing camera:", err);
         
-        let errorMessage = 'Failed to initialize camera. ';
+  let errorMessage = 'Failed to initialize camera. ';
         
-        if (err.name === 'NotAllowedError') {
-          errorMessage += 'Camera permission denied. Please allow camera access in your browser settings and refresh the page.';
-        } else if (err.name === 'NotFoundError') {
+  if (err.name === 'NotFoundError') {
           errorMessage += 'No camera found on your device. Please connect a camera and refresh the page.';
         } else if (err.name === 'NotReadableError') {
           errorMessage += 'Camera is already in use by another application. Please close other apps using the camera and try again.';
@@ -1247,7 +1274,7 @@ $csrf_complete_token = CSRFProtection::generateToken('complete_distribution');
     });
 
     // Start scanner
-    startButton.addEventListener('click', () => {
+    startButton.addEventListener('click', async () => {
       // Prevent starting if distribution is completed
       if (distributionCompleted) {
         alert("Scanner is disabled. The distribution has been completed and finalized.");
@@ -1256,6 +1283,41 @@ $csrf_complete_token = CSRFProtection::generateToken('complete_distribution');
       
       if (!currentCameraId) {
         alert("Please select a camera.");
+        return;
+      }
+      
+      // Ensure scanner library is present and instance created
+      if (typeof window.Html5Qrcode === 'undefined') {
+        alert('Scanner library is not loaded yet. Please wait a moment and try again.');
+        return;
+      }
+      if (!html5QrCode) {
+        try {
+          html5QrCode = new Html5Qrcode("reader");
+        } catch (e) {
+          console.error('Failed to create scanner instance:', e);
+          alert('Failed to initialize scanner.');
+          return;
+        }
+      }
+
+      // Request permission on user gesture (best compatibility), then release stream
+      try {
+        const tempStream = await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: currentCameraId } } });
+        tempStream.getTracks().forEach(t => t.stop());
+      } catch (err) {
+        console.error('Permission/start preflight error:', err);
+        let errorMessage = "Failed to start camera. ";
+        if (err.name === 'NotAllowedError' || (err.message && err.message.includes('Permission'))) {
+          errorMessage += "Camera permission was denied. Click the lock icon near the address bar → Site settings → Camera → Allow, then reload.";
+        } else if (err.name === 'NotFoundError') {
+          errorMessage += "Camera not found. Please check if your camera is connected.";
+        } else if (err.name === 'NotReadableError' || (err.message && err.message.includes('in use'))) {
+          errorMessage += "Camera is already in use by another application. Close other apps using the camera.";
+        } else {
+          errorMessage += err.message || "Unknown error occurred.";
+        }
+        alert(errorMessage);
         return;
       }
       
