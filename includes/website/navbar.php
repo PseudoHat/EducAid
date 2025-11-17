@@ -229,6 +229,9 @@ nav.navbar.fixed-header .container-fluid {
   nav.navbar.fixed-header .container-fluid {
     padding-left: 1.5rem;
     padding-right: 1.5rem;
+    gap: 3rem; /* Add minimum 3rem gap between brand and nav */
+    display: flex;
+    flex-wrap: nowrap;
   }
 }
 
@@ -236,6 +239,7 @@ nav.navbar.fixed-header .container-fluid {
   nav.navbar.fixed-header .container-fluid {
     padding-left: 2.5rem;
     padding-right: 2.5rem;
+    gap: 4rem; /* Increase gap on larger screens */
   }
 }
 
@@ -265,7 +269,8 @@ nav.navbar.fixed-header .navbar-brand {
 @media (min-width: 992px) {
   nav.navbar.fixed-header .navbar-brand {
     max-width: none;
-    margin-right: 2rem; /* Add spacing between brand and nav links */
+    margin-right: 0; /* Remove margin, use gap instead */
+    flex: 0 1 auto; /* Allow some flexibility */
   }
 }
 
@@ -320,10 +325,10 @@ nav.navbar.fixed-header .navbar-nav.spread-nav .nav-link {
 
 @media (min-width: 992px) {
   nav.navbar.fixed-header .navbar-nav.spread-nav {
-    flex: 0 1 auto;
-    justify-content: center;
+    flex: 0 0 auto; /* Don't grow or shrink */
+    justify-content: flex-end;
     gap: 0.75rem;
-    margin-left: auto; /* Push nav to the right side */
+    margin-left: 0; /* Remove auto margin */
   }
 
   nav.navbar.fixed-header .navbar-nav.spread-nav .nav-item {
