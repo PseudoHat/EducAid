@@ -1,4 +1,6 @@
 <?php 
+// Opt-in to camera access for this page (Permissions-Policy override)
+if (!defined('ALLOW_CAMERA')) { define('ALLOW_CAMERA', true); }
 // Load secure session configuration (must be before session_start)
 require_once __DIR__ . '/../../config/session_config.php';
 
@@ -1134,7 +1136,7 @@ $csrf_complete_token = CSRFProtection::generateToken('complete_distribution');
     </div>
   </div>
 
-  <script src="https://unpkg.com/html5-qrcode"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/minified/html5-qrcode.min.js"></script>
   <script src="../../assets/js/admin/sidebar.js"></script>
   <script src="../../assets/js/bootstrap.bundle.min.js"></script>
   <script>

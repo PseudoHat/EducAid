@@ -77,7 +77,12 @@ RewriteRule ^(.*)$ https://www.educ-aid.site/$1 [L,R=301]
 
 # Permissions Policy (Feature Policy)
 <IfModule mod_headers.c>
-    Header set Permissions-Policy "geolocation=(), microphone=(), camera=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=()"
+    # Default: deny sensitive features everywhere, but only if not already set by PHP
+    Header setifempty Permissions-Policy "geolocation=(), microphone=(), camera=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=()"
+
+    # Allow camera only on the QR scanner admin page using env flag
+    SetEnvIf Request_URI "^/modules/admin/scan_qr\.php$" allow_camera
+    Header set Permissions-Policy "geolocation=(), microphone=(), camera=(self), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=()" env=allow_camera
 </IfModule>
 
 # ----------------------------------------
