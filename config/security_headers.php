@@ -118,7 +118,7 @@ function generateCSPNonce() {
         if (!headers_sent()) {
             // Note: This is a simplified version. For production, you'd want to
             // regenerate the entire CSP header with the nonce included.
-            header("Content-Security-Policy: script-src 'nonce-{$nonce}' 'self' 'unsafe-inline' https://www.google.com https://www.gstatic.com https://cdn.jsdelivr.net; default-src 'self'", true);
+            header("Content-Security-Policy: script-src 'nonce-{$nonce}' 'self' 'unsafe-inline' https://www.google.com https://www.gstatic.com https://cdn.jsdelivr.net https://unpkg.com; default-src 'self'", true);
         }
     }
     return $nonce;

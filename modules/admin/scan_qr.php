@@ -1142,16 +1142,24 @@ $csrf_complete_token = CSRFProtection::generateToken('complete_distribution');
       function hasLib(){ return typeof window.Html5Qrcode !== 'undefined'; }
       function load(src, cb){ var s=document.createElement('script'); s.src=src; s.async=false; s.onload=cb; s.onerror=cb; document.head.appendChild(s); }
       if (hasLib()) return;
-      // Fallback to unpkg after a short wait if jsDelivr failed
-      setTimeout(function(){
-        if (!hasLib()) {
-          load('https://unpkg.com/html5-qrcode@2.3.8/minified/html5-qrcode.min.js', function(){
-            if (!hasLib()) {
-              console.error('Failed to load html5-qrcode from both CDNs.');
-            }
-          });
+
+      // Try multiple sources in order: unpkg -> local vendor copy
+      var sources = [
+        'https://unpkg.com/html5-qrcode@2.3.8/minified/html5-qrcode.min.js',
+        '../../assets/vendor/html5-qrcode/html5-qrcode.min.js'
+      ];
+
+      var idx = 0; var start = Date.now();
+      (function attempt(){
+        if (hasLib()) return; // already loaded
+        if (idx >= sources.length) {
+          // Wait a bit longer in case first static tag loads late
+          if (!hasLib() && (Date.now() - start) < 8000) { return setTimeout(attempt, 250); }
+          if (!hasLib()) console.error('Failed to load html5-qrcode from CDNs and local fallback.');
+          return;
         }
-      }, 500);
+        load(sources[idx++], function(){ setTimeout(attempt, 200); });
+      })();
     })();
   </script>
   <script src="../../assets/js/admin/sidebar.js"></script>
