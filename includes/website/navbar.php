@@ -265,6 +265,7 @@ nav.navbar.fixed-header .navbar-brand {
 @media (min-width: 992px) {
   nav.navbar.fixed-header .navbar-brand {
     max-width: none;
+    margin-right: 2rem; /* Add spacing between brand and nav links */
   }
 }
 
@@ -322,6 +323,7 @@ nav.navbar.fixed-header .navbar-nav.spread-nav .nav-link {
     flex: 0 1 auto;
     justify-content: center;
     gap: 0.75rem;
+    margin-left: auto; /* Push nav to the right side */
   }
 
   nav.navbar.fixed-header .navbar-nav.spread-nav .nav-item {
