@@ -1136,16 +1136,16 @@ $csrf_complete_token = CSRFProtection::generateToken('complete_distribution');
     </div>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/minified/html5-qrcode.min.js"></script>
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script>
     (function ensureHtml5Qrcode(){
       function hasLib(){ return typeof window.Html5Qrcode !== 'undefined'; }
       function load(src, cb){ var s=document.createElement('script'); s.src=src; s.async=false; s.onload=cb; s.onerror=cb; document.head.appendChild(s); }
       if (hasLib()) return;
 
-      // Try multiple sources in order: unpkg -> local vendor copy
+      // Try multiple sources in order: jsDelivr -> local vendor copy
       var sources = [
-        'https://unpkg.com/html5-qrcode@2.3.8/minified/html5-qrcode.min.js',
+        'https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js',
         '../../assets/vendor/html5-qrcode/html5-qrcode.min.js'
       ];
 
@@ -1198,46 +1198,17 @@ $csrf_complete_token = CSRFProtection::generateToken('complete_distribution');
           const start = Date.now();
           (function waitLib(){
             if (typeof window.Html5Qrcode !== 'undefined') return resolve();
-            if (Date.now() - start > 7000) return reject(new Error('Scanner library failed to load'));
-            setTimeout(waitLib, 150);
+            if (Date.now() - start > 10000) return reject(new Error('Scanner library failed to load'));
+            setTimeout(waitLib, 200);
           })();
         });
 
-        // Now enumerate cameras (will work because permission is granted)
-    const cameras = await Html5Qrcode.getCameras();
+        console.log('Scanner library loaded successfully');
         
-        if (!cameras || cameras.length === 0) {
-          throw new Error('No cameras found on your device');
-        }
+        // DO NOT enumerate cameras here - that requires permission!
+        // Camera enumeration will happen on Start button click after permission is granted
         
-        console.log(`Found ${cameras.length} camera(s)`);
-        
-        // Clear existing options except the first placeholder
-        cameraSelect.innerHTML = '<option value="">Select Camera</option>';
-        
-        cameras.forEach(camera => {
-          const option = document.createElement('option');
-          option.value = camera.id;
-          option.text = camera.label || `Camera ${camera.id}`;
-          cameraSelect.appendChild(option);
-        });
-        
-        // Prefer back camera (for mobile devices)
-        const backCam = cameras.find(cam => 
-          cam.label && cam.label.toLowerCase().includes('back')
-        );
-        
-        if (backCam) {
-          cameraSelect.value = backCam.id;
-          currentCameraId = backCam.id;
-          console.log('Selected back camera:', backCam.label);
-        } else if (cameras.length > 0) {
-          cameraSelect.value = cameras[0].id;
-          currentCameraId = cameras[0].id;
-          console.log('Selected first camera:', cameras[0].label || cameras[0].id);
-        }
-        
-  // Enable start button after successful initialization
+  // Enable start button after library is ready
   startButton.disabled = false;
   startButton.textContent = 'Start Scanner';
         
@@ -1281,11 +1252,6 @@ $csrf_complete_token = CSRFProtection::generateToken('complete_distribution');
         return;
       }
       
-      if (!currentCameraId) {
-        alert("Please select a camera.");
-        return;
-      }
-      
       // Ensure scanner library is present and instance created
       if (typeof window.Html5Qrcode === 'undefined') {
         alert('Scanner library is not loaded yet. Please wait a moment and try again.');
@@ -1301,27 +1267,67 @@ $csrf_complete_token = CSRFProtection::generateToken('complete_distribution');
         }
       }
 
-      // Request permission on user gesture (best compatibility), then release stream
+      startButton.disabled = true;
+      startButton.textContent = 'Requesting permission...';
+      stopButton.disabled = true;
+
       try {
-        const tempStream = await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: currentCameraId } } });
-        tempStream.getTracks().forEach(t => t.stop());
-      } catch (err) {
-        console.error('Permission/start preflight error:', err);
-        let errorMessage = "Failed to start camera. ";
-        if (err.name === 'NotAllowedError' || (err.message && err.message.includes('Permission'))) {
-          errorMessage += "Camera permission was denied. Click the lock icon near the address bar → Site settings → Camera → Allow, then reload.";
-        } else if (err.name === 'NotFoundError') {
-          errorMessage += "Camera not found. Please check if your camera is connected.";
-        } else if (err.name === 'NotReadableError' || (err.message && err.message.includes('in use'))) {
-          errorMessage += "Camera is already in use by another application. Close other apps using the camera.";
+        // Request camera permission first
+        console.log('Requesting camera permission...');
+        let stream;
+        if (currentCameraId) {
+          // Try the selected camera
+          try {
+            stream = await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: currentCameraId } } });
+          } catch (err) {
+            if (err.name === 'OverconstrainedError') {
+              console.warn('Selected camera unavailable, using default');
+              stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            } else {
+              throw err;
+            }
+          }
         } else {
-          errorMessage += err.message || "Unknown error occurred.";
+          // No camera selected yet, request general permission
+          stream = await navigator.mediaDevices.getUserMedia({ video: true });
         }
-        alert(errorMessage);
-        return;
-      }
-      
-      html5QrCode.start(
+
+        // Stop the permission stream immediately
+        stream.getTracks().forEach(t => t.stop());
+        console.log('Camera permission granted');
+
+        // Now enumerate cameras with permission
+        if (!currentCameraId) {
+          const cameras = await Html5Qrcode.getCameras();
+          if (!cameras || cameras.length === 0) {
+            throw new Error('No cameras found on your device');
+          }
+
+          console.log(`Found ${cameras.length} camera(s)`);
+          cameraSelect.innerHTML = '<option value="">Select Camera</option>';
+          cameras.forEach(camera => {
+            const option = document.createElement('option');
+            option.value = camera.id;
+            option.text = camera.label || `Camera ${camera.id}`;
+            cameraSelect.appendChild(option);
+          });
+
+          // Prefer back camera
+          const backCam = cameras.find(cam => cam.label && cam.label.toLowerCase().includes('back'));
+          if (backCam) {
+            cameraSelect.value = backCam.id;
+            currentCameraId = backCam.id;
+            console.log('Selected back camera:', backCam.label);
+          } else {
+            cameraSelect.value = cameras[0].id;
+            currentCameraId = cameras[0].id;
+            console.log('Selected first camera:', cameras[0].label || cameras[0].id);
+          }
+        }
+
+        // Now start scanning with the selected camera
+        console.log('Starting scanner with camera:', currentCameraId);
+        await html5QrCode.start(
         currentCameraId,
         { 
           fps: 10, 
@@ -1392,18 +1398,20 @@ $csrf_complete_token = CSRFProtection::generateToken('complete_distribution');
             console.log("Scanner error:", error);
           }
         }
-      ).then(() => {
+      );
+
         startButton.disabled = true;
         startButton.textContent = 'Scanner Running...';
         stopButton.disabled = false;
         console.log("Scanner started successfully");
-      }).catch(err => {
+
+      } catch (err) {
         console.error("Failed to start scanning:", err);
         
         let errorMessage = "Failed to start camera. ";
         
         if (err.name === 'NotAllowedError' || (err.message && err.message.includes('Permission'))) {
-          errorMessage += "Camera permission was denied. Please allow camera access in your browser settings.";
+          errorMessage += "Camera permission was denied. Click the lock icon near the address bar → Site settings → Camera → Allow, then reload.";
         } else if (err.name === 'NotFoundError') {
           errorMessage += "Camera not found. Please check if your camera is connected.";
         } else if (err.name === 'NotReadableError' || (err.message && err.message.includes('in use'))) {
@@ -1417,7 +1425,7 @@ $csrf_complete_token = CSRFProtection::generateToken('complete_distribution');
         alert(errorMessage);
         startButton.disabled = false;
         stopButton.disabled = true;
-      });
+      }
     });
 
     // Stop scanner
