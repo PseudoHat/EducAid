@@ -1,14 +1,4 @@
 <?php
-// Opt-in to camera access for this page (used by Permissions-Policy)
-if (!defined('ALLOW_CAMERA')) { define('ALLOW_CAMERA', true); }
-
-// Load security headers before any output
-require_once __DIR__ . '/../../config/security_headers.php';
-
-// Prevent caching of this page (camera permission pages should always be fresh)
-header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
-header('Pragma: no-cache');
-header('Expires: 0');
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -50,9 +40,6 @@ if (!$qr_res) {
     echo "Error executing query: " . pg_last_error($connection);
     exit;
 }
-
-// Count results for table rendering
-$qr_count = pg_num_rows($qr_res);
 
 ?>
 
@@ -104,42 +91,6 @@ $qr_count = pg_num_rows($qr_res);
     </style>
 </head>
 <body>
-    <!-- Camera Permission Debug Info -->
-    <script>
-        console.log('=== Camera Permission Debug (scanner.php) ===');
-        console.log('ALLOW_CAMERA constant:', <?php echo defined('ALLOW_CAMERA') && ALLOW_CAMERA ? 'true' : 'false'; ?>);
-        console.log('Page:', window.location.pathname);
-        
-        if (navigator.permissions && navigator.permissions.query) {
-            navigator.permissions.query({name: 'camera'}).then(function(result) {
-                console.log('Camera permission state:', result.state);
-            }).catch(function(err) {
-                console.log('Permissions API check failed:', err.message);
-            });
-        }
-        console.log('===============================');
-    </script>
-    
-    <!-- Inspect actual response headers (async) -->
-    <script>
-        (async function(){
-            try {
-                const res = await fetch(window.location.href + '?probe=' + Date.now(), { method: 'GET', cache: 'no-store' });
-                const pol = res.headers.get('permissions-policy');
-                console.log('Response Permissions-Policy header:', pol);
-                if (pol && pol.includes('camera=()')) {
-                    console.error('🚨 CLOUDFLARE CACHE STILL ACTIVE: camera=() detected');
-                    console.error('The cached header is still being served by Cloudflare edge servers');
-                    console.error('Try: Development Mode in Cloudflare (bypasses cache for 3 hours)');
-                } else if (pol && pol.includes('camera=(self)')) {
-                    console.log('✅ Header correct: camera=(self)');
-                } else {
-                    console.log('⚠️ No Permissions-Policy header (should be permissive)');
-                }
-            } catch(e){ console.log('Header probe failed:', e.message); }
-        })();
-    </script>
-    
     <div id="wrapper">
         <?php include __DIR__ . '/../../includes/admin/admin_sidebar.php'; ?>
         <div class="sidebar-backdrop d-none" id="sidebar-backdrop"></div>
@@ -171,69 +122,90 @@ $qr_count = pg_num_rows($qr_res);
                     </div>
                 </div>
 
-                                <!-- Load QR library from CSP-allowed CDN with fallback (unpkg -> jsDelivr -> local) -->
-                                <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-                                <script>
-                                    (function ensureHtml5Qrcode(){
-                                        function hasLib(){ return typeof window.Html5Qrcode !== 'undefined'; }
-                                        function load(src, cb){ var s=document.createElement('script'); s.src=src; s.async=false; s.onload=cb; s.onerror=cb; document.head.appendChild(s); }
-                                        if (hasLib()) return;
-
-                                        var sources = [
-                                            'https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js',
-                                            '../../assets/vendor/html5-qrcode/html5-qrcode.min.js'
-                                        ];
-                                        var idx = 0; var start = Date.now();
-                                        (function attempt(){
-                                            if (hasLib()) return;
-                                            if (idx >= sources.length) {
-                                                if (!hasLib() && (Date.now() - start) < 8000) { return setTimeout(attempt, 250); }
-                                                if (!hasLib()) { console.error('Failed to load html5-qrcode from CDNs and local fallback.'); }
-                                                return;
-                                            }
-                                            load(sources[idx++], function(){ setTimeout(attempt, 200); });
-                                        })();
-                                    })();
-                                </script>
+                <script src="https://unpkg.com/html5-qrcode"></script>
                 <script>
                     const startButton = document.getElementById('start-button');
                     const stopButton = document.getElementById('stop-button');
                     const resultSpan = document.getElementById('result');
                     const cameraSelect = document.getElementById('camera-select');
-                                        let html5QrCode = null; // lazy init when library is available
+                    const html5QrCode = new Html5Qrcode("reader");
 
                     let currentCameraId = null;
 
-                    // Initialize library wait only - NO camera enumeration until Start is clicked
-                                        async function initializeCameraSelection() {
-                        startButton.disabled = true;
-                        startButton.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Initializing...';
-
-                        // Wait until the scanner library is available (handle slow CDN)
+                    // Request camera permissions and initialize camera selection
+                    async function initializeCameraSelection() {
                         try {
-                            await new Promise((resolve, reject) => {
-                                const start = Date.now();
-                                (function waitLib(){
-                                    if (typeof window.Html5Qrcode !== 'undefined') return resolve();
-                                    if (Date.now() - start > 10000) return reject(new Error('Scanner library failed to load'));
-                                    setTimeout(waitLib, 200);
-                                })();
-                            });
-                        } catch (e) {
-                            console.error('Failed to load scanner library:', e);
-                            alert('Scanner library failed to load. Please check your connection and reload the page.');
                             startButton.disabled = true;
-                            startButton.textContent = 'Scanner Unavailable';
-                            return;
+                            startButton.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Initializing...';
+                            
+                            // CRITICAL: Request camera permission first before enumerating devices
+                            console.log('Requesting camera permission...');
+                            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                            
+                            // Stop the stream immediately after getting permission
+                            stream.getTracks().forEach(track => track.stop());
+                            console.log('Camera permission granted');
+                            
+                            // Now enumerate cameras (will work because permission is granted)
+                            const cameras = await Html5Qrcode.getCameras();
+                            
+                            if (!cameras || cameras.length === 0) {
+                                throw new Error('No cameras found on your device');
+                            }
+                            
+                            console.log(`Found ${cameras.length} camera(s)`);
+                            
+                            // Clear existing options except the first placeholder
+                            cameraSelect.innerHTML = '<option value="">Select Camera</option>';
+                            
+                            cameras.forEach(camera => {
+                                const option = document.createElement('option');
+                                option.value = camera.id;
+                                option.text = camera.label || `Camera ${camera.id}`;
+                                cameraSelect.appendChild(option);
+                            });
+                            
+                            // Prefer back camera (for mobile devices)
+                            const backCam = cameras.find(cam => 
+                                cam.label && cam.label.toLowerCase().includes('back')
+                            );
+                            
+                            if (backCam) {
+                                cameraSelect.value = backCam.id;
+                                currentCameraId = backCam.id;
+                                console.log('Selected back camera:', backCam.label);
+                            } else if (cameras.length > 0) {
+                                cameraSelect.value = cameras[0].id;
+                                currentCameraId = cameras[0].id;
+                                console.log('Selected first camera:', cameras[0].label || cameras[0].id);
+                            }
+                            
+                            // Enable start button after successful initialization
+                            startButton.disabled = false;
+                            startButton.textContent = 'Start Scanner';
+                            
+                        } catch (err) {
+                            console.error("Error initializing camera:", err);
+                            
+                            let errorMessage = 'Failed to initialize camera. ';
+                            
+                            if (err.name === 'NotAllowedError') {
+                                errorMessage += 'Camera permission denied. Please allow camera access in your browser settings and refresh the page.';
+                            } else if (err.name === 'NotFoundError') {
+                                errorMessage += 'No camera found on your device. Please connect a camera and refresh the page.';
+                            } else if (err.name === 'NotReadableError') {
+                                errorMessage += 'Camera is already in use by another application. Please close other apps using the camera and try again.';
+                            } else if (err.message && err.message.includes('secure')) {
+                                errorMessage += 'Camera access requires HTTPS. Please use a secure connection.';
+                            } else {
+                                errorMessage += err.message || 'Unknown error occurred.';
+                            }
+                            
+                            alert(errorMessage);
+                            
+                            startButton.disabled = true;
+                            startButton.textContent = 'Camera Error';
                         }
-
-                        console.log('Scanner library loaded successfully');
-                        
-                        // DO NOT enumerate cameras here - requires permission!
-                        // Camera enumeration will happen on Start button after permission is granted
-
-                        startButton.disabled = false;
-                        startButton.textContent = 'Start Scanner';
                     }
                     
                     // Initialize on page load
@@ -246,115 +218,57 @@ $qr_count = pg_num_rows($qr_res);
                         console.log('Camera changed to:', currentCameraId);
                     });
 
-                    startButton.addEventListener('click', async () => {
-                        console.log('Start clicked');
-
-                        // Ensure library present and instance created
-                        if (typeof window.Html5Qrcode === 'undefined') {
-                            alert('Scanner library is not loaded yet. Please wait a moment and try again.');
+                    startButton.addEventListener('click', () => {
+                        if (!currentCameraId) {
+                            alert("Please select a camera from the dropdown first.");
                             return;
                         }
-                        if (!html5QrCode) {
-                            try { html5QrCode = new Html5Qrcode("reader"); }
-                            catch (e) { console.error('Failed to create scanner instance:', e); alert('Failed to initialize scanner.'); return; }
-                        }
 
-                        startButton.disabled = true;
-                        startButton.textContent = 'Requesting permission...';
-                        stopButton.disabled = true;
+                        console.log('Starting scanner with camera:', currentCameraId);
 
-                        try {
-                            let stream;
-                            if (currentCameraId) {
-                                // Try to request the selected camera specifically
-                                try {
-                                    stream = await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: currentCameraId } } });
-                                } catch (err) {
-                                    if (err.name === 'OverconstrainedError') {
-                                        console.warn('Selected camera not available, falling back to default camera.');
-                                        stream = await navigator.mediaDevices.getUserMedia({ video: true });
-                                    } else {
-                                        throw err;
-                                    }
+                        html5QrCode.start(
+                            currentCameraId,
+                            { fps: 10, qrbox: { width: 250, height: 250 } },
+                            decodedText => {
+                                resultSpan.textContent = decodedText;
+                                console.log('QR Code detected:', decodedText);
+                                html5QrCode.stop();
+                                startButton.disabled = false;
+                                startButton.textContent = 'Start Scanner';
+                                stopButton.disabled = true;
+                            },
+                            error => {
+                                // Ignore common decode errors (happens frequently during scanning)
+                                if (!error.includes('NotFoundException') && !error.includes('No MultiFormat Readers')) {
+                                    console.log("Scanner error:", error);
                                 }
-                            } else {
-                                // No camera preselected, request general permission
-                                stream = await navigator.mediaDevices.getUserMedia({ video: true });
                             }
-
-                            // Stop the stream immediately after getting permission
-                            stream.getTracks().forEach(track => track.stop());
-
-                            // If we didn't have a camera selected, enumerate and choose one now
-                            if (!currentCameraId) {
-                                const cameras = await Html5Qrcode.getCameras();
-                                if (!cameras || cameras.length === 0) {
-                                    throw new Error('No cameras found on your device');
-                                }
-                                cameraSelect.innerHTML = '<option value="">Select Camera</option>';
-                                cameras.forEach(camera => {
-                                    const option = document.createElement('option');
-                                    option.value = camera.id;
-                                    option.text = camera.label || `Camera ${camera.id}`;
-                                    cameraSelect.appendChild(option);
-                                });
-                                const backCam = cameras.find(cam => cam.label && cam.label.toLowerCase().includes('back'));
-                                if (backCam) {
-                                    cameraSelect.value = backCam.id;
-                                    currentCameraId = backCam.id;
-                                } else {
-                                    cameraSelect.value = cameras[0].id;
-                                    currentCameraId = cameras[0].id;
-                                }
-                                console.log('Selected camera after permission:', cameraSelect.options[cameraSelect.selectedIndex]?.text);
-                            }
-
-                            console.log('Starting scanner with camera:', currentCameraId);
-                            await html5QrCode.start(
-                                currentCameraId,
-                                { fps: 10, qrbox: { width: 250, height: 250 } },
-                                decodedText => {
-                                    resultSpan.textContent = decodedText;
-                                    console.log('QR Code detected:', decodedText);
-                                    html5QrCode.stop();
-                                    startButton.disabled = false;
-                                    startButton.textContent = 'Start Scanner';
-                                    stopButton.disabled = true;
-                                },
-                                error => {
-                                    // Ignore common decode errors (happens frequently during scanning)
-                                    if (!error.includes('NotFoundException') && !error.includes('No MultiFormat Readers')) {
-                                        console.log('Scanner error:', error);
-                                    }
-                                }
-                            );
-
+                        ).then(() => {
                             startButton.disabled = true;
                             startButton.textContent = 'Scanner Running...';
                             stopButton.disabled = false;
-                            console.log('Scanner started successfully');
-
-                        } catch (err) {
-                            console.error('Failed to start scanning:', err);
-
-                            let errorMessage = 'Failed to start camera. ';
-                            if (err.name === 'NotAllowedError' || (err.message && err.message.toLowerCase().includes('permission'))) {
-                                errorMessage += 'Camera permission was denied. Click the camera icon in your browser address bar to allow access, then reload or click Start again.';
+                            console.log("Scanner started successfully");
+                        }).catch(err => {
+                            console.error("Failed to start scanning:", err);
+                            
+                            let errorMessage = "Failed to start camera. ";
+                            
+                            if (err.name === 'NotAllowedError' || err.message.includes('Permission')) {
+                                errorMessage += "Camera permission was denied. Please allow camera access in your browser settings.";
                             } else if (err.name === 'NotFoundError') {
-                                errorMessage += 'Camera not found. Please check if your camera is connected.';
-                            } else if (err.name === 'NotReadableError' || (err.message && err.message.toLowerCase().includes('in use'))) {
-                                errorMessage += 'Camera is already in use by another application. Please close other apps using the camera.';
-                            } else if (err.message && err.message.toLowerCase().includes('secure')) {
-                                errorMessage += 'Camera access requires HTTPS. Please use a secure connection.';
+                                errorMessage += "Camera not found. Please check if your camera is connected.";
+                            } else if (err.name === 'NotReadableError' || err.message.includes('in use')) {
+                                errorMessage += "Camera is already in use by another application. Please close other apps using the camera.";
+                            } else if (err.message.includes('secure context')) {
+                                errorMessage += "Camera access requires HTTPS. Please use a secure connection.";
                             } else {
-                                errorMessage += err.message || 'Unknown error occurred.';
+                                errorMessage += err.message || "Unknown error occurred.";
                             }
-
+                            
                             alert(errorMessage);
                             startButton.disabled = false;
                             startButton.textContent = 'Start Scanner';
-                            stopButton.disabled = true;
-                        }
+                        });
                     });
 
                     stopButton.addEventListener('click', () => {

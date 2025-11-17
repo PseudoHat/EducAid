@@ -20,6 +20,10 @@ if (!defined('SECURITY_HEADERS_LOADED')) {
     return; // Already loaded
 }
 
+// DISABLED: All security headers are managed by Cloudflare
+// If you need to re-enable PHP headers, uncomment the code below
+
+/*
 // Only set headers if not already sent
 if (!headers_sent()) {
     
@@ -33,11 +37,11 @@ if (!headers_sent()) {
     // Adjust this based on your actual third-party services
     $csp = implode('; ', [
         "default-src 'self'",
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.google.com https://www.gstatic.com https://cdn.jsdelivr.net https://unpkg.com https://static.cloudflareinsights.com",
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.google.com https://www.gstatic.com https://cdn.jsdelivr.net",
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net",
         "font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net data:",
         "img-src 'self' data: https: blob:",
-        "connect-src 'self' https://cloudflareinsights.com",
+        "connect-src 'self'",
         "frame-src 'self' https://www.google.com",
         "object-src 'none'",
         "base-uri 'self'",
@@ -64,39 +68,18 @@ if (!headers_sent()) {
     
     // 6. Permissions-Policy (replaces Feature-Policy)
     // Restricts access to browser features and APIs
-    // Strategy:
-    //  - On camera pages (ALLOW_CAMERA=true): explicitly ALLOW camera for same-origin and replace any prior header
-    //  - On all other pages: explicitly DENY camera
-    $allowCamera = defined('ALLOW_CAMERA') && constant('ALLOW_CAMERA') === true;
-
-    // Remove any previously set Permissions-Policy header from PHP before setting ours
-    if (function_exists('header_remove')) { @header_remove('Permissions-Policy'); }
-
-    if ($allowCamera) {
-        $permissions = implode(', ', [
-            'geolocation=()',
-            'microphone=()',
-            'camera=(self)',
-            'payment=()',
-            'usb=()',
-            'magnetometer=()',
-            'gyroscope=()',
-            'accelerometer=()'
-        ]);
-        header("Permissions-Policy: {$permissions}", true);
-    } else {
-        $permissions = implode(', ', [
-            'geolocation=()',
-            'microphone=()',
-            'camera=()',
-            'payment=()',
-            'usb=()',
-            'magnetometer=()',
-            'gyroscope=()',
-            'accelerometer=()'
-        ]);
-        header("Permissions-Policy: {$permissions}", true);
-    }
+    // Denies access to sensitive features unless explicitly needed
+    $permissions = implode(', ', [
+        'geolocation=()',
+        'microphone=()',
+        'camera=()',
+        'payment=()',
+        'usb=()',
+        'magnetometer=()',
+        'gyroscope=()',
+        'accelerometer=()'
+    ]);
+    header("Permissions-Policy: {$permissions}");
     
     // BONUS: Additional security headers
     
@@ -118,6 +101,7 @@ if (!headers_sent()) {
     // header('Pragma: no-cache');
     // header('Expires: 0');
 }
+*/
 
 /**
  * Helper function to add CSP nonce for inline scripts
@@ -135,7 +119,7 @@ function generateCSPNonce() {
         if (!headers_sent()) {
             // Note: This is a simplified version. For production, you'd want to
             // regenerate the entire CSP header with the nonce included.
-            header("Content-Security-Policy: script-src 'nonce-{$nonce}' 'self' 'unsafe-inline' https://www.google.com https://www.gstatic.com https://cdn.jsdelivr.net https://unpkg.com; default-src 'self'", true);
+            header("Content-Security-Policy: script-src 'nonce-{$nonce}' 'self' 'unsafe-inline' https://www.google.com https://www.gstatic.com https://cdn.jsdelivr.net; default-src 'self'", true);
         }
     }
     return $nonce;

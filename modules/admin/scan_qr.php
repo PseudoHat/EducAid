@@ -1,15 +1,4 @@
 <?php 
-// Opt-in to camera access for this page (Permissions-Policy override)
-if (!defined('ALLOW_CAMERA')) { define('ALLOW_CAMERA', true); }
-
-// CRITICAL: Include security headers BEFORE any output to set Permissions-Policy with camera=(self)
-require_once __DIR__ . '/../../config/security_headers.php';
-
-// Prevent caching of this page (camera permission pages should always be fresh)
-header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
-header('Pragma: no-cache');
-header('Expires: 0');
-
 // Load secure session configuration (must be before session_start)
 require_once __DIR__ . '/../../config/session_config.php';
 
@@ -533,131 +522,131 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm_distribution'
     ]);
     exit;
   }
-  
+
   $student_id = $_POST['student_id'];
   $admin_id = $_SESSION['admin_id'] ?? 1;
     
-  try {
-    // Start transaction
-    pg_query($connection, "BEGIN");
-    
-    // Get current active snapshot (or create a temporary one)
-    $snapshot_query = "
-      SELECT snapshot_id, academic_year, semester 
-      FROM distribution_snapshots 
-      WHERE finalized_at IS NULL OR finalized_at >= CURRENT_DATE - INTERVAL '7 days'
-      ORDER BY finalized_at DESC NULLS FIRST
-      LIMIT 1
-    ";
-    $snapshot_result = pg_query($connection, $snapshot_query);
-    $snapshot_id = null;
-    
-    if ($snapshot_result && pg_num_rows($snapshot_result) > 0) {
-      $snapshot = pg_fetch_assoc($snapshot_result);
-      $snapshot_id = $snapshot['snapshot_id'];
-    } else {
-      // Create a temporary snapshot for ongoing distribution
-      // CRITICAL: Set finalized_at = NULL explicitly to prevent auto-completion
-      $temp_snapshot_query = "
-        INSERT INTO distribution_snapshots 
-        (distribution_date, location, total_students_count, academic_year, semester, 
-         finalized_by, finalized_at, notes, distribution_id)
-        VALUES (CURRENT_DATE, 'Ongoing', 0, 
-          (SELECT value FROM config WHERE key = 'current_academic_year'),
-          (SELECT value FROM config WHERE key = 'current_semester'),
-          $1, NULL, 'Auto-created during QR scanning', 
-          'TEMP-' || TO_CHAR(NOW(), 'YYYY-MM-DD-HH24MISS'))
-        RETURNING snapshot_id
-      ";
-      $temp_result = pg_query_params($connection, $temp_snapshot_query, [$admin_id]);
-      if ($temp_result) {
-        $temp_row = pg_fetch_assoc($temp_result);
-        $snapshot_id = $temp_row['snapshot_id'];
-        error_log("Created temporary distribution snapshot: $snapshot_id (finalized_at = NULL - ongoing)");
-      }
+    try {
+        // Start transaction
+        pg_query($connection, "BEGIN");
+        
+        // Get current active snapshot (or create a temporary one)
+        $snapshot_query = "
+            SELECT snapshot_id, academic_year, semester 
+            FROM distribution_snapshots 
+            WHERE finalized_at IS NULL OR finalized_at >= CURRENT_DATE - INTERVAL '7 days'
+            ORDER BY finalized_at DESC NULLS FIRST
+            LIMIT 1
+        ";
+        $snapshot_result = pg_query($connection, $snapshot_query);
+        $snapshot_id = null;
+        
+        if ($snapshot_result && pg_num_rows($snapshot_result) > 0) {
+            $snapshot = pg_fetch_assoc($snapshot_result);
+            $snapshot_id = $snapshot['snapshot_id'];
+        } else {
+            // Create a temporary snapshot for ongoing distribution
+            // CRITICAL: Set finalized_at = NULL explicitly to prevent auto-completion
+            $temp_snapshot_query = "
+                INSERT INTO distribution_snapshots 
+                (distribution_date, location, total_students_count, academic_year, semester, 
+                 finalized_by, finalized_at, notes, distribution_id)
+                VALUES (CURRENT_DATE, 'Ongoing', 0, 
+                    (SELECT value FROM config WHERE key = 'current_academic_year'),
+                    (SELECT value FROM config WHERE key = 'current_semester'),
+                    $1, NULL, 'Auto-created during QR scanning', 
+                    'TEMP-' || TO_CHAR(NOW(), 'YYYY-MM-DD-HH24MISS'))
+                RETURNING snapshot_id
+            ";
+            $temp_result = pg_query_params($connection, $temp_snapshot_query, [$admin_id]);
+            if ($temp_result) {
+                $temp_row = pg_fetch_assoc($temp_result);
+                $snapshot_id = $temp_row['snapshot_id'];
+                error_log("Created temporary distribution snapshot: $snapshot_id (finalized_at = NULL - ongoing)");
+            }
+        }
+        
+        // Update student status to 'given'
+        $update_query = "UPDATE students SET status = 'given' WHERE student_id = $1";
+        $update_result = pg_query_params($connection, $update_query, [$student_id]);
+        
+        if (!$update_result) {
+            throw new Exception('Failed to update student status');
+        }
+        
+        // Get QR code for this student
+        $qr_query = "SELECT unique_id FROM qr_codes WHERE student_id = $1";
+        $qr_result = pg_query_params($connection, $qr_query, [$student_id]);
+        $qr_data = $qr_result ? pg_fetch_assoc($qr_result) : null;
+        $qr_code_used = $qr_data['unique_id'] ?? null;
+        
+        // Update QR code status to 'Done' (must match CHECK constraint: 'Pending' or 'Done')
+        $qr_update_query = "UPDATE qr_codes SET status = 'Done' WHERE student_id = $1";
+        $qr_update_result = pg_query_params($connection, $qr_update_query, [$student_id]);
+        
+        if (!$qr_update_result) {
+            throw new Exception('Failed to update QR code status');
+        }
+        
+        // Create distribution record linking student to snapshot
+        if ($snapshot_id) {
+            $record_query = "
+                INSERT INTO distribution_student_records 
+                (snapshot_id, student_id, qr_code_used, scanned_by, verification_method, notes)
+                VALUES ($1, $2, $3, $4, 'qr_scan', 'Scanned via QR code scanner')
+                ON CONFLICT (snapshot_id, student_id) DO UPDATE 
+                SET scanned_at = NOW(), scanned_by = EXCLUDED.scanned_by
+            ";
+            $record_result = pg_query_params($connection, $record_query, [
+                $snapshot_id, $student_id, $qr_code_used, $admin_id
+            ]);
+            
+            if (!$record_result) {
+                error_log("Warning: Failed to create distribution record for student $student_id in snapshot $snapshot_id");
+            } else {
+                error_log("Created distribution record: Student $student_id linked to snapshot $snapshot_id");
+            }
+        }
+        
+        // Log QR scan to qr_logs table for tracking
+        $log_query = "INSERT INTO qr_logs (student_id, scanned_at, scanned_by) VALUES ($1, NOW(), $2)";
+        $log_result = pg_query_params($connection, $log_query, [$student_id, $admin_id]);
+        
+        if (!$log_result) {
+            error_log("Warning: Failed to log QR scan for student $student_id: " . pg_last_error($connection));
+        }
+        
+        // Add student notification for successful distribution
+        createStudentNotification(
+            $connection,
+            $student_id,
+            'Scholarship Aid Distributed!',
+            'Your scholarship aid has been successfully distributed. Thank you for participating in the EducAid program.',
+            'success',
+            'high',
+            'student_dashboard.php'
+        );
+        
+        // Commit transaction
+        pg_query($connection, "COMMIT");
+        
+        echo json_encode([
+            'success' => true,
+            'message' => 'Distribution confirmed successfully',
+            'next_token' => CSRFProtection::generateToken('confirm_distribution')
+        ]);
+    } catch (Exception $e) {
+        // Rollback on any error
+        pg_query($connection, "ROLLBACK");
+        error_log("Distribution confirmation error: " . $e->getMessage());
+        
+        echo json_encode([
+            'success' => false,
+            'message' => 'Failed to confirm distribution: ' . $e->getMessage(),
+            'next_token' => CSRFProtection::generateToken('confirm_distribution')
+        ]);
     }
-    
-    // Update student status to 'given'
-    $update_query = "UPDATE students SET status = 'given' WHERE student_id = $1";
-    $update_result = pg_query_params($connection, $update_query, [$student_id]);
-    
-    if (!$update_result) {
-      throw new Exception('Failed to update student status');
-    }
-    
-    // Get QR code for this student
-    $qr_query = "SELECT unique_id FROM qr_codes WHERE student_id = $1";
-    $qr_result = pg_query_params($connection, $qr_query, [$student_id]);
-    $qr_data = $qr_result ? pg_fetch_assoc($qr_result) : null;
-    $qr_code_used = $qr_data['unique_id'] ?? null;
-    
-    // Update QR code status to 'Done' (must match CHECK constraint: 'Pending' or 'Done')
-    $qr_update_query = "UPDATE qr_codes SET status = 'Done' WHERE student_id = $1";
-    $qr_update_result = pg_query_params($connection, $qr_update_query, [$student_id]);
-    
-    if (!$qr_update_result) {
-      throw new Exception('Failed to update QR code status');
-    }
-    
-    // Create distribution record linking student to snapshot
-    if ($snapshot_id) {
-      $record_query = "
-        INSERT INTO distribution_student_records 
-        (snapshot_id, student_id, qr_code_used, scanned_by, verification_method, notes)
-        VALUES ($1, $2, $3, $4, 'qr_scan', 'Scanned via QR code scanner')
-        ON CONFLICT (snapshot_id, student_id) DO UPDATE 
-        SET scanned_at = NOW(), scanned_by = EXCLUDED.scanned_by
-      ";
-      $record_result = pg_query_params($connection, $record_query, [
-        $snapshot_id, $student_id, $qr_code_used, $admin_id
-      ]);
-      
-      if (!$record_result) {
-        error_log("Warning: Failed to create distribution record for student $student_id in snapshot $snapshot_id");
-      } else {
-        error_log("Created distribution record: Student $student_id linked to snapshot $snapshot_id");
-      }
-    }
-    
-    // Log QR scan to qr_logs table for tracking
-    $log_query = "INSERT INTO qr_logs (student_id, scanned_at, scanned_by) VALUES ($1, NOW(), $2)";
-    $log_result = pg_query_params($connection, $log_query, [$student_id, $admin_id]);
-    
-    if (!$log_result) {
-      error_log("Warning: Failed to log QR scan for student $student_id: " . pg_last_error($connection));
-    }
-    
-    // Add student notification for successful distribution
-    createStudentNotification(
-      $connection,
-      $student_id,
-      'Scholarship Aid Distributed!',
-      'Your scholarship aid has been successfully distributed. Thank you for participating in the EducAid program.',
-      'success',
-      'high',
-      'student_dashboard.php'
-    );
-    
-    // Commit transaction
-    pg_query($connection, "COMMIT");
-    
-    echo json_encode([
-      'success' => true,
-      'message' => 'Distribution confirmed successfully',
-      'next_token' => CSRFProtection::generateToken('confirm_distribution')
-    ]);
-  } catch (Exception $e) {
-    // Rollback on any error
-    pg_query($connection, "ROLLBACK");
-    error_log("Distribution confirmation error: " . $e->getMessage());
-    
-    echo json_encode([
-      'success' => false,
-      'message' => 'Failed to confirm distribution: ' . $e->getMessage(),
-      'next_token' => CSRFProtection::generateToken('confirm_distribution')
-    ]);
-  }
-  exit;
+    exit;
 }
 
 // Handle QR code lookup
@@ -898,60 +887,6 @@ $csrf_complete_token = CSRFProtection::generateToken('complete_distribution');
   </style>
   </head>
 <body>
-  <!-- Camera Permission Debug Info -->
-  <script>
-    console.log('=== Camera Permission Debug ===');
-    console.log('ALLOW_CAMERA constant:', <?php echo defined('ALLOW_CAMERA') && ALLOW_CAMERA ? 'true' : 'false'; ?>);
-    console.log('Page:', window.location.pathname);
-    
-    // Check if Permissions-Policy header blocks camera
-    if (navigator.permissions && navigator.permissions.query) {
-      navigator.permissions.query({name: 'camera'}).then(function(result) {
-        console.log('Camera permission state:', result.state);
-        if (result.state === 'denied') {
-          console.warn('⚠️ Camera permission is DENIED at browser level');
-        } else if (result.state === 'prompt') {
-          console.log('✅ Camera permission will prompt user');
-        } else {
-          console.log('✅ Camera permission is GRANTED');
-        }
-      }).catch(function(err) {
-        console.log('Permissions API check failed:', err.message);
-      });
-    }
-    
-    // Check for policy violations in real-time
-    const originalError = console.error;
-    console.error = function(...args) {
-      const msg = args.join(' ');
-      if (msg.includes('Permissions policy violation') || msg.includes('camera is not allowed')) {
-        console.log('%c🚨 POLICY VIOLATION DETECTED', 'color: red; font-size: 16px; font-weight: bold');
-        console.log('This means HTTP headers or meta tags are blocking camera');
-        console.log('Check Response Headers in Network tab for Permissions-Policy');
-      }
-      originalError.apply(console, args);
-    };
-    console.log('===============================');
-  </script>
-  <!-- Inspect actual response headers (async) -->
-  <script>
-    (async function(){
-      try {
-        const res = await fetch(window.location.href + '?probe=' + Date.now(), { method: 'GET', cache: 'no-store' });
-        const pol = res.headers.get('permissions-policy');
-        console.log('Response Permissions-Policy header:', pol);
-        if (pol && pol.includes('camera=()')) {
-          console.error('🚨 CLOUDFLARE RULE STILL ACTIVE: camera=() detected in header');
-          console.log('Wait 2-3 minutes after deleting Cloudflare rule, then hard refresh (Ctrl+Shift+R)');
-        } else if (pol && pol.includes('camera=(self)')) {
-          console.log('✅ Header correct: camera=(self) - permission should work');
-        } else {
-          console.log('⚠️ No Permissions-Policy header found (browser will use permissive default)');
-        }
-      } catch(e){ console.log('Header probe failed:', e.message); }
-    })();
-  </script>
-  
   <?php include __DIR__ . '/../../includes/admin/admin_topbar.php'; ?>
   <div id="wrapper" class="admin-wrapper">
     <?php include __DIR__ . '/../../includes/admin/admin_sidebar.php'; ?>
@@ -1199,39 +1134,14 @@ $csrf_complete_token = CSRFProtection::generateToken('complete_distribution');
     </div>
   </div>
 
-  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-  <script>
-    (function ensureHtml5Qrcode(){
-      function hasLib(){ return typeof window.Html5Qrcode !== 'undefined'; }
-      function load(src, cb){ var s=document.createElement('script'); s.src=src; s.async=false; s.onload=cb; s.onerror=cb; document.head.appendChild(s); }
-      if (hasLib()) return;
-
-      // Try multiple sources in order: jsDelivr -> local vendor copy
-      var sources = [
-        'https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js',
-        '../../assets/vendor/html5-qrcode/html5-qrcode.min.js'
-      ];
-
-      var idx = 0; var start = Date.now();
-      (function attempt(){
-        if (hasLib()) return; // already loaded
-        if (idx >= sources.length) {
-          // Wait a bit longer in case first static tag loads late
-          if (!hasLib() && (Date.now() - start) < 8000) { return setTimeout(attempt, 250); }
-          if (!hasLib()) console.error('Failed to load html5-qrcode from CDNs and local fallback.');
-          return;
-        }
-        load(sources[idx++], function(){ setTimeout(attempt, 200); });
-      })();
-    })();
-  </script>
+  <script src="https://unpkg.com/html5-qrcode"></script>
   <script src="../../assets/js/admin/sidebar.js"></script>
   <script src="../../assets/js/bootstrap.bundle.min.js"></script>
   <script>
-  const startButton = document.getElementById('start-button');
-  const stopButton = document.getElementById('stop-button');
-  const cameraSelect = document.getElementById('camera-select');
-  let html5QrCode = null; // create instance only when library is loaded
+    const startButton = document.getElementById('start-button');
+    const stopButton = document.getElementById('stop-button');
+    const cameraSelect = document.getElementById('camera-select');
+    const html5QrCode = new Html5Qrcode("reader");
     let currentCameraId = null;
     let currentStudentData = null;
     const distributionCompleted = <?= $distribution_completed ? 'true' : 'false' ?>;
@@ -1250,37 +1160,66 @@ $csrf_complete_token = CSRFProtection::generateToken('complete_distribution');
       return new URLSearchParams(params).toString();
     }
     
-  // Initialize camera selection without prompting permission (do that on Start)
-  async function initializeCameraSelection() {
+    // Initialize camera selection with proper permission request
+    async function initializeCameraSelection() {
       try {
         startButton.disabled = true;
         startButton.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Initializing...';
         
-        // Wait until the scanner library is available (handle slow CDN)
-        await new Promise((resolve, reject) => {
-          const start = Date.now();
-          (function waitLib(){
-            if (typeof window.Html5Qrcode !== 'undefined') return resolve();
-            if (Date.now() - start > 10000) return reject(new Error('Scanner library failed to load'));
-            setTimeout(waitLib, 200);
-          })();
+        // CRITICAL: Request camera permission first before enumerating devices
+        console.log('Requesting camera permission...');
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        
+        // Stop the stream immediately after getting permission
+        stream.getTracks().forEach(track => track.stop());
+        console.log('Camera permission granted');
+        
+        // Now enumerate cameras (will work because permission is granted)
+        const cameras = await Html5Qrcode.getCameras();
+        
+        if (!cameras || cameras.length === 0) {
+          throw new Error('No cameras found on your device');
+        }
+        
+        console.log(`Found ${cameras.length} camera(s)`);
+        
+        // Clear existing options except the first placeholder
+        cameraSelect.innerHTML = '<option value="">Select Camera</option>';
+        
+        cameras.forEach(camera => {
+          const option = document.createElement('option');
+          option.value = camera.id;
+          option.text = camera.label || `Camera ${camera.id}`;
+          cameraSelect.appendChild(option);
         });
-
-        console.log('Scanner library loaded successfully');
         
-        // DO NOT enumerate cameras here - that requires permission!
-        // Camera enumeration will happen on Start button click after permission is granted
+        // Prefer back camera (for mobile devices)
+        const backCam = cameras.find(cam => 
+          cam.label && cam.label.toLowerCase().includes('back')
+        );
         
-  // Enable start button after library is ready
-  startButton.disabled = false;
-  startButton.textContent = 'Start Scanner';
+        if (backCam) {
+          cameraSelect.value = backCam.id;
+          currentCameraId = backCam.id;
+          console.log('Selected back camera:', backCam.label);
+        } else if (cameras.length > 0) {
+          cameraSelect.value = cameras[0].id;
+          currentCameraId = cameras[0].id;
+          console.log('Selected first camera:', cameras[0].label || cameras[0].id);
+        }
+        
+        // Enable start button after successful initialization
+        startButton.disabled = false;
+        startButton.textContent = 'Start Scanner';
         
       } catch (err) {
         console.error("Error initializing camera:", err);
         
-  let errorMessage = 'Failed to initialize camera. ';
+        let errorMessage = 'Failed to initialize camera. ';
         
-  if (err.name === 'NotFoundError') {
+        if (err.name === 'NotAllowedError') {
+          errorMessage += 'Camera permission denied. Please allow camera access in your browser settings and refresh the page.';
+        } else if (err.name === 'NotFoundError') {
           errorMessage += 'No camera found on your device. Please connect a camera and refresh the page.';
         } else if (err.name === 'NotReadableError') {
           errorMessage += 'Camera is already in use by another application. Please close other apps using the camera and try again.';
@@ -1308,101 +1247,19 @@ $csrf_complete_token = CSRFProtection::generateToken('complete_distribution');
     });
 
     // Start scanner
-    startButton.addEventListener('click', async () => {
+    startButton.addEventListener('click', () => {
       // Prevent starting if distribution is completed
       if (distributionCompleted) {
         alert("Scanner is disabled. The distribution has been completed and finalized.");
         return;
       }
       
-      // Ensure scanner library is present and instance created
-      if (typeof window.Html5Qrcode === 'undefined') {
-        alert('Scanner library is not loaded yet. Please wait a moment and try again.');
+      if (!currentCameraId) {
+        alert("Please select a camera.");
         return;
       }
-      if (!html5QrCode) {
-        try {
-          html5QrCode = new Html5Qrcode("reader");
-        } catch (e) {
-          console.error('Failed to create scanner instance:', e);
-          alert('Failed to initialize scanner.');
-          return;
-        }
-      }
-
-      startButton.disabled = true;
-      startButton.textContent = 'Requesting permission...';
-      stopButton.disabled = true;
-
-      try {
-        // Check if Permissions-Policy is blocking camera before attempting
-        if (document.featurePolicy && !document.featurePolicy.allowsFeature('camera')) {
-          console.error('🚨 BLOCKED: Permissions-Policy header is denying camera access');
-          console.error('The HTTP response header still contains camera=()');
-          console.error('Solutions:');
-          console.error('1. Wait 5 minutes after deleting Cloudflare rule');
-          console.error('2. Purge Cloudflare cache: Cache → Configuration → Purge Everything');
-          console.error('3. Try incognito/private browsing mode');
-          console.error('4. Clear browser cache and hard refresh (Ctrl+Shift+Delete)');
-          throw new Error('Camera blocked by Permissions-Policy header. See console for solutions.');
-        }
-
-        // Request camera permission first
-        console.log('Requesting camera permission...');
-        let stream;
-        if (currentCameraId) {
-          // Try the selected camera
-          try {
-            stream = await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: currentCameraId } } });
-          } catch (err) {
-            if (err.name === 'OverconstrainedError') {
-              console.warn('Selected camera unavailable, using default');
-              stream = await navigator.mediaDevices.getUserMedia({ video: true });
-            } else {
-              throw err;
-            }
-          }
-        } else {
-          // No camera selected yet, request general permission
-          stream = await navigator.mediaDevices.getUserMedia({ video: true });
-        }
-
-        // Stop the permission stream immediately
-        stream.getTracks().forEach(t => t.stop());
-        console.log('Camera permission granted');
-
-        // Now enumerate cameras with permission
-        if (!currentCameraId) {
-          const cameras = await Html5Qrcode.getCameras();
-          if (!cameras || cameras.length === 0) {
-            throw new Error('No cameras found on your device');
-          }
-
-          console.log(`Found ${cameras.length} camera(s)`);
-          cameraSelect.innerHTML = '<option value="">Select Camera</option>';
-          cameras.forEach(camera => {
-            const option = document.createElement('option');
-            option.value = camera.id;
-            option.text = camera.label || `Camera ${camera.id}`;
-            cameraSelect.appendChild(option);
-          });
-
-          // Prefer back camera
-          const backCam = cameras.find(cam => cam.label && cam.label.toLowerCase().includes('back'));
-          if (backCam) {
-            cameraSelect.value = backCam.id;
-            currentCameraId = backCam.id;
-            console.log('Selected back camera:', backCam.label);
-          } else {
-            cameraSelect.value = cameras[0].id;
-            currentCameraId = cameras[0].id;
-            console.log('Selected first camera:', cameras[0].label || cameras[0].id);
-          }
-        }
-
-        // Now start scanning with the selected camera
-        console.log('Starting scanner with camera:', currentCameraId);
-        await html5QrCode.start(
+      
+      html5QrCode.start(
         currentCameraId,
         { 
           fps: 10, 
@@ -1473,20 +1330,18 @@ $csrf_complete_token = CSRFProtection::generateToken('complete_distribution');
             console.log("Scanner error:", error);
           }
         }
-      );
-
+      ).then(() => {
         startButton.disabled = true;
         startButton.textContent = 'Scanner Running...';
         stopButton.disabled = false;
         console.log("Scanner started successfully");
-
-      } catch (err) {
+      }).catch(err => {
         console.error("Failed to start scanning:", err);
         
         let errorMessage = "Failed to start camera. ";
         
         if (err.name === 'NotAllowedError' || (err.message && err.message.includes('Permission'))) {
-          errorMessage += "Camera permission was denied. Click the lock icon near the address bar → Site settings → Camera → Allow, then reload.";
+          errorMessage += "Camera permission was denied. Please allow camera access in your browser settings.";
         } else if (err.name === 'NotFoundError') {
           errorMessage += "Camera not found. Please check if your camera is connected.";
         } else if (err.name === 'NotReadableError' || (err.message && err.message.includes('in use'))) {
@@ -1500,7 +1355,7 @@ $csrf_complete_token = CSRFProtection::generateToken('complete_distribution');
         alert(errorMessage);
         startButton.disabled = false;
         stopButton.disabled = true;
-      }
+      });
     });
 
     // Stop scanner
