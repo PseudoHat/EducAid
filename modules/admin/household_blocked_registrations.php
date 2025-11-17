@@ -403,6 +403,11 @@ while ($row = pg_fetch_assoc($barangaysResult)) {
 }
 ?>
 <?php $page_title='Household Blocked Registrations'; $extra_css=['../../assets/css/admin/manage_applicants.css', '../../assets/css/admin/table_core.css']; include __DIR__ . '/../../includes/admin/admin_head.php'; ?>
+
+<!-- SweetAlert2 Library -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11.14.5/dist/sweetalert2.min.css">
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.14.5/dist/sweetalert2.all.min.js"></script>
+
 <style>
     .bulk-actions-bar {
         background: #ffffff;
@@ -727,18 +732,20 @@ while ($row = pg_fetch_assoc($barangaysResult)) {
             const bulkActionsBar = document.getElementById('bulkActionsBar');
             const selectedCountText = document.getElementById('selectedCountText');
             const selectAllSticky = document.getElementById('selectAllSticky');
+            const selectAll = document.getElementById('selectAll');
 
             if (checkboxes.length > 0) {
-                bulkActionsBar.classList.remove('d-none');
-                selectedCountText.textContent = checkboxes.length;
+                if (bulkActionsBar) bulkActionsBar.classList.remove('d-none');
+                if (selectedCountText) selectedCountText.textContent = checkboxes.length;
                 
                 // Sync sticky checkbox with selection state
                 const allCheckboxes = document.querySelectorAll('.record-checkbox');
-                selectAllSticky.checked = checkboxes.length === allCheckboxes.length;
+                if (selectAllSticky) selectAllSticky.checked = checkboxes.length === allCheckboxes.length;
+                if (selectAll) selectAll.checked = checkboxes.length === allCheckboxes.length;
             } else {
-                bulkActionsBar.classList.add('d-none');
-                document.getElementById('selectAll').checked = false;
-                selectAllSticky.checked = false;
+                if (bulkActionsBar) bulkActionsBar.classList.add('d-none');
+                if (selectAll) selectAll.checked = false;
+                if (selectAllSticky) selectAllSticky.checked = false;
             }
         }
 
@@ -748,31 +755,41 @@ while ($row = pg_fetch_assoc($barangaysResult)) {
             const selectedIds = Array.from(checkboxes).map(cb => cb.value);
             
             if (selectedIds.length === 0) {
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'No Selection',
-                    text: 'Please select at least one record to delete'
-                });
+                if (typeof Swal !== 'undefined') {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'No Selection',
+                        text: 'Please select at least one record to delete'
+                    });
+                } else {
+                    alert('Please select at least one record to delete');
+                }
                 return;
             }
 
-            const result = await Swal.fire({
-                title: 'Delete Selected Records?',
-                html: `
-                    <div class="text-start">
-                        <p>You are about to permanently delete <strong>${selectedIds.length}</strong> blocked attempt record(s).</p>
-                        <p class="text-danger"><i class="bi bi-exclamation-triangle me-2"></i><strong>This action cannot be undone!</strong></p>
-                        <p class="text-muted">These records will be removed from the database and will no longer appear in this log.</p>
-                    </div>
-                `,
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonText: 'Yes, Delete',
-                confirmButtonColor: '#dc3545',
-                cancelButtonText: 'Cancel'
-            });
+            let confirmed = false;
+            if (typeof Swal !== 'undefined') {
+                const result = await Swal.fire({
+                    title: 'Delete Selected Records?',
+                    html: `
+                        <div class="text-start">
+                            <p>You are about to permanently delete <strong>${selectedIds.length}</strong> blocked attempt record(s).</p>
+                            <p class="text-danger"><i class="bi bi-exclamation-triangle me-2"></i><strong>This action cannot be undone!</strong></p>
+                            <p class="text-muted">These records will be removed from the database and will no longer appear in this log.</p>
+                        </div>
+                    `,
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonText: 'Yes, Delete',
+                    confirmButtonColor: '#dc3545',
+                    cancelButtonText: 'Cancel'
+                });
+                confirmed = result.isConfirmed;
+            } else {
+                confirmed = confirm(`Delete ${selectedIds.length} selected record(s)?\n\nThis action cannot be undone!`);
+            }
 
-            if (result.isConfirmed) {
+            if (confirmed) {
                 await processBulkDelete(selectedIds);
             }
         }
@@ -795,28 +812,40 @@ while ($row = pg_fetch_assoc($barangaysResult)) {
                 const data = await response.json();
 
                 if (data.success) {
-                    await Swal.fire({
-                        icon: 'success',
-                        title: 'Deleted Successfully',
-                        text: data.message,
-                        timer: 2000,
-                        showConfirmButton: false
-                    });
+                    if (typeof Swal !== 'undefined') {
+                        await Swal.fire({
+                            icon: 'success',
+                            title: 'Deleted Successfully',
+                            text: data.message,
+                            timer: 2000,
+                            showConfirmButton: false
+                        });
+                    } else {
+                        alert(data.message || 'Records deleted successfully');
+                    }
                     location.reload();
                 } else {
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Error',
-                        text: data.message || 'Failed to delete records'
-                    });
+                    if (typeof Swal !== 'undefined') {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error',
+                            text: data.message || 'Failed to delete records'
+                        });
+                    } else {
+                        alert('Error: ' + (data.message || 'Failed to delete records'));
+                    }
                 }
             } catch (error) {
                 console.error('Bulk delete error:', error);
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error',
-                    text: 'An error occurred while deleting records'
-                });
+                if (typeof Swal !== 'undefined') {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Error',
+                        text: 'An error occurred while deleting records'
+                    });
+                } else {
+                    alert('An error occurred while deleting records');
+                }
             }
         }
 
@@ -870,12 +899,16 @@ while ($row = pg_fetch_assoc($barangaysResult)) {
 
         async function processOverride(attemptId, reason) {
             // Disable the confirm button and show loading state
-            const swalConfirmButton = Swal.getConfirmButton();
-            const originalButtonText = swalConfirmButton.innerHTML;
+            let swalConfirmButton = null;
+            let originalButtonText = '';
             
-            if (swalConfirmButton) {
-                swalConfirmButton.disabled = true;
-                swalConfirmButton.innerHTML = '<i class="spinner-border spinner-border-sm me-2"></i>Processing...';
+            if (typeof Swal !== 'undefined' && Swal.getConfirmButton) {
+                swalConfirmButton = Swal.getConfirmButton();
+                if (swalConfirmButton) {
+                    originalButtonText = swalConfirmButton.innerHTML;
+                    swalConfirmButton.disabled = true;
+                    swalConfirmButton.innerHTML = '<i class="spinner-border spinner-border-sm me-2"></i>Processing...';
+                }
             }
             
             try {
@@ -934,30 +967,34 @@ while ($row = pg_fetch_assoc($barangaysResult)) {
                         `;
                     }
                     
-                    await Swal.fire({
-                        icon: 'success',
-                        title: 'Override Approved',
-                        html: `
-                            <div class="text-start">
-                                <p>The household block has been overridden. A one-time registration bypass link has been generated:</p>
-                                <div class="alert alert-info">
-                                    <small><strong>Bypass URL:</strong></small><br>
-                                    <input type="text" class="form-control form-control-sm mt-1" value="${data.bypass_url}" readonly 
-                                           onclick="this.select()">
+                    if (typeof Swal !== 'undefined') {
+                        await Swal.fire({
+                            icon: 'success',
+                            title: 'Override Approved',
+                            html: `
+                                <div class="text-start">
+                                    <p>The household block has been overridden. A one-time registration bypass link has been generated:</p>
+                                    <div class="alert alert-info">
+                                        <small><strong>Bypass URL:</strong></small><br>
+                                        <input type="text" class="form-control form-control-sm mt-1" value="${data.bypass_url}" readonly 
+                                               onclick="this.select()">
+                                    </div>
+                                    <p><small class="text-muted">
+                                        <i class="bi bi-clock me-1"></i>Expires: ${new Date(data.expires_at).toLocaleString()}
+                                    </small></p>
+                                    ${emailStatusHtml}
+                                    <p class="text-warning"><small>
+                                        <i class="bi bi-exclamation-triangle me-1"></i>
+                                        This link can only be used once and expires in 24 hours.
+                                    </small></p>
                                 </div>
-                                <p><small class="text-muted">
-                                    <i class="bi bi-clock me-1"></i>Expires: ${new Date(data.expires_at).toLocaleString()}
-                                </small></p>
-                                ${emailStatusHtml}
-                                <p class="text-warning"><small>
-                                    <i class="bi bi-exclamation-triangle me-1"></i>
-                                    This link can only be used once and expires in 24 hours.
-                                </small></p>
-                            </div>
-                        `,
-                        confirmButtonText: 'OK',
-                        width: '600px'
-                    });
+                            `,
+                            confirmButtonText: 'OK',
+                            width: '600px'
+                        });
+                    } else {
+                        alert('Override approved successfully!\n\nBypass URL: ' + data.bypass_url);
+                    }
                     location.reload();
                 } else {
                     // Re-enable button on error
@@ -971,13 +1008,18 @@ while ($row = pg_fetch_assoc($barangaysResult)) {
                         swalConfirmButton.innerHTML = originalButtonText;
                     }
                     
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Error',
-                        text: data.message || 'Failed to process override'
-                    });
+                    if (typeof Swal !== 'undefined') {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error',
+                            text: data.message || 'Failed to process override'
+                        });
+                    } else {
+                        alert('Error: ' + (data.message || 'Failed to process override'));
+                    }
                 }
             } catch (error) {
+                console.error('Override error:', error);
                 // Re-enable button on exception
                 const overrideButton = document.getElementById('override-btn-' + attemptId);
                 if (overrideButton) {
@@ -989,11 +1031,15 @@ while ($row = pg_fetch_assoc($barangaysResult)) {
                     swalConfirmButton.innerHTML = originalButtonText;
                 }
                 
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error',
-                    text: 'An error occurred while processing the override'
-                });
+                if (typeof Swal !== 'undefined') {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Error',
+                        text: 'An error occurred while processing the override'
+                    });
+                } else {
+                    alert('An error occurred while processing the override');
+                }
             }
         }
     </script>

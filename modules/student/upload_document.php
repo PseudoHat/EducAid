@@ -4,15 +4,107 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+// CRITICAL: Detect AJAX requests early and set up error handling for JSON responses
+$is_ajax_request = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && 
+                   strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest';
+$is_ajax_post = $_SERVER['REQUEST_METHOD'] === 'POST' && 
+                (isset($_POST['ajax_upload']) || isset($_POST['process_document']) || 
+                 isset($_POST['update_year_level']) || isset($_POST['cancel_preview']) || 
+                 isset($_POST['start_reupload']));
+
+// For AJAX requests, catch any fatal errors and return JSON
+if ($is_ajax_request || $is_ajax_post) {
+    // Set up error handler to catch any PHP errors and return JSON
+    set_error_handler(function($errno, $errstr, $errfile, $errline) {
+        http_response_code(500);
+        header('Content-Type: application/json');
+        echo json_encode([
+            'success' => false,
+            'message' => 'Server error: ' . $errstr,
+            'debug' => ['file' => basename($errfile), 'line' => $errline]
+        ]);
+        exit;
+    });
+    
+    // Set up exception handler
+    set_exception_handler(function($exception) {
+        http_response_code(500);
+        header('Content-Type: application/json');
+        echo json_encode([
+            'success' => false,
+            'message' => 'Server exception: ' . $exception->getMessage(),
+            'debug' => ['file' => basename($exception->getFile()), 'line' => $exception->getLine()]
+        ]);
+        exit;
+    });
+    
+    // Ensure fatal errors also return JSON
+    register_shutdown_function(function() use ($is_ajax_request, $is_ajax_post) {
+        $error = error_get_last();
+        if ($error && ($is_ajax_request || $is_ajax_post) && 
+            in_array($error['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR])) {
+            http_response_code(500);
+            header('Content-Type: application/json');
+            echo json_encode([
+                'success' => false,
+                'message' => 'Fatal error: ' . $error['message'],
+                'debug' => ['file' => basename($error['file']), 'line' => $error['line']]
+            ]);
+        }
+    });
+}
+
 // Disable output buffering to prevent header issues
 if (ob_get_level()) {
     ob_end_clean();
 }
 
 require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../../config/FilePathConfig.php';
 require_once __DIR__ . '/../../services/UnifiedFileService.php';
 require_once __DIR__ . '/../../services/DocumentReuploadService.php';
 require_once __DIR__ . '/../../services/EnrollmentFormOCRService.php';
+
+// Initialize FilePathConfig for Railway-compatible path handling
+$pathConfig = FilePathConfig::getInstance();
+
+/**
+ * Convert absolute file paths to web-accessible relative paths (Railway-compatible)
+ * Handles both localhost (Windows/Linux) and Railway (/mnt/assets/) environments
+ * 
+ * @param string $absolutePath Absolute file path from database
+ * @return string Web-accessible relative path (../../assets/uploads/...)
+ */
+function convertToWebPath($absolutePath) {
+    global $pathConfig;
+    
+    // If already a relative path, ensure proper prefix
+    if (strpos($absolutePath, 'assets/uploads/') === 0) {
+        return '../../' . $absolutePath;
+    }
+    
+    // Get the base uploads directory from FilePathConfig
+    $uploadsDir = $pathConfig->getUploadsDir();
+    
+    // Normalize path separators
+    $absolutePath = str_replace('\\', '/', $absolutePath);
+    $uploadsDir = str_replace('\\', '/', $uploadsDir);
+    
+    // Remove base directory to get relative path
+    if (strpos($absolutePath, $uploadsDir) === 0) {
+        $relativePath = substr($absolutePath, strlen($uploadsDir));
+        $relativePath = ltrim($relativePath, '/');
+        return '../../assets/uploads/' . $relativePath;
+    }
+    
+    // Fallback: Try to extract from common patterns
+    if (preg_match('#assets/uploads/(.+)$#', $absolutePath, $matches)) {
+        return '../../assets/uploads/' . $matches[1];
+    }
+    
+    // If all else fails, return as-is (might be Railway volume path)
+    return $absolutePath;
+}
 
 // PHPMailer for email notifications
 use PHPMailer\PHPMailer\PHPMailer;
@@ -207,23 +299,8 @@ $docs_query = pg_query_params($connection,
 
 $existing_documents = [];
 while ($doc = pg_fetch_assoc($docs_query)) {
-    // Convert absolute file path to web-accessible relative path
-    $file_path = $doc['file_path'];
-    
-    // Check if it's an absolute path
-    if (strpos($file_path, 'c:\\xampp\\htdocs\\EducAid\\') === 0 || strpos($file_path, 'C:\\xampp\\htdocs\\EducAid\\') === 0) {
-        // Convert to relative path from this module's location
-        $file_path = '../../' . str_replace(['c:\\xampp\\htdocs\\EducAid\\', 'C:\\xampp\\htdocs\\EducAid\\'], '', $file_path);
-        $file_path = str_replace('\\', '/', $file_path); // Convert backslashes to forward slashes
-    } elseif (strpos($file_path, '/xampp/htdocs/EducAid/') === 0 || strpos($file_path, dirname(dirname(__DIR__)) . '/') === 0) {
-        // Linux/Mac absolute path
-        $file_path = '../../' . str_replace(dirname(dirname(__DIR__)) . '/', '', $file_path);
-    } elseif (strpos($file_path, 'assets/uploads/') === 0) {
-        // Relative path stored in DB - add ../../ prefix for web access from modules/student/
-        $file_path = '../../' . $file_path;
-    }
-    
-    $doc['file_path'] = $file_path;
+    // Convert absolute file path to web-accessible relative path (Railway-compatible)
+    $doc['file_path'] = convertToWebPath($doc['file_path']);
     $existing_documents[$doc['document_type_code']] = $doc;
 }
 
@@ -1339,16 +1416,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['process_document'])) 
 }
 
 // Handle AJAX file upload to session (preview stage)
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_upload']) && $can_upload) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_upload'])) {
+    // CRITICAL: Start output buffering immediately to prevent any header issues
+    while (ob_get_level()) {
+        ob_end_clean();
+    }
+    ob_start();
+    
+    // CRITICAL: Always return JSON for AJAX uploads, even if upload is disabled
+    if (!$can_upload) {
+        ob_end_clean(); // Clear any buffered output
+        header('Content-Type: application/json');
+        error_log("AJAX Upload BLOCKED - Student: $student_id, can_upload: false, status: $student_status, needs_upload: " . ($needs_upload ? 'true' : 'false'));
+        echo json_encode([
+            'success' => false, 
+            'message' => 'Document uploads are currently disabled for your account. Status: ' . $student_status
+        ]);
+        exit;
+    }
+    
     // Suppress error display for AJAX requests
     ini_set('display_errors', '0');
     error_reporting(E_ALL);
     
-    // Clean output buffer and set JSON header immediately
-    while (ob_get_level()) {
-        ob_end_clean();
-    }
+    // Clear output buffer and set JSON header
+    ob_end_clean();
     header('Content-Type: application/json');
+    
+    // Log the upload attempt
+    error_log("AJAX Upload Handler - Student: $student_id, POST data: " . json_encode($_POST));
     
     try {
         $doc_type_code = $_POST['document_type'] ?? '';
@@ -1362,11 +1458,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_upload']) && $ca
         if (!isset($_FILES['document_file']) || $_FILES['document_file']['error'] !== UPLOAD_ERR_OK) {
             $error_code = $_FILES['document_file']['error'] ?? 'none';
             error_log("AJAX Upload: File upload error code: $error_code");
-            echo json_encode(['success' => false, 'message' => 'File upload error']);
+            echo json_encode(['success' => false, 'message' => 'File upload error. Error code: ' . $error_code]);
             exit;
         }
         
         $file = $_FILES['document_file'];
+        
+        error_log("AJAX Upload: Processing file - Name: {$file['name']}, Size: {$file['size']}, Type: {$file['type']}");
         
         // Use DocumentReuploadService to upload to TEMP folder (WITHOUT automatic OCR)
         $result = $reuploadService->uploadToTemp(
@@ -1383,6 +1481,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_upload']) && $ca
             ]
         );
         
+        error_log("AJAX Upload: Service result - " . json_encode($result));
+        
         if ($result['success']) {
             // Store temp file info in session for confirmation
             $_SESSION['temp_uploads'][$doc_type_code] = [
@@ -1395,6 +1495,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_upload']) && $ca
                 'verification_score' => 0
             ];
             
+            error_log("AJAX Upload: SUCCESS - File stored in session");
+            
             echo json_encode([
                 'success' => true,
                 'message' => 'File uploaded successfully. Click "Process OCR" to analyze the document.',
@@ -1405,9 +1507,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_upload']) && $ca
                 ]
             ]);
         } else {
+            error_log("AJAX Upload: FAILED - " . $result['message']);
             echo json_encode(['success' => false, 'message' => $result['message']]);
         }
     } catch (Exception $e) {
+        error_log("AJAX Upload: EXCEPTION - " . $e->getMessage());
         echo json_encode(['success' => false, 'message' => 'Upload failed: ' . $e->getMessage()]);
     }
     exit;
@@ -1775,6 +1879,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $can_upload) {
     
     // Handle cancel preview
     elseif (isset($_POST['cancel_preview']) && isset($_POST['document_type'])) {
+        // Check if this is an AJAX request
+        $is_ajax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest';
+        
         $doc_type_code = $_POST['document_type'];
         
         if (isset($_SESSION['temp_uploads'][$doc_type_code])) {
@@ -1786,16 +1893,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $can_upload) {
             
             error_log("Cancel preview for $doc_type_code - Result: " . ($cancelResult['success'] ? 'SUCCESS' : 'FAILED'));
             
-            // Redirect to refresh and show upload zone again
-            header("Location: upload_document.php?cancelled=" . $doc_type_code);
-            exit;
+            if ($is_ajax) {
+                // Return JSON for AJAX requests
+                header('Content-Type: application/json');
+                echo json_encode([
+                    'success' => true,
+                    'message' => 'Preview cancelled successfully.',
+                    'document_type' => $doc_type_code
+                ]);
+                exit;
+            } else {
+                // Redirect for regular form submissions
+                header("Location: upload_document.php?cancelled=" . $doc_type_code);
+                exit;
+            }
         } else {
-            $upload_result = ['success' => false, 'message' => 'No preview to cancel.'];
+            if ($is_ajax) {
+                header('Content-Type: application/json');
+                echo json_encode(['success' => false, 'message' => 'No preview to cancel.']);
+                exit;
+            } else {
+                $upload_result = ['success' => false, 'message' => 'No preview to cancel.'];
+            }
         }
     }
     
     // Handle re-upload of existing document (delete existing and start fresh)
     elseif (isset($_POST['start_reupload']) && isset($_POST['document_type'])) {
+        // Check if this is an AJAX request
+        $is_ajax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest';
+        
         $doc_type_code = $_POST['document_type'];
         
         // First, get the file path before deleting from database
@@ -1887,11 +2014,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $can_upload) {
                 unset($_SESSION['temp_uploads'][$doc_type_code]);
             }
             
-            // Redirect to refresh the page and show upload form
-            header("Location: upload_document.php?reupload_started=" . $doc_type_code);
-            exit;
+            if ($is_ajax) {
+                // Return JSON for AJAX requests
+                header('Content-Type: application/json');
+                echo json_encode([
+                    'success' => true,
+                    'message' => 'Document deleted successfully. You can now upload a new document.',
+                    'document_type' => $doc_type_code
+                ]);
+                exit;
+            } else {
+                // Redirect to refresh the page and show upload form
+                header("Location: upload_document.php?reupload_started=" . $doc_type_code);
+                exit;
+            }
         } else {
-            $upload_result = ['success' => false, 'message' => 'Failed to delete existing document. Please try again.'];
+            if ($is_ajax) {
+                header('Content-Type: application/json');
+                echo json_encode(['success' => false, 'message' => 'Failed to delete existing document. Please try again.']);
+                exit;
+            } else {
+                $upload_result = ['success' => false, 'message' => 'Failed to delete existing document. Please try again.'];
+            }
         }
     }
 }
@@ -2410,19 +2554,8 @@ $page_title = 'Upload Documents';
                         <div class="existing-document">
                             <?php if ($is_image): ?>
                             <?php
-                                // Convert absolute database path to web-accessible relative path
-                                $webDocPath = $doc['file_path'];
-                                // Normalize Windows backslashes to forward slashes first
-                                $webDocPath = str_replace('\\', '/', $webDocPath);
-                                // Remove absolute path prefix
-                                if (stripos($webDocPath, 'c:/xampp/htdocs/EducAid/') === 0) {
-                                    $webDocPath = '../../' . substr($webDocPath, strlen('c:/xampp/htdocs/EducAid/'));
-                                } elseif (strpos($webDocPath, dirname(dirname(__DIR__)) . '/') === 0) {
-                                    $webDocPath = '../../' . str_replace(dirname(dirname(__DIR__)) . '/', '', $webDocPath);
-                                } elseif (strpos($webDocPath, 'assets/') === 0) {
-                                    // Already relative, just add ../../
-                                    $webDocPath = '../../' . $webDocPath;
-                                }
+                                // Convert absolute database path to web-accessible relative path (Railway-compatible)
+                                $webDocPath = convertToWebPath($doc['file_path']);
                             ?>
                             <img src="<?= htmlspecialchars($webDocPath) ?>?v=<?= time() ?>" 
                                  class="document-preview"
@@ -2483,21 +2616,8 @@ $page_title = 'Upload Documents';
                                 $preview_is_image = in_array($preview_data['extension'], ['jpg', 'jpeg', 'png', 'gif']);
                                 $preview_is_pdf = $preview_data['extension'] === 'pdf';
                                 
-                                // Convert absolute temp path to web-accessible relative path
-                                $webPath = $preview_data['path'];
-                                
-                                // Normalize Windows backslashes to forward slashes first
-                                $webPath = str_replace('\\', '/', $webPath);
-                                
-                                // Remove absolute path prefix
-                                if (stripos($webPath, 'c:/xampp/htdocs/EducAid/') === 0) {
-                                    $webPath = '../../' . substr($webPath, strlen('c:/xampp/htdocs/EducAid/'));
-                                } elseif (strpos($webPath, dirname(dirname(__DIR__)) . '/') === 0) {
-                                    $webPath = '../../' . str_replace(dirname(dirname(__DIR__)) . '/', '', $webPath);
-                                } elseif (strpos($webPath, 'assets/') === 0) {
-                                    // Already relative, just add ../../
-                                    $webPath = '../../' . $webPath;
-                                }
+                                // Convert absolute temp path to web-accessible relative path (Railway-compatible)
+                                $webPath = convertToWebPath($preview_data['path']);
                                 
                                 // Debug log
                                 error_log("Preview path conversion: " . $preview_data['path'] . " → " . $webPath);
@@ -3496,6 +3616,9 @@ $page_title = 'Upload Documents';
             try {
                 const response = await fetch('upload_document.php', {
                     method: 'POST',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
                     body: formData
                 });
                 
@@ -3504,6 +3627,7 @@ $page_title = 'Upload Documents';
                 if (!contentType || !contentType.includes('application/json')) {
                     const text = await response.text();
                     console.error('Server returned non-JSON response:', text.substring(0, 500));
+                    console.error('Full response length:', text.length);
                     throw new Error('Server error: Expected JSON response but got ' + contentType);
                 }
                 
@@ -3715,6 +3839,114 @@ $page_title = 'Upload Documents';
                         this.value = '';
                     }
                 });
+            });
+            
+            // Intercept cancel_preview form submissions and convert to AJAX
+            document.querySelectorAll('form').forEach(form => {
+                const cancelInput = form.querySelector('input[name="cancel_preview"]');
+                const reuploadInput = form.querySelector('input[name="start_reupload"]');
+                
+                if (cancelInput) {
+                    form.addEventListener('submit', async function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        
+                        const docType = form.querySelector('input[name="document_type"]').value;
+                        const button = form.querySelector('button[type="submit"]');
+                        const originalHTML = button.innerHTML;
+                        
+                        button.disabled = true;
+                        button.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Cancelling...';
+                        
+                        try {
+                            const formData = new FormData();
+                            formData.append('cancel_preview', '1');
+                            formData.append('document_type', docType);
+                            
+                            const response = await fetch('upload_document.php', {
+                                method: 'POST',
+                                headers: {
+                                    'X-Requested-With': 'XMLHttpRequest'
+                                },
+                                body: formData
+                            });
+                            
+                            const contentType = response.headers.get('content-type');
+                            if (!contentType || !contentType.includes('application/json')) {
+                                const text = await response.text();
+                                console.error('Cancel preview returned non-JSON:', text.substring(0, 500));
+                                throw new Error('Server error: Expected JSON response');
+                            }
+                            
+                            const data = await response.json();
+                            
+                            if (data.success) {
+                                // Reload page to show upload form
+                                window.location.href = 'upload_document.php';
+                            } else {
+                                alert('Cancel failed: ' + stripHtml(data.message));
+                                button.disabled = false;
+                                button.innerHTML = originalHTML;
+                            }
+                        } catch (error) {
+                            console.error('Cancel error:', error);
+                            alert('Cancel failed. Please try refreshing the page.');
+                            button.disabled = false;
+                            button.innerHTML = originalHTML;
+                        }
+                    });
+                }
+                
+                if (reuploadInput) {
+                    form.addEventListener('submit', async function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        
+                        const docType = form.querySelector('input[name="document_type"]').value;
+                        const button = form.querySelector('button[type="submit"]');
+                        const originalHTML = button.innerHTML;
+                        
+                        button.disabled = true;
+                        button.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Deleting...';
+                        
+                        try {
+                            const formData = new FormData();
+                            formData.append('start_reupload', '1');
+                            formData.append('document_type', docType);
+                            
+                            const response = await fetch('upload_document.php', {
+                                method: 'POST',
+                                headers: {
+                                    'X-Requested-With': 'XMLHttpRequest'
+                                },
+                                body: formData
+                            });
+                            
+                            const contentType = response.headers.get('content-type');
+                            if (!contentType || !contentType.includes('application/json')) {
+                                const text = await response.text();
+                                console.error('Reupload returned non-JSON:', text.substring(0, 500));
+                                throw new Error('Server error: Expected JSON response');
+                            }
+                            
+                            const data = await response.json();
+                            
+                            if (data.success) {
+                                // Reload page to show upload form
+                                window.location.href = 'upload_document.php';
+                            } else {
+                                alert('Delete failed: ' + stripHtml(data.message));
+                                button.disabled = false;
+                                button.innerHTML = originalHTML;
+                            }
+                        } catch (error) {
+                            console.error('Reupload error:', error);
+                            alert('Delete failed. Please try refreshing the page.');
+                            button.disabled = false;
+                            button.innerHTML = originalHTML;
+                        }
+                    });
+                }
             });
         });
         
