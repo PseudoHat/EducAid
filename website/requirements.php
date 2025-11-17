@@ -34,8 +34,21 @@ $pageType = $seoData['type'];
   <meta name="csrf-token" content="<?php echo CSRFProtection::generateToken('cms_content'); ?>" />
   <?php endif; ?>
 
-  <!-- Google Fonts -->
-  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <?php 
+  // Critical CSS to prevent FOUC
+  include __DIR__ . '/../includes/website/critical_css.php'; 
+  ?>
+
+  <!-- Preload Critical Resources -->
+  <link rel="preload" href="../assets/css/bootstrap.min.css" as="style" />
+  <link rel="preload" href="../assets/css/website/landing_page.css" as="style" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+  <!-- Google Fonts (async) -->
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'" />
+  <noscript><link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700&display=swap" rel="stylesheet" /></noscript>
+  
   <!-- Bootstrap 5 -->
   <link href="../assets/css/bootstrap.min.css" rel="stylesheet" />
   <!-- Bootstrap Icons -->
@@ -794,5 +807,10 @@ function formatChatbotResponse(text) {
   });
   </script>
   <?php endif; ?>
+
+  <?php 
+  // Anti-FOUC scripts for smooth page transitions
+  include __DIR__ . '/../includes/website/anti_fouc_scripts.php'; 
+  ?>
 </body>
 </html>
