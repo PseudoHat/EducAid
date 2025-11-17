@@ -1,6 +1,10 @@
 <?php 
 // Opt-in to camera access for this page (Permissions-Policy override)
 if (!defined('ALLOW_CAMERA')) { define('ALLOW_CAMERA', true); }
+
+// CRITICAL: Include security headers BEFORE any output to set Permissions-Policy with camera=(self)
+require_once __DIR__ . '/../../config/security_headers.php';
+
 // Load secure session configuration (must be before session_start)
 require_once __DIR__ . '/../../config/session_config.php';
 
