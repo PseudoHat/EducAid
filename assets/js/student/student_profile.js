@@ -27,11 +27,21 @@
       }
       this.disabled = true;
       this.textContent = "Sending...";
+      
+      console.log('Sending OTP request for email:', email);
+      
       fetch('', {
         method: 'POST',
         headers: {'Content-Type':'application/x-www-form-urlencoded'},
         body: `ajax=send_otp&new_email=${encodeURIComponent(email)}`
-      }).then(res => res.json()).then(data => {
+      }).then(res => {
+        console.log('OTP send response status:', res.status);
+        if (!res.ok) {
+          throw new Error(`HTTP error! status: ${res.status}`);
+        }
+        return res.json();
+      }).then(data => {
+        console.log('OTP send response data:', data);
         if (data.status === 'success') {
           document.getElementById('emailOtpStatus').textContent = "OTP sent! Check email.";
           document.getElementById('emailOtpStatus').className = 'form-success';
@@ -45,8 +55,9 @@
           this.disabled = false;
           this.textContent = "Send OTP";
         }
-      }).catch(()=>{
-        document.getElementById('emailOtpStatus').textContent = "Failed to send. Try again.";
+      }).catch((error)=>{
+        console.error('OTP send error:', error);
+        document.getElementById('emailOtpStatus').textContent = "Network error. Please try again.";
         document.getElementById('emailOtpStatus').className = 'form-error';
         this.disabled = false; this.textContent = "Send OTP";
       });
@@ -68,11 +79,21 @@
         return;
       }
       this.disabled = true; this.textContent = "Verifying...";
+      
+      console.log('Verifying OTP:', otp);
+      
       fetch('', {
         method: 'POST',
         headers: {'Content-Type':'application/x-www-form-urlencoded'},
         body: `ajax=verify_otp&otp=${encodeURIComponent(otp)}&new_email=${encodeURIComponent(email)}`
-      }).then(res=>res.json()).then(data=>{
+      }).then(res => {
+        console.log('OTP verify response status:', res.status);
+        if (!res.ok) {
+          throw new Error(`HTTP error! status: ${res.status}`);
+        }
+        return res.json();
+      }).then(data=>{
+        console.log('OTP verify response data:', data);
         if (data.status === 'success') {
           document.getElementById('emailOtpStatus').textContent = "OTP verified!";
           document.getElementById('emailOtpStatus').className = 'form-success';
@@ -88,8 +109,9 @@
           this.disabled = false; this.textContent = "Verify OTP";
           otpVerified = false;
         }
-      }).catch(()=>{
-        document.getElementById('otpInputError').textContent = "Failed to verify. Try again.";
+      }).catch((error)=>{
+        console.error('OTP verify error:', error);
+        document.getElementById('otpInputError').textContent = "Network error. Please try again.";
         this.disabled = false; this.textContent = "Verify OTP";
       });
     };
@@ -130,12 +152,47 @@
       document.getElementById('otpPwdError').textContent = '';
     }
 
+    // Initialize password strength validator (using new reusable validator)
+    let passwordValidator = null;
+    
+    document.addEventListener('DOMContentLoaded', function() {
+      const passwordModal = document.getElementById('passwordModal');
+      
+      if (passwordModal) {
+        passwordModal.addEventListener('shown.bs.modal', function() {
+          // Initialize validator when modal is shown
+          if (!passwordValidator && typeof setupPasswordValidation === 'function') {
+            passwordValidator = setupPasswordValidation({
+              passwordInputId: 'newPassword',
+              confirmPasswordInputId: 'confirmPassword',
+              currentPasswordInputId: 'currentPassword',
+              strengthBarId: 'strengthBar',
+              strengthTextId: 'strengthText',
+              strengthFeedbackId: 'strengthFeedback',
+              matchTextId: 'passwordMatchText',
+              submitButtonId: 'sendOtpPwdBtn'
+            });
+          } else if (passwordValidator && passwordValidator.reset) {
+            // Reset validator if reopening modal
+            passwordValidator.reset();
+          }
+        });
+        
+        // Clean up when modal is hidden
+        passwordModal.addEventListener('hidden.bs.modal', function() {
+          if (passwordValidator && passwordValidator.reset) {
+            passwordValidator.reset();
+          }
+        });
+      }
+    });
+
     document.getElementById('sendOtpPwdBtn').onclick = function(e) {
       e.preventDefault();
       clearFieldErrors();
-      const currentPwd = document.getElementById('currentPwdInput').value;
-      const newPwd = document.getElementById('newPwdInput').value;
-      const confirmPwd = document.getElementById('confirmPwdInput').value;
+      const currentPwd = document.getElementById('currentPassword').value;
+      const newPwd = document.getElementById('newPassword').value;
+      const confirmPwd = document.getElementById('confirmPassword').value;
 
       if (!currentPwd) {
         document.getElementById('currentPwdError').textContent = "Required";
@@ -145,10 +202,21 @@
         document.getElementById('newPwdError').textContent = "Required";
         return;
       }
-      if (newPwd.length < 12) {
-        document.getElementById('newPwdError').textContent = "Min 12 characters";
-        return;
+      
+      // Validate using the password strength validator
+      if (passwordValidator && passwordValidator.validate) {
+        if (!passwordValidator.validate()) {
+          document.getElementById('newPwdError').textContent = "Password does not meet requirements";
+          return;
+        }
+      } else {
+        // Fallback validation if validator not available
+        if (newPwd.length < 12) {
+          document.getElementById('newPwdError').textContent = "Min 12 characters";
+          return;
+        }
       }
+      
       if (!confirmPwd) {
         document.getElementById('confirmPwdError').textContent = "Required";
         return;
@@ -258,119 +326,3 @@
 
     // Make togglePasswordVisibility available globally
     window.togglePasswordVisibility = togglePasswordVisibility;
-
-    // Password strength indicator
-    function checkPasswordStrength(password) {
-      let strength = 0;
-      const feedback = [];
-
-      if (password.length >= 12) strength += 25;
-      else feedback.push('At least 12 characters');
-
-      if (/[a-z]/.test(password) && /[A-Z]/.test(password)) strength += 25;
-      else feedback.push('Mix of uppercase and lowercase');
-
-      if (/\d/.test(password)) strength += 25;
-      else feedback.push('Include numbers');
-
-      if (/[^a-zA-Z0-9]/.test(password)) strength += 25;
-      else feedback.push('Include special characters');
-
-      return { strength, feedback };
-    }
-
-    // Initialize password strength indicator
-    function initPasswordStrength() {
-      const newPwdInput = document.getElementById('newPwdInput');
-      
-      if (!newPwdInput) {
-        console.log('Password input not found');
-        return;
-      }
-
-      // Check if strength indicator already exists
-      const existingBar = document.querySelector('.password-strength-bar');
-      if (existingBar) {
-        console.log('Strength indicator already exists');
-        return;
-      }
-      
-      // Create strength indicator elements
-      const strengthBar = document.createElement('div');
-      strengthBar.className = 'password-strength-bar mt-2';
-      strengthBar.style.cssText = 'height: 4px; background: #e0e0e0; border-radius: 2px; overflow: hidden;';
-      
-      const strengthFill = document.createElement('div');
-      strengthFill.className = 'password-strength-fill';
-      strengthFill.style.cssText = 'height: 100%; width: 0%; transition: all 0.3s ease; border-radius: 2px;';
-      strengthBar.appendChild(strengthFill);
-      
-      const strengthText = document.createElement('div');
-      strengthText.className = 'password-strength-text mt-1';
-      strengthText.style.cssText = 'font-size: 0.875rem; color: #666;';
-      
-      // Insert after the input's parent div
-      const inputGroup = newPwdInput.closest('.input-group');
-      const parentDiv = inputGroup ? inputGroup.parentElement : newPwdInput.parentElement;
-      
-      if (parentDiv) {
-        // Find the error span if it exists
-        const errorSpan = parentDiv.querySelector('#newPwdError');
-        if (errorSpan) {
-          parentDiv.insertBefore(strengthBar, errorSpan.nextSibling);
-          parentDiv.insertBefore(strengthText, strengthBar.nextSibling);
-        } else {
-          parentDiv.appendChild(strengthBar);
-          parentDiv.appendChild(strengthText);
-        }
-        console.log('Strength indicator added to DOM');
-      }
-      
-      // Update strength on input
-      newPwdInput.addEventListener('input', function() {
-        const password = this.value;
-        
-        if (password.length === 0) {
-          strengthFill.style.width = '0%';
-          strengthText.textContent = '';
-          return;
-        }
-        
-        const result = checkPasswordStrength(password);
-        const strength = result.strength;
-        
-        // Update bar width and color
-        strengthFill.style.width = strength + '%';
-        
-        if (strength <= 25) {
-          strengthFill.style.background = '#dc3545';
-          strengthText.innerHTML = '<span style="color: #dc3545;">Weak</span> - ' + result.feedback.join(', ');
-        } else if (strength <= 50) {
-          strengthFill.style.background = '#ffc107';
-          strengthText.innerHTML = '<span style="color: #ffc107;">Fair</span> - ' + result.feedback.join(', ');
-        } else if (strength <= 75) {
-          strengthFill.style.background = '#17a2b8';
-          strengthText.innerHTML = '<span style="color: #17a2b8;">Good</span> - ' + result.feedback.join(', ');
-        } else {
-          strengthFill.style.background = '#28a745';
-          strengthText.innerHTML = '<span style="color: #28a745;">Strong</span> - Password meets all requirements';
-        }
-      });
-      
-      console.log('Password strength listener attached');
-    }
-
-    // Initialize on page load
-    document.addEventListener('DOMContentLoaded', function() {
-      console.log('DOM loaded, initializing password strength');
-      initPasswordStrength();
-      
-      // Also initialize when the password modal is shown
-      const passwordModal = document.getElementById('passwordModal');
-      if (passwordModal) {
-        passwordModal.addEventListener('shown.bs.modal', function() {
-          console.log('Password modal shown, re-initializing strength indicator');
-          initPasswordStrength();
-        });
-      }
-    });

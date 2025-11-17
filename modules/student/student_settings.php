@@ -28,22 +28,29 @@ require __DIR__ . '/../../phpmailer/vendor/autoload.php';
 // Email Change OTP
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax'])) {
     header('Content-Type: application/json');
+    error_log("AJAX OTP Request - Action: " . $_POST['ajax']);
+    
     // --- OTP Send ---
     if ($_POST['ajax'] === 'send_otp' && isset($_POST['new_email'])) {
         $newEmail = filter_var($_POST['new_email'], FILTER_SANITIZE_EMAIL);
+        error_log("Send OTP - Email: " . $newEmail);
+        
         if (!filter_var($newEmail, FILTER_VALIDATE_EMAIL)) {
+            error_log("Send OTP - Invalid email format");
             echo json_encode(['status' => 'error', 'message' => 'Invalid email format.']);
             exit;
         }
         // Check if email is used by an admin
         $adminCheck = pg_query_params($connection, "SELECT 1 FROM admins WHERE email = $1", [$newEmail]);
         if (pg_num_rows($adminCheck) > 0) {
+            error_log("Send OTP - Email already in use by admin");
             echo json_encode(['status' => 'error', 'message' => 'This email is already in use.']);
             exit;
         }
         // Check if email already used by another active student (exclude current)
         $res = pg_query_params($connection, "SELECT 1 FROM students WHERE email = $1 AND student_id != $2 AND is_archived = FALSE", [$newEmail, $student_id]);
         if (pg_num_rows($res) > 0) {
+            error_log("Send OTP - Email already registered by another student");
             echo json_encode(['status' => 'error', 'message' => 'This email is already registered by another active student.']);
             exit;
         }
@@ -51,6 +58,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax'])) {
         $_SESSION['profile_otp'] = $otp;
         $_SESSION['profile_otp_email'] = $newEmail;
         $_SESSION['profile_otp_time'] = time();
+        
+        error_log("Send OTP - Generated OTP: " . $otp);
 
         // PHPMailer send
         $mail = new PHPMailer(true);
@@ -69,8 +78,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax'])) {
             $mail->Body    = "Your One-Time Password (OTP) for updating your EducAid email is: <strong>$otp</strong><br><br>This OTP is valid for 40 seconds.";
             $mail->AltBody = "Your OTP for updating your EducAid email is: $otp. This OTP is valid for 40 seconds.";
             $mail->send();
+            error_log("Send OTP - Email sent successfully");
             echo json_encode(['status' => 'success', 'message' => 'OTP sent! Please check your email.']);
         } catch (Exception $e) {
+            error_log("Send OTP - Mail error: " . $e->getMessage());
             echo json_encode(['status' => 'error', 'message' => 'Failed to send OTP. Please try again.']);
         }
         exit;
@@ -80,25 +91,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax'])) {
     if ($_POST['ajax'] === 'verify_otp' && isset($_POST['otp']) && isset($_POST['new_email'])) {
         $enteredOtp = filter_var($_POST['otp'], FILTER_SANITIZE_NUMBER_INT);
         $email = filter_var($_POST['new_email'], FILTER_SANITIZE_EMAIL);
+        
+        error_log("Verify OTP - Entered OTP: " . $enteredOtp . ", Email: " . $email);
 
         if (!isset($_SESSION['profile_otp'], $_SESSION['profile_otp_email'], $_SESSION['profile_otp_time'])) {
+            error_log("Verify OTP - No session data");
             echo json_encode(['status' => 'error', 'message' => 'No OTP sent or session expired.']);
             exit;
         }
+        
+        error_log("Verify OTP - Session OTP: " . $_SESSION['profile_otp'] . ", Session Email: " . $_SESSION['profile_otp_email']);
+        
         if ($_SESSION['profile_otp_email'] !== $email) {
+            error_log("Verify OTP - Email mismatch");
             echo json_encode(['status' => 'error', 'message' => 'Email mismatch.']);
             exit;
         }
         if ((time() - $_SESSION['profile_otp_time']) > 40) {
+            error_log("Verify OTP - OTP expired");
             unset($_SESSION['profile_otp'], $_SESSION['profile_otp_email'], $_SESSION['profile_otp_time'], $_SESSION['profile_otp_verified']);
             echo json_encode(['status' => 'error', 'message' => 'OTP expired. Please resend.']);
             exit;
         }
         if ((int)$enteredOtp === (int)$_SESSION['profile_otp']) {
+            error_log("Verify OTP - Success");
             $_SESSION['profile_otp_verified'] = true;
             echo json_encode(['status' => 'success', 'message' => 'OTP verified!']);
             unset($_SESSION['profile_otp'], $_SESSION['profile_otp_time']);
         } else {
+            error_log("Verify OTP - Invalid OTP");
             $_SESSION['profile_otp_verified'] = false;
             echo json_encode(['status' => 'error', 'message' => 'Invalid OTP.']);
         }
@@ -211,7 +232,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_email'])) {
         }
         
         try {
-            pg_query($connection, "UPDATE students SET email = '" . pg_escape_string($connection, $newEmail) . "' WHERE student_id = '" . pg_escape_string($connection, $student_id) . "'");
+            $updateResult = pg_query($connection, "UPDATE students SET email = '" . pg_escape_string($connection, $newEmail) . "' WHERE student_id = '" . pg_escape_string($connection, $student_id) . "'");
+            
+            if (!$updateResult) {
+                error_log("Email update failed for student $student_id: " . pg_last_error($connection));
+                $_SESSION['profile_flash'] = 'Failed to update email. Please try again.';
+                $_SESSION['profile_flash_type'] = 'error';
+                unset($_SESSION['profile_otp_email'], $_SESSION['profile_otp_verified']);
+                header("Location: student_settings.php");
+                exit;
+            }
+            
+            $affectedRows = pg_affected_rows($updateResult);
+            if ($affectedRows === 0) {
+                error_log("Email update affected 0 rows for student $student_id");
+                $_SESSION['profile_flash'] = 'Failed to update email. Student not found.';
+                $_SESSION['profile_flash_type'] = 'error';
+                unset($_SESSION['profile_otp_email'], $_SESSION['profile_otp_verified']);
+                header("Location: student_settings.php");
+                exit;
+            }
+            
             $msg = 'Your email has been changed to ' . $newEmail . '.';
             pg_query($connection, "INSERT INTO notifications (student_id, message) VALUES ('" . pg_escape_string($connection, $student_id) . "', '" . pg_escape_string($connection, $msg) . "')");
             $nameRes = pg_query($connection, "SELECT first_name, last_name FROM students WHERE student_id = '" . pg_escape_string($connection, $student_id) . "'");
@@ -347,6 +388,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_password'])) {
         header("Location: student_settings.php");
         exit;
     }
+    // Check password complexity
+    if (!preg_match('/[A-Z]/', $newPwd) || !preg_match('/[a-z]/', $newPwd) || 
+        !preg_match('/[0-9]/', $newPwd) || !preg_match('/[^A-Za-z0-9]/', $newPwd)) {
+        $_SESSION['profile_flash'] = 'Password must contain uppercase, lowercase, numbers, and special characters.';
+        $_SESSION['profile_flash_type'] = 'error';
+        header("Location: student_settings.php");
+        exit;
+    }
     if ($newPwd !== $confirmPwd) {
         $_SESSION['profile_flash'] = 'Passwords do not match.';
         $_SESSION['profile_flash_type'] = 'error';
@@ -429,6 +478,8 @@ unset($_SESSION['profile_flash'], $_SESSION['profile_flash_type']);
       border-left: 3px solid #28a745;
     }
     .home-section { padding-top: 0 !important; }
+    /* Hide inline error badges inside password modal (progress bar already provides feedback) */
+    #passwordModal .form-error { display: none !important; }
     .home-section > .main-header:first-child { margin-top: 0 !important; }
     
     /* Settings Header */
@@ -695,6 +746,90 @@ unset($_SESSION['profile_flash'], $_SESSION['profile_flash_type']);
       padding: 1.5rem 2rem;
       background: #f7fafc;
       border-radius: 0 0 16px 16px;
+    }
+    
+    /* Ensure modals appear above sidebar/backdrops */
+    .modal { z-index: 1100 !important; position: fixed; }
+    .modal-backdrop { z-index: 1095 !important; }
+
+    /* When any Bootstrap modal is open, neutralize potential stacking-context creators */
+    body.modal-open .home-section { transform: none !important; filter: none !important; }
+    body.modal-open .home-section * { transform: none !important; }
+
+    /* Prevent the student sidebar overlay from intercepting clicks while a modal is open */
+    body.modal-open .sidebar-backdrop { pointer-events: none !important; opacity: 0 !important; z-index: 0 !important; }
+    
+    /* Mobile Responsiveness: Compact modal styling (match manage_applicants) */
+    @media (max-width: 767px) {
+      .modal-dialog { 
+        max-width: 90% !important; 
+        margin: 1.5rem auto !important; 
+      }
+      
+      .modal-content { 
+        height: auto !important; 
+        max-height: 85vh !important; 
+        border-radius: 1rem !important; 
+        display: flex; 
+        flex-direction: column; 
+      }
+      
+      .modal-header { 
+        padding: 0.75rem 1rem; 
+        position: sticky; 
+        top: 0; 
+        background: #f8f9fa; 
+        z-index: 1; 
+        border-radius: 1rem 1rem 0 0; 
+        border-bottom: 1px solid #e0e0e0; 
+      }
+      
+      .modal-body { 
+        padding: 0.75rem 1rem; 
+        overflow-y: auto; 
+        max-height: calc(85vh - 140px); 
+        flex: 1; 
+      }
+      
+      .modal-footer { 
+        padding: 0.75rem 1rem; 
+        position: sticky; 
+        bottom: 0; 
+        background: #fff; 
+        z-index: 1; 
+        border-top: 1px solid #e0e0e0; 
+        flex-shrink: 0; 
+      }
+      
+      .modal-title { 
+        font-size: 1rem; 
+        line-height: 1.3; 
+      }
+      
+      .modal-title i { 
+        font-size: 0.9rem; 
+      }
+      
+      .alert {
+        padding: 0.5rem 0.75rem;
+        margin-bottom: 0.75rem;
+        font-size: 0.85rem;
+      }
+      
+      .form-label {
+        font-size: 0.9rem;
+        margin-bottom: 0.4rem;
+      }
+      
+      .form-control {
+        padding: 0.6rem 0.75rem;
+        font-size: 0.9rem;
+      }
+      
+      .btn {
+        padding: 0.5rem 0.75rem;
+        font-size: 0.9rem;
+      }
     }
     
     /* Form Styling */
@@ -1065,69 +1200,7 @@ unset($_SESSION['profile_flash'], $_SESSION['profile_flash_type']);
       border-color: #4299e1;
     }
 
-    /* ============================================================================
-       MODAL Z-INDEX FIX
-       ============================================================================
-       Page hierarchy:
-       - Sidebar (mobile): 1080
-       - Sidebar backdrop: 1060
-       - Topbar: 1050
-       - Header: 1030
-       
-       Modal hierarchy (must cover everything):
-       - Backdrop: 1090 (covers page elements)
-       - Modal: 9999 (way above backdrop - prevents DOM order issues)
-       ============================================================================ */
-    
-    /* Backdrop - covers sidebar/topbar/header but stays below modal */
-    .modal-backdrop {
-      z-index: 1090 !important; /* Above sidebar (1080) */
-      background-color: rgba(0, 0, 0, 0.5) !important;
-      opacity: 1 !important;
-    }
-    
-    .modal-backdrop.show {
-      opacity: 1 !important;
-    }
-    
-    .modal-backdrop.fade {
-      opacity: 0 !important;
-    }
 
-    /* Modal container - extremely high z-index to overcome DOM order */
-    .modal {
-      z-index: 9999 !important; /* Way above backdrop */
-      background: transparent !important;
-      position: fixed !important;
-    }
-
-    .modal.show,
-    .modal.fade,
-    .modal.fade.show {
-      z-index: 9999 !important;
-    }
-
-    /* Modal dialog - inherit z-index from parent */
-    .modal-dialog {
-      z-index: inherit !important;
-      position: relative !important;
-      pointer-events: auto !important;
-    }
-
-    /* Modal content - inherit z-index from parent */
-    .modal-content {
-      z-index: inherit !important;
-      position: relative !important;
-      pointer-events: auto !important;
-      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5) !important;
-    }
-    
-    /* Ensure sidebar, topbar, header are below modal */
-    .sidebar,
-    .topbar,
-    .header {
-      z-index: 1000 !important;
-    }
   </style>
 </head>
 <body>
@@ -1515,17 +1588,24 @@ unset($_SESSION['profile_flash'], $_SESSION['profile_flash_type']);
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
               </div>
               <div class="modal-body">
-                <div class="alert alert-warning">
-                  <i class="bi bi-shield-exclamation me-2"></i>
-                  <strong>Security Notice:</strong> Your new password must be at least 12 characters long.
+                <div class="alert alert-info mb-3">
+                  <i class="bi bi-shield-check me-2"></i>
+                  <strong>Password Requirements:</strong>
+                  <ul class="mb-0 mt-2" style="font-size: 0.9rem;">
+                    <li>At least 12 characters long</li>
+                    <li>Contains uppercase and lowercase letters</li>
+                    <li>Contains numbers</li>
+                    <li>Contains special characters (!@#$%^&*)</li>
+                    <li>Cannot reuse your current password</li>
+                  </ul>
                 </div>
                 
                 <div class="mb-3 position-relative">
                   <label class="form-label">Current Password</label>
                   <div class="input-group">
-                    <input type="password" name="current_password" id="currentPwdInput" 
+                    <input type="password" name="current_password" id="currentPassword" 
                            class="form-control" placeholder="Enter your current password" required minlength="8">
-                    <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility('currentPwdInput', 'currentPwdIcon')">
+                    <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility('currentPassword', 'currentPwdIcon')">
                       <i class="bi bi-eye" id="currentPwdIcon"></i>
                     </button>
                   </div>
@@ -1535,11 +1615,25 @@ unset($_SESSION['profile_flash'], $_SESSION['profile_flash_type']);
                 <div class="mb-3 position-relative">
                   <label class="form-label">New Password</label>
                   <div class="input-group">
-                    <input type="password" name="new_password" id="newPwdInput" 
+                    <input type="password" name="new_password" id="newPassword" 
                            class="form-control" placeholder="Enter your new password" required minlength="12">
-                    <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility('newPwdInput', 'newPwdIcon')">
+                    <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility('newPassword', 'newPwdIcon')">
                       <i class="bi bi-eye" id="newPwdIcon"></i>
                     </button>
+                  </div>
+                  
+                  <!-- Password Strength Indicator -->
+                  <div class="mt-2">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                      <small class="text-muted">Password Strength:</small>
+                      <small id="strengthText" class="fw-bold"></small>
+                    </div>
+                    <div class="progress" style="height: 8px;">
+                      <div id="strengthBar" class="progress-bar" role="progressbar" 
+                           style="width: 0%; transition: all 0.3s ease;" 
+                           aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+                    </div>
+                    <small id="strengthFeedback" class="text-muted d-block mt-1"></small>
                   </div>
                   <span id="newPwdError" class="form-error position-absolute" style="right:15px;top:35px;"></span>
                 </div>
@@ -1547,12 +1641,13 @@ unset($_SESSION['profile_flash'], $_SESSION['profile_flash_type']);
                 <div class="mb-3 position-relative">
                   <label class="form-label">Confirm New Password</label>
                   <div class="input-group">
-                    <input type="password" name="confirm_password" id="confirmPwdInput" 
+                    <input type="password" name="confirm_password" id="confirmPassword" 
                            class="form-control" placeholder="Confirm your new password" required minlength="12">
-                    <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility('confirmPwdInput', 'confirmPwdIcon')">
+                    <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility('confirmPassword', 'confirmPwdIcon')">
                       <i class="bi bi-eye" id="confirmPwdIcon"></i>
                     </button>
                   </div>
+                  <small id="passwordMatchText" class="d-block mt-1"></small>
                   <span id="confirmPwdError" class="form-error position-absolute" style="right:15px;top:35px;"></span>
                 </div>
                 
@@ -1702,39 +1797,16 @@ unset($_SESSION['profile_flash'], $_SESSION['profile_flash_type']);
 
   <script src="../../assets/js/bootstrap.bundle.min.js"></script>
   <script src="../../assets/js/student/sidebar.js"></script>
+  <script src="../../assets/js/shared/password_strength_validator.js"></script>
   <script src="../../assets/js/student/student_profile.js"></script>
   
   <script>
-    // Fix modal z-index and ensure modal is clickable above backdrop
+    // Move modals to <body> on open to avoid stacking-context issues from ancestors
     document.addEventListener('DOMContentLoaded', function() {
-      const allModals = document.querySelectorAll('.modal');
-      
-      allModals.forEach(modal => {
-        modal.addEventListener('show.bs.modal', function() {
-          // Ensure modal has highest z-index before it shows
-          setTimeout(() => {
-            this.style.zIndex = '9999';
-            const dialog = this.querySelector('.modal-dialog');
-            const content = this.querySelector('.modal-content');
-            if (dialog) dialog.style.pointerEvents = 'auto';
-            if (content) content.style.pointerEvents = 'auto';
-            
-            // Force backdrop to stay below modal
-            const backdrop = document.querySelector('.modal-backdrop');
-            if (backdrop) {
-              backdrop.style.zIndex = '1090';
-              backdrop.style.pointerEvents = 'none'; // Make backdrop non-interactive
-            }
-          }, 10);
-        });
-        
-        modal.addEventListener('shown.bs.modal', function() {
-          // Double-check after animation completes
-          this.style.zIndex = '9999';
-          const backdrop = document.querySelector('.modal-backdrop');
-          if (backdrop) {
-            backdrop.style.zIndex = '1090';
-            backdrop.style.pointerEvents = 'none'; // Backdrop should not block clicks
+      document.querySelectorAll('.modal').forEach(function(modalEl) {
+        modalEl.addEventListener('show.bs.modal', function() {
+          if (this.parentElement !== document.body) {
+            document.body.appendChild(this);
           }
         });
       });

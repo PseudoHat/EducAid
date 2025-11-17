@@ -95,7 +95,6 @@ function getNotificationIcon($type) {
   <div id="wrapper" style="padding-top: var(--topbar-h);">
     <!-- Sidebar -->
     <?php include __DIR__ . '/../../includes/student/student_sidebar.php'; ?>
-    <div class="sidebar-backdrop d-none" id="sidebar-backdrop"></div>
     
     <!-- Student Header -->
     <?php include __DIR__ . '/../../includes/student/student_header.php'; ?>

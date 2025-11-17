@@ -52,7 +52,6 @@ include __DIR__ . '/../../includes/student_session_tracker.php';
   <?php include __DIR__ . '/../../includes/student/student_topbar.php'; ?>
   <div id="wrapper" style="padding-top: var(--topbar-h);">
     <?php include __DIR__ . '/../../includes/student/student_sidebar.php'; ?>
-    <div class="sidebar-backdrop d-none" id="sidebar-backdrop"></div>
     <?php include __DIR__ . '/../../includes/student/student_header.php'; ?>
 
     <section class="home-section" id="page-content-wrapper">

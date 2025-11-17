@@ -1919,7 +1919,6 @@ $page_title = 'Upload Documents';
         .home-section {
             margin-left: 260px;
             padding: 2rem;
-            transition: margin-left 0.3s ease;
             min-height: 100vh;
             background: #f8f9fa;
         }

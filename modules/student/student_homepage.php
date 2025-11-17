@@ -168,10 +168,7 @@ if (!isset($_SESSION['schedule_modal_shown'])) {
   <style>
     body:not(.js-ready) .sidebar { visibility: hidden; transition: none !important; }
     
-    /* Adjust main content spacing */
-    .home-section {
-      padding-top: 0;
-    }
+    /* Removed page-specific .home-section override to avoid conflicts with global sidebar layout */
     
     /* Footer styles - Small chip/sticker */
     .main-footer {
@@ -276,11 +273,15 @@ if (!isset($_SESSION['schedule_modal_shown'])) {
   <!-- Student Topbar -->
   <?php include __DIR__ . '/../../includes/student/student_topbar.php'; ?>
 
-  <div id="wrapper" style="padding-top: var(--topbar-h);">
-    <!-- Sidebar -->
-  <?php include __DIR__ . '/../../includes/student/student_sidebar.php'; ?>
-   
-    <!-- Main Header (outside home-section for proper fixed positioning) -->
+  <div id="wrapper" style="padding-top: var(--topbar-h, 60px);">
+    <?php include __DIR__ . '/../../includes/student/student_sidebar.php'; ?>
+    <?php // Safety: ensure backdrop exists if the include was customized or failed
+    if (!defined('STUDENT_SIDEBAR_BACKDROP')) {
+      echo '<div class="sidebar-backdrop d-none" id="sidebar-backdrop"></div>';
+      define('STUDENT_SIDEBAR_BACKDROP', true);
+    }
+    ?>
+    
     <?php include __DIR__ . '/../../includes/student/student_header.php'; ?>
 
     <!-- Page Content -->
@@ -981,6 +982,9 @@ if (!isset($_SESSION['schedule_modal_shown'])) {
   
   <!-- Announcement Read More Toggle -->
   <script>
+    // Mark body as ready after scripts load (enables sidebar visibility)
+    document.body.classList.add('js-ready');
+    
     document.addEventListener('DOMContentLoaded', function() {
       const toggleBtn = document.getElementById('toggleAnnouncementBtn');
       if (toggleBtn) {

@@ -5,7 +5,19 @@ document.addEventListener("DOMContentLoaded", function () {
   document.body.classList.add("js-ready");
   const sidebar = document.getElementById("sidebar");
   const toggleBtn = document.getElementById("menu-toggle");
-  const backdrop = document.getElementById("sidebar-backdrop");
+  let backdrop = document.getElementById("sidebar-backdrop");
+  // Fallback: if some pages forgot to include the backdrop, create it
+  if (!backdrop) {
+    backdrop = document.createElement('div');
+    backdrop.id = 'sidebar-backdrop';
+    backdrop.className = 'sidebar-backdrop d-none';
+    // Prefer placing after sidebar in DOM if available, else append to body
+    if (sidebar && sidebar.parentElement) {
+      sidebar.parentElement.insertBefore(backdrop, sidebar.nextSibling);
+    } else {
+      document.body.appendChild(backdrop);
+    }
+  }
   const homeSection = document.querySelector(".home-section") || document.getElementById("mainContent");
 
   function isMobile() {

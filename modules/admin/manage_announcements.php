@@ -263,7 +263,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
   // Handle edit announcement
   if (isset($_POST['edit_announcement'])) {
+    error_log("=== EDIT ANNOUNCEMENT REQUEST ===");
+    error_log("POST data: " . print_r($_POST, true));
+    
     if (!CSRFProtection::validateToken('post_announcement', $token)) {
+      error_log("CSRF validation failed");
       header('Location: ' . $_SERVER['PHP_SELF'] . '?error=csrf');
       exit;
     }
@@ -275,12 +279,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $event_time = !empty($_POST['event_time']) ? $_POST['event_time'] : null;
     $location = !empty($_POST['location']) ? trim($_POST['location']) : null;
 
+    error_log("Parsed values - ID: $announcement_id, Title: $title");
+
     // Server-side validation
     if (empty($title) || strlen($title) > 255) {
+      error_log("Title validation failed");
       header('Location: ' . $_SERVER['PHP_SELF'] . '?error=invalid_title');
       exit;
     }
     if (empty($remarks) || strlen($remarks) > 5000) {
+      error_log("Remarks validation failed");
       header('Location: ' . $_SERVER['PHP_SELF'] . '?error=invalid_remarks');
       exit;
     }
@@ -295,6 +303,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       exit;
     }
 
+    $affected_rows = pg_affected_rows($result);
+    error_log("Update successful. Affected rows: $affected_rows");
+
     header('Location: ' . $_SERVER['PHP_SELF'] . '?updated=1');
     exit;
   }
@@ -305,9 +316,6 @@ $posted = isset($_GET['posted']);
 $updated = isset($_GET['updated']);
 ?>
 <?php $page_title='Manage Announcements'; $extra_css=['../../assets/css/admin/manage_announcements.css']; include __DIR__ . '/../../includes/admin/admin_head.php'; ?>
-
-<!-- TinyMCE Rich Text Editor -->
-<script src="https://cdn.tiny.cloud/1/no-api-key/tinymce/6/tinymce.min.js" referrerpolicy="origin"></script>
 
 <style>
   .card:hover { transform:none!important; transition:none!important; }
@@ -474,6 +482,9 @@ $updated = isset($_GET['updated']);
               case 'db_insert': 
                 echo 'Failed to save announcement to database. Please try again.'; 
                 break;
+              case 'db_update':
+                echo 'Failed to update announcement in database. Please try again.';
+                break;
               case 'toggle_failed': 
                 echo 'Failed to update announcement status. Please try again.'; 
                 break;
@@ -577,7 +588,7 @@ function renderPage() {
       <td>${a.posted_at}</td>
       <td>${badge}</td>
       <td>
-        <button type="button" class="btn btn-sm btn-outline-primary me-1 mb-1" onclick="editAnnouncement(${a.announcement_id})">
+        <button type="button" class="btn btn-sm btn-outline-primary me-1 mb-1" onclick="editAnnouncement('${a.announcement_id}')">
           <i class="bi bi-pencil"></i> Edit
         </button>
         <form method="POST" class="d-inline">
@@ -649,16 +660,28 @@ if(dropZone && imgInput && inlinePreview){
 
 // Edit announcement function
 function editAnnouncement(id) {
-  const announcement = announcements.find(a => a.announcement_id === id);
+  console.log('Edit clicked for announcement ID:', id, 'Type:', typeof id);
+  console.log('Available announcements:', announcements.length);
+  
+  // Convert to number for comparison
+  const numericId = parseInt(id);
+  const announcement = announcements.find(a => parseInt(a.announcement_id) === numericId);
+  
   if (!announcement) {
     console.error('Announcement not found:', id);
+    console.log('Looking for ID:', numericId);
+    console.log('Available IDs:', announcements.map(a => a.announcement_id));
+    alert('Error: Announcement not found. Please refresh the page and try again.');
     return;
   }
+  
+  console.log('Found announcement:', announcement);
   
   // Get the form
   const form = document.getElementById('announcementForm');
   if (!form) {
     console.error('Form not found');
+    alert('Error: Form not found. Please refresh the page.');
     return;
   }
   
@@ -676,9 +699,10 @@ function editAnnouncement(id) {
   if (eventTimeInput) eventTimeInput.value = announcement.event_time || '';
   if (locationInput) locationInput.value = announcement.location || '';
   
-  // Update TinyMCE content
-  if (tinymce.get('remarksEditor')) {
-    tinymce.get('remarksEditor').setContent(announcement.remarks);
+  // Update remarks textarea content
+  const remarksEditor = document.getElementById('remarksEditor');
+  if (remarksEditor) {
+    remarksEditor.value = announcement.remarks;
   }
   
   // Change form to edit mode
@@ -701,7 +725,8 @@ function editAnnouncement(id) {
     editIdInput.name = 'announcement_id';
     form.insertBefore(editIdInput, form.firstChild);
   }
-  editIdInput.value = id;
+  editIdInput.value = numericId;
+  console.log('Set announcement_id to:', editIdInput.value);
   
   // Add hidden input to ensure edit_announcement is submitted
   let editActionInput = form.querySelector('input[name="edit_announcement"]');
@@ -712,10 +737,9 @@ function editAnnouncement(id) {
     editActionInput.value = '1';
     form.insertBefore(editActionInput, form.firstChild);
   }
+  console.log('Set edit_announcement flag');
   
-  console.log('Edit mode enabled for announcement:', id);
-  
-  console.log('Edit mode enabled for announcement:', id);
+  console.log('Edit mode enabled for announcement:', numericId);
   
   // Add cancel button if not exists
   let cancelBtn = form.querySelector('.cancel-edit-btn');
@@ -738,9 +762,10 @@ function resetForm() {
   
   form.reset();
   
-  // Reset TinyMCE
-  if (tinymce.get('remarksEditor')) {
-    tinymce.get('remarksEditor').setContent('');
+  // Reset remarks textarea
+  const remarksEditor = document.getElementById('remarksEditor');
+  if (remarksEditor) {
+    remarksEditor.value = '';
   }
   
   const submitBtn = form.querySelector('button[type="submit"]');
@@ -768,31 +793,10 @@ function resetForm() {
   if (placeholder) placeholder.hidden = false;
 }
 
-// Initialize TinyMCE Rich Text Editor
-tinymce.init({
-  selector: '#remarksEditor',
-  height: 300,
-  menubar: false,
-  plugins: [
-    'lists', 'link', 'charmap', 'preview', 'searchreplace',
-    'wordcount', 'fullscreen'
-  ],
-  toolbar: 'undo redo | formatselect | bold italic underline | bullist numlist | link | removeformat | preview fullscreen',
-  content_style: 'body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; font-size: 14px; }',
-  branding: false,
-  promotion: false,
-  block_formats: 'Paragraph=p; Heading 1=h1; Heading 2=h2; Heading 3=h3',
-  setup: function(editor) {
-    // Ensure form validation works with TinyMCE
-    editor.on('change', function() {
-      editor.save(); // Save content back to textarea
-    });
-  }
-});
-
 // Add form submit event listener for debugging
 document.getElementById('announcementForm').addEventListener('submit', function(e) {
   const formData = new FormData(this);
+  console.log('=== FORM SUBMISSION ===');
   console.log('Form submission data:');
   for (let [key, value] of formData.entries()) {
     console.log(key + ':', value);
@@ -800,13 +804,21 @@ document.getElementById('announcementForm').addEventListener('submit', function(
   
   // Check if we're in edit mode
   const editMode = formData.has('edit_announcement');
+  const hasAnnouncementId = formData.has('announcement_id');
   console.log('Edit mode:', editMode);
+  console.log('Has announcement_id:', hasAnnouncementId);
   
-  if (editMode && !formData.has('announcement_id')) {
-    console.error('Missing announcement_id in edit mode!');
+  if (editMode && !hasAnnouncementId) {
+    console.error('ERROR: Missing announcement_id in edit mode!');
     alert('Error: Missing announcement ID. Please try again.');
     e.preventDefault();
     return false;
+  }
+  
+  if (editMode) {
+    console.log('Submitting EDIT for announcement ID:', formData.get('announcement_id'));
+  } else {
+    console.log('Submitting NEW announcement');
   }
 });
 </script>

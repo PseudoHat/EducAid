@@ -32,7 +32,7 @@ class OTPService {
         
         // Send email
         error_log("OTPService: About to send email");
-        $emailResult = $this->sendOTPEmail($email, $otp, $purpose);
+        $emailResult = $this->sendOTPEmail($email, $otp, $purpose, $adminId);
         error_log("OTPService: Email sending result: " . ($emailResult ? 'SUCCESS' : 'FAILED'));
         
         return $emailResult;
@@ -112,7 +112,9 @@ class OTPService {
     /**
      * Send OTP email using PHPMailer with professional template
      */
-    private function sendOTPEmail($email, $otp, $purpose) {
+    private function sendOTPEmail($email, $otp, $purpose, $adminId = null) {
+        error_log("OTPService: sendOTPEmail called - Sending to: $email, OTP: $otp, Purpose: $purpose, AdminId: $adminId");
+        
         $mail = new PHPMailer(true);
         
         try {
@@ -129,35 +131,35 @@ class OTPService {
             $mail->setFrom('dilucayaka02@gmail.com', 'EducAid System');
             $mail->addAddress($email);
             
+            error_log("OTPService: PHPMailer configured, recipient added: $email");
+            
             // Content
             $mail->isHTML(true);
             $mail->Subject = 'EducAid Verification Code - ' . $otp;
             
-            // Get user's name from database (optional enhancement)
+            // Get user's name from database
             $recipient_name = 'Admin User'; // Default name
             
-            // Try to get actual name from database
-            $nameQuery = "SELECT firstname, lastname FROM admin_accounts WHERE email = $1";
-            $nameResult = pg_query_params($this->connection, $nameQuery, [$email]);
-            if ($nameResult && pg_num_rows($nameResult) > 0) {
-                $nameRow = pg_fetch_assoc($nameResult);
-                $recipient_name = trim($nameRow['firstname'] . ' ' . $nameRow['lastname']) ?: 'Admin User';
+            // Try to get actual name from database if adminId is provided
+            if ($adminId) {
+                $nameQuery = "SELECT first_name, last_name FROM admins WHERE admin_id = $1";
+                $nameResult = pg_query_params($this->connection, $nameQuery, [$adminId]);
+                if ($nameResult && pg_num_rows($nameResult) > 0) {
+                    $nameRow = pg_fetch_assoc($nameResult);
+                    $recipient_name = trim($nameRow['first_name'] . ' ' . $nameRow['last_name']) ?: 'Admin User';
+                }
             }
             
-            // Generate professional email using our template
-            $purposeMapping = [
-                'email_change' => 'login',
-                'password_change' => 'password_reset',
-                'login' => 'login'
-            ];
-            $templatePurpose = $purposeMapping[$purpose] ?? 'login';
+            // Use the actual purpose directly for the email template
+            $mail->Body = generateOTPEmailTemplate($otp, $recipient_name, $purpose);
             
-            $mail->Body = generateOTPEmailTemplate($otp, $recipient_name, $templatePurpose);
-            
+            error_log("OTPService: About to send email via PHPMailer...");
             $mail->send();
+            error_log("OTPService: Email sent successfully to $email");
             return true;
         } catch (Exception $e) {
             error_log("OTP Email Error: " . $mail->ErrorInfo);
+            error_log("OTP Email Exception: " . $e->getMessage());
             return false;
         }
     }

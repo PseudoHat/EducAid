@@ -324,10 +324,6 @@ h5 {
   .info-banner { padding: 10px 12px; }
 }
 
-/* Sidebar backdrop disabled in student portal */
-.sidebar-backdrop { display:none !important; }
-.sidebar-backdrop.d-none { display:none !important; }
-
 /* ===========================
    No-scroll for Mobile Menu
 =========================== */

@@ -127,6 +127,12 @@ if (!function_exists('student_menu_link')) {
   </ul>
 </div>
 
+<?php
+// Mark that the sidebar backdrop has been emitted to avoid duplicates downstream
+if (!defined('STUDENT_SIDEBAR_BACKDROP')) {
+  define('STUDENT_SIDEBAR_BACKDROP', true);
+}
+?>
 <div class="sidebar-backdrop d-none" id="sidebar-backdrop"></div>
 
 <!-- Logout Confirmation Modal -->

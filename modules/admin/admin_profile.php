@@ -1,5 +1,8 @@
 <?php
 /** @phpstan-ignore-file */
+// Start output buffering to prevent any output before JSON responses
+ob_start();
+
 include __DIR__ . '/../../config/database.php';
 include __DIR__ . '/../../services/OTPService.php';
 require_once __DIR__ . '/../../includes/CSRFProtection.php';
@@ -10,6 +13,15 @@ require_once __DIR__ . '/../../config/session_config.php';
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
+
+// Helper function to send clean JSON responses
+function sendJsonResponse($data) {
+    ob_clean(); // Clear any output buffer
+    header('Content-Type: application/json');
+    echo json_encode($data);
+    exit();
+}
+
 if (!isset($_SESSION['admin_username'])) {
   header("Location: ../../unified_login.php");
   exit;
@@ -66,9 +78,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       ];
       
       if ($isAjaxRequest) {
-        header('Content-Type: application/json');
-        echo json_encode($response);
-        exit();
+        sendJsonResponse($response);
       }
     }
     
@@ -103,22 +113,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $_SESSION['temp_new_email'] = $new_email;
       $_SESSION['temp_admin_id'] = $admin_id;
       
+      error_log("ADMIN PROFILE: Attempting to send OTP to $new_email for admin $admin_id");
+      
       if ($otpService->sendOTP($new_email, 'email_change', $admin_id)) {
+        error_log("ADMIN PROFILE: OTP sent successfully");
         $response = [
           'status' => 'success', 
           'message' => 'Verification code sent to your new email address.',
           'next_token' => CSRFProtection::generateToken('email_otp_verify')
         ];
       } else {
+        error_log("ADMIN PROFILE: OTP sending failed");
         $response['message'] = 'Failed to send verification code. Please try again.';
         $response['next_token'] = CSRFProtection::generateToken('email_otp_request');
       }
     }
     
     if ($isAjaxRequest) {
-      header('Content-Type: application/json');
-      echo json_encode($response);
-      exit();
+      sendJsonResponse($response);
     }
   }
   
@@ -134,9 +146,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       ];
       
       if ($isAjaxRequest) {
-        header('Content-Type: application/json');
-        echo json_encode($response);
-        exit();
+        sendJsonResponse($response);
       }
     }
     
@@ -178,9 +188,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     
     if ($isAjaxRequest) {
-      header('Content-Type: application/json');
-      echo json_encode($response);
-      exit();
+      sendJsonResponse($response);
     }
   }
   
@@ -196,9 +204,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       ];
       
       if ($isAjaxRequest) {
-        header('Content-Type: application/json');
-        echo json_encode($response);
-        exit();
+        sendJsonResponse($response);
       }
     }
     
@@ -227,8 +233,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($new_password !== $confirm_password) {
       $response['message'] = 'New passwords do not match.';
       $response['next_token'] = CSRFProtection::generateToken('password_otp_request');
-    } elseif (strlen($new_password) < 8) {
-      $response['message'] = 'New password must be at least 8 characters.';
+    } elseif (strlen($new_password) < 12) {
+      $response['message'] = 'New password must be at least 12 characters.';
+      $response['next_token'] = CSRFProtection::generateToken('password_otp_request');
+    } elseif (!preg_match('/[A-Z]/', $new_password) || !preg_match('/[a-z]/', $new_password) || 
+              !preg_match('/[0-9]/', $new_password) || !preg_match('/[!@#$%^&*()_+\-=\[\]{};:\'"\\|,.<>\/?]/', $new_password)) {
+      $response['message'] = 'Password must contain uppercase, lowercase, numbers, and special characters.';
       $response['next_token'] = CSRFProtection::generateToken('password_otp_request');
     } else {
       $_SESSION['temp_new_password'] = password_hash($new_password, PASSWORD_DEFAULT);
@@ -247,9 +257,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     
     if ($isAjaxRequest) {
-      header('Content-Type: application/json');
-      echo json_encode($response);
-      exit();
+      sendJsonResponse($response);
     }
   }
   
@@ -265,9 +273,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       ];
       
       if ($isAjaxRequest) {
-        header('Content-Type: application/json');
-        echo json_encode($response);
-        exit();
+        sendJsonResponse($response);
       }
     }
     
@@ -309,9 +315,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     
     if ($isAjaxRequest) {
-      header('Content-Type: application/json');
-      echo json_encode($response);
-      exit();
+      sendJsonResponse($response);
     }
   }
 }
@@ -935,23 +939,40 @@ $csrf_password_token = CSRFProtection::generateToken('password_otp_request');
             <div class="mb-3">
               <label for="newPassword" class="form-label">New Password <span class="text-danger">*</span></label>
               <div class="input-group">
-                <input type="password" class="form-control" id="newPassword" name="new_password" minlength="8" required>
+                <input type="password" class="form-control" id="newPassword" name="new_password" minlength="12" required>
                 <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility('newPassword', this)">
                   <i class="bi bi-eye"></i>
                 </button>
               </div>
-              <small class="text-muted">Minimum 8 characters</small>
+              <small class="text-muted">Must be at least 12 characters with uppercase, lowercase, numbers, and special characters</small>
+            </div>
+            
+            <!-- Password Strength Indicator -->
+            <div class="mb-3">
+              <label class="form-label">Password Strength</label>
+              <div class="progress" style="height: 25px;">
+                <div 
+                  id="strengthBar" 
+                  class="progress-bar" 
+                  role="progressbar" 
+                  style="width: 0%; transition: width 0.3s ease, background-color 0.3s ease;" 
+                  aria-valuenow="0" 
+                  aria-valuemin="0" 
+                  aria-valuemax="100"
+                ></div>
+              </div>
+              <small id="strengthText" class="text-muted d-block mt-1"></small>
             </div>
             
             <div class="mb-3">
               <label for="confirmPassword" class="form-label">Confirm New Password <span class="text-danger">*</span></label>
               <div class="input-group">
-                <input type="password" class="form-control" id="confirmPassword" name="confirm_password" minlength="8" required>
+                <input type="password" class="form-control" id="confirmPassword" name="confirm_password" minlength="12" required>
                 <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility('confirmPassword', this)">
                   <i class="bi bi-eye"></i>
                 </button>
               </div>
-              <div class="invalid-feedback">Passwords do not match.</div>
+              <small id="passwordMatchText" class="d-block mt-1"></small>
             </div>
           </div>
           <div class="modal-footer">
@@ -1279,28 +1300,8 @@ function backToPasswordStep1() {
   hideError('passwordStep2Error');
 }
 
-// Real-time password confirmation validation
+// Real-time password validation (handled by password_strength_validator.js)
 document.addEventListener('DOMContentLoaded', function() {
-  const newPasswordInput = document.getElementById('newPassword');
-  const confirmPasswordInput = document.getElementById('confirmPassword');
-  
-  function validatePasswordMatch() {
-    if (newPasswordInput.value && confirmPasswordInput.value) {
-      if (newPasswordInput.value !== confirmPasswordInput.value) {
-        confirmPasswordInput.setCustomValidity('Passwords do not match');
-        confirmPasswordInput.classList.add('is-invalid');
-      } else {
-        confirmPasswordInput.setCustomValidity('');
-        confirmPasswordInput.classList.remove('is-invalid');
-      }
-    }
-  }
-  
-  if (newPasswordInput && confirmPasswordInput) {
-    newPasswordInput.addEventListener('input', validatePasswordMatch);
-    confirmPasswordInput.addEventListener('input', validatePasswordMatch);
-  }
-  
   // Format OTP inputs to only accept numbers
   const otpInputs = ['emailOTP', 'passwordOTP'];
   otpInputs.forEach(inputId => {
@@ -1311,8 +1312,26 @@ document.addEventListener('DOMContentLoaded', function() {
       });
     }
   });
+  
+  // Initialize password strength validator for change password modal
+  // Note: We use custom IDs since this is in a modal with different field names
+  if (document.getElementById('newPassword') && document.getElementById('strengthBar')) {
+    setupPasswordValidation({
+      passwordInputId: 'newPassword',
+      confirmPasswordInputId: 'confirmPassword',
+      strengthBarId: 'strengthBar',
+      strengthTextId: 'strengthText',
+      passwordMatchTextId: 'passwordMatchText',
+      currentPasswordInputId: 'currentPassword', // Check for password reuse
+      submitButtonSelector: '#passwordStep1Form button[type="submit"]',
+      minStrength: 70,
+      requireMatch: true
+    });
+    console.log('✅ Password strength validator initialized for change password modal');
+  }
 });
 </script>
+<script src="../../assets/js/shared/password_strength_validator.js"></script>
 <script src="../../assets/js/admin/sidebar.js"></script>
 </body>
 </html>

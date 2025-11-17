@@ -223,9 +223,24 @@ function generateOTPEmailTemplate($otp, $recipient_name = 'User', $purpose = 'lo
             <div class="content">
                 <div class="greeting">Hello ' . htmlspecialchars($recipient_name) . '!</div>
                 
-                <div class="message">
-                    You have requested to ' . ($purpose === 'login' ? 'sign in to your EducAid account' : 'reset your password') . '. 
-                    Please use the verification code below to complete the process.
+                <div class="message">';
+                
+    // Dynamic message based on purpose
+    if ($purpose === 'email_change') {
+        $template .= 'You have requested to <strong>change your email address</strong> for your EducAid account. 
+                    Please use the verification code below to confirm this change and complete the process.';
+    } elseif ($purpose === 'password_change') {
+        $template .= 'You have requested to <strong>change your password</strong> for your EducAid account. 
+                    Please use the verification code below to verify your identity and complete the password change.';
+    } elseif ($purpose === 'password_reset') {
+        $template .= 'You have requested to <strong>reset your password</strong> for your EducAid account. 
+                    Please use the verification code below to complete the password reset process.';
+    } else {
+        $template .= 'You have requested to <strong>sign in</strong> to your EducAid account. 
+                    Please use the verification code below to complete the login process.';
+    }
+    
+    $template .= '
                 </div>
                 
                 <!-- OTP Code -->

@@ -48,6 +48,11 @@ class SessionTimeoutMiddleware {
      * @return array Status information for frontend warnings
      */
     public function handle() {
+        // Skip timeout for localhost development
+        if ($this->isLocalhost()) {
+            return ['status' => 'localhost_bypass', 'skip_timeout' => true];
+        }
+        
         // Only process if user is logged in
         if (!$this->isAuthenticated()) {
             return ['status' => 'not_authenticated'];
@@ -113,6 +118,16 @@ class SessionTimeoutMiddleware {
      */
     private function isAuthenticated() {
         return isset($_SESSION['student_id']) || isset($_SESSION['admin_id']);
+    }
+    
+    /**
+     * Check if running on localhost
+     */
+    private function isLocalhost() {
+        $host = $_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? '';
+        return in_array($host, ['localhost', '127.0.0.1', '::1']) || 
+               strpos($host, 'localhost:') === 0 || 
+               strpos($host, '127.0.0.1:') === 0;
     }
     
     /**
