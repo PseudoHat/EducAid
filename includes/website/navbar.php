@@ -270,7 +270,14 @@ nav.navbar.fixed-header .navbar-brand {
   nav.navbar.fixed-header .navbar-brand {
     max-width: none;
     margin-right: 0; /* Remove margin, use gap instead */
+    margin-left: 1rem; /* Add left spacing for better visual balance */
     flex: 0 1 auto; /* Allow some flexibility */
+  }
+}
+
+@media (min-width: 1200px) {
+  nav.navbar.fixed-header .navbar-brand {
+    margin-left: 1.5rem; /* Increase left spacing on larger screens */
   }
 }
 
