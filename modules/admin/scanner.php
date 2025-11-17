@@ -1,4 +1,9 @@
 <?php
+// Opt-in to camera access for this page (used by Permissions-Policy)
+if (!defined('ALLOW_CAMERA')) { define('ALLOW_CAMERA', true); }
+
+// Load security headers before any output
+require_once __DIR__ . '/../../config/security_headers.php';
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -40,6 +45,9 @@ if (!$qr_res) {
     echo "Error executing query: " . pg_last_error($connection);
     exit;
 }
+
+// Count results for table rendering
+$qr_count = pg_num_rows($qr_res);
 
 ?>
 
@@ -122,18 +130,33 @@ if (!$qr_res) {
                     </div>
                 </div>
 
-                <script src="https://unpkg.com/html5-qrcode"></script>
+                                <!-- Load QR library from CSP-allowed CDN with fallback -->
+                                <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/minified/html5-qrcode.min.js"></script>
+                                <script>
+                                    (function ensureHtml5Qrcode(){
+                                        function hasLib(){ return typeof window.Html5Qrcode !== 'undefined'; }
+                                        function load(src, cb){ var s=document.createElement('script'); s.src=src; s.async=false; s.onload=cb; s.onerror=cb; document.head.appendChild(s); }
+                                        if (hasLib()) return;
+                                        setTimeout(function(){
+                                            if (!hasLib()) {
+                                                load('https://unpkg.com/html5-qrcode@2.3.8/minified/html5-qrcode.min.js', function(){
+                                                    if (!hasLib()) { console.error('Failed to load html5-qrcode from both CDNs.'); }
+                                                });
+                                            }
+                                        }, 500);
+                                    })();
+                                </script>
                 <script>
                     const startButton = document.getElementById('start-button');
                     const stopButton = document.getElementById('stop-button');
                     const resultSpan = document.getElementById('result');
                     const cameraSelect = document.getElementById('camera-select');
-                    const html5QrCode = new Html5Qrcode("reader");
+                                        let html5QrCode = null; // lazy init when library is available
 
                     let currentCameraId = null;
 
                     // Request camera permissions and initialize camera selection
-                    async function initializeCameraSelection() {
+                                        async function initializeCameraSelection() {
                         try {
                             startButton.disabled = true;
                             startButton.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Initializing...';
@@ -146,8 +169,18 @@ if (!$qr_res) {
                             stream.getTracks().forEach(track => track.stop());
                             console.log('Camera permission granted');
                             
-                            // Now enumerate cameras (will work because permission is granted)
-                            const cameras = await Html5Qrcode.getCameras();
+                                                        // Wait until the scanner library is available (handle slow CDN)
+                                                        await new Promise((resolve, reject) => {
+                                                            const start = Date.now();
+                                                            (function waitLib(){
+                                                                if (typeof window.Html5Qrcode !== 'undefined') return resolve();
+                                                                if (Date.now() - start > 7000) return reject(new Error('Scanner library failed to load'));
+                                                                setTimeout(waitLib, 150);
+                                                            })();
+                                                        });
+
+                                                        // Now enumerate cameras (will work because permission is granted)
+                                                        const cameras = await Html5Qrcode.getCameras();
                             
                             if (!cameras || cameras.length === 0) {
                                 throw new Error('No cameras found on your device');
@@ -225,6 +258,16 @@ if (!$qr_res) {
                         }
 
                         console.log('Starting scanner with camera:', currentCameraId);
+                        
+                        // Ensure library present and instance created
+                        if (typeof window.Html5Qrcode === 'undefined') {
+                            alert('Scanner library is not loaded yet. Please wait a moment and try again.');
+                            return;
+                        }
+                        if (!html5QrCode) {
+                            try { html5QrCode = new Html5Qrcode("reader"); }
+                            catch (e) { console.error('Failed to create scanner instance:', e); alert('Failed to initialize scanner.'); return; }
+                        }
 
                         html5QrCode.start(
                             currentCameraId,
