@@ -74,11 +74,12 @@ $has_qr_code = !empty($student_data['qr_unique_id']) && !empty($student_data['pa
 $qr_image_url = '';
 
 if ($has_qr_code) {
-    // Generate QR code image URL - construct absolute URL from root
-    // Use protocol-relative or full URL for production
-    $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-    $host = $_SERVER['HTTP_HOST'];
-    $qr_image_url = $protocol . '://' . $host . '/modules/admin/phpqrcode/generate_qr.php?data=' . urlencode($student_data['qr_unique_id']);
+  // Generate QR code image URL - construct absolute URL from root
+  // Respect reverse proxies (Railway/Cloudflare) via X-Forwarded-Proto
+  $forwardedProto = $_SERVER['HTTP_X_FORWARDED_PROTO'] ?? null;
+  $protocol = $forwardedProto ?: ((!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http');
+  $host = $_SERVER['HTTP_HOST'];
+  $qr_image_url = $protocol . '://' . $host . '/modules/admin/phpqrcode/generate_qr.php?data=' . urlencode($student_data['qr_unique_id']);
 }
 ?>
 <!DOCTYPE html>
