@@ -435,17 +435,17 @@ if ($has_qr_code) {
                         <i class="bi bi-cash-stack me-2"></i>Payment Details
                       </h6>
                       <hr>
-                      <p class="mb-2">
-                        <strong>Payroll Number:</strong><br>
-                        <span class="badge bg-primary fs-6">#<?= htmlspecialchars($distribution_details['payroll_number']) ?></span>
+                      <p class="mb-3">
+                        <strong class="d-block mb-2">Payroll Number:</strong>
+                        <span class="badge bg-primary d-inline-block" style="font-size: 0.9rem; padding: 0.5rem 1rem; max-width: 100%; word-wrap: break-word; white-space: normal; line-height: 1.4;">#<?= htmlspecialchars($distribution_details['payroll_number']) ?></span>
                       </p>
-                      <p class="mb-2">
-                        <strong>Amount Received:</strong><br>
+                      <p class="mb-3">
+                        <strong class="d-block mb-1">Amount Received:</strong>
                         <span class="fs-4 text-success fw-bold">₱<?= number_format($distribution_details['amount_received'], 2) ?></span>
                       </p>
                       <p class="mb-0">
-                        <strong>Location:</strong><br>
-                        <?= htmlspecialchars($distribution_details['location']) ?>
+                        <strong class="d-block mb-1">Location:</strong>
+                        <span class="text-muted"><?= htmlspecialchars($distribution_details['location']) ?></span>
                       </p>
                     </div>
                   </div>
