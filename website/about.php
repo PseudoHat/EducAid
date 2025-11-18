@@ -123,8 +123,8 @@ include __DIR__ . '/../includes/website/cookie_consent.php';
   <section class="py-5 bg-body-tertiary">
     <div class="container">
       <div class="text-center mb-5">
-  <h2 class="section-title" data-lp-key="about_values_heading"<?php echo about_block_style('about_values_heading'); ?>><?php echo about_block('about_values_heading','Our Core Values'); ?></h2>
-  <p class="section-lead" data-lp-key="about_values_lead"<?php echo about_block_style('about_values_lead'); ?>><?php echo about_block('about_values_lead','The principles that guide our commitment to educational assistance'); ?></p>
+        <h2 class="section-title" data-lp-key="about_values_heading"<?php echo about_block_style('about_values_heading'); ?>><?php echo about_block('about_values_heading','Our Core Values'); ?></h2>
+        <p class="section-lead" data-lp-key="about_values_lead"<?php echo about_block_style('about_values_lead'); ?>><?php echo about_block('about_values_lead','The principles that guide our commitment to educational assistance'); ?></p>
       </div>
       <div class="row g-4">
         <div class="col-md-6 col-lg-4">
@@ -189,8 +189,8 @@ include __DIR__ . '/../includes/website/cookie_consent.php';
   <section class="py-5">
     <div class="container">
       <div class="text-center mb-5">
-  <h2 class="section-title" data-lp-key="about_features_heading"<?php echo about_block_style('about_features_heading'); ?>><?php echo about_block('about_features_heading','What Makes EducAid Special'); ?></h2>
-  <p class="section-lead" data-lp-key="about_features_lead"<?php echo about_block_style('about_features_lead'); ?>><?php echo about_block('about_features_lead','Advanced features designed for transparency, security, and ease of use'); ?></p>
+        <h2 class="section-title" data-lp-key="about_features_heading"<?php echo about_block_style('about_features_heading'); ?>><?php echo about_block('about_features_heading','What Makes EducAid Special'); ?></h2>
+        <p class="section-lead" data-lp-key="about_features_lead"<?php echo about_block_style('about_features_lead'); ?>><?php echo about_block('about_features_lead','Advanced features designed for transparency, security, and ease of use'); ?></p>
       </div>
       <div class="row g-4">
         <div class="col-lg-6">
@@ -214,7 +214,7 @@ include __DIR__ . '/../includes/website/cookie_consent.php';
               </div>
               <div>
                 <h5 class="fw-bold" data-lp-key="about_feat_notifications_title"<?php echo about_block_style('about_feat_notifications_title'); ?>><?php echo about_block('about_feat_notifications_title','Real-Time Notifications'); ?></h5>
-                <p class="text-body-secondary mb-0" data-lp-key="about_feat_notifications_body"<?php echo about_block_style('about_feat_notifications_body'); ?>><?php echo about_block('about_feat_notifications_body','Instant updates via SMS and email about application status, requirements, schedules, and important announcements.'); ?></p>
+                <p class="text-body-secondary mb-0" data-lp-key="about_feat_notifications_body"<?php echo about_block_style('about_feat_notifications_body'); ?>><?php echo about_block('about_feat_notifications_body','Instant updates via email about application status, requirements, schedules, and important announcements.'); ?></p>
               </div>
             </div>
           </div>

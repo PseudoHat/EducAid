@@ -30,7 +30,10 @@ if (!isset($connection)) {
 }
 require_once __DIR__ . '/../includes/website/contact_content_helper.php';
 
-// (Optional) Mailer integration could be added later. For now: log inquiries.
+// PHPMailer for sending emails to admins
+use PHPMailer\PHPMailer\PHPMailer;
+use PHPMailer\PHPMailer\Exception;
+require_once __DIR__ . '/../phpmailer/vendor/autoload.php';
 
 $errors = [];
 $successMsg = '';
@@ -51,6 +54,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_inquiry'])) {
         if ($message === '' || strlen($message) < 10) $errors[] = 'Message must be at least 10 characters.';
 
         if (!$errors) {
+            // Log the inquiry
             $entry = [
                 'ts' => date('c'),
                 'ip' => $_SERVER['REMOTE_ADDR'] ?? '',
@@ -61,9 +65,112 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_inquiry'])) {
                 'message' => $message
             ];
             $logFile = __DIR__ . '/../data/contact_messages.log';
-            // ensure directory exists
             @mkdir(dirname($logFile), 0775, true);
             @file_put_contents($logFile, json_encode($entry, JSON_UNESCAPED_SLASHES) . PHP_EOL, FILE_APPEND | LOCK_EX);
+            
+            // Send email notification to all active admins
+            try {
+                // Get all active admin emails
+                $adminQuery = "SELECT email, first_name, last_name FROM admins WHERE is_active = TRUE AND email IS NOT NULL AND email != ''";
+                $adminResult = pg_query($connection, $adminQuery);
+                
+                if ($adminResult && pg_num_rows($adminResult) > 0) {
+                    $mail = new PHPMailer(true);
+                    
+                    // SMTP Configuration from environment variables
+                    $mail->isSMTP();
+                    $mail->Host       = getenv('SMTP_HOST') ?: 'smtp.gmail.com';
+                    $mail->SMTPAuth   = true;
+                    $mail->Username   = getenv('SMTP_USERNAME') ?: 'dilucayaka02@gmail.com';
+                    $mail->Password   = getenv('SMTP_PASSWORD') ?: 'jlldeyglhksjflvg';
+                    $encryption       = getenv('SMTP_ENCRYPTION') ?: 'tls';
+                    
+                    if (strtolower($encryption) === 'ssl') {
+                        $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
+                    } else {
+                        $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+                    }
+                    $mail->Port       = (int)(getenv('SMTP_PORT') ?: 587);
+                    
+                    // From address
+                    $fromEmail = getenv('SMTP_FROM_EMAIL') ?: ($mail->Username ?: 'noreply@educaid.local');
+                    $fromName  = getenv('SMTP_FROM_NAME')  ?: 'EducAid Contact Form';
+                    $mail->setFrom($fromEmail, $fromName);
+                    
+                    // Add reply-to as the sender's email
+                    $mail->addReplyTo($email, $name);
+                    
+                    // Add all active admins as recipients
+                    while ($admin = pg_fetch_assoc($adminResult)) {
+                        $adminFullName = trim(($admin['first_name'] ?? '') . ' ' . ($admin['last_name'] ?? ''));
+                        $mail->addAddress($admin['email'], $adminFullName);
+                    }
+                    
+                    // Email content
+                    $mail->isHTML(true);
+                    $mail->Subject = 'EducAid Contact Form: ' . htmlspecialchars($subject);
+                    
+                    $mail->Body = "
+                        <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;'>
+                            <div style='background: #0d6efd; color: white; padding: 20px; border-radius: 5px 5px 0 0;'>
+                                <h2 style='margin: 0;'>📬 New Contact Form Submission</h2>
+                            </div>
+                            
+                            <div style='padding: 20px; background: #f8f9fa; border: 1px solid #dee2e6;'>
+                                <div style='margin-bottom: 15px;'>
+                                    <strong>From:</strong> " . htmlspecialchars($name) . "<br>
+                                    <strong>Email:</strong> <a href='mailto:" . htmlspecialchars($email) . "'>" . htmlspecialchars($email) . "</a><br>
+                                    <strong>Date:</strong> " . date('F j, Y g:i A') . "
+                                </div>
+                                
+                                <div style='margin-bottom: 15px;'>
+                                    <strong>Subject:</strong><br>
+                                    <div style='background: white; padding: 10px; border-left: 4px solid #0d6efd; margin-top: 5px;'>
+                                        " . nl2br(htmlspecialchars($subject)) . "
+                                    </div>
+                                </div>
+                                
+                                <div style='margin-bottom: 15px;'>
+                                    <strong>Message:</strong><br>
+                                    <div style='background: white; padding: 15px; border-left: 4px solid #0d6efd; margin-top: 5px;'>
+                                        " . nl2br(htmlspecialchars($message)) . "
+                                    </div>
+                                </div>
+                                
+                                <hr style='border: none; border-top: 1px solid #dee2e6; margin: 20px 0;'>
+                                
+                                <div style='font-size: 12px; color: #6c757d;'>
+                                    <strong>Technical Details:</strong><br>
+                                    IP Address: " . htmlspecialchars($_SERVER['REMOTE_ADDR'] ?? 'Unknown') . "<br>
+                                    Timestamp: " . date('c') . "
+                                </div>
+                            </div>
+                            
+                            <div style='padding: 15px; background: #e9ecef; border-radius: 0 0 5px 5px; text-align: center; font-size: 12px; color: #6c757d;'>
+                                This is an automated message from the EducAid contact form.<br>
+                                To respond, simply reply to this email.
+                            </div>
+                        </div>
+                    ";
+                    
+                    $mail->AltBody = "New Contact Form Submission\n\n"
+                        . "From: $name\n"
+                        . "Email: $email\n"
+                        . "Date: " . date('F j, Y g:i A') . "\n\n"
+                        . "Subject:\n$subject\n\n"
+                        . "Message:\n$message\n\n"
+                        . "---\n"
+                        . "IP Address: " . ($_SERVER['REMOTE_ADDR'] ?? 'Unknown') . "\n"
+                        . "Timestamp: " . date('c');
+                    
+                    $mail->send();
+                    error_log("Contact form email sent successfully to " . pg_num_rows($adminResult) . " admin(s)");
+                }
+            } catch (Exception $e) {
+                error_log("Failed to send contact form email: " . $e->getMessage());
+                // Don't show email errors to users, but log them
+            }
+            
             $successMsg = 'Your inquiry was received. A staff member may reach out via email if needed.';
             $_POST = []; // clear form data
         }

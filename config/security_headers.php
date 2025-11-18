@@ -15,28 +15,29 @@ if (!defined('SECURITY_HEADERS_LOADED')) {
     return; // Already loaded
 }
 
-// HYBRID APPROACH: Cloudflare handles some headers, PHP handles CSP and complex policies
-// Cloudflare manages: HSTS, TLS, OCSP
-// PHP manages: CSP, Permissions-Policy, Referrer-Policy (for fine-grained control)
+// NOTE: Main security headers disabled - managed by Cloudflare in production
+// For localhost development without Cloudflare, uncomment the block below
 
+/*
 // Only set headers if not already sent
 if (!headers_sent()) {
     
     // 1. Strict-Transport-Security (HSTS)
-    // DISABLED - Managed by Cloudflare Transform Rules
-    // header('Strict-Transport-Security: max-age=31536000; includeSubDomains');
+    // Forces HTTPS for 1 year, includes subdomains
+    // Prevents SSL stripping attacks
+    header('Strict-Transport-Security: max-age=31536000; includeSubDomains');
     
     // 2. Content-Security-Policy (CSP)
     // Prevents XSS by whitelisting allowed content sources
     // Adjust this based on your actual third-party services
     $csp = implode('; ', [
         "default-src 'self'",
-        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.google.com https://www.gstatic.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://ajax.cloudflare.com",
-        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com",
-        "font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com data:",
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.google.com https://www.gstatic.com https://cdn.jsdelivr.net",
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net",
+        "font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net data:",
         "img-src 'self' data: https: blob:",
-        "connect-src 'self' https://cloudflareinsights.com",
-        "frame-src 'self' https://www.google.com https://challenges.cloudflare.com",
+        "connect-src 'self'",
+        "frame-src 'self' https://www.google.com",
         "object-src 'none'",
         "base-uri 'self'",
         "form-action 'self'",
@@ -46,11 +47,13 @@ if (!headers_sent()) {
     header("Content-Security-Policy: {$csp}");
     
     // 3. X-Frame-Options
-    // Could be managed by Cloudflare, but PHP gives more control
+    // Prevents clickjacking by disallowing embedding in iframes
+    // SAMEORIGIN allows embedding on same domain only
     header('X-Frame-Options: SAMEORIGIN');
     
     // 4. X-Content-Type-Options
-    // Simple header, PHP is fine
+    // Prevents MIME sniffing attacks
+    // Forces browser to respect declared content types
     header('X-Content-Type-Options: nosniff');
     
     // 5. Referrer-Policy
@@ -59,20 +62,18 @@ if (!headers_sent()) {
     header('Referrer-Policy: strict-origin-when-cross-origin');
     
     // 6. Permissions-Policy (replaces Feature-Policy)
-    // PHP manages this for per-page control (e.g., camera for QR scanner)
-    // Check if ALLOW_CAMERA is defined before this file is included
-    $allowCamera = defined('ALLOW_CAMERA') && constant('ALLOW_CAMERA') === true;
-    $permissionsDirectives = [
+    // Restricts access to browser features and APIs
+    // Denies access to sensitive features unless explicitly needed
+    $permissions = implode(', ', [
         'geolocation=()',
         'microphone=()',
-        $allowCamera ? 'camera=(self)' : 'camera=()',
+        'camera=()',
         'payment=()',
         'usb=()',
         'magnetometer=()',
         'gyroscope=()',
         'accelerometer=()'
-    ];
-    $permissions = implode(', ', $permissionsDirectives);
+    ]);
     header("Permissions-Policy: {$permissions}");
     
     // BONUS: Additional security headers
@@ -95,6 +96,7 @@ if (!headers_sent()) {
     // header('Pragma: no-cache');
     // header('Expires: 0');
 }
+*/
 
 /**
  * Helper function to add CSP nonce for inline scripts

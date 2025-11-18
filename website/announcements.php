@@ -470,7 +470,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body text-center">
-        <img id="modalImage" src="" alt="Full size announcement image" style="max-width: 100%; height: auto;">
+        <img id="modalImage" class="img-fluid d-block mx-auto" src="" alt="Full size announcement image">
       </div>
     </div>
   </div>

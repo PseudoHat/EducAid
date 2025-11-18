@@ -249,10 +249,10 @@ $pageType = $seoData['type'];
               </div>
               <div class="accordion-item">
                 <h2 class="accordion-header">
-                  <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#section2" data-lp-key="hiw_step2_accord2_title"<?php echo hiw_block_style('hiw_step2_accord2_title'); ?>><?php echo hiw_block('hiw_step2_accord2_title','Family & Financial Background'); ?></button>
+                  <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#section2" data-lp-key="hiw_step2_accord2_title"<?php echo hiw_block_style('hiw_step2_accord2_title'); ?>><?php echo hiw_block('hiw_step2_accord2_title','Academic Details'); ?></button>
                 </h2>
                 <div id="section2" class="accordion-collapse collapse" data-bs-parent="#applicationSections">
-                  <div class="accordion-body small" data-lp-key="hiw_step2_accord2_desc"<?php echo hiw_block_style('hiw_step2_accord2_desc'); ?>><?php echo hiw_block('hiw_step2_accord2_desc','Parents\' information, household income, number of dependents, and other scholarship recipients in the family.'); ?></div>
+                  <div class="accordion-body small" data-lp-key="hiw_step2_accord2_desc"<?php echo hiw_block_style('hiw_step2_accord2_desc'); ?>><?php echo hiw_block('hiw_step2_accord2_desc','University/college information, program enrolled, year level, student ID number, and current academic status.'); ?></div>
                 </div>
               </div>
               <div class="accordion-item">
@@ -319,7 +319,7 @@ $pageType = $seoData['type'];
               </div>
             </div>
             
-            <div class="alert alert-info mt-3" data-lp-key="hiw_step3_status_updates"<?php echo hiw_block_style('hiw_step3_status_updates'); ?>><?php echo hiw_block('hiw_step3_status_updates','<strong>Status Updates:</strong> You\'ll receive SMS and email notifications at each stage. Log in to your dashboard to see detailed status.'); ?></div>
+            <div class="alert alert-info mt-3" data-lp-key="hiw_step3_status_updates"<?php echo hiw_block_style('hiw_step3_status_updates'); ?>><?php echo hiw_block('hiw_step3_status_updates','<strong>Status Updates:</strong> You\'ll receive email notifications at each stage. Log in to your dashboard to see detailed status.'); ?></div>
           </div>
         </div>
         <div class="col-lg-6">

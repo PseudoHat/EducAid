@@ -598,39 +598,39 @@ if ($usedDatesResult) {
             ?>
 
             <!-- Stats Card -->
-            <div class="row mb-4 g-4">
+            <div class="row mb-4 g-3">
                 <div class="col-md-4">
-                    <div class="card border-0 shadow-sm h-100" style="border-radius: 12px; overflow: hidden; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
-                        <div class="card-body text-center text-white" style="padding: 2rem;">
-                            <div style="font-size: 3rem; margin-bottom: 0.5rem;">
+                    <div class="card border-0 shadow-sm h-100" style="border-radius: 10px; overflow: hidden; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                        <div class="card-body text-center text-white" style="padding: 1.25rem;">
+                            <div style="font-size: 2rem; margin-bottom: 0.25rem;">
                                 <i class="bi bi-people-fill"></i>
                             </div>
-                            <h5 class="mb-2" style="font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px; opacity: 0.9;">Total Students</h5>
-                            <h2 class="mb-0 fw-bold" style="font-size: 2.5rem;"><?= number_format($countStudents) ?></h2>
+                            <h5 class="mb-1" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.9;">Total Students</h5>
+                            <h2 class="mb-0 fw-bold" style="font-size: 1.75rem;"><?= number_format($countStudents) ?></h2>
                         </div>
                     </div>
                 </div>
                 <div class="col-md-4">
-                    <div class="card border-0 shadow-sm h-100" style="border-radius: 12px; overflow: hidden; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);">
-                        <div class="card-body text-center text-white" style="padding: 2rem;">
-                            <div style="font-size: 3rem; margin-bottom: 0.5rem;">
+                    <div class="card border-0 shadow-sm h-100" style="border-radius: 10px; overflow: hidden; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);">
+                        <div class="card-body text-center text-white" style="padding: 1.25rem;">
+                            <div style="font-size: 2rem; margin-bottom: 0.25rem;">
                                 <i class="bi bi-hash"></i>
                             </div>
-                            <h5 class="mb-2" style="font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px; opacity: 0.9;">Max Payroll Number</h5>
-                            <h2 class="mb-0 fw-bold" style="font-size: 2.5rem;">
+                            <h5 class="mb-1" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.9;">Max Payroll Number</h5>
+                            <h2 class="mb-0 fw-bold" style="font-size: 1.5rem; word-wrap: break-word;">
                                 <?= $maxPayroll ? (is_numeric($maxPayroll) ? number_format((float)$maxPayroll) : htmlspecialchars($maxPayroll)) : '—' ?>
                             </h2>
                         </div>
                     </div>
                 </div>
                 <div class="col-md-4">
-                    <div class="card border-0 shadow-sm h-100" style="border-radius: 12px; overflow: hidden; background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
-                        <div class="card-body text-center text-white" style="padding: 2rem;">
-                            <div style="font-size: 3rem; margin-bottom: 0.5rem;">
+                    <div class="card border-0 shadow-sm h-100" style="border-radius: 10px; overflow: hidden; background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+                        <div class="card-body text-center text-white" style="padding: 1.25rem;">
+                            <div style="font-size: 2rem; margin-bottom: 0.25rem;">
                                 <i class="bi bi-calendar-check"></i>
                             </div>
-                            <h5 class="mb-2" style="font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px; opacity: 0.9;">Used Dates</h5>
-                            <h2 class="mb-0 fw-bold" style="font-size: 2.5rem;"><?= count($usedDates) ?></h2>
+                            <h5 class="mb-1" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.9;">Used Dates</h5>
+                            <h2 class="mb-0 fw-bold" style="font-size: 1.75rem;"><?= count($usedDates) ?></h2>
                         </div>
                     </div>
                 </div>
