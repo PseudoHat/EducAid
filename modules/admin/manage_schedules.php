@@ -617,7 +617,9 @@ if ($usedDatesResult) {
                                 <i class="bi bi-hash"></i>
                             </div>
                             <h5 class="mb-2" style="font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px; opacity: 0.9;">Max Payroll Number</h5>
-                            <h2 class="mb-0 fw-bold" style="font-size: 2.5rem;"><?= number_format($maxPayroll) ?></h2>
+                            <h2 class="mb-0 fw-bold" style="font-size: 2.5rem;">
+                                <?= $maxPayroll ? (is_numeric($maxPayroll) ? number_format((float)$maxPayroll) : htmlspecialchars($maxPayroll)) : '—' ?>
+                            </h2>
                         </div>
                     </div>
                 </div>
