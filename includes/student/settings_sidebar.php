@@ -21,18 +21,11 @@ $current_page = basename($_SERVER['PHP_SELF']);
         <i class="bi bi-person-circle me-2"></i>
         Account
     </a>
-    <a href="student_settings.php#security" class="settings-nav-item" data-section="security">
+    <a href="security_privacy.php" class="settings-nav-item <?= $current_page === 'security_privacy.php' ? 'active' : '' ?>" data-section="security">
         <i class="bi bi-shield-lock me-2"></i>
         Security & Privacy
     </a>
-    <a href="student_settings.php#privacy-data" class="settings-nav-item" data-section="privacy-data">
-        <i class="bi bi-incognito me-2"></i>
-        Privacy & Data
-    </a>
-    <a href="student_settings.php#notifications" class="settings-nav-item" data-section="notifications">
-        <i class="bi bi-envelope-open me-2"></i>
-        Notification Preferences
-    </a>
+    
     <a href="accessibility.php" class="settings-nav-item <?= $current_page === 'accessibility.php' ? 'active' : '' ?>">
         <i class="bi bi-universal-access me-2"></i>
         Accessibility

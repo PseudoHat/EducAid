@@ -81,7 +81,9 @@ unset($_SESSION['session_flash'], $_SESSION['session_flash_type']);
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" />
   <link href="../../assets/css/student/sidebar.css" rel="stylesheet" />
   <link rel="stylesheet" href="../../assets/css/student/accessibility.css" />
+  <link rel="stylesheet" href="../../assets/css/student/animations.css" />
   <script src="../../assets/js/student/accessibility.js"></script>
+  <script src="../../assets/js/student/animation_utils.js"></script>
   <style>
     body { background: #f7fafc; }
     
@@ -141,7 +143,6 @@ unset($_SESSION['session_flash'], $_SESSION['session_flash_type']);
       border-radius: 8px;
       font-weight: 500;
       font-size: 0.95rem;
-      transition: all 0.2s ease;
       margin-bottom: 0.25rem;
     }
 
@@ -223,7 +224,6 @@ unset($_SESSION['session_flash'], $_SESSION['session_flash_type']);
       border: 1px solid #e2e8f0;
       border-radius: 10px;
       background: #ffffff;
-      transition: all 0.2s ease;
     }
     
     .session-item:hover {

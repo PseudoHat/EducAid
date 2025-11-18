@@ -7128,6 +7128,82 @@ if (!$isAjaxRequest) {
         overflow: hidden;
     }
     
+    /* Tablet modal optimization (768px-991px) */
+    @media (min-width: 768px) and (max-width: 991.98px) {
+        .student-modal-responsive {
+            max-width: 600px;
+            margin: 2rem auto;
+        }
+        
+        .student-modal-responsive .modal-content {
+            border-radius: 1rem;
+        }
+        
+        .student-modal-responsive .modal-header {
+            padding: 1.25rem;
+        }
+        
+        .student-modal-responsive .modal-body {
+            padding: 1rem 1.25rem;
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+        
+        .student-modal-responsive .modal-footer {
+            padding: 1rem 1.25rem;
+        }
+        
+        .student-modal-responsive .modal-title {
+            font-size: 1.1rem;
+        }
+        
+        .student-modal-responsive .btn {
+            font-size: 0.9rem;
+            padding: 0.65rem 1.25rem;
+        }
+    }
+    
+    /* Mobile modal optimization */
+    @media (max-width: 767.98px) {
+        .student-modal-responsive {
+            max-width: 90%;
+            margin: 1.5rem auto;
+        }
+        
+        .student-modal-responsive .modal-content {
+            border-radius: 1rem;
+        }
+        
+        .student-modal-responsive .modal-header {
+            padding: 1rem;
+        }
+        
+        .student-modal-responsive .modal-body {
+            padding: 0.85rem 1rem;
+            max-height: 60vh;
+            overflow-y: auto;
+        }
+        
+        .student-modal-responsive .modal-footer {
+            padding: 0.75rem 1rem;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        
+        .student-modal-responsive .modal-footer .btn {
+            width: 100%;
+        }
+        
+        .student-modal-responsive .modal-title {
+            font-size: 1rem;
+        }
+        
+        .student-modal-responsive .btn {
+            font-size: 0.875rem;
+            padding: 0.6rem 1rem;
+        }
+    }
+    
     /* Custom terms content styling */
     .terms-content h6 {
         color: #0d6efd;
@@ -7261,7 +7337,7 @@ async function checkNameBeforeProceeding() {
 function showNameDuplicateBlockModal(firstName, lastName, count) {
     const modalHtml = `
         <div class="modal fade" id="nameDuplicateBlockModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
-            <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-dialog modal-dialog-centered student-modal-responsive">
                 <div class="modal-content border-danger">
                     <div class="modal-header bg-danger text-white">
                         <h5 class="modal-title">

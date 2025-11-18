@@ -158,6 +158,21 @@ if (!isset($_SESSION['schedule_modal_shown'])) {
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>EducAid – Student Dashboard</title>
 
+  <!-- Critical CSS for FOUC Prevention -->
+  <style>
+    body {
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      background: #f5f5f5;
+    }
+    body.ready {
+      opacity: 1;
+    }
+    body:not(.ready) .sidebar {
+      visibility: hidden;
+    }
+  </style>
+
   <!-- Bootstrap 5.3.3 + Icons -->
   <link href="../../assets/css/bootstrap.min.css" rel="stylesheet" />
   <link href="../../assets/css/bootstrap-icons.css" rel="stylesheet" />
@@ -169,7 +184,6 @@ if (!isset($_SESSION['schedule_modal_shown'])) {
   <link rel="stylesheet" href="../../assets/css/student/accessibility.css" />
   <script src="../../assets/js/student/accessibility.js"></script>
   <style>
-    body:not(.js-ready) .sidebar { visibility: hidden; transition: none !important; }
     
     /* Removed page-specific .home-section override to avoid conflicts with global sidebar layout */
     
@@ -257,6 +271,39 @@ if (!isset($_SESSION['schedule_modal_shown'])) {
       color: white;
     }
     
+    /* Tablet modal optimization (768px-991px) */
+    @media (min-width: 768px) and (max-width: 991.98px) {
+      .student-modal-responsive {
+        max-width: 600px;
+        margin: 2rem auto;
+      }
+      
+      .student-modal-responsive .modal-content {
+        border-radius: 1rem;
+      }
+      
+      .student-modal-responsive .modal-header {
+        padding: 1.25rem;
+      }
+      
+      .student-modal-responsive .modal-body {
+        padding: 1rem 1.25rem;
+      }
+      
+      .student-modal-responsive .modal-footer {
+        padding: 1rem 1.25rem;
+      }
+      
+      .student-modal-responsive .modal-title {
+        font-size: 1.1rem;
+      }
+      
+      .student-modal-responsive .btn {
+        font-size: 0.9rem;
+        padding: 0.65rem 1.25rem;
+      }
+    }
+    
     @media (max-width: 768px) {
       .welcome-content {
         text-align: center;
@@ -268,6 +315,38 @@ if (!isset($_SESSION['schedule_modal_shown'])) {
       .welcome-actions {
         width: 100%;
         text-align: center;
+      }
+      
+      /* Mobile modal optimization */
+      .student-modal-responsive {
+        max-width: 90%;
+        margin: 1.5rem auto;
+      }
+      
+      .student-modal-responsive .modal-content {
+        border-radius: 1rem;
+      }
+      
+      .student-modal-responsive .modal-header {
+        padding: 1rem;
+      }
+      
+      .student-modal-responsive .modal-body {
+        padding: 0.85rem 1rem;
+      }
+      
+      .student-modal-responsive .modal-footer {
+        padding: 0.75rem 1rem;
+      }
+      
+      .student-modal-responsive .modal-title {
+        font-size: 1rem;
+      }
+      
+      .student-modal-responsive .btn {
+        font-size: 0.875rem;
+        padding: 0.6rem 1rem;
+        width: 100%;
       }
     }
   </style>
@@ -459,7 +538,7 @@ if (!isset($_SESSION['schedule_modal_shown'])) {
                 // Show modal on first login instead of alert
                 if ($showScheduleModal) {
                     echo '<div class="modal fade" id="scheduleModal" tabindex="-1" aria-labelledby="scheduleModalLabel" aria-hidden="true">'
-                       . '<div class="modal-dialog modal-dialog-centered">'
+                       . '<div class="modal-dialog modal-dialog-centered student-modal-responsive">'
                        . '<div class="modal-content">'
                        . '<div class="modal-header">'
                        . '<h5 class="modal-title" id="scheduleModalLabel">Your Distribution Schedule</h5>'
@@ -1023,6 +1102,18 @@ if (!isset($_SESSION['schedule_modal_shown'])) {
         });
       }
     });
+  </script>
+  
+  <!-- Anti-FOUC Script -->
+  <script>
+    (function() {
+      document.body.classList.add('ready');
+      window.addEventListener('pageshow', function(event) {
+        if (event.persisted) {
+          document.body.classList.add('ready');
+        }
+      });
+    })();
   </script>
 </body>
 </html>

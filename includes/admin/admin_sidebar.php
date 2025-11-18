@@ -199,9 +199,6 @@ $canScanQRPublished = $canScanQR && $schedulePublished;
       echo $hbHtml;
     ?>
 
-    <!-- My Profile -->
-    <?= menu_link('admin_profile.php', 'bi bi-person-circle', 'My Profile', is_active('admin_profile.php', $current)); ?>
-
     <!-- Distribution Management (super_admin only) -->
     <?php if ($admin_role === 'super_admin'): ?>
       <li class="nav-item dropdown">

@@ -4,29 +4,26 @@
 (function() {
   'use strict';
 
-  // Load and apply saved accessibility preferences
+  // Load and apply saved accessibility preferences (without High Contrast)
   function loadAccessibilityPreferences() {
-    // Load saved preferences from localStorage
     const savedTextSize = localStorage.getItem('textSize') || 'normal';
-    const savedHighContrast = localStorage.getItem('highContrast') === 'true';
     const savedReduceAnimations = localStorage.getItem('reduceAnimations') === 'true';
 
     // Apply text size
     document.documentElement.classList.remove('text-small', 'text-normal', 'text-large');
     document.documentElement.classList.add('text-' + savedTextSize);
 
-    // Apply high contrast
-    if (savedHighContrast) {
-      document.documentElement.classList.add('high-contrast');
-    } else {
-      document.documentElement.classList.remove('high-contrast');
-    }
+    // Always disable/remove high contrast mode
+    document.documentElement.classList.remove('high-contrast');
+    try { localStorage.removeItem('highContrast'); } catch(e) {}
 
-    // Apply reduced animations
+    // Apply reduced animations (also includes simple animations for maximum reduction)
     if (savedReduceAnimations) {
       document.documentElement.classList.add('reduce-animations');
+      document.documentElement.classList.add('simple-animations');
     } else {
       document.documentElement.classList.remove('reduce-animations');
+      document.documentElement.classList.remove('simple-animations');
     }
   }
 

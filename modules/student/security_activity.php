@@ -48,7 +48,9 @@ $student_info = pg_fetch_assoc($student_info_result);
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" />
   <link href="../../assets/css/student/sidebar.css" rel="stylesheet" />
   <link rel="stylesheet" href="../../assets/css/student/accessibility.css" />
+  <link rel="stylesheet" href="../../assets/css/student/animations.css" />
   <script src="../../assets/js/student/accessibility.js"></script>
+  <script src="../../assets/js/student/animation_utils.js"></script>
   <style>
     body { background: #f7fafc; }
     
@@ -108,7 +110,6 @@ $student_info = pg_fetch_assoc($student_info_result);
       border-radius: 8px;
       font-weight: 500;
       font-size: 0.95rem;
-      transition: all 0.2s ease;
       margin-bottom: 0.25rem;
     }
 
@@ -190,7 +191,6 @@ $student_info = pg_fetch_assoc($student_info_result);
       border: 1px solid #e2e8f0;
       border-radius: 8px;
       background: #ffffff;
-      transition: all 0.2s ease;
     }
     
     .history-item:hover {

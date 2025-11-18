@@ -1,0 +1,64 @@
+feat: Major student settings refactoring and animation improvements
+
+## Settings Structure Changes
+- Move Security & Privacy to dedicated page (security_privacy.php)
+- Remove Privacy & Data and Notification Preferences from inline sidebar
+- Update settings_sidebar.php navigation to reflect new structure
+- Add dedicated security_privacy.php with password change functionality
+
+## Animation System Overhaul
+- Remove all sidebar profile animations to fix conflicts on dedicated pages
+- Remove page-specific transitions from active_sessions.php, accessibility.php, security_activity.php
+- Create unified animation reduction system with two complementary CSS classes
+
+## Enhanced Reduce Animations Feature
+- Merge simple-animations functionality into existing Reduce Animations toggle
+- Apply both .reduce-animations and .simple-animations classes when enabled
+- Update global accessibility.js to apply combined animation reduction
+- Completely disable animations while preserving all interactive functionality
+- Keep subtle opacity transitions (120ms) for essential user feedback
+
+## High Contrast Removal
+- Remove High Contrast Mode feature entirely per user request
+- Clean up related UI toggles and CSS rules
+- Update accessibility.js to remove high-contrast logic
+
+## Modal Z-Index Fixes
+- Fix logout modal appearing behind sidebar
+- Add proper z-index layering for modals (1100) and backdrops (1090)
+- Ensure modals display correctly with proper positioning
+
+## FOUC Prevention Updates
+- Add critical inline CSS to all student pages
+- Implement anti-FOUC script with .ready class
+- Fix sidebar visibility issues by using body:not(.ready) selector
+- Ensure smooth page load experience without flash of unstyled content
+
+## Files Added
+- modules/student/security_privacy.php
+- assets/css/student/animations.css
+- assets/js/student/animation_utils.js
+
+## Files Modified
+- modules/student/student_settings.php
+- modules/student/accessibility.php
+- modules/student/active_sessions.php
+- modules/student/security_activity.php
+- modules/student/student_profile.php
+- modules/student/student_notifications.php
+- modules/student/student_homepage.php
+- modules/student/qr_code.php
+- modules/student/upload_document.php
+- includes/student/settings_sidebar.php
+- includes/student/student_sidebar.php
+- assets/js/student/accessibility.js
+
+## Breaking Changes
+None - all changes are backward compatible
+
+## Testing Recommendations
+1. Test Reduce Animations toggle on all student pages
+2. Verify Security & Privacy page functionality
+3. Test modal displays (logout, password change)
+4. Verify sidebar navigation on tablet/mobile devices
+5. Test FOUC prevention on slow connections

@@ -2050,7 +2050,20 @@ $page_title = 'Upload Documents';
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= $page_title ?> - EducAid</title>
     
-    <!-- Bootstrap 5.3.3 + Icons -->
+  <!-- Critical CSS for FOUC Prevention -->
+  <style>
+    body {
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      background: #f5f5f5;
+    }
+    body.ready {
+      opacity: 1;
+    }
+    body:not(.ready) .sidebar {
+      visibility: hidden;
+    }
+  </style>    <!-- Bootstrap 5.3.3 + Icons -->
     <link href="../../assets/css/bootstrap.min.css" rel="stylesheet">
     <link href="../../assets/css/bootstrap-icons.css" rel="stylesheet">
     
@@ -2059,7 +2072,6 @@ $page_title = 'Upload Documents';
     <link rel="stylesheet" href="../../assets/css/student/distribution_notifications.css">
     
     <style>
-        body:not(.js-ready) .sidebar { visibility: hidden; transition: none !important; }
         
         .home-section {
             margin-left: 260px;
@@ -4110,6 +4122,18 @@ $page_title = 'Upload Documents';
             // Then check every 3 seconds
             setInterval(checkDocumentStatus, 3000);
         });
+    </script>
+    
+    <!-- Anti-FOUC Script -->
+    <script>
+        (function() {
+            document.body.classList.add('ready');
+            window.addEventListener('pageshow', function(event) {
+                if (event.persisted) {
+                    document.body.classList.add('ready');
+                }
+            });
+        })();
     </script>
 </body>
 </html>
