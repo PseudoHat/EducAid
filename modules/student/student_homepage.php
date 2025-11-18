@@ -120,23 +120,26 @@ function formatLastLogin($last_login_string) {
 
 // Fetch past distributions where this student participated
 $past_participation_query = "
-    SELECT DISTINCT
-        ds.distribution_date,
-        ds.location,
-        ds.academic_year,
-        ds.semester,
-        ds.finalized_at,
-        ds.notes,
-        CONCAT(a.first_name, ' ', a.last_name) as finalized_by_name
-    FROM distribution_snapshots ds
-    LEFT JOIN admins a ON ds.finalized_by = a.admin_id
-    WHERE ds.students_data::text LIKE '%\"student_id\":\"' || $1 || '\"%'
-       OR ds.students_data::text LIKE '%\"student_id\":' || $1 || ',%'
-       OR ds.students_data::text LIKE '%\"student_id\":' || $1 || '}%'
-       OR ds.students_data::text LIKE '%\"student_id\": \"' || $1 || '\"%'
-       OR ds.students_data::text LIKE '%\"student_id\": ' || $1 || ',%'
-       OR ds.students_data::text LIKE '%\"student_id\": ' || $1 || '}%'
-    ORDER BY ds.finalized_at DESC
+  SELECT DISTINCT
+    ds.distribution_date,
+    ds.location,
+    ds.academic_year,
+    ds.semester,
+    ds.finalized_at,
+    ds.notes,
+    CONCAT(a.first_name, ' ', a.last_name) as finalized_by_name,
+    COALESCE(dss.payroll_number, '') AS payroll_number
+  FROM distribution_snapshots ds
+  LEFT JOIN admins a ON ds.finalized_by = a.admin_id
+  LEFT JOIN distribution_student_snapshot dss ON dss.distribution_id = ds.distribution_id AND dss.student_id = $1
+  WHERE dss.student_id = $1
+     OR ds.students_data::text LIKE '%\"student_id\":\"' || $1 || '\"%'
+     OR ds.students_data::text LIKE '%\"student_id\":' || $1 || ',%'
+     OR ds.students_data::text LIKE '%\"student_id\":' || $1 || '}%'
+     OR ds.students_data::text LIKE '%\"student_id\": \"' || $1 || '\"%'
+     OR ds.students_data::text LIKE '%\"student_id\": ' || $1 || ',%'
+     OR ds.students_data::text LIKE '%\"student_id\": ' || $1 || '}%'
+  ORDER BY ds.finalized_at DESC
 ";
 $past_participation_result = pg_query_params($connection, $past_participation_query, [$studentId]);
 
@@ -701,6 +704,15 @@ if (!isset($_SESSION['schedule_modal_shown'])) {
                                                     </div>
                                                     <?php endif; ?>
                                                     
+                                                    <?php if (!empty($dist['payroll_number'])): ?>
+                                                    <div class="mb-2">
+                                                      <small class="text-muted d-block">
+                                                        <i class="bi bi-hash me-1"></i>
+                                                        <strong>Payroll #:</strong> <?php echo htmlspecialchars($dist['payroll_number']); ?>
+                                                      </small>
+                                                    </div>
+                                                    <?php endif; ?>
+
                                                     <?php if (!empty($dist['notes'])): ?>
                                                     <div class="mt-2 pt-2 border-top">
                                                         <small class="text-muted">
