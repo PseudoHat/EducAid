@@ -72,6 +72,13 @@ if ($current_dist_query && $current_semester_query) {
     }
 }
 
+// Detect presence of distribution_payrolls table for conditional cleanup use later
+$hasHistoryTable = false;
+$historyTableRes = pg_query($connection, "SELECT 1 FROM information_schema.tables WHERE table_name='distribution_payrolls' LIMIT 1");
+if ($historyTableRes && pg_num_rows($historyTableRes) > 0) {
+  $hasHistoryTable = true;
+}
+
 // Get student counts
 $student_counts = getStudentCounts($connection);
 
@@ -161,6 +168,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       }
       // Finally, revert student status
       pg_query_params($connection, "UPDATE students SET status = 'applicant' WHERE student_id = $1", [$student_id]);
+
+      // Remove provisional history rows for this student for current period if table exists (only if list not yet scheduled/distributed)
+      if ($hasHistoryTable && !empty($current_year) && !empty($current_semester) && !$workflow_status['has_schedules'] && !$has_scanned_students) {
+        pg_query_params(
+          $connection,
+          "DELETE FROM distribution_payrolls WHERE student_id = $1 AND academic_year = $2 AND semester = $3 AND snapshot_id IS NULL",
+          [$student_id, $current_year, $current_semester]
+        );
+      }
     }
         // Reset finalized flag using UPSERT
         pg_query($connection, "
@@ -219,6 +235,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         if (isset($_POST['reset_payroll'])) {
           pg_query($connection, "UPDATE students SET payroll_no = NULL WHERE status = 'active'");
+          // Clean up provisional distribution_payrolls rows for current academic period (only those without snapshot linkage)
+          if ($hasHistoryTable && !empty($current_year) && !empty($current_semester) && !$has_scanned_students) {
+            pg_query_params(
+              $connection,
+              "DELETE FROM distribution_payrolls WHERE academic_year = $1 AND semester = $2 AND snapshot_id IS NULL",
+              [$current_year, $current_semester]
+            );
+          }
           $notification_msg = "Student list reverted and payroll numbers reset. All QR code records deleted.";
         } else {
             $notification_msg = "Student list reverted (payroll numbers preserved). All QR code records deleted.";
@@ -271,6 +295,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $connection,
             "UPDATE students SET payroll_no = $1 WHERE student_id = $2",
             [$formattedCode, $student_id]
+          );
+          // Record history (academic year + semester) if table exists
+          pg_query($connection, "DO $$ BEGIN IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name='distribution_payrolls') THEN NULL; END IF; END $$;");
+          pg_query_params(
+            $connection,
+            "INSERT INTO distribution_payrolls (student_id, payroll_no, academic_year, semester) VALUES ($1,$2,$3,$4)\n             ON CONFLICT (student_id, academic_year, semester) DO UPDATE SET payroll_no=EXCLUDED.payroll_no, assigned_at=NOW()",
+            [$student_id, $formattedCode, $currentYear, $currentSemester]
           );
                 $student_payrolls[] = [
                     'student_id' => $student_id,

@@ -451,6 +451,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['complete_distribution
                 $snapshot_count = pg_affected_rows($snapshot_student_result);
                 error_log("Created/updated $snapshot_count student profile snapshot(s) for distribution: $distribution_id");
             }
+
+            // SAFETY BACKFILL: Ensure distribution_payrolls has entries for this period
+            if (!empty($academic_year) && !empty($semester)) {
+              error_log("Backfilling distribution_payrolls for academic period: $academic_year $semester");
+              $history_backfill_query = "
+                INSERT INTO distribution_payrolls
+                  (student_id, payroll_no, academic_year, semester, snapshot_id, assigned_at)
+                SELECT s.student_id, s.payroll_no::text, $1, $2, $3, NOW()
+                FROM students s
+                WHERE s.status IN ('active','given')
+                  AND s.payroll_no IS NOT NULL AND s.payroll_no <> ''
+                ON CONFLICT (student_id, academic_year, semester)
+                DO UPDATE SET
+                  payroll_no = EXCLUDED.payroll_no,
+                  snapshot_id = COALESCE(distribution_payrolls.snapshot_id, EXCLUDED.snapshot_id)
+              ";
+
+              $history_params = [$academic_year, $semester, $final_snapshot_id];
+              $history_backfill_result = pg_query_params($connection, $history_backfill_query, $history_params);
+
+              if (!$history_backfill_result) {
+                error_log("Warning: Failed to backfill distribution_payrolls: " . pg_last_error($connection));
+              } else {
+                $history_count = pg_affected_rows($history_backfill_result);
+                error_log("Backfilled/updated $history_count row(s) in distribution_payrolls for $academic_year $semester");
+              }
+            } else {
+              error_log("Skipped distribution_payrolls backfill: academic period not resolved");
+            }
         }
         
         // AUTO-CLOSE ACTIVE SLOTS when distribution is completed

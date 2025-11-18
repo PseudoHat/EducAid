@@ -189,6 +189,8 @@ class ReportFilters {
                     s.first_registered_academic_year,
                     s.expected_graduation_year,
                     s.school_student_id,
+                    s.payroll_no AS latest_payroll,
+                    ARRAY(SELECT dp.payroll_no FROM distribution_payrolls dp WHERE dp.student_id = s.student_id ORDER BY dp.assigned_at ASC) AS payroll_history,
                     b.name AS barangay,
                     m.name AS municipality,
                     u.name AS university,
