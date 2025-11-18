@@ -120,6 +120,7 @@ if (!function_exists('truncateMessage')) {
           </button>
           <ul class="dropdown-menu dropdown-menu-end shadow-sm">
             <li><h6 class="dropdown-header"><?=$adminDisplay?></h6></li>
+            <li><a class="dropdown-item" href="admin_profile.php"><i class="bi bi-person-circle me-2"></i>Profile</a></li>
             <li><a class="dropdown-item" href="settings.php"><i class="bi bi-gear me-2"></i>Settings</a></li>
             <li><hr class="dropdown-divider"/></li>
             <li><a class="dropdown-item" href="logout.php"><i class="bi bi-box-arrow-right me-2"></i>Logout</a></li>
@@ -187,6 +188,13 @@ $__hdr = educaid_get_header_theme($connection ?? null);
   .admin-icon-btn .bi { font-size: 1rem; }
   .admin-header-actions .dropdown-menu { min-width: 300px; max-width: 350px; }
   .notification-content .fw-medium { font-size: 0.875rem; }
+  
+  /* Notification dropdown optimization */
+  .admin-header-actions .dropdown-item { padding: 0.65rem 0.85rem; }
+  .admin-header-actions .notification-icon { font-size: 1rem; }
+  .admin-header-actions .dropdown-item small { font-size: 0.75rem; }
+  .admin-header-actions .dropdown-header { font-size: 0.9rem; padding: 0.65rem 0.85rem; }
+  .badge-sm { font-size: 0.65rem; }
 }
 
 @media (max-width: 576px){

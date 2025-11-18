@@ -451,6 +451,14 @@ unset($_SESSION['profile_flash'], $_SESSION['profile_flash_type']);
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Settings - EducAid</title>
+  
+  <!-- Critical CSS for FOUC prevention -->
+  <style>
+    body { opacity: 0; transition: opacity 0.3s ease; background: #f5f5f5; }
+    body.ready { opacity: 1; }
+    body:not(.ready) .sidebar { visibility: hidden; }
+  </style>
+  
   <link href="../../assets/css/bootstrap.min.css" rel="stylesheet" />
   <link href="../../assets/css/bootstrap-icons.css" rel="stylesheet" />
   <link rel="stylesheet" href="../../assets/css/student/homepage.css" />
@@ -1342,156 +1350,13 @@ unset($_SESSION['profile_flash'], $_SESSION['profile_flash_type']);
               </div>
             </div>
 
-            <!-- Security & Privacy Section -->
-            <div class="settings-content-section" id="security">
+            <!-- Security & Privacy Section moved to dedicated page: modules/student/security_privacy.php -->
+            <div class="settings-content-section">
               <h2 class="section-title">Security & Privacy</h2>
-              <p class="section-description">Protect your account with strong security settings</p>
-              
-              <div class="settings-section">
-                <div class="settings-section-body">
-                  <div class="setting-item" id="password">
-                    <div class="setting-info">
-                      <div class="setting-label">Password</div>
-                      <div class="setting-value">••••••••••••</div>
-                      <div class="setting-description">Last changed: Recently (secure password required)</div>
-                    </div>
-                    <div class="setting-actions">
-                      <button class="btn btn-setting btn-setting-danger" data-bs-toggle="modal" data-bs-target="#passwordModal">
-                        <i class="bi bi-key me-1"></i>Change Password
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <p class="section-description">This section has been moved to a dedicated page for clarity. <a href="security_privacy.php">Open Security & Privacy</a></p>
             </div>
 
-            <!-- Privacy & Data Section (inline) -->
-            <div class="settings-content-section" id="privacy-data">
-              <h2 class="section-title">Privacy & Data</h2>
-              <p class="section-description">Download a copy of your data from EducAid.</p>
-              <div class="settings-section">
-                <div class="settings-section-body">
-                  <div class="setting-item">
-                    <div class="setting-info">
-                      <div class="setting-label">Download My Data</div>
-                      <div id="exportStatus" class="setting-description">No export requested yet.</div>
-                      <div id="downloadContainer" class="mt-2 d-none">
-                        <a id="downloadLink" href="#" class="btn btn-success btn-sm"><i class="bi bi-file-zip me-1"></i> Download ZIP</a>
-                        <small class="text-muted ms-2" id="fileMeta"></small>
-                      </div>
-                    </div>
-                    <div class="setting-actions">
-                      <button id="requestExportBtn" class="btn btn-setting btn-setting-primary"><i class="bi bi-cloud-arrow-down me-1"></i> Request Export</button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Notification Preferences (email-only) -->
-            <div class="settings-content-section" id="notifications">
-              <h2 class="section-title">Email Notification Preferences</h2>
-              <p class="section-description">Control how you receive email notifications about your scholarship application.</p>
-              <div class="settings-section">
-                <div class="settings-section-body">
-                  <div class="setting-item">
-                    <div class="setting-info">
-                      <div class="setting-label">Email Delivery Frequency</div>
-                      <div class="setting-description">Choose when to receive email notifications.</div>
-                      <div class="mt-3">
-                        <div class="form-check mb-2">
-                          <input class="form-check-input" type="radio" name="emailFrequency" id="freqImmediate" value="immediate" checked>
-                          <label class="form-check-label" for="freqImmediate">
-                            <strong>Immediate</strong> <span class="badge bg-success">Recommended</span>
-                            <small class="d-block text-muted ms-4">Get emails as updates happen in real-time</small>
-                          </label>
-                        </div>
-                        <div class="form-check">
-                          <input class="form-check-input" type="radio" name="emailFrequency" id="freqDaily" value="daily">
-                          <label class="form-check-label" for="freqDaily">
-                            <strong>Daily Digest</strong>
-                            <small class="d-block text-muted ms-4">Receive one email per day summarizing all updates</small>
-                          </label>
-                        </div>
-                      </div>
-
-                      <!-- Critical Notifications Alert -->
-                      <div class="alert alert-warning mt-3 mb-0" role="alert">
-                        <div class="d-flex">
-                          <i class="bi bi-exclamation-triangle-fill me-2 flex-shrink-0"></i>
-                          <div>
-                            <strong>Important:</strong> Critical alerts (document rejections, errors, warnings) 
-                            are <strong>always sent immediately</strong> regardless of your preference to ensure 
-                            you don't miss important application updates.
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    <div class="setting-actions">
-                      <button id="saveNotifPrefsBtn" class="btn btn-setting btn-setting-primary">
-                        <i class="bi bi-save me-1"></i>Save Preferences
-                      </button>
-                    </div>
-                  </div>
-
-                  <!-- Information about notification types -->
-                  <div class="setting-item border-0 pb-0">
-                    <div class="setting-info">
-                      <div class="setting-label">What You'll Receive</div>
-                      <div class="setting-description">You will receive email notifications for all of the following:</div>
-                      <div class="row mt-3 g-3">
-                        <div class="col-12 col-md-6">
-                          <div class="d-flex align-items-start">
-                            <i class="bi bi-check-circle-fill text-success me-2 mt-1"></i>
-                            <div>
-                              <strong>Document Updates</strong>
-                              <small class="d-block text-muted">Approvals, rejections, and re-upload requests</small>
-                            </div>
-                          </div>
-                        </div>
-                        <div class="col-12 col-md-6">
-                          <div class="d-flex align-items-start">
-                            <i class="bi bi-check-circle-fill text-success me-2 mt-1"></i>
-                            <div>
-                              <strong>Application Status</strong>
-                              <small class="d-block text-muted">Verification and approval notifications</small>
-                            </div>
-                          </div>
-                        </div>
-                        <div class="col-12 col-md-6">
-                          <div class="d-flex align-items-start">
-                            <i class="bi bi-check-circle-fill text-success me-2 mt-1"></i>
-                            <div>
-                              <strong>Announcements</strong>
-                              <small class="d-block text-muted">Important system-wide messages and updates</small>
-                            </div>
-                          </div>
-                        </div>
-                        <div class="col-12 col-md-6">
-                          <div class="d-flex align-items-start">
-                            <i class="bi bi-check-circle-fill text-success me-2 mt-1"></i>
-                            <div>
-                              <strong>Schedule Changes</strong>
-                              <small class="d-block text-muted">Distribution schedules and deadline reminders</small>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <!-- Bell icon reminder -->
-                      <div class="alert alert-info mt-3 mb-0" role="alert">
-                        <i class="bi bi-bell-fill me-2"></i>
-                        <small>
-                          <strong>Reminder:</strong> You'll always see notifications in the bell icon 
-                          (<i class="bi bi-bell"></i>) at the top of the page, regardless of email settings.
-                        </small>
-                      </div>
-                    </div>
-                  </div>
-
-                </div>
-              </div>
-            </div>
+            <!-- Privacy & Data and Notification Preferences sections removed per user request -->
 
             <!-- Modals (same as before but updated redirects) -->
             <!-- Email Modal with OTP -->
@@ -2069,6 +1934,18 @@ unset($_SESSION['profile_flash'], $_SESSION['profile_flash_type']);
         }
       }
     });
+  </script>
+  
+  <!-- Anti-FOUC Script -->
+  <script>
+    (function() {
+      document.body.classList.add('ready');
+      window.addEventListener('pageshow', function(event) {
+        if (event.persisted) {
+          document.body.classList.add('ready');
+        }
+      });
+    })();
   </script>
 </body>
 </html>

@@ -82,15 +82,18 @@ if (!function_exists('student_menu_link')) {
 
 <!-- student_sidebar.php -->
 <div class="sidebar student-sidebar" id="sidebar">
-  <div class="sidebar-profile" role="region" aria-label="Signed in user">
-    <div class="avatar-circle" aria-hidden="true" title="<?= htmlspecialchars($student_name) ?>">
-      <?php $initials = strtoupper(mb_substr($student_name,0,1)); echo htmlspecialchars($initials); ?>
+  <!-- Clickable Profile Section - Links to Profile Page -->
+  <a href="student_profile.php" class="sidebar-profile-link" role="region" aria-label="View Profile">
+    <div class="sidebar-profile">
+      <div class="avatar-circle" aria-hidden="true" title="<?= htmlspecialchars($student_name) ?>">
+        <?php $initials = strtoupper(mb_substr($student_name,0,1)); echo htmlspecialchars($initials); ?>
+      </div>
+      <div class="profile-text">
+        <span class="name" title="<?= htmlspecialchars($student_name) ?>"><?= htmlspecialchars($student_name) ?></span>
+        <span class="role" title="<?= htmlspecialchars($student_role) ?>"><?= htmlspecialchars($student_role) ?></span>
+      </div>
     </div>
-    <div class="profile-text">
-      <span class="name" title="<?= htmlspecialchars($student_name) ?>"><?= htmlspecialchars($student_name) ?></span>
-      <span class="role" title="<?= htmlspecialchars($student_role) ?>"><?= htmlspecialchars($student_role) ?></span>
-    </div>
-  </div>
+  </a>
 
   <ul class="nav-list flex-grow-1 d-flex flex-column">
     <!-- Dashboard -->
@@ -106,13 +109,6 @@ if (!function_exists('student_menu_link')) {
 
     <!-- Notifications -->
     <?= student_menu_link('student_notifications.php', 'bi bi-bell', 'Notifications', is_active_student('student_notifications.php', $current)); ?>
-
-  
-
-  
-
-    <!-- Profile -->
-    <?= student_menu_link('student_profile.php', 'bi bi-person-circle', 'Profile', is_active_student('student_profile.php', $current)); ?>
 
     <!-- Filler flex spacer -->
     <li class="mt-auto p-0 m-0"></li>
@@ -135,9 +131,9 @@ if (!defined('STUDENT_SIDEBAR_BACKDROP')) {
 ?>
 <div class="sidebar-backdrop d-none" id="sidebar-backdrop"></div>
 
-<!-- Logout Confirmation Modal -->
+<!-- Logout Confirmation Modal - Positioned outside sidebar for proper z-index stacking -->
 <div class="modal fade" id="logoutModal" tabindex="-1" aria-labelledby="logoutModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
+  <div class="modal-dialog modal-dialog-centered student-logout-modal">
     <div class="modal-content" style="border-radius: 16px; border: none; box-shadow: 0 10px 40px rgba(0,0,0,0.2);">
       <div class="modal-header border-0" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 24px 28px; border-radius: 16px 16px 0 0;">
         <div class="d-flex align-items-center gap-3">
@@ -191,6 +187,20 @@ $profileAvatarEnd = $sidebarThemeSettings['profile_avatar_bg_end'] ?? '#0b5ed7';
 $profileNameColor = $sidebarThemeSettings['profile_name_color'] ?? '#212529';
 $profileRoleColor = $sidebarThemeSettings['profile_role_color'] ?? '#6c757d';
 $profileBorderColor = $sidebarThemeSettings['profile_border_color'] ?? '#dee2e6';
+
+// Function to convert hex to RGB
+if (!function_exists('hexToRgb')) {
+    function hexToRgb($hex) {
+        $hex = str_replace('#', '', $hex);
+        if (strlen($hex) === 3) {
+            $hex = $hex[0].$hex[0].$hex[1].$hex[1].$hex[2].$hex[2];
+        }
+        $r = hexdec(substr($hex, 0, 2));
+        $g = hexdec(substr($hex, 2, 2));
+        $b = hexdec(substr($hex, 4, 2));
+        return "$r, $g, $b";
+    }
+}
 
 // Function to adjust color opacity for subtle effects
 if (!function_exists('adjustColorOpacity')) {
@@ -256,9 +266,27 @@ if (!function_exists('adjustColorOpacity')) {
     background: #ffcdd2;
     color: #b71c1c;
 }
+
+/* Mobile adjustments for Apple/iOS devices - sticky logout */
 @media (max-width:768px) {
+    .student-sidebar .nav-list {
+        justify-content: flex-start !important;
+        padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 72px) !important;
+    }
+    
+    .student-sidebar .nav-list > li.mt-auto {
+        display: none !important;
+    }
+    
+    .student-sidebar .nav-item.logout {
+        position: sticky;
+        bottom: calc(env(safe-area-inset-bottom, 0px) + 4px);
+        z-index: 10;
+        margin-bottom: 0;
+    }
+    
     .student-sidebar .nav-item a { margin: 2px 8px; }
-    .student-sidebar .nav-item.logout a.logout-link { margin: 6px 8px 8px; }
+    .student-sidebar .nav-item.logout a.logout-link { margin: 6px 8px 0; }
 }
 
 /* Mobile overlay fix - ensure sidebar covers topbar */
@@ -272,16 +300,51 @@ if (!function_exists('adjustColorOpacity')) {
     }
 }
 
+/* Clickable Profile Link - No animations to prevent conflicts */
+.student-sidebar .sidebar-profile-link {
+    display: block;
+    text-decoration: none;
+    border-radius: 12px;
+    margin: 0 8px 12px 8px;
+}
+
+.student-sidebar .sidebar-profile-link:hover {
+    background: rgba(<?= hexToRgb($profileAvatarStart) ?>, 0.05);
+}
+
+.student-sidebar .sidebar-profile-link:active {
+    background: rgba(<?= hexToRgb($profileAvatarStart) ?>, 0.08);
+}
+
 /* Profile block */
 .student-sidebar .sidebar-profile {
     display: flex;
     align-items: center;
     gap: .75rem;
-    padding: 0 1rem 1rem 1rem;
-    margin-bottom: .35rem;
+    padding: 1rem;
+    margin-bottom: 0;
     border-bottom: 1px solid <?= adjustColorOpacity($profileBorderColor, 0.4) ?>;
 }
+
+.student-sidebar.close .sidebar-profile-link {
+    margin: 0 8px 20px 8px;
+}
+
+.student-sidebar.close .sidebar-profile {
+    justify-content: center;
+    padding: 8px;
+}
+
 .student-sidebar.close .sidebar-profile .profile-text { display: none; }
+
+.student-sidebar .sidebar-profile-link:hover .avatar-circle {
+    box-shadow: 0 4px 12px rgba(<?= hexToRgb($profileAvatarStart) ?>, 0.4);
+}
+
+.student-sidebar .sidebar-profile-link:hover .name {
+    color: <?= htmlspecialchars($profileAvatarStart) ?>;
+}
+
 .student-sidebar .sidebar-profile .avatar-circle {
     width: 42px;
     height: 42px;
@@ -317,5 +380,110 @@ if (!function_exists('adjustColorOpacity')) {
     color: <?= htmlspecialchars($profileRoleColor) ?>;
     font-weight: 600;
     opacity: .85;
+}
+
+/* Logout Modal Z-index and Positioning Fix */
+#logoutModal {
+    z-index: 1100 !important;
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    display: none;
+}
+
+#logoutModal.show {
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-backdrop {
+    z-index: 1090 !important;
+}
+
+/* Prevent sidebar from interfering with modal */
+body.modal-open .sidebar,
+body.modal-open .student-sidebar {
+    z-index: 1000 !important;
+}
+
+/* Logout Modal Responsive Styles */
+/* Tablet optimization (768px-991px) */
+@media (min-width: 768px) and (max-width: 991.98px) {
+    .student-logout-modal {
+        max-width: 500px;
+        margin: 2rem auto;
+    }
+    
+    .student-logout-modal .modal-content {
+        border-radius: 14px !important;
+    }
+    
+    .student-logout-modal .modal-header {
+        padding: 20px 24px !important;
+    }
+    
+    .student-logout-modal .modal-header h5 {
+        font-size: 1.1rem !important;
+    }
+    
+    .student-logout-modal .modal-body {
+        padding: 24px !important;
+    }
+    
+    .student-logout-modal .modal-footer {
+        padding: 0 24px 20px !important;
+    }
+    
+    .student-logout-modal .btn {
+        font-size: 0.9rem !important;
+        padding: 9px 18px !important;
+    }
+}
+
+/* Mobile optimization */
+@media (max-width: 767.98px) {
+    .student-logout-modal {
+        max-width: 90%;
+        margin: 1.5rem auto;
+    }
+    
+    .student-logout-modal .modal-content {
+        border-radius: 12px !important;
+    }
+    
+    .student-logout-modal .modal-header {
+        padding: 16px 20px !important;
+    }
+    
+    .student-logout-modal .modal-header .d-flex {
+        gap: 0.75rem !important;
+    }
+    
+    .student-logout-modal .modal-header h5 {
+        font-size: 1rem !important;
+    }
+    
+    .student-logout-modal .modal-header small {
+        font-size: 0.8rem !important;
+    }
+    
+    .student-logout-modal .modal-body {
+        padding: 20px !important;
+    }
+    
+    .student-logout-modal .modal-footer {
+        padding: 0 20px 16px !important;
+        flex-direction: column;
+        gap: 8px !important;
+    }
+    
+    .student-logout-modal .modal-footer .btn {
+        width: 100%;
+        font-size: 0.875rem !important;
+        padding: 10px 16px !important;
+    }
 }
 </style>

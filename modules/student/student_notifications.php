@@ -78,6 +78,22 @@ function getNotificationIcon($type) {
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Notifications</title>
+  
+  <!-- Critical CSS for FOUC Prevention -->
+  <style>
+    body {
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      background: #f5f5f5;
+    }
+    body.ready {
+      opacity: 1;
+    }
+    body:not(.ready) .sidebar {
+      visibility: hidden;
+    }
+  </style>
+  
   <link href="../../assets/css/bootstrap.min.css" rel="stylesheet" />
   <link href="../../assets/css/bootstrap-icons.css" rel="stylesheet" />
   <link rel="stylesheet" href="../../assets/css/student/homepage.css" />
@@ -86,7 +102,6 @@ function getNotificationIcon($type) {
   <link rel="stylesheet" href="../../assets/css/admin/notification.css" />
   <link rel="stylesheet" href="../../assets/css/student/accessibility.css" />
   <script src="../../assets/js/student/accessibility.js"></script>
-  <style>body:not(.js-ready) .sidebar { visibility:hidden; }</style>
 </head>
 <body>
   <!-- Student Topbar -->
@@ -326,6 +341,18 @@ function getNotificationIcon($type) {
               }
           });
   }
+  </script>
+  
+  <!-- Anti-FOUC Script -->
+  <script>
+    (function() {
+      document.body.classList.add('ready');
+      window.addEventListener('pageshow', function(event) {
+        if (event.persisted) {
+          document.body.classList.add('ready');
+        }
+      });
+    })();
   </script>
   
   <div id="undo-snackbar" class="undo-snackbar"></div>

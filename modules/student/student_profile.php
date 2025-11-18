@@ -456,6 +456,22 @@ unset($_SESSION['profile_flash'], $_SESSION['profile_flash_type']);
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Profile</title>
+  
+  <!-- Critical CSS for FOUC Prevention -->
+  <style>
+    body {
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      background: #f5f5f5;
+    }
+    body.ready {
+      opacity: 1;
+    }
+    body:not(.ready) .sidebar {
+      visibility: hidden;
+    }
+  </style>
+  
   <link href="../../assets/css/bootstrap.min.css" rel="stylesheet" />
   <link href="../../assets/css/bootstrap-icons.css" rel="stylesheet" />
   <link rel="stylesheet" href="../../assets/css/student/homepage.css" />
@@ -656,6 +672,82 @@ unset($_SESSION['profile_flash'], $_SESSION['profile_flash_type']);
       padding: 1.5rem;
       background: #f8f9fa;
       border-radius: 0 0 12px 12px;
+    }
+    
+    /* Tablet modal optimization (768px-991px) */
+    @media (min-width: 768px) and (max-width: 991.98px) {
+      .modal-dialog {
+        max-width: 650px;
+        margin: 2rem auto;
+      }
+      
+      .modal-content {
+        border-radius: 1rem;
+      }
+      
+      .modal-header {
+        padding: 1.25rem;
+      }
+      
+      .modal-body {
+        padding: 1rem 1.25rem;
+        max-height: 70vh;
+        overflow-y: auto;
+      }
+      
+      .modal-footer {
+        padding: 1rem 1.25rem;
+      }
+      
+      .modal-title {
+        font-size: 1.1rem;
+      }
+      
+      .btn {
+        font-size: 0.9rem;
+        padding: 0.65rem 1.25rem;
+      }
+    }
+    
+    /* Mobile modal optimization */
+    @media (max-width: 767.98px) {
+      .modal-dialog {
+        max-width: 90%;
+        margin: 1.5rem auto;
+      }
+      
+      .modal-content {
+        border-radius: 1rem;
+      }
+      
+      .modal-header {
+        padding: 1rem;
+      }
+      
+      .modal-body {
+        padding: 0.85rem 1rem;
+        max-height: 60vh;
+        overflow-y: auto;
+      }
+      
+      .modal-footer {
+        padding: 0.75rem 1rem;
+        flex-direction: column;
+        gap: 0.5rem;
+      }
+      
+      .modal-footer .btn {
+        width: 100%;
+      }
+      
+      .modal-title {
+        font-size: 1rem;
+      }
+      
+      .btn {
+        font-size: 0.875rem;
+        padding: 0.6rem 1rem;
+      }
     }
     
     /* Form Controls */
@@ -1334,6 +1426,18 @@ unset($_SESSION['profile_flash'], $_SESSION['profile_flash_type']);
             document.body.style.removeProperty('padding-right');
         }, 100);
     });
+  </script>
+  
+  <!-- Anti-FOUC Script -->
+  <script>
+    (function() {
+      document.body.classList.add('ready');
+      window.addEventListener('pageshow', function(event) {
+        if (event.persisted) {
+          document.body.classList.add('ready');
+        }
+      });
+    })();
   </script>
 </body>
 </html>

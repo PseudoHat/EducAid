@@ -32,7 +32,9 @@ $student_info = pg_fetch_assoc($student_info_result);
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" />
   <link href="../../assets/css/student/sidebar.css" rel="stylesheet" />
   <link rel="stylesheet" href="../../assets/css/student/accessibility.css" />
+  <link rel="stylesheet" href="../../assets/css/student/animations.css" />
   <script src="../../assets/js/student/accessibility.js"></script>
+  <script src="../../assets/js/student/animation_utils.js"></script>
   <style>
     body { background: #f7fafc; }
     
@@ -193,7 +195,6 @@ $student_info = pg_fetch_assoc($student_info_result);
       font-weight: 500;
       font-size: 0.9rem;
       border: 1px solid transparent;
-      transition: all 0.2s ease;
     }
 
     .btn-setting-primary {
@@ -262,14 +263,28 @@ $student_info = pg_fetch_assoc($student_info_result);
       font-weight: 600 !important;
     }
 
-    /* Reduce Animations */
+    /* Reduce Animations - Fully disable all animations while keeping functionality */
     html.reduce-animations *,
     html.reduce-animations *::before,
     html.reduce-animations *::after {
-      animation-duration: 0.01ms !important;
+      animation: none !important;
+      animation-duration: 0s !important;
+      animation-delay: 0s !important;
       animation-iteration-count: 1 !important;
-      transition-duration: 0.01ms !important;
+      transition: none !important;
+      transition-duration: 0s !important;
+      transition-delay: 0s !important;
+      transform: none !important;
       scroll-behavior: auto !important;
+    }
+    
+    /* Allow essential interactions without animation */
+    html.reduce-animations *:hover,
+    html.reduce-animations *:focus,
+    html.reduce-animations *:active {
+      transition: none !important;
+      animation: none !important;
+      transform: none !important;
     }
 
     @media (max-width: 768px) {
@@ -345,22 +360,7 @@ $student_info = pg_fetch_assoc($student_info_result);
                     </div>
                   </div>
 
-                  <!-- High Contrast Mode -->
-                  <div class="setting-item">
-                    <div class="setting-info">
-                      <div class="setting-label">High Contrast Mode</div>
-                      <div class="setting-value">
-                        <span class="badge bg-secondary">Disabled</span>
-                      </div>
-                      <div class="setting-description">Enhance visibility for visually impaired students</div>
-                    </div>
-                    <div class="setting-actions">
-                      <div class="form-check form-switch">
-                        <input class="form-check-input" type="checkbox" role="switch" id="highContrastToggle" style="width: 3rem; height: 1.5rem; cursor: pointer;">
-                        <label class="form-check-label ms-2" for="highContrastToggle"></label>
-                      </div>
-                    </div>
-                  </div>
+                  
 
                   <!-- Reduce Animations -->
                   <div class="setting-item">
@@ -369,7 +369,7 @@ $student_info = pg_fetch_assoc($student_info_result);
                       <div class="setting-value">
                         <span class="badge bg-secondary">Disabled</span>
                       </div>
-                      <div class="setting-description">Minimize motion effects for students with motion sensitivity</div>
+                      <div class="setting-description">Reduce all animations to minimal effects while keeping all functionality intact</div>
                     </div>
                     <div class="setting-actions">
                       <div class="form-check form-switch">
@@ -395,12 +395,10 @@ $student_info = pg_fetch_assoc($student_info_result);
     document.addEventListener('DOMContentLoaded', function() {
       // Load saved preferences
       const savedTextSize = localStorage.getItem('textSize') || 'normal';
-      const savedHighContrast = localStorage.getItem('highContrast') === 'true';
       const savedReduceAnimations = localStorage.getItem('reduceAnimations') === 'true';
 
       // Apply saved preferences
       applyTextSize(savedTextSize);
-      applyHighContrast(savedHighContrast);
       applyReduceAnimations(savedReduceAnimations);
 
       // Text Size Buttons
@@ -442,27 +440,9 @@ $student_info = pg_fetch_assoc($student_info_result);
         }
       });
 
-      // High Contrast Toggle
-      const highContrastToggle = document.getElementById('highContrastToggle');
-      if (highContrastToggle) {
-        highContrastToggle.checked = savedHighContrast;
-        // Update initial badge
-        const badge = highContrastToggle.closest('.setting-item').querySelector('.badge');
-        badge.textContent = savedHighContrast ? 'Enabled' : 'Disabled';
-        badge.className = savedHighContrast ? 'badge bg-success' : 'badge bg-secondary';
-        
-        highContrastToggle.addEventListener('change', function() {
-          applyHighContrast(this.checked);
-          localStorage.setItem('highContrast', this.checked);
-          
-          // Update badge
-          const badge = this.closest('.setting-item').querySelector('.badge');
-          badge.textContent = this.checked ? 'Enabled' : 'Disabled';
-          badge.className = this.checked ? 'badge bg-success' : 'badge bg-secondary';
-        });
-      }
+      // High Contrast removed per request
 
-      // Reduce Animations Toggle
+      // Reduce Animations Toggle (now includes simple animations)
       const reduceAnimationsToggle = document.getElementById('reduceAnimationsToggle');
       if (reduceAnimationsToggle) {
         reduceAnimationsToggle.checked = savedReduceAnimations;
@@ -474,6 +454,21 @@ $student_info = pg_fetch_assoc($student_info_result);
         reduceAnimationsToggle.addEventListener('change', function() {
           applyReduceAnimations(this.checked);
           localStorage.setItem('reduceAnimations', this.checked);
+          
+          // Also apply simple animations when reduce animations is enabled
+          if (this.checked) {
+            if (window.applySimpleAnimations) {
+              window.applySimpleAnimations();
+            } else {
+              document.documentElement.classList.add('simple-animations');
+            }
+          } else {
+            if (window.removeSimpleAnimations) {
+              window.removeSimpleAnimations();
+            } else {
+              document.documentElement.classList.remove('simple-animations');
+            }
+          }
           
           // Update badge
           const badge = this.closest('.setting-item').querySelector('.badge');
@@ -487,19 +482,16 @@ $student_info = pg_fetch_assoc($student_info_result);
         document.documentElement.classList.add('text-' + size);
       }
 
-      function applyHighContrast(enabled) {
-        if (enabled) {
-          document.documentElement.classList.add('high-contrast');
-        } else {
-          document.documentElement.classList.remove('high-contrast');
-        }
-      }
+      // High Contrast function removed
 
       function applyReduceAnimations(enabled) {
         if (enabled) {
           document.documentElement.classList.add('reduce-animations');
+          // Also add simple-animations for maximum animation reduction
+          document.documentElement.classList.add('simple-animations');
         } else {
           document.documentElement.classList.remove('reduce-animations');
+          document.documentElement.classList.remove('simple-animations');
         }
       }
     });

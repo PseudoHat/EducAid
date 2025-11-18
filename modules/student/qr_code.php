@@ -84,6 +84,22 @@ if ($has_qr_code) {
   <meta charset="UTF-8">
   <title>My QR Code - EducAid</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <!-- Critical CSS for FOUC Prevention -->
+  <style>
+    body {
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      background: #f5f5f5;
+    }
+    body.ready {
+      opacity: 1;
+    }
+    body:not(.ready) .sidebar {
+      visibility: hidden;
+    }
+  </style>
+  
   <link rel="stylesheet" href="../../assets/css/bootstrap.min.css">
   <link href="../../assets/css/bootstrap-icons.css" rel="stylesheet">
   <link rel="stylesheet" href="../../assets/css/student/homepage.css">
@@ -521,5 +537,17 @@ if ($has_qr_code) {
   
   <script src="../../assets/js/bootstrap.bundle.min.js"></script>
   <script src="../../assets/js/student/sidebar.js"></script>
+  
+  <!-- Anti-FOUC Script -->
+  <script>
+    (function() {
+      document.body.classList.add('ready');
+      window.addEventListener('pageshow', function(event) {
+        if (event.persisted) {
+          document.body.classList.add('ready');
+        }
+      });
+    })();
+  </script>
 </body>
 </html>
