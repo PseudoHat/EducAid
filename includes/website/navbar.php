@@ -229,7 +229,7 @@ nav.navbar.fixed-header .container-fluid {
   nav.navbar.fixed-header .container-fluid {
     padding-left: 1.5rem;
     padding-right: 1.5rem;
-    gap: 3rem; /* Add minimum 3rem gap between brand and nav */
+    gap: 1.5rem; /* Reduced gap to prevent collision at 100% zoom */
     display: flex;
     flex-wrap: nowrap;
   }
@@ -239,7 +239,13 @@ nav.navbar.fixed-header .container-fluid {
   nav.navbar.fixed-header .container-fluid {
     padding-left: 2.5rem;
     padding-right: 2.5rem;
-    gap: 4rem; /* Increase gap on larger screens */
+    gap: 2rem; /* Moderate gap on larger screens */
+  }
+}
+
+@media (min-width: 1400px) {
+  nav.navbar.fixed-header .container-fluid {
+    gap: 3rem; /* More generous gap on extra large screens */
   }
 }
 
@@ -290,12 +296,25 @@ nav.navbar.fixed-header .navbar-brand .brand-text {
   text-overflow: ellipsis;
 }
 
-/* On desktop, allow full brand text to display since hamburger is hidden */
+/* On desktop, keep ellipsis behavior but allow more width */
 @media (min-width: 992px) {
   nav.navbar.fixed-header .navbar-brand .brand-text {
+    max-width: 280px; /* Prevent collision with nav items */
+  }
+}
+
+/* Allow more space on larger screens */
+@media (min-width: 1200px) {
+  nav.navbar.fixed-header .navbar-brand .brand-text {
+    max-width: 320px;
+  }
+}
+
+@media (min-width: 1400px) {
+  nav.navbar.fixed-header .navbar-brand .brand-text {
+    max-width: none; /* Full text on extra large screens */
     overflow: visible;
     text-overflow: clip;
-    max-width: none;
   }
 }
 
