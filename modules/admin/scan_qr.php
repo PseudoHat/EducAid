@@ -59,7 +59,7 @@ $student_check_query = "
     SELECT COUNT(*) as count 
     FROM students s 
     INNER JOIN qr_codes q ON s.student_id = q.student_id 
-    WHERE s.status IN ('active', 'given') AND s.payroll_no IS NOT NULL
+    WHERE s.status IN ('active', 'given') AND s.payroll_no IS NOT NULL AND s.payroll_no <> ''
 ";
 $student_check_result = pg_query($connection, $student_check_query);
 $student_count = 0;
@@ -87,7 +87,7 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
                s.student_id, s.status, dsr.scanned_at as date_given
         FROM students s
         LEFT JOIN distribution_student_records dsr ON s.student_id = dsr.student_id
-        WHERE s.status IN ('active', 'given') AND s.payroll_no IS NOT NULL
+        WHERE s.status IN ('active', 'given') AND s.payroll_no IS NOT NULL AND s.payroll_no <> ''
         ORDER BY s.payroll_no ASC
     ";
     
@@ -733,7 +733,7 @@ $students_query = "
         LIMIT 1
     ) qr_log ON true
     LEFT JOIN admins qr_admin ON qr_log.scanned_by = qr_admin.admin_id
-    WHERE s.status IN ('active', 'given') AND s.payroll_no IS NOT NULL
+    WHERE s.status IN ('active', 'given') AND s.payroll_no IS NOT NULL AND s.payroll_no <> ''
     ORDER BY s.student_id, dsr.scanned_at DESC NULLS LAST, s.payroll_no ASC
 ";
 

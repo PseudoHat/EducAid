@@ -391,23 +391,43 @@ class DistributionManager {
     public function getStorageStatistics() {
         $stats = [];
         
-        // 1. ACTIVE STUDENTS - Scan actual files using pathConfig
-        $activeUploadsPath = $this->pathConfig->getStudentPath();
-        $activeFolders = ['enrollment_forms', 'grades', 'id_pictures', 'indigency', 'letter_to_mayor'];
-        
+        // 1. ACTIVE STUDENTS - Query documents table for file paths and calculate sizes
         $activeFiles = 0;
         $activeSize = 0;
+        
+        // Get count of active students
         $activeStudentsQuery = pg_query($this->conn, "SELECT COUNT(DISTINCT student_id) as count FROM students WHERE status IN ('active', 'given')");
         $activeStudentCount = pg_fetch_assoc($activeStudentsQuery)['count'] ?? 0;
         
-        foreach ($activeFolders as $folder) {
-            $folderPath = $this->pathConfig->getStudentPath($folder);
-            if (is_dir($folderPath)) {
-                $files = glob($folderPath . '/*.*');
-                foreach ($files as $file) {
-                    if (is_file($file)) {
-                        $activeFiles++;
-                        $activeSize += filesize($file);
+        // Get documents for active students from database
+        $activeDocsQuery = pg_query($this->conn, "
+            SELECT d.file_path, d.file_size_bytes, d.ocr_text_path, d.verification_data_path 
+            FROM documents d
+            INNER JOIN students s ON d.student_id = s.student_id
+            WHERE s.status IN ('active', 'given') 
+            AND d.status = 'approved'
+        ");
+        
+        if ($activeDocsQuery) {
+            while ($doc = pg_fetch_assoc($activeDocsQuery)) {
+                $activeFiles++;
+                // Use file_size_bytes from DB if available, otherwise check file
+                if (!empty($doc['file_size_bytes'])) {
+                    $activeSize += (int)$doc['file_size_bytes'];
+                } elseif (!empty($doc['file_path'])) {
+                    $fullPath = $this->resolveFilePath($doc['file_path']);
+                    if (file_exists($fullPath)) {
+                        $activeSize += filesize($fullPath);
+                    }
+                }
+
+                // Include sidecar files if present (OCR text and verification JSON)
+                foreach (['ocr_text_path', 'verification_data_path'] as $sidecarKey) {
+                    if (!empty($doc[$sidecarKey])) {
+                        $sidecarPath = $this->resolveFilePath($doc[$sidecarKey]);
+                        if ($sidecarPath && file_exists($sidecarPath)) {
+                            $activeSize += (int)filesize($sidecarPath);
+                        }
                     }
                 }
             }
@@ -456,52 +476,169 @@ class DistributionManager {
             'total_size' => $distSize
         ];
         
-        // 3. ARCHIVED STUDENTS - From database view (if exists)
-        $archivedQuery = pg_query($this->conn, "
-            SELECT 
-                COUNT(*) as student_count,
-                0 as file_count,
-                0 as total_size
-            FROM students 
-            WHERE is_archived = true
+        // 3. ARCHIVED STUDENTS - Query documents table for archived students
+        $archivedFiles = 0;
+        $archivedSize = 0;
+        
+        $archivedStudentsQuery = pg_query($this->conn, "SELECT COUNT(*) as count FROM students WHERE is_archived = true");
+        $archivedStudentCount = $archivedStudentsQuery ? (pg_fetch_assoc($archivedStudentsQuery)['count'] ?? 0) : 0;
+        
+        // Get documents for archived students from database
+        $archivedDocsQuery = pg_query($this->conn, "
+            SELECT d.file_path, d.file_size_bytes, d.ocr_text_path, d.verification_data_path 
+            FROM documents d
+            INNER JOIN students s ON d.student_id = s.student_id
+            WHERE s.is_archived = true
         ");
         
-        if ($archivedQuery && pg_num_rows($archivedQuery) > 0) {
-            $archivedData = pg_fetch_assoc($archivedQuery);
-            $stats[] = [
-                'category' => 'archived',
-                'student_count' => (int)$archivedData['student_count'],
-                'file_count' => (int)$archivedData['file_count'],
-                'total_size' => (int)$archivedData['total_size']
-            ];
-        } else {
-            // Fallback: scan archived_students folder if exists using pathConfig
-            $archivedPath = $this->pathConfig->getArchivedStudentsPath();
-            $archivedFiles = 0;
-            $archivedSize = 0;
-            
-            if (is_dir($archivedPath)) {
-                $files = glob($archivedPath . DIRECTORY_SEPARATOR . '*.*', GLOB_BRACE);
-                foreach ($files as $file) {
-                    if (is_file($file)) {
-                        $archivedFiles++;
-                        $archivedSize += filesize($file);
+        if ($archivedDocsQuery) {
+            while ($doc = pg_fetch_assoc($archivedDocsQuery)) {
+                $archivedFiles++;
+                if (!empty($doc['file_size_bytes'])) {
+                    $archivedSize += (int)$doc['file_size_bytes'];
+                } elseif (!empty($doc['file_path'])) {
+                    $fullPath = $this->resolveFilePath($doc['file_path']);
+                    if (file_exists($fullPath)) {
+                        $archivedSize += filesize($fullPath);
+                    }
+                }
+
+                foreach (['ocr_text_path', 'verification_data_path'] as $sidecarKey) {
+                    if (!empty($doc[$sidecarKey])) {
+                        $sidecarPath = $this->resolveFilePath($doc[$sidecarKey]);
+                        if ($sidecarPath && file_exists($sidecarPath)) {
+                            $archivedSize += (int)filesize($sidecarPath);
+                        }
                     }
                 }
             }
-            
-            $archivedStudentsQuery = pg_query($this->conn, "SELECT COUNT(*) as count FROM students WHERE is_archived = true");
-            $archivedStudentCount = $archivedStudentsQuery ? (pg_fetch_assoc($archivedStudentsQuery)['count'] ?? 0) : 0;
-            
+        }
+        
+        $stats[] = [
+            'category' => 'archived',
+            'student_count' => (int)$archivedStudentCount,
+            'file_count' => $archivedFiles,
+            'total_size' => $archivedSize
+        ];
+
+        // 4. MUNICIPALITY LOGOS
+        $muniLogosPath = $this->pathConfig->getMunicipalLogosPath();
+        $muniTotals = $this->scanDirectoryTotals($muniLogosPath);
+        $stats[] = [
+            'category' => 'municipality_logos',
+            'student_count' => 0,
+            'file_count' => $muniTotals['files'],
+            'total_size' => $muniTotals['size']
+        ];
+
+        // 5. ANNOUNCEMENTS (images, attachments)
+        $annPath = $this->pathConfig->getAnnouncementsPath();
+        $annTotals = $this->scanDirectoryTotals($annPath);
+        $stats[] = [
+            'category' => 'announcements',
+            'student_count' => 0,
+            'file_count' => $annTotals['files'],
+            'total_size' => $annTotals['size']
+        ];
+
+        // 6. TEMP FOLDERS (all doc types – includes JSON sidecars)
+        $tempPath = $this->pathConfig->getTempPath();
+        $tempTotals = $this->scanDirectoryTotals($tempPath);
+        $stats[] = [
+            'category' => 'temp',
+            'student_count' => 0,
+            'file_count' => $tempTotals['files'],
+            'total_size' => $tempTotals['size']
+        ];
+
+        // 7. BLACKLISTED AND LOST+FOUND if present
+        $blacklistedPath = rtrim($this->pathConfig->getUploadsDir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'blacklisted_students';
+        $blackTotals = $this->scanDirectoryTotals($blacklistedPath);
+        if ($blackTotals['files'] > 0) {
             $stats[] = [
-                'category' => 'archived',
-                'student_count' => (int)$archivedStudentCount,
-                'file_count' => $archivedFiles,
-                'total_size' => $archivedSize
+                'category' => 'blacklisted',
+                'student_count' => 0,
+                'file_count' => $blackTotals['files'],
+                'total_size' => $blackTotals['size']
+            ];
+        }
+
+        $lostFoundPath = rtrim($this->pathConfig->getUploadsDir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'lost+found';
+        $lostTotals = $this->scanDirectoryTotals($lostFoundPath);
+        if ($lostTotals['files'] > 0) {
+            $stats[] = [
+                'category' => 'lost_found',
+                'student_count' => 0,
+                'file_count' => $lostTotals['files'],
+                'total_size' => $lostTotals['size']
             ];
         }
         
         return $stats;
+    }
+    
+    /**
+     * Resolve file path from database to actual filesystem path
+     * Handles both relative paths (/assets/uploads/...) and absolute paths
+     */
+    private function resolveFilePath($dbPath) {
+        if (empty($dbPath)) {
+            return '';
+        }
+        
+        // If path starts with /assets/uploads/ or assets/uploads/, make it relative to base uploads
+        if (preg_match('#^/?assets/uploads/(.+)$#', $dbPath, $matches)) {
+            return $this->pathConfig->getUploadsDir() . $matches[1];
+        }
+        
+        // If it's already an absolute path starting with base uploads dir, return as-is
+        if (strpos($dbPath, $this->pathConfig->getUploadsDir()) === 0) {
+            return $dbPath;
+        }
+        
+        // If path starts with /mnt/assets/uploads/ (Railway), return as-is
+        if (strpos($dbPath, '/mnt/assets/uploads/') === 0) {
+            return $dbPath;
+        }
+        
+        // Otherwise, treat as relative to uploads directory
+        return $this->pathConfig->getUploadsDir() . ltrim($dbPath, '/');
+    }
+
+    /**
+     * Recursively scan a directory and return total files and size.
+     * Safely handles missing paths and permission issues.
+     * @param string $path
+     * @return array{files:int,size:int}
+     */
+    private function scanDirectoryTotals($path) {
+        $totalFiles = 0;
+        $totalSize = 0;
+
+        if (!is_dir($path)) {
+            return ['files' => 0, 'size' => 0];
+        }
+
+        $iter = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($path, FilesystemIterator::SKIP_DOTS | FilesystemIterator::FOLLOW_SYMLINKS),
+            RecursiveIteratorIterator::SELF_FIRST
+        );
+
+        foreach ($iter as $file) {
+            try {
+                if ($file->isFile()) {
+                    $totalFiles++;
+                    $size = @filesize($file->getPathname());
+                    if ($size !== false) {
+                        $totalSize += (int)$size;
+                    }
+                }
+            } catch (Throwable $t) {
+                // Ignore unreadable files
+            }
+        }
+
+        return ['files' => $totalFiles, 'size' => $totalSize];
     }
 
     private function resetGivenStudents() {

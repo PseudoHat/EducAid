@@ -504,6 +504,7 @@ function sendApprovalEmail($email, $firstName, $lastName, $extensionName, $appro
     $mail = new PHPMailer(true);
     
     try {
+        require_once __DIR__ . '/../../includes/env_url_helper.php';
         $mail->isSMTP();
         $mail->Host       = 'smtp.gmail.com';
         $mail->SMTPAuth   = true;
@@ -516,6 +517,8 @@ function sendApprovalEmail($email, $firstName, $lastName, $extensionName, $appro
         $mail->addAddress($email);
 
         $mail->isHTML(true);
+        // Use helper for environment-aware login URL
+        $loginUrl = getUnifiedLoginUrl();
         
         if ($approved) {
             $mail->Subject = 'EducAid Registration Approved';
@@ -525,7 +528,7 @@ function sendApprovalEmail($email, $firstName, $lastName, $extensionName, $appro
                 <p>Dear {$fullName},</p>
                 <p>Your EducAid registration has been <strong>approved</strong>. You can now log in to your account and proceed with your application.</p>
                 " . (!empty($remarks) ? "<p><strong>Admin Notes:</strong> {$remarks}</p>" : "") . "
-                <p>You can log in at: <a href='http://localhost/EducAid/unified_login.php'>EducAid Login</a></p>
+                <p><a href='" . htmlspecialchars($loginUrl, ENT_QUOTES, 'UTF-8') . "' style='background:#28a745;color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none;display:inline-block;font-weight:600;'>Login Now</a></p>
                 <p>Best regards,<br>EducAid Admin Team</p>
             ";
         } else {
@@ -536,7 +539,8 @@ function sendApprovalEmail($email, $firstName, $lastName, $extensionName, $appro
                 <p>Dear {$fullName},</p>
                 <p>Thank you for your interest in EducAid. Unfortunately, your registration could not be approved at this time.</p>
                 " . (!empty($remarks) ? "<p><strong>Reason:</strong> {$remarks}</p>" : "") . "
-                <p>If you believe this is an error or would like to reapply, please contact our office.</p>
+                <p>If you believe this is an error or would like to reapply, please contact our office. When ready, you can attempt a new registration by clicking below.</p>
+                <p><a href='" . htmlspecialchars($loginUrl, ENT_QUOTES, 'UTF-8') . "' style='background:#0d6efd;color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none;display:inline-block;font-weight:600;'>Login Now</a></p>
                 <p>Best regards,<br>EducAid Admin Team</p>
             ";
         }

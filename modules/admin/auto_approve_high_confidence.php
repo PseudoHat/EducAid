@@ -161,6 +161,7 @@ function sendApprovalEmail($email, $firstName, $lastName, $extensionName, $appro
     $mail = new PHPMailer(true);
     
     try {
+        require_once __DIR__ . '/../../includes/env_url_helper.php';
         $mail->isSMTP();
         $mail->Host       = 'smtp.gmail.com';
         $mail->SMTPAuth   = true;
@@ -175,6 +176,7 @@ function sendApprovalEmail($email, $firstName, $lastName, $extensionName, $appro
         $mail->isHTML(true);
         
         if ($approved) {
+            $loginUrl = getUnifiedLoginUrl();
             $mail->Subject = 'EducAid Registration Approved';
             $fullName = trim($firstName . ' ' . $lastName . ' ' . $extensionName);
             $mail->Body    = "
@@ -182,7 +184,7 @@ function sendApprovalEmail($email, $firstName, $lastName, $extensionName, $appro
                 <p>Dear {$fullName},</p>
                 <p>Your EducAid registration has been <strong>approved</strong>. You can now log in to your account and proceed with your application.</p>
                 " . (!empty($remarks) ? "<p><strong>Admin Notes:</strong> {$remarks}</p>" : "") . "
-                <p>You can log in at: <a href='http://localhost/EducAid/unified_login.php'>EducAid Login</a></p>
+                <p><a href='" . htmlspecialchars($loginUrl, ENT_QUOTES, 'UTF-8') . "' style='background:#28a745;color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none;display:inline-block;font-weight:600;'>Login Now</a></p>
                 <p>Best regards,<br>EducAid Admin Team</p>
             ";
         }

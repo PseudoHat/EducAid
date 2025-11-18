@@ -122,7 +122,8 @@ function notifyStudentDocumentStatus($connection, $student_id, $document_type, $
                 $message,
                 'error',
                 'high',
-                'student_documents.php',
+                // Direct students to login so they can access dashboard (env-aware URL built in email service)
+                'unified_login.php',
                 true // is_priority - shows as modal
             );
             

@@ -141,7 +141,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_schedule'])) {
                     
                     try {
                         // First, get all students with payroll numbers to know actual capacity
-                        $studentCountResult = pg_query($connection, "SELECT COUNT(*) as count FROM students WHERE payroll_no IS NOT NULL");
+                        $studentCountResult = pg_query($connection, "SELECT COUNT(*) as count FROM students WHERE payroll_no IS NOT NULL AND payroll_no <> ''");
                         $studentCountRow = pg_fetch_assoc($studentCountResult);
                         $actualStudentCount = intval($studentCountRow['count']);
                         
@@ -169,35 +169,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_schedule'])) {
                                     $students_to_schedule = min($students_in_batch, $actualStudentCount - ($counter - 1));
                                     
                                     for ($i = 0; $i < $students_to_schedule; $i++) {
-                                        $pno = $counter;
-                                        
-                                        // Check if student exists before creating schedule
-                                        if ($pno > $actualStudentCount) {
-                                            error_log("Skipping payroll_no $pno - exceeds actual student count of $actualStudentCount");
-                                            break;
-                                        }
-                                        
-                                        $sidRes = pg_query_params($connection, 
-                                            "SELECT student_id FROM students WHERE payroll_no = $1", 
-                                            [$pno]
+                                        // Fetch the next student in payroll order (payroll_no is TEXT formatted)
+                                        $offset = $counter - 1;
+                                        $sidRes = pg_query_params(
+                                            $connection,
+                                            "SELECT student_id, payroll_no FROM students WHERE payroll_no IS NOT NULL AND payroll_no <> '' ORDER BY payroll_no ASC LIMIT 1 OFFSET $1",
+                                            [$offset]
                                         );
-                                        
+
                                         if (!$sidRes) {
-                                            error_log("Failed to query student with payroll_no: $pno - " . pg_last_error($connection));
+                                            error_log("Failed to query student at offset: $offset - " . pg_last_error($connection));
                                             continue;
                                         }
-                                        
+
                                         $sid = pg_fetch_assoc($sidRes);
                                         if (!$sid) {
-                                            error_log("No student found with payroll_no: $pno");
-                                            continue;
+                                            error_log("No student found at offset: $offset");
+                                            break;
                                         }
-                                        
+
                                         $studentId = intval($sid['student_id']);
-                                        
+                                        $pno = (string)$sid['payroll_no'];
+
                                         // Debug the data being inserted
                                         error_log("Inserting schedule: student_id=$studentId, payroll_no=$pno, batch_no=" . ($batch_num + 1) . ", date=$current_date, time_slot=$time_slot, location=$location");
-                                        
+
                                         $insertResult = pg_query_params($connection,
                                             "INSERT INTO schedules (student_id, payroll_no, batch_no, distribution_date, time_slot, location) 
                                              VALUES ($1, $2, $3, $4, $5, $6)",
@@ -419,9 +415,9 @@ $csrfToken = CSRFProtection::generateToken('manage_schedules');
 // Get payroll info
 $result = pg_query($connection, "SELECT MAX(payroll_no) AS max_no FROM students");
 $row = pg_fetch_assoc($result);
-$maxPayroll = isset($row['max_no']) ? intval($row['max_no']) : 0;
+$maxPayroll = isset($row['max_no']) ? $row['max_no'] : '';
 
-$countRes = pg_query($connection, "SELECT COUNT(payroll_no) AS count_no FROM students WHERE payroll_no IS NOT NULL");
+$countRes = pg_query($connection, "SELECT COUNT(*) AS count_no FROM students WHERE payroll_no IS NOT NULL AND payroll_no <> ''");
 $rowCount = pg_fetch_assoc($countRes);
 $countStudents = isset($rowCount['count_no']) ? intval($rowCount['count_no']) : 0;
 
@@ -621,7 +617,9 @@ if ($usedDatesResult) {
                                 <i class="bi bi-hash"></i>
                             </div>
                             <h5 class="mb-2" style="font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px; opacity: 0.9;">Max Payroll Number</h5>
-                            <h2 class="mb-0 fw-bold" style="font-size: 2.5rem;"><?= number_format($maxPayroll) ?></h2>
+                            <h2 class="mb-0 fw-bold" style="font-size: 2.5rem;">
+                                <?= $maxPayroll ? (is_numeric($maxPayroll) ? number_format((float)$maxPayroll) : htmlspecialchars($maxPayroll)) : '—' ?>
+                            </h2>
                         </div>
                     </div>
                 </div>

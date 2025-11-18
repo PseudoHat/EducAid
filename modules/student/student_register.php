@@ -823,7 +823,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processEnrollmentOcr'
 
         // Save OCR data for later use during registration (with session prefix to prevent conflicts)
         $sessionPrefix = $_SESSION['file_prefix'] ?? 'session';
-        $confidenceFile = $uploadDir . DIRECTORY_SEPARATOR . $sessionPrefix . '_enrollment_confidence.json';
+        $confidenceFile = $uploadDir . DIRECTORY_SEPARATOR . $sessionPrefix . '_enrollment.confidence.json';
         $confidenceData = [
             'overall_confidence' => $overallConfidence,
             'detailed_scores' => $verification['confidence_scores'],
@@ -2894,6 +2894,28 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processIdPictureOcr']
     // Save verification results
     file_put_contents($targetPath . '.verify.json', json_encode($verification, JSON_PRETTY_PRINT));
 
+    // Also save a session-based confidence JSON for ID Picture
+    // Mirrors other documents' confidence files and aligns to .confidence.json naming
+    try {
+        $sessionPrefix = $_SESSION['file_prefix'] ?? 'session';
+        $confidenceFile = $uploadDir . DIRECTORY_SEPARATOR . $sessionPrefix . '_idpic.confidence.json';
+        $confidenceData = [
+            'overall_confidence' => $avgConfidence,
+            'detailed_scores' => [
+                'first_name' => isset($firstNameSimilarity) ? round($firstNameSimilarity, 2) : null,
+                'middle_name' => isset($middleNameSimilarity) ? round($middleNameSimilarity, 2) : null,
+                'last_name' => isset($lastNameSimilarity) ? round($lastNameSimilarity, 2) : null,
+                'university' => isset($universitySimilarity) ? round($universitySimilarity, 2) : null,
+                'school_student_id' => isset($checks['school_student_id_match']['similarity']) ? round($checks['school_student_id_match']['similarity'], 2) : null
+            ],
+            'timestamp' => time()
+        ];
+        @file_put_contents($confidenceFile, json_encode($confidenceData));
+    } catch (\Throwable $e) {
+        // Non-fatal; log and continue
+        error_log('ID Picture confidence save error: ' . $e->getMessage());
+    }
+
     // ========================================
     // OPTIONAL: Save OCR Debug Results (DISABLED for production to reduce file clutter)
     // To enable debug file generation, uncomment this section
@@ -3218,7 +3240,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processLetterOcr'])) 
             // Find and store the matched text snippet
             $pattern = '/\b\w*' . preg_quote(substr($formData['first_name'], 0, 3), '/') . '\w*\b/i';
             if (preg_match($pattern, $ocrText, $matches)) {
-                $verification['found_text_snippets']['first_name'] = $matches[0];
+                $verification['found_text_snippets']['first_name'] = (string)($matches[0] ?? '');
             }
         }
     }
@@ -3233,7 +3255,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processLetterOcr'])) 
             // Find and store the matched text snippet
             $pattern = '/\b\w*' . preg_quote(substr($formData['last_name'], 0, 3), '/') . '\w*\b/i';
             if (preg_match($pattern, $ocrText, $matches)) {
-                $verification['found_text_snippets']['last_name'] = $matches[0];
+                $verification['found_text_snippets']['last_name'] = (string)($matches[0] ?? '');
             }
         }
     }
@@ -3248,7 +3270,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processLetterOcr'])) 
             // Find and store the matched text snippet
             $pattern = '/\b\w*' . preg_quote(substr($barangayName, 0, 4), '/') . '\w*\b/i';
             if (preg_match($pattern, $ocrText, $matches)) {
-                $verification['found_text_snippets']['barangay'] = $matches[0];
+                $verification['found_text_snippets']['barangay'] = (string)($matches[0] ?? '');
             }
         }
     }
@@ -3377,7 +3399,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processLetterOcr'])) 
     // Save OCR confidence score to temp file for later use during registration
     // Use session-based filename to prevent conflicts between multiple users
     $sessionPrefix = $_SESSION['file_prefix'] ?? 'session';
-    $confidenceFile = $uploadDir . DIRECTORY_SEPARATOR . $sessionPrefix . '_letter_confidence.json';
+    $confidenceFile = $uploadDir . DIRECTORY_SEPARATOR . $sessionPrefix . '_letter.confidence.json';
     $confidenceData = [
         'overall_confidence' => $averageConfidence,
         'detailed_scores' => $verification['confidence_scores'],
@@ -3608,7 +3630,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processCertificateOcr
             // Find and store the matched text snippet
             $pattern = '/\b\w*' . preg_quote(substr($formData['first_name'], 0, 3), '/') . '\w*\b/i';
             if (preg_match($pattern, $ocrText, $matches)) {
-                $verification['found_text_snippets']['first_name'] = $matches[0];
+                $verification['found_text_snippets']['first_name'] = (string)($matches[0] ?? '');
             }
         }
     }
@@ -3623,7 +3645,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processCertificateOcr
             // Find and store the matched text snippet
             $pattern = '/\b\w*' . preg_quote(substr($formData['last_name'], 0, 3), '/') . '\w*\b/i';
             if (preg_match($pattern, $ocrText, $matches)) {
-                $verification['found_text_snippets']['last_name'] = $matches[0];
+                $verification['found_text_snippets']['last_name'] = (string)($matches[0] ?? '');
             }
         }
     }
@@ -3638,7 +3660,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processCertificateOcr
             // Find and store the matched text snippet
             $pattern = '/\b\w*' . preg_quote(substr($barangayName, 0, 4), '/') . '\w*\b/i';
             if (preg_match($pattern, $ocrText, $matches)) {
-                $verification['found_text_snippets']['barangay'] = $matches[0];
+                $verification['found_text_snippets']['barangay'] = (string)($matches[0] ?? '');
             }
         }
     }
@@ -3724,7 +3746,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processCertificateOcr
     // Save OCR confidence score to temp file for later use during registration
     // Use session-based filename to prevent conflicts between multiple users
     $sessionPrefix = $_SESSION['file_prefix'] ?? 'session';
-    $confidenceFile = $uploadDir . DIRECTORY_SEPARATOR . $sessionPrefix . '_certificate_confidence.json';
+    $confidenceFile = $uploadDir . DIRECTORY_SEPARATOR . $sessionPrefix . '_certificate.confidence.json';
     $confidenceData = [
         'overall_confidence' => $averageConfidence,
         'detailed_scores' => $verification['confidence_scores'],
@@ -4099,7 +4121,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processGradesOcr'])) 
     $sessionPrefix = $_SESSION['file_prefix'] ?? 'session';
     $pathConfig = FilePathConfig::getInstance();
     $tempEnrollmentDir = $pathConfig->getTempPath('enrollment_forms');
-    $enrollmentConfidenceFile = $tempEnrollmentDir . DIRECTORY_SEPARATOR . $sessionPrefix . '_enrollment_confidence.json';
+    $enrollmentConfidenceFile = $tempEnrollmentDir . DIRECTORY_SEPARATOR . $sessionPrefix . '_enrollment.confidence.json';
     
     if (file_exists($enrollmentConfidenceFile)) {
         $enrollmentData = json_decode(file_get_contents($enrollmentConfidenceFile), true);
@@ -4300,7 +4322,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['processGradesOcr'])) 
         // Save verification results for confidence calculation
         // Use session-based filename to prevent conflicts between multiple users
         $sessionPrefix = $_SESSION['file_prefix'] ?? 'session';
-        $confidenceFile = $uploadDir . DIRECTORY_SEPARATOR . $sessionPrefix . '_grades_confidence.json';
+        $confidenceFile = $uploadDir . DIRECTORY_SEPARATOR . $sessionPrefix . '_grades.confidence.json';
         @file_put_contents($confidenceFile, json_encode([
             'overall_confidence' => $verification['summary']['average_confidence'],
             'ocr_confidence' => $verification['summary']['average_confidence'],
@@ -5320,11 +5342,11 @@ function cleanSubjectName($rawSubject) {
 function renameConfidenceFile($docType, $sessionPrefix, $newFilePath, $tempDir) {
     // Map document types to confidence file naming patterns
     $confidencePatterns = [
-        'id_picture' => '_id_picture_confidence.json',  // Not used for ID pictures
-        'eaf' => '_enrollment_confidence.json',
-        'letter_to_mayor' => '_letter_confidence.json',
-        'indigency' => '_certificate_confidence.json',
-        'grades' => '_grades_confidence.json'
+        'id_picture' => '_idpic.confidence.json',  // Used for ID pictures (session-based)
+        'eaf' => '_enrollment.confidence.json',
+        'letter_to_mayor' => '_letter.confidence.json',
+        'indigency' => '_certificate.confidence.json',
+        'grades' => '_grades.confidence.json'
     ];
     
     if (!isset($confidencePatterns[$docType])) {
@@ -5338,7 +5360,7 @@ function renameConfidenceFile($docType, $sessionPrefix, $newFilePath, $tempDir) 
     // Build new confidence file path (student ID-based)
     // Strip extension from newFilePath before adding .confidence.json
     $pathWithoutExt = preg_replace('/\.(jpg|jpeg|png)$/i', '', $newFilePath);
-    $newConfidenceFile = $pathWithoutExt . '_confidence.json';
+    $newConfidenceFile = $pathWithoutExt . '.confidence.json';
     
     error_log("Renaming confidence file for $docType:");
     error_log("  From: $oldConfidenceFile");
@@ -6169,7 +6191,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['register'])) {
         ];
         
         foreach ($tempDirs as $tempDir) {
-            $confidenceFiles = glob($tempDir . DIRECTORY_SEPARATOR . $sessionPrefix . '*_confidence.json');
+            $confidenceFiles = glob($tempDir . DIRECTORY_SEPARATOR . $sessionPrefix . '*.confidence.json');
             foreach ($confidenceFiles as $file) {
                 if (file_exists($file)) {
                     @unlink($file);
@@ -7222,6 +7244,23 @@ console.log('🔍 Verification - Is it the stub?', window.nextStep.toString().in
 // ============================================
 
 // Password visibility toggle function
+// Disable/enable all Back buttons during document processing to prevent state glitches
+function setBackButtonsDisabled(disabled) {
+    try {
+        const backButtons = document.querySelectorAll('button[onclick="prevStep()"]');
+        backButtons.forEach(btn => {
+            btn.disabled = !!disabled;
+            if (disabled) {
+                btn.classList.add('disabled');
+            } else {
+                btn.classList.remove('disabled');
+            }
+        });
+        window.isProcessingDocument = !!disabled;
+    } catch (e) {
+        console.warn('setBackButtonsDisabled error:', e);
+    }
+}
 function togglePasswordVisibility(fieldId, iconId) {
     const field = document.getElementById(fieldId);
     const icon = document.getElementById(iconId);
@@ -8669,6 +8708,9 @@ function processIdPictureDocument() {
         return;
     }
     
+    // Disable Back buttons during processing to avoid step state issues
+    setBackButtonsDisabled(true);
+
     // Show processing state
     if (processBtn) {
         processBtn.disabled = true;
@@ -8716,6 +8758,10 @@ function processIdPictureDocument() {
         console.error('ID Picture OCR Error:', error);
         showNotifier('Error processing ID Picture: ' + error.message, 'error');
         resetIdPictureProcessButton();
+    })
+    .finally(() => {
+        // Re-enable Back buttons after processing completes
+        setBackButtonsDisabled(false);
     });
 }
 
@@ -8971,6 +9017,9 @@ function processEnrollmentDocument() {
         return;
     }
     
+    // Disable Back buttons during processing to avoid step state issues
+    setBackButtonsDisabled(true);
+
     // Show processing state
     if (processBtn) {
         processBtn.disabled = true;
@@ -9025,6 +9074,10 @@ function processEnrollmentDocument() {
         console.error('OCR Error:', error);
         showNotifier('Error processing document: ' + error.message, 'error');
         resetProcessButton();
+    })
+    .finally(() => {
+        // Re-enable Back buttons after processing completes
+        setBackButtonsDisabled(false);
     });
 }
 
@@ -10491,6 +10544,8 @@ console.log('✅ Connection monitoring ready');
 
     // Letter to Mayor OCR Processing
     document.getElementById('processLetterOcrBtn').addEventListener('click', async function() {
+        // Disable Back buttons during processing
+        setBackButtonsDisabled(true);
         const formData = new FormData();
         const fileInput = document.getElementById('letterToMayorForm');
         const file = fileInput.files[0];
@@ -10572,6 +10627,8 @@ console.log('✅ Connection monitoring ready');
         .finally(() => {
             this.disabled = false;
             this.innerHTML = '<i class="bi bi-search me-2"></i>Verify Letter Content';
+            // Re-enable Back buttons
+            setBackButtonsDisabled(false);
         });
     });
 
@@ -10706,6 +10763,8 @@ console.log('✅ Connection monitoring ready');
 
     // Certificate OCR Processing
     document.getElementById('processCertificateOcrBtn').addEventListener('click', async function() {
+        // Disable Back buttons during processing
+        setBackButtonsDisabled(true);
         const formData = new FormData();
         const fileInput = document.getElementById('certificateForm');
         const file = fileInput.files[0];
@@ -10780,6 +10839,8 @@ console.log('✅ Connection monitoring ready');
         .finally(() => {
             this.disabled = false;
             this.innerHTML = '<i class="bi bi-search me-2"></i>Verify Certificate Content';
+            // Re-enable Back buttons
+            setBackButtonsDisabled(false);
         });
     });
 
@@ -10859,6 +10920,8 @@ document.getElementById('gradesForm').addEventListener('change', function(e) {
 
 // Grades OCR Processing
 document.getElementById('processGradesOcrBtn').addEventListener('click', async function() {
+    // Disable Back buttons during processing
+    setBackButtonsDisabled(true);
     const formData = new FormData();
     const fileInput = document.getElementById('gradesForm');
     const file = fileInput.files[0];
@@ -10968,6 +11031,8 @@ document.getElementById('processGradesOcrBtn').addEventListener('click', async f
             trackUploadedFile('grades', fileInput.files[0].name);
             markFileAsUploaded();
         }
+        // Re-enable Back buttons
+        setBackButtonsDisabled(false);
     });
 });
 
