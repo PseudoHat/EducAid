@@ -402,34 +402,34 @@ if ($has_qr_code) {
               
               <div class="row g-3">
                 <div class="col-md-6">
-                  <div class="card border-primary">
+                  <div class="card border-primary h-100">
                     <div class="card-body">
                       <h6 class="card-title text-primary">
                         <i class="bi bi-calendar-check me-2"></i>Distribution Information
                       </h6>
                       <hr>
-                      <p class="mb-2">
-                        <strong>Distribution ID:</strong><br>
+                      <p class="mb-3">
+                        <strong class="d-block mb-1">Distribution ID:</strong>
                         <code class="text-muted"><?= htmlspecialchars($distribution_details['distribution_id']) ?></code>
                       </p>
-                      <p class="mb-2">
-                        <strong>Academic Year:</strong><br>
-                        <?= htmlspecialchars($distribution_details['academic_year']) ?>
+                      <p class="mb-3">
+                        <strong class="d-block mb-1">Academic Year:</strong>
+                        <span class="text-muted"><?= htmlspecialchars($distribution_details['academic_year']) ?></span>
                       </p>
-                      <p class="mb-2">
-                        <strong>Semester:</strong><br>
-                        <?= htmlspecialchars($distribution_details['semester']) ?>
+                      <p class="mb-3">
+                        <strong class="d-block mb-1">Semester:</strong>
+                        <span class="text-muted"><?= htmlspecialchars($distribution_details['semester']) ?></span>
                       </p>
                       <p class="mb-0">
-                        <strong>Date Received:</strong><br>
-                        <?= date('F j, Y', strtotime($distribution_details['distribution_date'])) ?>
+                        <strong class="d-block mb-1">Date Received:</strong>
+                        <span class="text-muted"><?= date('F j, Y', strtotime($distribution_details['distribution_date'])) ?></span>
                       </p>
                     </div>
                   </div>
                 </div>
                 
                 <div class="col-md-6">
-                  <div class="card border-success">
+                  <div class="card border-success h-100">
                     <div class="card-body">
                       <h6 class="card-title text-success">
                         <i class="bi bi-cash-stack me-2"></i>Payment Details

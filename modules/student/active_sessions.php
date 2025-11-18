@@ -85,7 +85,10 @@ unset($_SESSION['session_flash'], $_SESSION['session_flash_type']);
   <script src="../../assets/js/student/accessibility.js"></script>
   <script src="../../assets/js/student/animation_utils.js"></script>
   <style>
-    body { background: #f7fafc; }
+    /* FOUC Prevention */
+    body { opacity: 0; transition: opacity 0.3s ease; background: #f7fafc; }
+    body.ready { opacity: 1; }
+    body:not(.ready) .sidebar { visibility: hidden; }
     
     /* Main Content Area Layout */
     .home-section {
@@ -446,5 +449,11 @@ unset($_SESSION['session_flash'], $_SESSION['session_flash_type']);
 
   <script src="../../assets/js/bootstrap.bundle.min.js"></script>
   <script src="../../assets/js/student/sidebar.js"></script>
+  <script>
+    // FOUC Prevention - show body after load
+    document.addEventListener('DOMContentLoaded', function() {
+      document.body.classList.add('ready');
+    });
+  </script>
 </body>
 </html>
