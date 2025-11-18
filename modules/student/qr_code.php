@@ -74,8 +74,9 @@ $has_qr_code = !empty($student_data['qr_unique_id']) && !empty($student_data['pa
 $qr_image_url = '';
 
 if ($has_qr_code) {
-    // Generate QR code image URL
-    $qr_image_url = '../admin/phpqrcode/generate_qr.php?data=' . urlencode($student_data['qr_unique_id']);
+    // Generate QR code image URL - use absolute path from document root
+    $base_path = rtrim(dirname(dirname($_SERVER['SCRIPT_NAME'])), '/');
+    $qr_image_url = $base_path . '/admin/phpqrcode/generate_qr.php?data=' . urlencode($student_data['qr_unique_id']);
 }
 ?>
 <!DOCTYPE html>
