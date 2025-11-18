@@ -4,39 +4,13 @@
  * Usage: Run this file once from browser or CLI to update Railway database
  */
 
-// For Railway PostgreSQL connection
-// Try multiple methods to get DATABASE_URL
-$railway_db_url = getenv('DATABASE_URL') ?: ($_ENV['DATABASE_URL'] ?? ($_SERVER['DATABASE_URL'] ?? null));
+// For Railway - use database.php which already handles Railway connection
+require_once __DIR__ . '/config/database.php';
 
-echo "Checking for Railway DATABASE_URL...<br>";
-echo "getenv: " . (getenv('DATABASE_URL') ? 'Found' : 'Not found') . "<br>";
-echo "ENV: " . (isset($_ENV['DATABASE_URL']) ? 'Found' : 'Not found') . "<br>";
-echo "SERVER: " . (isset($_SERVER['DATABASE_URL']) ? 'Found' : 'Not found') . "<br><br>";
-
-if ($railway_db_url) {
-    echo "Using Railway DATABASE_URL<br>";
-    // Parse Railway DATABASE_URL
-    $db = parse_url($railway_db_url);
-    $connection = pg_connect(
-        "host={$db['host']} " .
-        "port={$db['port']} " .
-        "dbname=" . ltrim($db['path'], '/') . " " .
-        "user={$db['user']} " .
-        "password={$db['pass']} " .
-        "sslmode=require"
-    );
-    
-    if (!$connection) {
-        die("Failed to connect to Railway database: " . pg_last_error() . "<br>");
-    }
-    echo "<strong style='color: green;'>✅ Connected to Railway database</strong><br>";
-    echo "Host: {$db['host']}<br>";
-    echo "Database: " . ltrim($db['path'], '/') . "<br><br>";
+if ($connection) {
+    echo "<strong style='color: green;'>✅ Connected to database</strong><br><br>";
 } else {
-    // Fallback to local database
-    echo "DATABASE_URL not found, using local database<br>";
-    require_once __DIR__ . '/config/database.php';
-    echo "<strong style='color: blue;'>Connected to local database</strong><br><br>";
+    die("Failed to connect to database<br>");
 }
 
 // Configuration
@@ -46,8 +20,12 @@ $new_email = 'migueldy420@gmail.com';
 try {
     // If no old email specified, find first student
     if (empty($old_email)) {
-        $query = "SELECT student_id, first_name, last_name, email FROM students ORDER BY created_at ASC LIMIT 1";
+        $query = "SELECT student_id, first_name, last_name, email FROM students WHERE email IS NOT NULL AND email != '' ORDER BY student_id ASC LIMIT 1";
         $result = pg_query($connection, $query);
+        
+        if (!$result) {
+            die("Query error: " . pg_last_error($connection) . "<br>");
+        }
         
         if ($result && pg_num_rows($result) > 0) {
             $student = pg_fetch_assoc($result);
