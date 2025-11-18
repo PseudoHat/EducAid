@@ -74,12 +74,8 @@ $has_qr_code = !empty($student_data['qr_unique_id']) && !empty($student_data['pa
 $qr_image_url = '';
 
 if ($has_qr_code) {
-  // Generate QR code image URL - construct absolute URL from root
-  // Respect reverse proxies (Railway/Cloudflare) via X-Forwarded-Proto
-  $forwardedProto = $_SERVER['HTTP_X_FORWARDED_PROTO'] ?? null;
-  $protocol = $forwardedProto ?: ((!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http');
-  $host = $_SERVER['HTTP_HOST'];
-  $qr_image_url = $protocol . '://' . $host . '/modules/admin/phpqrcode/generate_qr.php?data=' . urlencode($student_data['qr_unique_id']);
+    // Generate QR code image URL
+    $qr_image_url = '../admin/phpqrcode/generate_qr.php?data=' . urlencode($student_data['qr_unique_id']);
 }
 ?>
 <!DOCTYPE html>
@@ -551,41 +547,6 @@ if ($has_qr_code) {
           document.body.classList.add('ready');
         }
       });
-    })();
-  </script>
-  
-  <!-- QR Debug Logger: logs URL, identifiers, and fetch status to console -->
-  <script>
-    (function() {
-      try {
-        const dbg = {
-          has_qr_code: <?php echo $has_qr_code ? 'true' : 'false'; ?>,
-          qr_image_url: <?php echo json_encode($qr_image_url ?? ''); ?>,
-          qr_unique_id: <?php echo json_encode($student_data['qr_unique_id'] ?? null); ?>,
-          student_id: <?php echo json_encode($student_data['student_id'] ?? null); ?>,
-          payroll_no: <?php echo json_encode($student_data['payroll_no'] ?? null); ?>,
-          page: window.location.href
-        };
-        console.log('[QR Debug] Context:', dbg);
-
-        if (dbg.has_qr_code && dbg.qr_image_url) {
-          const url = dbg.qr_image_url + (dbg.qr_image_url.includes('?') ? '&' : '?') + '_dbg_ts=' + Date.now();
-          fetch(url, { method: 'GET', cache: 'no-store' })
-            .then(res => {
-              console.log('[QR Debug] Fetch status:', res.status, res.statusText, 'CT:', res.headers.get('content-type'));
-              if (!res.ok) {
-                return res.text().then(t => {
-                  console.log('[QR Debug] Error body (first 400 chars):', (t || '').slice(0, 400));
-                });
-              }
-            })
-            .catch(err => console.error('[QR Debug] Network error:', err));
-        } else {
-          console.warn('[QR Debug] No QR available for this student.');
-        }
-      } catch (e) {
-        console.error('[QR Debug] Logger failed:', e);
-      }
     })();
   </script>
 </body>

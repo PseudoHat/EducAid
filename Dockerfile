@@ -9,14 +9,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libjpeg62-turbo-dev \
         libfreetype6-dev \
         libpq-dev \
+        libzip-dev \
         git \
         unzip \
         zip \
     && rm -rf /var/lib/apt/lists/*
 
-# Install PHP extensions (GD + PostgreSQL)
+# Install PHP extensions (GD + PostgreSQL + zip)
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install -j"$(nproc)" gd pdo pdo_pgsql pgsql
+    && docker-php-ext-install -j"$(nproc)" gd pdo pdo_pgsql pgsql zip
 
 # Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
