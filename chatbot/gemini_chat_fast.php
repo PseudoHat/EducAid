@@ -69,29 +69,52 @@ $payload = [
 
 $startTime = microtime(true);
 
-// Single API call with fast timeouts
-$ch = curl_init($url);
-curl_setopt_array($ch, [
-  CURLOPT_POST => true,
-  CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
-  CURLOPT_POSTFIELDS => json_encode($payload),
-  CURLOPT_RETURNTRANSFER => true,
-  CURLOPT_CONNECTTIMEOUT => 5,
-  CURLOPT_TIMEOUT => 15,
-  CURLOPT_SSL_VERIFYPEER => true,
-  CURLOPT_SSL_VERIFYHOST => 2,
-]);
+// Retry logic for rate limits
+$maxRetries = 3;
+$retryCount = 0;
+$httpCode = 0;
+$response = null;
+$curlError = null;
 
-$response = curl_exec($ch);
-$httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-$curlError = curl_error($ch);
-curl_close($ch);
+while ($retryCount <= $maxRetries) {
+  $ch = curl_init($url);
+  curl_setopt_array($ch, [
+    CURLOPT_POST => true,
+    CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+    CURLOPT_POSTFIELDS => json_encode($payload),
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_CONNECTTIMEOUT => 5,
+    CURLOPT_TIMEOUT => 15,
+    CURLOPT_SSL_VERIFYPEER => true,
+    CURLOPT_SSL_VERIFYHOST => 2,
+  ]);
+
+  $response = curl_exec($ch);
+  $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+  $curlError = curl_error($ch);
+  curl_close($ch);
+  
+  // Success or non-retryable error
+  if ($httpCode === 200 || $httpCode !== 429) {
+    break;
+  }
+  
+  // Rate limit - retry with backoff
+  if ($httpCode === 429 && $retryCount < $maxRetries) {
+    $retryCount++;
+    $backoffSeconds = pow(2, $retryCount - 1); // 1s, 2s, 4s
+    error_log("[FastChatbot] Rate limit (429) - Retry {$retryCount}/{$maxRetries} after {$backoffSeconds}s");
+    sleep($backoffSeconds);
+  } else {
+    break;
+  }
+}
 
 $endTime = microtime(true);
 $responseTime = round(($endTime - $startTime) * 1000);
 
 // Log response time for monitoring
-error_log("[FastChatbot] Response time: {$responseTime}ms | HTTP: {$httpCode} | Model: {$model}");
+error_log("[FastChatbot] Response time: {$responseTime}ms | HTTP: {$httpCode} | Model: {$model} | Retries: {$retryCount}");
 
 // Handle cURL errors
 if ($curlError) {
@@ -113,8 +136,8 @@ if ($httpCode !== 200) {
   
   // Handle rate limiting specifically
   if ($httpCode === 429) {
-    $userMessage = "The AI assistant is experiencing high demand right now. Please wait 30-60 seconds and try again.";
-    error_log("[FastChatbot] Rate limit (429) | Response: " . substr($response, 0, 200));
+    $userMessage = "I'm experiencing high demand right now. I've tried multiple times but couldn't connect. Please try again in 1-2 minutes.";
+    error_log("[FastChatbot] Rate limit (429) after {$retryCount} retries | Response: " . substr($response, 0, 200));
   } 
   // Handle quota exceeded
   else if ($httpCode === 403 && isset($errorData['error']['message']) && strpos($errorData['error']['message'], 'quota') !== false) {
