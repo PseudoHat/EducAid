@@ -2023,16 +2023,28 @@ $pageType = $seoData['type'];
                                         <div class="form-group mb-3">
                                             <label class="form-label">New Password</label>
                                             <input type="password" class="form-control form-control" id="forgot_new_password" 
-                                                   name="forgot_new_password" placeholder="Minimum 12 characters" minlength="12" required>
-                                            <div class="form-text">Password must be at least 12 characters long</div>
+                                                   name="forgot_new_password" placeholder="Minimum 12 characters" minlength="12" required autocomplete="new-password">
+                                            
+                                            <!-- Password Strength Indicator -->
+                                            <div class="mt-2">
+                                                <div class="progress" style="height: 8px; border-radius: 4px;">
+                                                    <div id="strengthBar" class="progress-bar" role="progressbar" 
+                                                         style="width: 0%; transition: all 0.3s ease;" 
+                                                         aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+                                                </div>
+                                                <div id="strengthText" class="form-text mt-1">
+                                                    <i class="bi bi-info-circle me-1"></i>Enter a password to see strength
+                                                </div>
+                                            </div>
                                         </div>
                                         <div class="form-group mb-4">
                                             <label class="form-label">Confirm New Password</label>
                                             <input type="password" class="form-control form-control" id="confirm_password" 
-                                                   name="confirm_password" placeholder="Re-enter your password" required>
+                                                   name="confirm_password" placeholder="Re-enter your password" required autocomplete="new-password">
+                                            <div id="passwordMatchText" class="form-text mt-1"></div>
                                         </div>
                                         <div class="d-grid">
-                                            <button type="submit" class="btn btn-primary btn-lg">
+                                            <button type="submit" class="btn btn-primary btn-lg" id="updatePasswordBtn">
                                                 <i class="bi bi-key me-2"></i>Update Password
                                             </button>
                                         </div>
@@ -2061,6 +2073,9 @@ $pageType = $seoData['type'];
     <!-- Consistent mobile navbar behavior (burger → X, body.navbar-open) -->
     <script src="assets/js/website/mobile-navbar.js"></script>
     <script src="assets/js/login.js"></script>
+    
+    <!-- Password Strength Validator -->
+    <script src="assets/js/shared/password_strength_validator.js"></script>
     
     <!-- reCAPTCHA v2 modal + integration -->
     <script>
@@ -2513,6 +2528,38 @@ $pageType = $seoData['type'];
         console.log('✅ Login Page Editor ready');
     </script>
     <?php endif; ?>
+
+    <!-- Initialize Password Strength Validator for Forgot Password -->
+    <script>
+        // Initialize password strength validator when the forgot password step 3 is shown
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Initializing password strength validator for unified login');
+            
+            // Setup password validation for forgot password form
+            if (typeof setupPasswordValidation === 'function') {
+                setupPasswordValidation({
+                    passwordInputId: 'forgot_new_password',
+                    confirmPasswordInputId: 'confirm_password',
+                    strengthBarId: 'strengthBar',
+                    strengthTextId: 'strengthText',
+                    passwordMatchTextId: 'passwordMatchText',
+                    submitButtonSelector: '#updatePasswordBtn',
+                    minStrength: 70,
+                    requireMatch: true,
+                    onValidationChange: function(isValid) {
+                        console.log('Password validation state:', isValid);
+                        const submitBtn = document.getElementById('updatePasswordBtn');
+                        if (submitBtn) {
+                            submitBtn.disabled = !isValid;
+                        }
+                    }
+                });
+                console.log('✅ Password strength validator initialized');
+            } else {
+                console.error('❌ setupPasswordValidation function not found');
+            }
+        });
+    </script>
 
 </body>
 </html>
