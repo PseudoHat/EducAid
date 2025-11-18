@@ -113,13 +113,18 @@ if ($httpCode !== 200) {
   
   // Handle rate limiting specifically
   if ($httpCode === 429) {
-    $userMessage = "I'm getting too many requests right now. Please wait a moment and try again.";
+    $userMessage = "The AI assistant is experiencing high demand right now. Please wait 30-60 seconds and try again.";
     error_log("[FastChatbot] Rate limit (429) | Response: " . substr($response, 0, 200));
   } 
   // Handle quota exceeded
   else if ($httpCode === 403 && isset($errorData['error']['message']) && strpos($errorData['error']['message'], 'quota') !== false) {
-    $userMessage = "The AI service quota has been exceeded. Please try again later or contact support.";
+    $userMessage = "The AI service daily quota has been reached. Please try again tomorrow or contact support.";
     error_log("[FastChatbot] Quota exceeded (403) | Response: " . substr($response, 0, 200));
+  }
+  // Handle invalid API key
+  else if ($httpCode === 400 && isset($errorData['error']['message']) && strpos($errorData['error']['message'], 'API key') !== false) {
+    $userMessage = "There's a configuration issue with the AI service. Please contact support.";
+    error_log("[FastChatbot] Invalid API key (400) | Response: " . substr($response, 0, 200));
   }
   // Generic error
   else {
