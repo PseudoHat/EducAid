@@ -37,8 +37,20 @@ if ($userMessage === '') {
   exit;
 }
 
-// Use gemini-2.0-flash-exp - Gen 2 model (fastest available)
-$model = 'gemini-2.0-flash-exp';
+// Try multiple models as fallbacks (in order of preference)
+$models = [
+  'gemini-2.5-flash',      // Newest and fastest
+  'gemini-2.0-flash',      // Stable alternative
+  'gemini-2.0-flash-001',  // Another stable option
+];
+
+$selectedModel = null;
+foreach ($models as $tryModel) {
+  $selectedModel = $tryModel;
+  break; // Use first available model
+}
+
+$model = $selectedModel;
 $url = 'https://generativelanguage.googleapis.com/v1beta/models/' . $model . ':generateContent?key=' . urlencode($API_KEY);
 
 // Optimized prompt
@@ -69,44 +81,69 @@ $payload = [
 
 $startTime = microtime(true);
 
-// Retry logic for rate limits
+// Retry logic with model fallback
 $maxRetries = 3;
 $retryCount = 0;
+$modelAttempts = 0;
 $httpCode = 0;
 $response = null;
 $curlError = null;
 
-while ($retryCount <= $maxRetries) {
-  $ch = curl_init($url);
-  curl_setopt_array($ch, [
-    CURLOPT_POST => true,
-    CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
-    CURLOPT_POSTFIELDS => json_encode($payload),
-    CURLOPT_RETURNTRANSFER => true,
-    CURLOPT_CONNECTTIMEOUT => 5,
-    CURLOPT_TIMEOUT => 15,
-    CURLOPT_SSL_VERIFYPEER => true,
-    CURLOPT_SSL_VERIFYHOST => 2,
-  ]);
-
-  $response = curl_exec($ch);
-  $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-  $curlError = curl_error($ch);
-  curl_close($ch);
+while ($modelAttempts < count($models)) {
+  $currentModel = $models[$modelAttempts];
+  $currentUrl = 'https://generativelanguage.googleapis.com/v1beta/models/' . $currentModel . ':generateContent?key=' . urlencode($API_KEY);
   
-  // Success or non-retryable error
-  if ($httpCode === 200 || $httpCode !== 429) {
+  $retryCount = 0;
+  while ($retryCount <= $maxRetries) {
+    $ch = curl_init($currentUrl);
+    curl_setopt_array($ch, [
+      CURLOPT_POST => true,
+      CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+      CURLOPT_POSTFIELDS => json_encode($payload),
+      CURLOPT_RETURNTRANSFER => true,
+      CURLOPT_CONNECTTIMEOUT => 5,
+      CURLOPT_TIMEOUT => 20,
+      CURLOPT_SSL_VERIFYPEER => true,
+      CURLOPT_SSL_VERIFYHOST => 2,
+    ]);
+
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlError = curl_error($ch);
+    curl_close($ch);
+    
+    // Success
+    if ($httpCode === 200) {
+      $model = $currentModel; // Update to successful model
+      break 2; // Exit both loops
+    }
+    
+    // Non-retryable error
+    if ($httpCode !== 429) {
+      break;
+    }
+    
+    // Rate limit - retry with longer backoff
+    if ($httpCode === 429 && $retryCount < $maxRetries) {
+      $retryCount++;
+      $backoffSeconds = min(10, pow(2, $retryCount)); // 2s, 4s, 8s (cap at 10s)
+      error_log("[FastChatbot] Model: {$currentModel} - Rate limit (429) - Retry {$retryCount}/{$maxRetries} after {$backoffSeconds}s");
+      sleep($backoffSeconds);
+    } else {
+      break;
+    }
+  }
+  
+  // If we got a 200, we're done
+  if ($httpCode === 200) {
     break;
   }
   
-  // Rate limit - retry with backoff
-  if ($httpCode === 429 && $retryCount < $maxRetries) {
-    $retryCount++;
-    $backoffSeconds = pow(2, $retryCount - 1); // 1s, 2s, 4s
-    error_log("[FastChatbot] Rate limit (429) - Retry {$retryCount}/{$maxRetries} after {$backoffSeconds}s");
-    sleep($backoffSeconds);
-  } else {
-    break;
+  // Try next model
+  $modelAttempts++;
+  if ($modelAttempts < count($models)) {
+    error_log("[FastChatbot] Switching to fallback model: {$models[$modelAttempts]}");
+    sleep(1); // Brief pause before trying next model
   }
 }
 
