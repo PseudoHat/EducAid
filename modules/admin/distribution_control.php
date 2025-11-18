@@ -1199,6 +1199,24 @@ if ($current_year_check && pg_num_rows($current_year_check) > 0) {
                     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                 </div>
             <?php endif; ?>
+
+            <?php if (isset($_SESSION['success_message'])): ?>
+                <div class="alert alert-modern alert-success alert-dismissible fade show" role="alert">
+                    <i class="bi bi-check-circle me-2"></i>
+                    <?php echo htmlspecialchars($_SESSION['success_message']); ?>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+                <?php unset($_SESSION['success_message']); ?>
+            <?php endif; ?>
+
+            <?php if (isset($_SESSION['error_message'])): ?>
+                <div class="alert alert-modern alert-danger alert-dismissible fade show" role="alert">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    <?php echo htmlspecialchars($_SESSION['error_message']); ?>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+                <?php unset($_SESSION['error_message']); ?>
+            <?php endif; ?>
             
             <?php if ($migration_needed): ?>
                 <div class="alert alert-modern alert-info alert-dismissible fade show" role="alert">
@@ -1829,6 +1847,44 @@ function showGraduateReviewModal(data) {
 }
 
 </script>
+
+<?php 
+// Success modal for distribution completion (from scan_qr redirect)
+$distCompleted = $_SESSION['show_distribution_completed'] ?? null;
+if ($distCompleted):
+        $ay = trim(($distCompleted['academic_year'] ?? '') . ' ' . ($distCompleted['semester'] ?? ''));
+        $ts = (int)($distCompleted['total_students'] ?? 0);
+        $loc = htmlspecialchars($distCompleted['location'] ?? '');
+?>
+<div class="modal fade" id="distributionCompletedModal" tabindex="-1" aria-labelledby="distributionCompletedModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title" id="distributionCompletedModalLabel"><i class="bi bi-check2-circle me-2"></i>Distribution Finalized</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-2">The distribution has been successfully completed and finalized.</p>
+                <ul class="mb-0">
+                    <li><strong>Period:</strong> <?php echo htmlspecialchars($ay); ?></li>
+                    <li><strong>Students recorded:</strong> <?php echo number_format($ts); ?></li>
+                    <?php if ($loc): ?><li><strong>Location:</strong> <?php echo $loc; ?></li><?php endif; ?>
+                </ul>
+                <hr/>
+                <p class="mb-0 small text-muted">Next: Use <em>End Distribution</em> to compress files and reset the system for the next cycle.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+    </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            try { new bootstrap.Modal(document.getElementById('distributionCompletedModal')).show(); } catch (e) {}
+        });
+    </script>
+<?php unset($_SESSION['show_distribution_completed']); endif; ?>
 
 <!-- Graduating Students Review Modal -->
 <div class="modal fade" id="graduateReviewModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">

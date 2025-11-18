@@ -78,7 +78,13 @@ if ($file['error'] !== UPLOAD_ERR_OK) {
         UPLOAD_ERR_CANT_WRITE => 'Failed to write file to disk',
         UPLOAD_ERR_EXTENSION => 'Upload stopped by PHP extension'
     ];
+    // Add server limits when it is a size error for clearer guidance
     $message = $errorMessages[$file['error']] ?? 'Unknown upload error';
+    if (in_array($file['error'], [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE], true)) {
+        $uploadMax = ini_get('upload_max_filesize');
+        $postMax = ini_get('post_max_size');
+        $message .= sprintf(' (server upload_max_filesize=%s, post_max_size=%s). Please raise these limits or upload a smaller file.', $uploadMax ?: 'n/a', $postMax ?: 'n/a');
+    }
     echo json_encode(['success' => false, 'message' => $message]);
     exit;
 }
@@ -94,10 +100,37 @@ if (!in_array($mimeType, $allowedMimeTypes, true)) {
     exit;
 }
 
-// Validate file size (max 5MB)
-$maxSize = 5 * 1024 * 1024; // 5MB
-if ($file['size'] > $maxSize) {
-    echo json_encode(['success' => false, 'message' => 'File size exceeds 5MB limit']);
+// Validate file size considering both application and server limits
+$configuredMax = 5 * 1024 * 1024; // 5MB
+// Helper: convert shorthand php.ini sizes (e.g., 2M) to bytes
+$toBytes = function($val) {
+    $val = trim((string)$val);
+    if ($val === '' || !preg_match('/^[0-9]+[KMG]?$/i', $val)) return null;
+    $num = (int)$val;
+    $unit = strtoupper(substr($val, -1));
+    switch ($unit) {
+        case 'G': return $num * 1024 * 1024 * 1024;
+        case 'M': return $num * 1024 * 1024;
+        case 'K': return $num * 1024;
+        default: return (int)$val;
+    }
+};
+$serverUploadMax = $toBytes(ini_get('upload_max_filesize')) ?: PHP_INT_MAX;
+$serverPostMax   = $toBytes(ini_get('post_max_size')) ?: PHP_INT_MAX;
+$effectiveMax    = min($configuredMax, $serverUploadMax, $serverPostMax);
+if ($file['size'] > $effectiveMax) {
+    $human = function($bytes){
+        if ($bytes >= 1024*1024) return number_format($bytes/1024/1024, 2) . ' MB';
+        if ($bytes >= 1024) return number_format($bytes/1024, 2) . ' KB';
+        return $bytes . ' B';
+    };
+    echo json_encode([
+        'success' => false,
+        'message' => sprintf(
+            'File too large. Max allowed is %s (server upload_max_filesize=%s, post_max_size=%s).',
+            $human($effectiveMax), $human($serverUploadMax), $human($serverPostMax)
+        )
+    ]);
     exit;
 }
 
@@ -143,8 +176,9 @@ if (!move_uploaded_file($file['tmp_name'], $filepath)) {
     exit;
 }
 
-// Store relative path in database (from web root)
-$dbPath = '/assets/uploads/municipality_logos/' . $filename;
+// Store normalized relative path in database (consistent on Railway and Localhost)
+// Ensures value like: assets/uploads/municipality_logos/<file>
+$dbPath = $pathConfig->getRelativePath($filepath);
 
 // Update database
 $updateQuery = "UPDATE municipalities 

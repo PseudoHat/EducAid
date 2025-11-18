@@ -124,47 +124,86 @@ class DistributionManager {
             return []; // No distributed students yet
         }
         
-        // Scan actual files in uploads directory using pathConfig
-        $uploadsPath = $this->pathConfig->getUploadsDir();
+        // Resilient scan of student document folders (Railway vs Localhost differences)
         $totalFiles = 0;
         $totalSize = 0;
-        
-        // Scan the enrollment_forms, grades, id_pictures, indigency, letter_to_mayor folders for files matching our students
-        $folders = ['student/enrollment_forms', 'student/grades', 'student/id_pictures', 'student/indigency', 'student/letter_to_mayor'];
-        
-        error_log("DistributionManager: Scanning uploads for " . count($studentIds) . " students with 'given' status");
-        
-        foreach ($folders as $folder) {
-            $folderPath = $uploadsPath . '/' . $folder;
-            if (is_dir($folderPath)) {
-                $files = glob($folderPath . '/*.*');
-                error_log("DistributionManager: Found " . count($files) . " files in $folder");
-                
-                foreach ($files as $file) {
-                    if (is_file($file)) {
-                        // Check if file belongs to any of our 'given' students
-                        $filename = basename($file);
-                        $filenameLower = strtolower($filename);
-                        foreach ($studentIds as $studentId) {
-                            $studentIdLower = strtolower($studentId);
-                            // Files are named like: GENERALTRIAS-2025-3-9YW3ST_Soliman_Rojen_...
-                            // Use case-insensitive matching
-                            if (strpos($filenameLower, $studentIdLower) !== false) {
-                                $totalFiles++;
-                                $size = filesize($file);
-                                $totalSize += $size;
-                                error_log("DistributionManager: Matched file $filename to student $studentId ($size bytes)");
-                                break; // Move to next file
+
+        // Standard folder names to scan; environment-specific variants resolved per folder
+        $docFolders = [
+            'enrollment_forms',
+            'grades',
+            'id_pictures',
+            'indigency',
+            'letter_to_mayor'
+        ];
+
+        error_log("DistributionManager: Scanning student folders for " . count($studentIds) . " 'given' students");
+
+        foreach ($docFolders as $folderName) {
+            $candidatePaths = $this->resolveStudentFolderCandidates($folderName);
+            $fullPath = null;
+            foreach ($candidatePaths as $cand) {
+                if (is_dir($cand)) { $fullPath = $cand; break; }
+            }
+
+            if (!$fullPath) {
+                error_log("DistributionManager: No matching directory for '$folderName' (checked variants)");
+                continue;
+            }
+
+            // Detect structure: student-organized subfolders or legacy flat listing
+            $items = scandir($fullPath);
+            $hasStudentFolders = false;
+            foreach ($items as $item) {
+                if ($item !== '.' && $item !== '..' && is_dir($fullPath . DIRECTORY_SEPARATOR . $item)) {
+                    $hasStudentFolders = true; break;
+                }
+            }
+
+            $files = [];
+            if ($hasStudentFolders) {
+                foreach ($items as $item) {
+                    if ($item === '.' || $item === '..') continue;
+                    $studentFolder = $fullPath . DIRECTORY_SEPARATOR . $item;
+                    if (!is_dir($studentFolder)) continue;
+                    foreach (scandir($studentFolder) as $f) {
+                        if ($f === '.' || $f === '..') continue;
+                        $p = $studentFolder . DIRECTORY_SEPARATOR . $f;
+                        if (is_file($p)) {
+                            if (!preg_match('/\.(ocr\.(txt|json)|verify\.json|confidence\.json|tsv)$/i', $f)) {
+                                $files[] = $p;
                             }
                         }
                     }
                 }
             } else {
-                error_log("DistributionManager: Folder $folder NOT FOUND");
+                foreach ($items as $f) {
+                    if ($f === '.' || $f === '..') continue;
+                    $p = $fullPath . DIRECTORY_SEPARATOR . $f;
+                    if (is_file($p)) {
+                        if (!preg_match('/\.(ocr\.(txt|json)|verify\.json|confidence\.json|tsv)$/i', $f)) {
+                            $files[] = $p;
+                        }
+                    }
+                }
+            }
+
+            foreach ($files as $file) {
+                $filename = basename($file);
+                $filenameLower = strtolower($filename);
+                $parentFolder = strtolower(basename(dirname($file)));
+                foreach ($studentIds as $studentId) {
+                    $sid = strtolower($studentId);
+                    if (strpos($filenameLower, $sid) !== false || $parentFolder === $sid) {
+                        $totalFiles++;
+                        $size = @filesize($file);
+                        if ($size !== false) { $totalSize += (int)$size; }
+                        break;
+                    }
+                }
             }
         }
-        
-        error_log("DistributionManager: Total files: $totalFiles, Total size: $totalSize bytes");
+        error_log("DistributionManager: Total matched files: $totalFiles, size: $totalSize bytes");
 
         
         // Get a unique distribution ID (or create one if needed)
@@ -416,8 +455,9 @@ class DistributionManager {
                     $activeSize += (int)$doc['file_size_bytes'];
                 } elseif (!empty($doc['file_path'])) {
                     $fullPath = $this->resolveFilePath($doc['file_path']);
-                    if (file_exists($fullPath)) {
-                        $activeSize += filesize($fullPath);
+                    if ($fullPath && file_exists($fullPath)) {
+                        $sz = @filesize($fullPath);
+                        if ($sz !== false) { $activeSize += (int)$sz; }
                     }
                 }
 
@@ -426,7 +466,8 @@ class DistributionManager {
                     if (!empty($doc[$sidecarKey])) {
                         $sidecarPath = $this->resolveFilePath($doc[$sidecarKey]);
                         if ($sidecarPath && file_exists($sidecarPath)) {
-                            $activeSize += (int)filesize($sidecarPath);
+                            $sz = @filesize($sidecarPath);
+                            if ($sz !== false) { $activeSize += (int)$sz; }
                         }
                     }
                 }
@@ -498,8 +539,9 @@ class DistributionManager {
                     $archivedSize += (int)$doc['file_size_bytes'];
                 } elseif (!empty($doc['file_path'])) {
                     $fullPath = $this->resolveFilePath($doc['file_path']);
-                    if (file_exists($fullPath)) {
-                        $archivedSize += filesize($fullPath);
+                    if ($fullPath && file_exists($fullPath)) {
+                        $sz = @filesize($fullPath);
+                        if ($sz !== false) { $archivedSize += (int)$sz; }
                     }
                 }
 
@@ -507,7 +549,8 @@ class DistributionManager {
                     if (!empty($doc[$sidecarKey])) {
                         $sidecarPath = $this->resolveFilePath($doc[$sidecarKey]);
                         if ($sidecarPath && file_exists($sidecarPath)) {
-                            $archivedSize += (int)filesize($sidecarPath);
+                            $sz = @filesize($sidecarPath);
+                            if ($sz !== false) { $archivedSize += (int)$sz; }
                         }
                     }
                 }
@@ -586,23 +629,29 @@ class DistributionManager {
             return '';
         }
         
-        // If path starts with /assets/uploads/ or assets/uploads/, make it relative to base uploads
-        if (preg_match('#^/?assets/uploads/(.+)$#', $dbPath, $matches)) {
-            return $this->pathConfig->getUploadsDir() . $matches[1];
+        // Normalize to an absolute path under uploads
+        $uploadsDir = rtrim($this->pathConfig->getUploadsDir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
+        $candidate = '';
+
+        if (preg_match('#^/?assets/uploads/(.+)$#', $dbPath, $m)) {
+            $candidate = $uploadsDir . str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $m[1]);
+        } elseif (strpos($dbPath, $uploadsDir) === 0) {
+            $candidate = $dbPath;
+        } elseif (strpos($dbPath, '/mnt/assets/uploads/') === 0) {
+            $candidate = str_replace('/', DIRECTORY_SEPARATOR, $dbPath);
+        } else {
+            $candidate = $uploadsDir . ltrim(str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $dbPath), DIRECTORY_SEPARATOR);
         }
-        
-        // If it's already an absolute path starting with base uploads dir, return as-is
-        if (strpos($dbPath, $this->pathConfig->getUploadsDir()) === 0) {
-            return $dbPath;
+
+        if ($candidate && file_exists($candidate)) {
+            return $candidate;
         }
-        
-        // If path starts with /mnt/assets/uploads/ (Railway), return as-is
-        if (strpos($dbPath, '/mnt/assets/uploads/') === 0) {
-            return $dbPath;
-        }
-        
-        // Otherwise, treat as relative to uploads directory
-        return $this->pathConfig->getUploadsDir() . ltrim($dbPath, '/');
+
+        // Try flexible resolution: handle student/students and Railway folder name variants
+        $relative = preg_replace('#^' . preg_quote($uploadsDir, '#') . '#', '', $candidate);
+        $relative = ltrim(str_replace(['\\', '/'], DIRECTORY_SEPARATOR, $relative), DIRECTORY_SEPARATOR);
+        $flex = $this->findExistingFileVariant($relative);
+        return $flex ?: $candidate;
     }
 
     /**
@@ -639,6 +688,76 @@ class DistributionManager {
         }
 
         return ['files' => $totalFiles, 'size' => $totalSize];
+    }
+
+    // Build candidate absolute paths for a standard student document folder name
+    private function resolveStudentFolderCandidates($standardName) {
+        $uploadsDir = rtrim($this->pathConfig->getUploadsDir(), DIRECTORY_SEPARATOR);
+        $studentBases = ['student', 'students', 'Student', 'Students'];
+        $mapped = $this->pathConfig->getFolderName($standardName);
+        $variants = array_unique([
+            $mapped,
+            strtolower($mapped),
+            strtoupper($mapped),
+            ucfirst(strtolower($mapped)),
+            $standardName,
+            strtolower($standardName),
+            strtoupper($standardName),
+            ucfirst(strtolower($standardName))
+        ]);
+        $candidates = [];
+        foreach ($studentBases as $base) {
+            foreach ($variants as $v) {
+                $candidates[] = $uploadsDir . DIRECTORY_SEPARATOR . $base . DIRECTORY_SEPARATOR . $v;
+            }
+        }
+        foreach ($variants as $v) {
+            $candidates[] = $uploadsDir . DIRECTORY_SEPARATOR . $v;
+        }
+        $seen = [];
+        $uniq = [];
+        foreach ($candidates as $p) {
+            if (!isset($seen[$p])) { $uniq[] = $p; $seen[$p] = true; }
+        }
+        return $uniq;
+    }
+
+    // Attempt to find an existing file when folder names differ between environments
+    private function findExistingFileVariant($relativeUnderUploads) {
+        $uploadsDir = rtrim($this->pathConfig->getUploadsDir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
+        $parts = array_values(array_filter(explode(DIRECTORY_SEPARATOR, $relativeUnderUploads), function($p){ return $p !== ''; }));
+        if (count($parts) < 3) {
+            $path = $uploadsDir . $relativeUnderUploads;
+            return file_exists($path) ? $path : '';
+        }
+
+        // Locate the base segment (student/students)
+        $baseIdx = -1;
+        for ($i=0; $i<count($parts); $i++) {
+            $segLower = strtolower($parts[$i]);
+            if (in_array($segLower, ['student','students'])) { $baseIdx = $i; break; }
+        }
+        if ($baseIdx === -1 || !isset($parts[$baseIdx+1])) {
+            $path = $uploadsDir . $relativeUnderUploads;
+            return file_exists($path) ? $path : '';
+        }
+
+        $docTypeSeg = $parts[$baseIdx+1];
+        $standardDoc = $this->pathConfig->getStandardFolderName($docTypeSeg);
+        $docVariants = $this->pathConfig->getFolderNameVariations($standardDoc);
+        $baseVariants = ['student','students','Student','Students'];
+
+        foreach ($baseVariants as $b) {
+            foreach ($docVariants as $d) {
+                $mut = $parts;
+                $mut[$baseIdx] = $b;
+                $mut[$baseIdx+1] = $d;
+                $candidate = $uploadsDir . implode(DIRECTORY_SEPARATOR, $mut);
+                if (file_exists($candidate)) { return $candidate; }
+            }
+        }
+
+        return '';
     }
 
     private function resetGivenStudents() {

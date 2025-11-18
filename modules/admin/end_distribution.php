@@ -144,10 +144,13 @@ function resetGivenStudents($connection) {
             'payroll_number' => false,
             'qr_code_path' => false,
             'qr_code' => false,
+            'needs_document_upload' => false,
+            'student_type' => false,
+            'admin_review_required' => false,
         ];
 
         // Check for payroll and QR code columns
-        $columnQuery = "SELECT column_name FROM information_schema.columns WHERE table_name = 'students' AND column_name IN ('payroll_no','payroll_number','qr_code_path','qr_code')";
+        $columnQuery = "SELECT column_name FROM information_schema.columns WHERE table_name = 'students' AND column_name IN ('payroll_no','payroll_number','qr_code_path','qr_code','needs_document_upload','student_type','admin_review_required')";
         $columnResult = pg_query($connection, $columnQuery);
         if ($columnResult) {
             while ($row = pg_fetch_assoc($columnResult)) {
@@ -210,6 +213,19 @@ function resetGivenStudents($connection) {
         $setParts[] = 'qr_code_path = NULL';
     } elseif ($columnCache['qr_code']) {
         $setParts[] = 'qr_code = NULL';
+    }
+    
+    // Mark students as requiring document re-upload for the next cycle
+    if ($columnCache['needs_document_upload']) {
+        $setParts[] = 'needs_document_upload = TRUE';
+    }
+    // If a simple student_type flag exists, classify as existing_student
+    if ($columnCache['student_type']) {
+        $setParts[] = "student_type = 'existing_student'";
+    }
+    // Migrated students should no longer be labeled as migrated next cycle
+    if ($columnCache['admin_review_required']) {
+        $setParts[] = 'admin_review_required = FALSE';
     }
     
     // Reset all discovered document path columns

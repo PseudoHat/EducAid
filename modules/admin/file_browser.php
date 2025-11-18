@@ -10,6 +10,7 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../../config/FilePathConfig.php';
 
 // Admin authentication check
 if (!isset($_SESSION['admin_id'])) {
@@ -95,6 +96,123 @@ if ($fullPath === false || strpos($fullPath, $baseRealPath) !== 0) {
     exit;
 }
 
+// Lightweight AJAX: return recursive stats for a specific subpath
+if (isset($_GET['stats']) && $_GET['stats'] === '1') {
+    header('Content-Type: application/json');
+    $sub = isset($_GET['subpath']) ? str_replace('\\', '/', $_GET['subpath']) : '';
+    $sub = trim($sub, '/');
+    $subSystem = str_replace('/', DIRECTORY_SEPARATOR, $sub);
+    $target = realpath($baseDir . $subSystem);
+    if ($target === false || strpos($target, $baseRealPath) !== 0) {
+        echo json_encode(['ok' => false, 'error' => 'invalid_path']);
+        exit;
+    }
+    $stats = fb_compute_recursive_stats($target);
+    echo json_encode(['ok' => true, 'size' => $stats['size'], 'files' => $stats['files'], 'dirs' => $stats['dirs']]);
+    exit;
+}
+
+// Helper: recursively compute total size and file count for a directory
+function fb_compute_recursive_stats($path) {
+    $totalSize = 0;
+    $fileCount = 0;
+    $dirCount = 0;
+    if (!is_dir($path)) {
+        if (is_file($path)) {
+            $size = @filesize($path);
+            if ($size !== false) $totalSize += (int)$size;
+            $fileCount++;
+        }
+        return ['size' => $totalSize, 'files' => $fileCount, 'dirs' => $dirCount];
+    }
+    $iterator = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator($path, FilesystemIterator::SKIP_DOTS | FilesystemIterator::FOLLOW_SYMLINKS),
+        RecursiveIteratorIterator::SELF_FIRST
+    );
+    foreach ($iterator as $item) {
+        try {
+            if ($item->isDir()) {
+                $dirCount++;
+            } elseif ($item->isFile()) {
+                $fileCount++;
+                $sz = @filesize($item->getPathname());
+                if ($sz !== false) $totalSize += (int)$sz;
+            }
+        } catch (Throwable $t) {
+            // ignore
+        }
+    }
+    return ['size' => $totalSize, 'files' => $fileCount, 'dirs' => $dirCount];
+}
+
+// Helper: recursively delete directory contents safely (confirms base path containment)
+function fb_delete_directory_recursive($targetPath, $baseRealPath) {
+    $real = realpath($targetPath);
+    if ($real === false || strpos($real, $baseRealPath) !== 0) {
+        return false;
+    }
+    if (!file_exists($real)) return true;
+    if (is_file($real) || is_link($real)) {
+        return @unlink($real);
+    }
+    $items = array_diff(scandir($real), ['.', '..']);
+    foreach ($items as $item) {
+        $child = $real . DIRECTORY_SEPARATOR . $item;
+        if (is_dir($child) && !is_link($child)) {
+            if (!fb_delete_directory_recursive($child, $baseRealPath)) return false;
+        } else {
+            if (!@unlink($child)) return false;
+        }
+    }
+    return @rmdir($real);
+}
+
+// Helper: resolve destination folder across environment variants (student/students and document folder mapping)
+function fb_resolve_destination_folder($baseDir, $baseRealPath, $destRel) {
+    $destRel = trim(str_replace('\\', '/', (string)$destRel));
+    if ($destRel === '' || $destRel === '/') {
+        $root = realpath($baseDir);
+        return ($root !== false && strpos($root, $baseRealPath) === 0) ? $root : false;
+    }
+    $direct = realpath($baseDir . str_replace('/', DIRECTORY_SEPARATOR, $destRel));
+    if ($direct !== false && strpos($direct, $baseRealPath) === 0 && is_dir($direct)) {
+        return $direct;
+    }
+    // Try environment-aware resolution for common student doc paths
+    $cfg = FilePathConfig::getInstance();
+    $parts = array_values(array_filter(explode('/', ltrim($destRel, '/'))));
+    if (count($parts) >= 2) {
+        $baseVariants = ['student','students','Student','Students'];
+        $docStandard = strtolower($parts[1]);
+        // If user typed Railway name, normalize to standard via getStandardFolderName
+        $docStandard = $cfg->getStandardFolderName($docStandard);
+        $docVariants = $cfg->getFolderNameVariations($docStandard);
+        foreach ($baseVariants as $b) {
+            foreach ($docVariants as $d) {
+                $mut = $parts;
+                $mut[0] = $b;
+                $mut[1] = $d;
+                $cand = $baseDir . str_replace('/', DIRECTORY_SEPARATOR, implode('/', $mut));
+                $real = realpath($cand);
+                if ($real !== false && strpos($real, $baseRealPath) === 0 && is_dir($real)) {
+                    return $real;
+                }
+                // Also try case variants for doc folder
+                $caseVars = [$d, strtolower($d), strtoupper($d), ucfirst(strtolower($d))];
+                foreach ($caseVars as $cv) {
+                    $mut[1] = $cv;
+                    $cand2 = $baseDir . str_replace('/', DIRECTORY_SEPARATOR, implode('/', $mut));
+                    $real2 = realpath($cand2);
+                    if ($real2 !== false && strpos($real2, $baseRealPath) === 0 && is_dir($real2)) {
+                        return $real2;
+                    }
+                }
+            }
+        }
+    }
+    return false;
+}
+
 // Handle folder creation
 if (isset($_POST['create_folder']) && isset($_POST['folder_name'])) {
     $folderName = trim($_POST['folder_name']);
@@ -125,9 +243,69 @@ if (isset($_POST['create_folder']) && isset($_POST['folder_name'])) {
     exit;
 }
 
+// Handle rename
+if (isset($_POST['rename_item']) && isset($_POST['old_path']) && isset($_POST['new_name'])) {
+    $oldRel = trim(str_replace('\\', '/', $_POST['old_path']));
+    $newName = trim($_POST['new_name']);
+    if ($newName === '' || preg_match('/[\\\/]/', $newName)) {
+        $_SESSION['error'] = 'Invalid new name.';
+        header('Location: file_browser.php?path=' . urlencode($currentPath));
+        exit;
+    }
+    $oldSystem = $baseDir . str_replace('/', DIRECTORY_SEPARATOR, $oldRel);
+    $oldReal = realpath($oldSystem);
+    if ($oldReal === false || strpos($oldReal, $baseRealPath) !== 0) {
+        $_SESSION['error'] = 'Invalid source path for rename.';
+        header('Location: file_browser.php?path=' . urlencode($currentPath));
+        exit;
+    }
+    $parent = dirname($oldReal);
+    $dest = $parent . DIRECTORY_SEPARATOR . $newName;
+    if (file_exists($dest)) {
+        $_SESSION['error'] = 'A file or folder with this name already exists.';
+    } else if (@rename($oldReal, $dest)) {
+        $_SESSION['success'] = 'Item renamed successfully.';
+    } else {
+        $_SESSION['error'] = 'Failed to rename item.';
+    }
+    header('Location: file_browser.php?path=' . urlencode($currentPath));
+    exit;
+}
+
+// Handle move
+if (isset($_POST['move_item']) && isset($_POST['source_path']) && isset($_POST['dest_path'])) {
+    $srcRel = trim(str_replace('\\', '/', $_POST['source_path']));
+    $dstRel = trim(str_replace('\\', '/', $_POST['dest_path']));
+    $srcReal = realpath($baseDir . str_replace('/', DIRECTORY_SEPARATOR, $srcRel));
+    // Resolve destination with environment-aware variants
+    $dstReal = fb_resolve_destination_folder($baseDir, $baseRealPath, $dstRel);
+    if ($srcReal === false || $dstReal === false || strpos($srcReal, $baseRealPath) !== 0 || strpos($dstReal, $baseRealPath) !== 0) {
+        $_SESSION['error'] = 'Invalid source or destination path.';
+        header('Location: file_browser.php?path=' . urlencode($currentPath));
+        exit;
+    }
+    if (!is_dir($dstReal)) {
+        $_SESSION['error'] = 'Destination must be an existing folder.';
+        header('Location: file_browser.php?path=' . urlencode($currentPath));
+        exit;
+    }
+    $basename = basename($srcReal);
+    $destPath = $dstReal . DIRECTORY_SEPARATOR . $basename;
+    if (file_exists($destPath)) {
+        $_SESSION['error'] = 'Destination already has an item with the same name.';
+    } else if (@rename($srcReal, $destPath)) {
+        $_SESSION['success'] = 'Item moved successfully.';
+    } else {
+        $_SESSION['error'] = 'Failed to move item.';
+    }
+    header('Location: file_browser.php?path=' . urlencode($currentPath));
+    exit;
+}
+
 // Handle folder deletion (single)
 if (isset($_POST['delete_folder']) && isset($_POST['folder_path'])) {
     $folderToDelete = trim($_POST['folder_path']);
+    $forceDelete = isset($_POST['force_delete']) && $_POST['force_delete'] === '1';
     
     // Normalize the path
     $folderToDelete = str_replace('\\', '/', $folderToDelete);
@@ -144,12 +322,12 @@ if (isset($_POST['delete_folder']) && isset($_POST['folder_path'])) {
     } else {
         // Check if folder is empty
         $files = array_diff(scandir($folderRealPath), ['.', '..']);
-        
-        if (count($files) > 0) {
-            $_SESSION['error'] = 'Cannot delete folder: It contains ' . count($files) . ' item(s). Please remove all contents first.';
+        if (count($files) > 0 && !$forceDelete) {
+            $_SESSION['error'] = 'Folder not empty. Enable recursive delete to proceed.';
         } else {
-            // Delete the empty folder
-            if (rmdir($folderRealPath)) {
+            // Delete recursively if needed
+            $ok = count($files) > 0 ? fb_delete_directory_recursive($folderRealPath, $baseRealPath) : @rmdir($folderRealPath);
+            if ($ok) {
                 $_SESSION['success'] = 'Folder deleted successfully.';
             } else {
                 $_SESSION['error'] = 'Failed to delete folder. Check permissions.';
@@ -165,6 +343,7 @@ if (isset($_POST['delete_folder']) && isset($_POST['folder_path'])) {
 // Handle bulk deletion (folders and files)
 if (isset($_POST['bulk_delete']) && isset($_POST['selected_items'])) {
     $selectedItems = $_POST['selected_items'];
+    $forceDeleteBulk = isset($_POST['force_delete_bulk']) && $_POST['force_delete_bulk'] === '1';
     
     if (!is_array($selectedItems) || empty($selectedItems)) {
         $_SESSION['error'] = 'No items selected for deletion.';
@@ -193,20 +372,13 @@ if (isset($_POST['bulk_delete']) && isset($_POST['selected_items'])) {
         
         // Check if it's a directory
         if (is_dir($itemRealPath)) {
-            // Check if folder is empty
             $contents = array_diff(scandir($itemRealPath), ['.', '..']);
-            
-            if (count($contents) > 0) {
-                $errors[] = basename($itemPath) . ': Folder not empty (' . count($contents) . ' items)';
+            if (count($contents) > 0 && !$forceDeleteBulk) {
+                $errors[] = basename($itemPath) . ': Folder not empty (enable recursive delete)';
                 $failedCount++;
             } else {
-                // Delete empty folder
-                if (rmdir($itemRealPath)) {
-                    $deletedCount++;
-                } else {
-                    $errors[] = basename($itemPath) . ': Failed to delete folder';
-                    $failedCount++;
-                }
+                $ok = count($contents) > 0 ? fb_delete_directory_recursive($itemRealPath, $baseRealPath) : @rmdir($itemRealPath);
+                if ($ok) { $deletedCount++; } else { $errors[] = basename($itemPath) . ': Failed to delete folder'; $failedCount++; }
             }
         } elseif (is_file($itemRealPath)) {
             // Delete file
@@ -247,6 +419,45 @@ if (isset($_POST['bulk_delete']) && isset($_POST['selected_items'])) {
     exit;
 }
 
+// Handle uploads
+if (isset($_POST['do_upload']) && isset($_FILES['upload_files'])) {
+    $files = $_FILES['upload_files'];
+    $uploaded = 0; $failed = 0; $messages = [];
+    // Ensure target directory exists and is within base
+    $targetDir = $fullPath;
+    $targetReal = realpath($targetDir);
+    if ($targetReal === false || strpos($targetReal, $baseRealPath) !== 0) {
+        $_SESSION['error'] = 'Invalid upload target.';
+        header('Location: file_browser.php?path=' . urlencode($currentPath));
+        exit;
+    }
+    // Normalize multiple files structure
+    $count = is_array($files['name']) ? count($files['name']) : 0;
+    for ($i = 0; $i < $count; $i++) {
+        if (!isset($files['tmp_name'][$i]) || $files['error'][$i] !== UPLOAD_ERR_OK) {
+            $failed++; continue;
+        }
+        $original = $files['name'][$i];
+        $safeName = basename(str_replace(['\\','/'], DIRECTORY_SEPARATOR, $original));
+        if ($safeName === '' || $safeName === '.' || $safeName === '..') { $failed++; continue; }
+        $dest = $targetReal . DIRECTORY_SEPARATOR . $safeName;
+        if (@move_uploaded_file($files['tmp_name'][$i], $dest)) {
+            $uploaded++;
+        } else {
+            $failed++; $messages[] = $safeName;
+        }
+    }
+    if ($uploaded > 0 && $failed === 0) {
+        $_SESSION['success'] = "Uploaded $uploaded file(s) successfully.";
+    } elseif ($uploaded > 0 && $failed > 0) {
+        $_SESSION['warning'] = "Uploaded $uploaded file(s), failed $failed: " . implode(', ', array_slice($messages, 0, 3)) . ($failed > 3 ? '...' : '');
+    } else {
+        $_SESSION['error'] = 'Upload failed for all files.';
+    }
+    header('Location: file_browser.php?path=' . urlencode($currentPath));
+    exit;
+}
+
 // Handle file download
 if (isset($_GET['download']) && $_GET['download'] === '1') {
     // Rebuild download path the same way
@@ -283,9 +494,10 @@ if (isset($_GET['download']) && $_GET['download'] === '1') {
 
 // Get directory contents
 $items = [];
-$totalSize = 0;
-$fileCount = 0;
-$dirCount = 0;
+$totalSize = 0; // non-recursive
+$fileCount = 0; // non-recursive
+$dirCount = 0;  // non-recursive
+$recursiveStats = fb_compute_recursive_stats($fullPath);
 
 if (is_dir($fullPath)) {
     $files = scandir($fullPath);
@@ -958,6 +1170,12 @@ $pageTitle = 'Railway Volume Browser';
                         <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#createFolderModal">
                             <i class="bi bi-folder-plus me-2"></i>Create Folder
                         </button>
+                        <button type="button" class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#uploadFilesModal">
+                            <i class="bi bi-upload me-2"></i>Upload Files
+                        </button>
+                        <a href="?path=<?php echo urlencode($currentPath); ?>" class="btn btn-outline-secondary btn-sm">
+                            <i class="bi bi-arrow-repeat me-2"></i>Refresh
+                        </a>
                     </div>
                     <div class="d-flex gap-2 align-items-center" id="bulkActionsBar" style="display: none !important;">
                         <span class="badge bg-info" id="selectedCountBadge">0 selected</span>
@@ -1013,6 +1231,7 @@ $pageTitle = 'Railway Volume Browser';
                                                 <a href="?path=<?php echo urlencode($item['path']); ?>">
                                                     <?php echo htmlspecialchars($item['name']); ?>
                                                 </a>
+                                                <small class="text-muted dir-size" data-subpath="<?php echo htmlspecialchars($item['path']); ?>">Size: <span class="dir-size-val">—</span></small>
                                             </div>
                                         <?php else: ?>
                                             <?php
@@ -1072,27 +1291,41 @@ $pageTitle = 'Railway Volume Browser';
                                 </div>
                                 
                                 <div class="col-md-1 text-center">
-                                    <?php if ($item['type'] === 'file'): ?>
-                                        <a href="?path=<?php echo urlencode($item['path']); ?>&download=1" 
-                                           class="btn btn-sm btn-outline-primary btn-action"
-                                           title="Download file">
-                                            <i class="bi bi-download"></i>
-                                        </a>
-                                    <?php else: ?>
-                                        <div class="d-flex gap-1 justify-content-center">
+                                    <div class="d-flex gap-1 justify-content-center">
+                                        <?php if ($item['type'] === 'file'): ?>
+                                            <a href="?path=<?php echo urlencode($item['path']); ?>&download=1" 
+                                               class="btn btn-sm btn-outline-primary btn-action"
+                                               title="Download file">
+                                                <i class="bi bi-download"></i>
+                                            </a>
+                                        <?php else: ?>
                                             <a href="?path=<?php echo urlencode($item['path']); ?>" 
                                                class="btn btn-sm btn-outline-secondary btn-action"
                                                title="Open folder">
                                                 <i class="bi bi-folder-symlink"></i>
                                             </a>
-                                            <button type="button"
-                                                    class="btn btn-sm btn-outline-danger btn-action"
-                                                    onclick="confirmDeleteFolder('<?php echo htmlspecialchars($item['name'], ENT_QUOTES); ?>', '<?php echo htmlspecialchars($item['path'], ENT_QUOTES); ?>')"
-                                                    title="Delete folder">
-                                                <i class="bi bi-trash"></i>
-                                            </button>
-                                        </div>
-                                    <?php endif; ?>
+                                        <?php endif; ?>
+                                        <button type="button"
+                                                class="btn btn-sm btn-outline-warning btn-action"
+                                                onclick="openRenameModal('<?php echo htmlspecialchars($item['name'], ENT_QUOTES); ?>', '<?php echo htmlspecialchars($item['path'], ENT_QUOTES); ?>')"
+                                                title="Rename">
+                                            <i class="bi bi-pencil"></i>
+                                        </button>
+                                        <button type="button"
+                                                class="btn btn-sm btn-outline-info btn-action"
+                                                onclick="openMoveModal('<?php echo htmlspecialchars($item['name'], ENT_QUOTES); ?>', '<?php echo htmlspecialchars($item['path'], ENT_QUOTES); ?>')"
+                                                title="Move">
+                                            <i class="bi bi-arrow-right-square"></i>
+                                        </button>
+                                        <?php if ($item['type'] === 'dir'): ?>
+                                        <button type="button"
+                                                class="btn btn-sm btn-outline-danger btn-action"
+                                                onclick="confirmDeleteFolder('<?php echo htmlspecialchars($item['name'], ENT_QUOTES); ?>', '<?php echo htmlspecialchars($item['path'], ENT_QUOTES); ?>')"
+                                                title="Delete folder (supports recursive)">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                        <?php endif; ?>
+                                    </div>
                                 </div>
                             </div>
                             
@@ -1118,6 +1351,7 @@ $pageTitle = 'Railway Volume Browser';
                                                 <small class="text-muted">
                                                     <?php echo date('M d, Y', $item['modified']); ?>
                                                 </small>
+                                                <small class="text-muted dir-size" data-subpath="<?php echo htmlspecialchars($item['path']); ?>">Size: <span class="dir-size-val">—</span></small>
                                             </div>
                                         </div>
                                         <div class="d-flex gap-1">
@@ -1127,9 +1361,21 @@ $pageTitle = 'Railway Volume Browser';
                                                 <i class="bi bi-folder-symlink"></i>
                                             </a>
                                             <button type="button"
+                                                    class="btn btn-sm btn-outline-warning btn-action"
+                                                    onclick="openRenameModal('<?php echo htmlspecialchars($item['name'], ENT_QUOTES); ?>', '<?php echo htmlspecialchars($item['path'], ENT_QUOTES); ?>')"
+                                                    title="Rename">
+                                                <i class="bi bi-pencil"></i>
+                                            </button>
+                                            <button type="button"
+                                                    class="btn btn-sm btn-outline-info btn-action"
+                                                    onclick="openMoveModal('<?php echo htmlspecialchars($item['name'], ENT_QUOTES); ?>', '<?php echo htmlspecialchars($item['path'], ENT_QUOTES); ?>')"
+                                                    title="Move">
+                                                <i class="bi bi-arrow-right-square"></i>
+                                            </button>
+                                            <button type="button"
                                                     class="btn btn-sm btn-outline-danger btn-action"
                                                     onclick="confirmDeleteFolder('<?php echo htmlspecialchars($item['name'], ENT_QUOTES); ?>', '<?php echo htmlspecialchars($item['path'], ENT_QUOTES); ?>')"
-                                                    title="Delete">
+                                                    title="Delete (supports recursive)">
                                                 <i class="bi bi-trash"></i>
                                             </button>
                                         </div>
@@ -1178,6 +1424,18 @@ $pageTitle = 'Railway Volume Browser';
                                            title="Download">
                                             <i class="bi bi-download"></i>
                                         </a>
+                                        <button type="button"
+                                                class="btn btn-sm btn-outline-warning btn-action"
+                                                onclick="openRenameModal('<?php echo htmlspecialchars($item['name'], ENT_QUOTES); ?>', '<?php echo htmlspecialchars($item['path'], ENT_QUOTES); ?>')"
+                                                title="Rename">
+                                            <i class="bi bi-pencil"></i>
+                                        </button>
+                                        <button type="button"
+                                                class="btn btn-sm btn-outline-info btn-action"
+                                                onclick="openMoveModal('<?php echo htmlspecialchars($item['name'], ENT_QUOTES); ?>', '<?php echo htmlspecialchars($item['path'], ENT_QUOTES); ?>')"
+                                                title="Move">
+                                            <i class="bi bi-arrow-right-square"></i>
+                                        </button>
                                     <?php endif; ?>
                                 </div>
                             </div>
@@ -1254,6 +1512,12 @@ $pageTitle = 'Railway Volume Browser';
                             <strong>Cannot Delete:</strong> This folder contains files or subfolders. Please remove all contents before deleting.
                         </div>
                         <input type="hidden" name="folder_path" id="folder_path_input">
+                        <div class="form-check mt-3">
+                            <input class="form-check-input" type="checkbox" value="1" id="forceDeleteCheckbox" name="force_delete">
+                            <label class="form-check-label" for="forceDeleteCheckbox">
+                                Delete non-empty folder recursively
+                            </label>
+                        </div>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -1288,14 +1552,112 @@ $pageTitle = 'Railway Volume Browser';
                         </div>
                         <div class="alert alert-info mb-0">
                             <i class="bi bi-info-circle me-2"></i>
-                            <strong>Note:</strong> Folders must be empty to be deleted. Non-empty folders will be skipped.
+                            <strong>Note:</strong> Enable recursive delete below to remove non-empty folders.
                         </div>
                         <div id="bulkDeleteItemsContainer"></div>
+                        <div class="form-check mt-3">
+                            <input class="form-check-input" type="checkbox" value="1" id="forceDeleteBulkCheckbox" name="force_delete_bulk">
+                            <label class="form-check-label" for="forceDeleteBulkCheckbox">
+                                Delete non-empty folders recursively
+                            </label>
+                        </div>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                         <button type="submit" name="bulk_delete" class="btn btn-danger" id="confirmBulkDeleteBtn">
                             <i class="bi bi-trash me-2"></i>Delete Selected Items
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Upload Files Modal -->
+    <div class="modal fade" id="uploadFilesModal" tabindex="-1" aria-labelledby="uploadFilesModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form method="POST" action="" enctype="multipart/form-data">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="uploadFilesModalLabel">
+                            <i class="bi bi-upload me-2"></i>Upload Files
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label for="upload_files" class="form-label">Choose file(s)</label>
+                            <input type="file" class="form-control" id="upload_files" name="upload_files[]" multiple required>
+                        </div>
+                        <div class="alert alert-info mb-0">
+                            <i class="bi bi-info-circle me-2"></i>
+                            <strong>Destination:</strong>
+                            <code><?php echo $isRailway ? '/mnt/assets/uploads' : '/assets/uploads'; ?><?php echo $currentPath ? '/' . htmlspecialchars($currentPath) : ''; ?></code>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" name="do_upload" class="btn btn-success">
+                            <i class="bi bi-upload me-2"></i>Upload
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rename Modal -->
+    <div class="modal fade" id="renameModal" tabindex="-1" aria-labelledby="renameModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form method="POST" action="">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="renameModalLabel">
+                            <i class="bi bi-pencil me-2"></i>Rename Item
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label for="rename_new_name" class="form-label">New Name</label>
+                            <input type="text" class="form-control" id="rename_new_name" name="new_name" required>
+                            <input type="hidden" id="rename_old_path" name="old_path">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" name="rename_item" class="btn btn-warning">
+                            <i class="bi bi-pencil me-2"></i>Rename
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Move Modal -->
+    <div class="modal fade" id="moveModal" tabindex="-1" aria-labelledby="moveModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form method="POST" action="">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="moveModalLabel">
+                            <i class="bi bi-arrow-right-square me-2"></i>Move Item
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Destination Folder (relative to uploads root)</label>
+                            <input type="text" class="form-control" id="move_dest_path" name="dest_path" placeholder="e.g. student/grades" required>
+                            <div class="form-text">Must be an existing folder. Current: <code><?php echo htmlspecialchars($currentPath ?: '/'); ?></code></div>
+                            <input type="hidden" id="move_source_path" name="source_path">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" name="move_item" class="btn btn-info">
+                            <i class="bi bi-arrow-right-square me-2"></i>Move
                         </button>
                     </div>
                 </form>
@@ -1391,10 +1753,12 @@ $pageTitle = 'Railway Volume Browser';
         const folderPathInput = document.getElementById('folder_path_input');
         const warningDiv = document.getElementById('folderNotEmptyWarning');
         const confirmBtn = document.getElementById('confirmDeleteBtn');
+        const forceCheckbox = document.getElementById('forceDeleteCheckbox');
         
         // Set folder name and path
         folderNameDisplay.textContent = folderName;
         folderPathInput.value = folderPath;
+        forceCheckbox.checked = false;
         
         // Check if folder has contents by making an AJAX call
         fetch('?path=' + encodeURIComponent(folderPath))
@@ -1406,7 +1770,8 @@ $pageTitle = 'Railway Volume Browser';
                 if (!isEmpty) {
                     // Show warning and disable delete button
                     warningDiv.style.display = 'block';
-                    confirmBtn.disabled = true;
+                    // Allow delete via recursive option
+                    confirmBtn.disabled = false;
                 } else {
                     // Hide warning and enable delete button
                     warningDiv.style.display = 'none';
@@ -1417,12 +1782,80 @@ $pageTitle = 'Railway Volume Browser';
                 console.error('Error checking folder contents:', error);
                 // On error, show warning to be safe
                 warningDiv.style.display = 'block';
-                confirmBtn.disabled = true;
+                // Still allow if user enables recursive
+                confirmBtn.disabled = false;
             });
         
         // Show the modal
         modal.show();
     }
+
+    // Rename helper
+    function openRenameModal(name, relPath) {
+        const modal = new bootstrap.Modal(document.getElementById('renameModal'));
+        document.getElementById('rename_new_name').value = name;
+        document.getElementById('rename_old_path').value = relPath;
+        modal.show();
+    }
+
+    // Move helper
+    function openMoveModal(name, relPath) {
+        const modal = new bootstrap.Modal(document.getElementById('moveModal'));
+        document.getElementById('move_source_path').value = relPath;
+        document.getElementById('move_dest_path').value = '';
+        modal.show();
+    }
+
+    // Drag-and-drop upload
+    (function() {
+        const container = document.querySelector('.file-browser-container');
+        if (!container) return;
+        ['dragenter','dragover','dragleave','drop'].forEach(eventName => {
+            container.addEventListener(eventName, e => { e.preventDefault(); e.stopPropagation(); });
+        });
+        container.addEventListener('dragover', () => { container.classList.add('dragover'); });
+        container.addEventListener('dragleave', () => { container.classList.remove('dragover'); });
+        container.addEventListener('drop', async (e) => {
+            container.classList.remove('dragover');
+            const dt = e.dataTransfer;
+            if (!dt || !dt.files || dt.files.length === 0) return;
+            const formData = new FormData();
+            formData.append('do_upload', '1');
+            for (let i = 0; i < dt.files.length; i++) {
+                formData.append('upload_files[]', dt.files[i], dt.files[i].name);
+            }
+            try {
+                const resp = await fetch(window.location.href, { method: 'POST', body: formData });
+                // After upload, reload to reflect changes
+                window.location.reload();
+            } catch (err) {
+                alert('Upload failed.');
+            }
+        });
+    })();
+
+    // Folder size badges via AJAX (limit to 50 to avoid overload)
+    (function(){
+        const items = Array.from(document.querySelectorAll('.dir-size')).slice(0, 50);
+        items.forEach(async el => {
+            const sub = el.getAttribute('data-subpath');
+            try {
+                const url = new URL(window.location.href);
+                url.searchParams.set('stats','1');
+                url.searchParams.set('subpath', sub);
+                const r = await fetch(url.toString(), { cache: 'no-store' });
+                const j = await r.json();
+                if (j && j.ok) {
+                    const mb = (j.size / (1024*1024)).toFixed(2);
+                    el.querySelector('.dir-size-val').textContent = `${mb} MB • ${j.files} files`;
+                } else {
+                    el.querySelector('.dir-size-val').textContent = '—';
+                }
+            } catch (e) {
+                el.querySelector('.dir-size-val').textContent = '—';
+            }
+        });
+    })();
     </script>
     
     <!-- Admin Sidebar Script (matches other admin pages) -->

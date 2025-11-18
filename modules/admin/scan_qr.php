@@ -519,8 +519,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['complete_distribution
         }
         
         $_SESSION['success_message'] = "Distribution completed and finalized! Recorded $total_students students for " . 
-            trim($academic_year . ' ' . ($semester ?? '')) . ". The scanner has been disabled." . $slot_message . $schedule_message . $email_message . 
-            " You can now proceed to 'End Distribution' to compress files and reset the system for the next cycle.";
+          trim($academic_year . ' ' . ($semester ?? '')) . ". The scanner has been disabled." . $slot_message . $schedule_message . $email_message . 
+          " You can now proceed to 'End Distribution' to compress files and reset the system for the next cycle.";
+        // Pass details for a success modal on Distribution Control page
+        $_SESSION['show_distribution_completed'] = [
+          'academic_year' => $academic_year,
+          'semester' => $semester,
+          'total_students' => $total_students,
+          'location' => $location,
+        ];
     } catch (Exception $e) {
         pg_query($connection, "ROLLBACK");
         $error_details = $e->getMessage() . " | Line: " . $e->getLine();
@@ -535,7 +542,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['complete_distribution
         $_SESSION['error_message'] .= " (Check logs for details)";
     }
     
-    header('Location: ' . $_SERVER['PHP_SELF']);
+    // Redirect to Distribution Control to avoid schedule gating on this page
+    header('Location: distribution_control.php');
     exit;
 }
 

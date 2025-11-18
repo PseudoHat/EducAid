@@ -75,9 +75,12 @@ class FileCompressionService {
             
             // CRITICAL FIX: Get students from distribution_student_records, not from current 'given' status
             // This allows compression to work even after students have been reset to 'applicant'
-            $studentsQuery = "SELECT s.student_id, s.first_name, s.middle_name, s.last_name
+            // Include payroll number from distribution_payrolls (snapshot-scoped); avoid referencing
+            // students.payroll_* columns directly to maintain schema compatibility
+            $studentsQuery = "SELECT s.student_id, s.first_name, s.middle_name, s.last_name, dp.payroll_no
                              FROM students s
                              INNER JOIN distribution_student_records dsr ON s.student_id = dsr.student_id
+                             LEFT JOIN distribution_payrolls dp ON dp.snapshot_id = $1 AND dp.student_id = s.student_id
                              WHERE dsr.snapshot_id = $1
                              ORDER BY s.student_id";
             $studentsResult = pg_query_params($this->conn, $studentsQuery, [$snapshotId]);
@@ -123,10 +126,16 @@ class FileCompressionService {
             $totalFilesMatched = 0;
             
             foreach ($folders as $folderName => $folderType) {
-                $fullPath = $this->pathConfig->getStudentPath($folderName);
-                error_log("Scanning folder: $fullPath");
-                
-                if (is_dir($fullPath)) {
+                // Resolve possible folder paths (handles student/students and Railway name variants)
+                $candidatePaths = $this->resolveStudentFolderCandidates($folderName);
+                $fullPath = null;
+                foreach ($candidatePaths as $cand) {
+                    if (is_dir($cand)) { $fullPath = $cand; break; }
+                }
+
+                error_log("Scanning folder candidates: " . implode(' | ', $candidatePaths));
+                if ($fullPath) {
+                    error_log("Using folder: $fullPath");
                     // NEW: Check if this folder has student subfolders (new structure) or flat files (old structure)
                     $items = scandir($fullPath);
                     $hasStudentFolders = false;
@@ -212,7 +221,7 @@ class FileCompressionService {
                         }
                     }
                 } else {
-                    error_log("  Directory not found: $fullPath");
+                    error_log("  No matching directory found for '$folderName' (checked variants)");
                 }
             }
             
@@ -261,8 +270,8 @@ class FileCompressionService {
                     continue; // Skip students with no files
                 }
                 
-                // Create folder name: "LastName, FirstName MiddleInitial - STUDENT-ID"
-                // Example: "Dela Cruz, Juan C. - GENERALTRIAS-2025-3-000000"
+                // Create folder name: "PAYROLL-NUMBER - FullName"
+                // Example: "PR-000123 - Dela Cruz, Juan C."
                 $lastName = trim($studentInfo['last_name'] ?? '');
                 $firstName = trim($studentInfo['first_name'] ?? '');
                 $middleName = trim($studentInfo['middle_name'] ?? '');
@@ -282,8 +291,16 @@ class FileCompressionService {
                 // Sanitize folder name (remove invalid characters for file systems)
                 $fullName = preg_replace('/[<>:"\/\\|?*]/', '', $fullName);
                 
-                // Final folder name format: "LastName, FirstName M. - STUDENT-ID"
-                $studentFolderName = $fullName . ' - ' . $studentId;
+                // Determine payroll number (fallback to student ID if unavailable)
+                $payrollNo = trim((string)($studentInfo['payroll_no'] ?? ''));
+                if ($payrollNo === '' || strtolower($payrollNo) === 'null') {
+                    $payrollNo = $studentId; // ensure uniqueness if payroll number is missing
+                }
+                // Sanitize payroll number
+                $payrollNo = preg_replace('/[<>:"\/\\|?*]/', '', $payrollNo);
+
+                // Final folder name format: "PAYROLL-NUMBER - FullName"
+                $studentFolderName = $payrollNo . ' - ' . $fullName;
                 
                 $studentOriginalSize = 0;
                 
@@ -312,8 +329,9 @@ class FileCompressionService {
                 
                 $studentsProcessed++;
                 $compressionLog[] = sprintf(
-                    "Student %s (%s %s %s): %d files, %.2f KB → Folder: %s",
+                    "Student %s (Payroll: %s | %s %s %s): %d files, %.2f KB → Folder: %s",
                     $studentId,
+                    $payrollNo,
                     $studentInfo['first_name'],
                     $middleName ? substr($middleName, 0, 1) . '.' : '',
                     $studentInfo['last_name'],
@@ -524,6 +542,40 @@ class FileCompressionService {
                 'message' => $e->getMessage()
             ];
         }
+    }
+    
+    // Build candidate absolute paths for a standard student document folder name
+    private function resolveStudentFolderCandidates($standardName) {
+        $uploadsDir = rtrim($this->pathConfig->getUploadsDir(), DIRECTORY_SEPARATOR);
+        $studentBases = ['student', 'students', 'Student', 'Students'];
+        $mapped = $this->pathConfig->getFolderName($standardName);
+        $variants = array_unique([
+            $mapped,
+            strtolower($mapped),
+            strtoupper($mapped),
+            ucfirst(strtolower($mapped)),
+            $standardName,
+            strtolower($standardName),
+            strtoupper($standardName),
+            ucfirst(strtolower($standardName))
+        ]);
+        $candidates = [];
+        foreach ($studentBases as $base) {
+            foreach ($variants as $v) {
+                $candidates[] = $uploadsDir . DIRECTORY_SEPARATOR . $base . DIRECTORY_SEPARATOR . $v;
+            }
+        }
+        // Also consider older layout with no 'student' base folder
+        foreach ($variants as $v) {
+            $candidates[] = $uploadsDir . DIRECTORY_SEPARATOR . $v;
+        }
+        // De-duplicate while preserving order
+        $seen = [];
+        $uniq = [];
+        foreach ($candidates as $p) {
+            if (!isset($seen[$p])) { $uniq[] = $p; $seen[$p] = true; }
+        }
+        return $uniq;
     }
     
     /**
