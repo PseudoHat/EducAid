@@ -5,8 +5,16 @@
  */
 
 // For Railway PostgreSQL connection
-$railway_db_url = getenv('DATABASE_URL');
+// Try multiple methods to get DATABASE_URL
+$railway_db_url = getenv('DATABASE_URL') ?: ($_ENV['DATABASE_URL'] ?? ($_SERVER['DATABASE_URL'] ?? null));
+
+echo "Checking for Railway DATABASE_URL...<br>";
+echo "getenv: " . (getenv('DATABASE_URL') ? 'Found' : 'Not found') . "<br>";
+echo "ENV: " . (isset($_ENV['DATABASE_URL']) ? 'Found' : 'Not found') . "<br>";
+echo "SERVER: " . (isset($_SERVER['DATABASE_URL']) ? 'Found' : 'Not found') . "<br><br>";
+
 if ($railway_db_url) {
+    echo "Using Railway DATABASE_URL<br>";
     // Parse Railway DATABASE_URL
     $db = parse_url($railway_db_url);
     $connection = pg_connect(
@@ -17,11 +25,18 @@ if ($railway_db_url) {
         "password={$db['pass']} " .
         "sslmode=require"
     );
-    echo "Connected to Railway database<br>";
+    
+    if (!$connection) {
+        die("Failed to connect to Railway database: " . pg_last_error() . "<br>");
+    }
+    echo "<strong style='color: green;'>✅ Connected to Railway database</strong><br>";
+    echo "Host: {$db['host']}<br>";
+    echo "Database: " . ltrim($db['path'], '/') . "<br><br>";
 } else {
     // Fallback to local database
+    echo "DATABASE_URL not found, using local database<br>";
     require_once __DIR__ . '/config/database.php';
-    echo "Connected to local database<br>";
+    echo "<strong style='color: blue;'>Connected to local database</strong><br><br>";
 }
 
 // Configuration
