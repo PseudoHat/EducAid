@@ -813,8 +813,8 @@ if (!function_exists('adjustColorOpacity')) {
     background: #ffcdd2;
     color: #b71c1c;
 }
-/* Tablet: Hide CMS section (768px - 991px) */
-@media (min-width: 768px) and (max-width: 991.98px) {
+/* Extended Tablet / Medium Desktop: Hide CMS section up to 1400px per new requirement */
+@media (min-width: 768px) and (max-width: 1400px) {
     .dropdown.cms-section,
     #submenu-cms {
         display: none !important;

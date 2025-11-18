@@ -787,6 +787,69 @@ $yearLevels = pg_fetch_all(pg_query($connection, "SELECT year_level_id, name FRO
             font-size: 0.75em;
             padding: 4px 8px;
         }
+        /* Compact multi-line column strategy (mimic audit_logs) */
+        .col-contact, td[data-label="Contact"],
+        .col-university, td[data-label="University"],
+        .col-course, td[data-label="Course"],
+        .col-applied, td[data-label="Applied"],
+        .col-name, td[data-label="Name"] {
+            white-space: normal !important;
+            word-break: break-word;
+            overflow-wrap: anywhere;
+            line-height: 1.25;
+            vertical-align: middle;
+        }
+        /* Fixed width guidance to avoid overall overflow while preserving wrap */
+        .registrations-table thead th { font-size: .8rem; letter-spacing:.25px; }
+        .registrations-table th.col-name { width: 150px; }
+        .registrations-table th.col-contact { width: 180px; }
+        .registrations-table th.col-barangay { width: 110px; }
+        .registrations-table th.col-university { width: 170px; }
+        .registrations-table th.col-course { width: 160px; }
+        .registrations-table th.col-year { width: 70px; }
+        .registrations-table th.col-applied { width: 110px; }
+        .registrations-table th.col-confidence { width: 130px; }
+        .registrations-table th.col-actions { width: 140px; }
+        /* Smaller font for secondary lines */
+        .registrations-table td small { display:block; font-size:.70rem; line-height:1.1; }
+        .registrations-table td .badge { font-size:.65rem; }
+        /* Reduce padding horizontally to fit without scroll */
+        .registrations-table td, .registrations-table th { padding: .55rem .6rem; }
+        .registrations-table td .fw-semibold { font-size:.82rem; }
+        .registrations-table td .primary-line { font-size:.8rem; font-weight:600; color:#212529; }
+        .registrations-table td .secondary-line { font-size:.7rem; color:#6c757d; }
+        /* Improve badge contrast */
+        .registrations-table td .badge.bg-warning { color:#212529; }
+        .registrations-table td .badge.bg-primary { background:#0d6efd; }
+        @media (max-width: 1400px){
+            .registrations-table th.col-contact { width: 160px; }
+            .registrations-table th.col-university { width: 150px; }
+            .registrations-table th.col-course { width: 140px; }
+        }
+        @media (max-width: 1200px){
+            .registrations-table th.col-contact { width: 150px; }
+            .registrations-table th.col-university { width: 140px; }
+            .registrations-table th.col-course { width: 130px; }
+            .registrations-table th.col-applied { width: 95px; }
+            .registrations-table td .badge { font-size:.60rem; }
+        }
+        @media (max-width: 992px){
+            .registrations-table th.col-contact { width: 140px; }
+            .registrations-table th.col-university { width: 135px; }
+            .registrations-table th.col-course { width: 120px; }
+        }
+        /* Mobile: card layout handled by table_core.css; allow full width */
+        @media (max-width: 767.98px){
+            .registrations-table th.col-name,
+            .registrations-table th.col-contact,
+            .registrations-table th.col-barangay,
+            .registrations-table th.col-university,
+            .registrations-table th.col-course,
+            .registrations-table th.col-year,
+            .registrations-table th.col-applied,
+            .registrations-table th.col-confidence,
+            .registrations-table th.col-actions { width:auto; }
+        }
                 .bulk-actions {
                         background: #ffffff;
                         border: 1px solid #dee2e6;
@@ -1085,22 +1148,22 @@ $yearLevels = pg_fetch_all(pg_query($connection, "SELECT year_level_id, name FRO
                                             Name <?php if ($sort_by === 'first_name') echo $sort_order === 'ASC' ? '↑' : '↓'; ?>
                                         </a>
                                     </th>
-                                    <th>Contact</th>
-                                    <th>Barangay</th>
-                                    <th>University</th>
-                                    <th>Course</th>
-                                    <th>Year</th>
-                                    <th>
+                                    <th class="col-contact">Contact</th>
+                                    <th class="col-barangay">Barangay</th>
+                                    <th class="col-university">University</th>
+                                    <th class="col-course">Course</th>
+                                    <th class="col-year">Year</th>
+                                    <th class="col-applied">
                                         <a href="?<?php echo http_build_query(array_merge($_GET, ['sort' => 'application_date', 'order' => $sort_by === 'application_date' && $sort_order === 'ASC' ? 'DESC' : 'ASC'])); ?>" class="sort-link <?php echo $sort_by === 'application_date' ? 'sort-active' : ''; ?>">
                                             Applied <?php if ($sort_by === 'application_date') echo $sort_order === 'ASC' ? '↑' : '↓'; ?>
                                         </a>
                                     </th>
-                                    <th>
+                                    <th class="col-confidence">
                                         <a href="?<?php echo http_build_query(array_merge($_GET, ['sort' => 'confidence_score', 'order' => $sort_by === 'confidence_score' && $sort_order === 'ASC' ? 'DESC' : 'ASC'])); ?>" class="sort-link <?php echo $sort_by === 'confidence_score' ? 'sort-active' : ''; ?>">
                                             Confidence <?php if ($sort_by === 'confidence_score') echo $sort_order === 'ASC' ? '↑' : '↓'; ?>
                                         </a>
                                     </th>
-                                    <th width="150">Actions</th>
+                                    <th class="col-actions">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -1119,31 +1182,34 @@ $yearLevels = pg_fetch_all(pg_query($connection, "SELECT year_level_id, name FRO
                                                 </div>
                                             </div>
                                         </td>
-                                        <td data-label="Contact">
-                                            <div class="small">
-                                                <div><?php echo htmlspecialchars($registration['email']); ?></div>
-                                                <div class="text-muted"><?php echo htmlspecialchars($registration['mobile']); ?></div>
+                                        <td data-label="Contact" class="col-contact">
+                                            <div class="small" title="<?php echo htmlspecialchars($registration['email'] . ' / ' . $registration['mobile']); ?>">
+                                                <div class="primary-line"><?php echo htmlspecialchars($registration['email']); ?></div>
+                                                <div class="secondary-line"><?php echo htmlspecialchars($registration['mobile']); ?></div>
                                             </div>
                                         </td>
-                                        <td data-label="Barangay"><?php echo htmlspecialchars($registration['barangay_name']); ?></td>
-                                        <td data-label="University">
-                                            <div class="small">
-                                                <?php echo htmlspecialchars($registration['university_name']); ?>
+                                        <td data-label="Barangay" class="col-barangay" title="<?php echo htmlspecialchars($registration['barangay_name']); ?>"><?php echo htmlspecialchars($registration['barangay_name']); ?></td>
+                                        <td data-label="University" class="col-university">
+                                            <div class="small" title="<?php echo htmlspecialchars($registration['university_name']); ?>">
+                                                <div class="primary-line"><?php echo htmlspecialchars($registration['university_name']); ?></div>
                                             </div>
                                         </td>
-                                        <td data-label="Course">
+                                        <td data-label="Course" class="col-course">
                                             <?php if (!empty($registration['course'])): ?>
-                                                <div class="small">
-                                                    <?php echo htmlspecialchars($registration['course']); ?>
+                                                <div class="small" title="<?php echo htmlspecialchars($registration['course']); ?>">
+                                                    <div class="primary-line"><?php echo htmlspecialchars($registration['course']); ?></div>
                                                 </div>
                                             <?php else: ?>
                                                 <span class="text-muted small">Not specified</span>
                                             <?php endif; ?>
                                         </td>
                                         <td data-label="Year"><?php echo htmlspecialchars($registration['year_level_name']); ?></td>
-                                        <td data-label="Applied">
+                                        <td data-label="Applied" class="col-applied">
                                             <small class="text-muted">
                                                 <?php echo date('M d, Y', strtotime($registration['application_date'])); ?>
+                                            </small>
+                                            <small class="text-muted">
+                                                <?php echo date('g:i A', strtotime($registration['application_date'])); ?>
                                             </small>
                                         </td>
                                         <td data-label="Confidence">

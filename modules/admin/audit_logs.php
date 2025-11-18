@@ -301,6 +301,46 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
             margin-bottom: 1rem;
         }
     }
+    /* Action Description column responsiveness fix */
+    .log-table table th.action-desc,
+    .log-table table td.action-desc {
+        white-space: normal !important; /* override table_core default nowrap */
+        word-break: break-word;
+        overflow-wrap: anywhere;
+    }
+    /* Prevent extreme column collapse causing vertical letter stacking */
+    .log-table table th.action-desc { min-width: 220px; }
+    @media (max-width: 1600px) { .log-table table th.action-desc { min-width: 200px; } }
+    @media (max-width: 1400px) { .log-table table th.action-desc { min-width: 180px; } }
+    @media (max-width: 1200px) { .log-table table th.action-desc { min-width: 160px; } }
+    @media (max-width: 992px)  { .log-table table th.action-desc { min-width: 140px; } }
+
+    /* Status column & badge responsiveness */
+    .log-table table th[style*="Status"],
+    .log-table table th.status-col { width: 100px; }
+    .log-table table td[data-label="Status"] { white-space: nowrap; }
+    .status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        white-space: nowrap;
+        line-height: 1.1;
+        letter-spacing: .5px;
+    }
+    @media (max-width: 1400px) {
+        .status-badge { font-size: 0.7rem; padding: 0.2rem 0.55rem; }
+    }
+    @media (max-width: 1200px) {
+        .status-badge { font-size: 0.68rem; padding: 0.18rem 0.5rem; }
+    }
+    @media (max-width: 992px) {
+        .status-badge { font-size: 0.66rem; padding: 0.16rem 0.45rem; }
+    }
+    /* Mobile card layout: allow full-width & center */
+    @media (max-width: 767px) {
+        .log-table table td[data-label="Status"] { white-space: normal; text-align: left; }
+        .status-badge { font-size: 0.75rem; padding: 4px 10px; letter-spacing: 0; }
+    }
 </style>
 </head>
 <body>
@@ -475,7 +515,7 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
                                 <th style="width: 100px;">User Type</th>
                                 <th style="width: 150px;">Username</th>
                                 <th style="width: 150px;">Category</th>
-                                <th>Action Description</th>
+                                <th class="action-desc">Action Description</th>
                                 <th style="width: 100px;">Status</th>
                                 <th style="width: 140px;">IP Address</th>
                                 <th style="width: 100px;">Details</th>
@@ -517,7 +557,7 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
                                             </span>
                                             <br><small class="text-muted"><?= htmlspecialchars($log['event_type']) ?></small>
                                         </td>
-                                        <td data-label="Action Description">
+                                        <td data-label="Action Description" class="action-desc">
                                             <small><?= htmlspecialchars($log['action_description']) ?></small>
                                         </td>
                                         <td data-label="Status">

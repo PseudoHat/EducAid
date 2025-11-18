@@ -1226,13 +1226,8 @@ unset($_SESSION['profile_flash'], $_SESSION['profile_flash_type']);
     <section class="home-section" id="page-content-wrapper">
       <div class="container-fluid py-4 px-4">
         <!-- Settings Header -->
-        <div class="settings-header mb-4 d-flex justify-content-between align-items-center">
-          <div>
-            <h1 class="mb-1">Settings</h1>
-          </div>
-          <a href="student_homepage.php" class="back-btn">
-            <i class="bi bi-arrow-left me-2"></i>Back to Profile
-          </a>
+        <div class="settings-header mb-4">
+          <h1 class="mb-1">Settings</h1>
         </div>
 
         <!-- Flash Messages -->
@@ -1349,14 +1344,6 @@ unset($_SESSION['profile_flash'], $_SESSION['profile_flash_type']);
                 </div>
               </div>
             </div>
-
-            <!-- Security & Privacy Section moved to dedicated page: modules/student/security_privacy.php -->
-            <div class="settings-content-section">
-              <h2 class="section-title">Security & Privacy</h2>
-              <p class="section-description">This section has been moved to a dedicated page for clarity. <a href="security_privacy.php">Open Security & Privacy</a></p>
-            </div>
-
-            <!-- Privacy & Data and Notification Preferences sections removed per user request -->
 
             <!-- Modals (same as before but updated redirects) -->
             <!-- Email Modal with OTP -->
