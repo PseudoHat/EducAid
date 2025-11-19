@@ -176,6 +176,10 @@ function resetGivenStudents($connection) {
                 $columnCache['document_columns'][] = $row['column_name'];
             }
         }
+        // Safety: ensure unique column names to avoid duplicate SET assignments
+        if (!empty($columnCache['document_columns'])) {
+            $columnCache['document_columns'] = array_values(array_unique($columnCache['document_columns']));
+        }
     }
 
     // IMPORTANT: Clear document records BEFORE changing status
@@ -228,9 +232,13 @@ function resetGivenStudents($connection) {
         $setParts[] = 'admin_review_required = FALSE';
     }
     
-    // Reset all discovered document path columns
+    // Reset all discovered document path columns (deduplicated)
+    $seenCols = [];
     foreach ($columnCache['document_columns'] as $docColumn) {
-        $setParts[] = pg_escape_identifier($connection, $docColumn) . " = NULL";
+        if (!isset($seenCols[$docColumn])) {
+            $seenCols[$docColumn] = true;
+            $setParts[] = pg_escape_identifier($connection, $docColumn) . " = NULL";
+        }
     }
 
     $query = "UPDATE students SET " . implode(', ', $setParts) . " WHERE status = 'given'";
@@ -543,12 +551,8 @@ if ($check_result && pg_num_rows($check_result) > 0) {
     $completed_snapshot_id = $completed_snapshot['snapshot_id'];
 }
 
-// If no completed snapshot exists, redirect back to scan_qr.php
-if (!$has_completed_snapshot) {
-    $_SESSION['error_message'] = "Please complete the distribution first using the 'Complete Distribution' button in the QR Scanner page. You must finalize the distribution AND have at least one student who received aid before ending it.";
-    header("Location: scan_qr.php");
-    exit;
-}
+// If no completed snapshot exists, do NOT redirect; we will render the page
+// and show a helpful message with disabled actions instead.
 
 // Get current distribution info from config and students
 $activeDistributions = [];
@@ -661,9 +665,23 @@ $pageTitle = "End Distribution";
                     </div>
                     <div class="card-body">
                     <?php if (empty($activeDistributions)): ?>
-                        <div class="alert alert-info">
-                            <i class="bi bi-info-circle"></i> No active distributions found.
-                        </div>
+                        <?php if (!$has_completed_snapshot): ?>
+                            <div class="alert alert-info d-flex align-items-center" role="alert">
+                                <i class="bi bi-info-circle me-2"></i>
+                                <div>
+                                    Complete the distribution first in QR Scanning (click "Complete Distribution"). Once finalized, you can compress and reset here.
+                                </div>
+                            </div>
+                            <div class="text-center">
+                                <button class="btn btn-primary" disabled title="Disabled until distribution is completed">
+                                    <i class="bi bi-file-zip-fill"></i> Compress & Reset
+                                </button>
+                            </div>
+                        <?php else: ?>
+                            <div class="alert alert-info">
+                                <i class="bi bi-info-circle"></i> No finalized distributions found in the recent period.
+                            </div>
+                        <?php endif; ?>
                     <?php else: ?>
                         <div class="table-responsive">
                             <table class="table table-hover">

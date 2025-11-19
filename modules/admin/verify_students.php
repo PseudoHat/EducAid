@@ -36,8 +36,12 @@ if (!$workflow_status['can_verify_students']) {
 ----------------------------*/
 $isFinalized = false;
 $configResult = pg_query($connection, "SELECT value FROM config WHERE key = 'student_list_finalized'");
-if ($configResult && $row = pg_fetch_assoc($configResult)) {
-    $isFinalized = ($row['value'] === '1');
+if ($configResult && ($row = pg_fetch_assoc($configResult))) {
+  $isFinalized = ($row['value'] === '1');
+} else {
+  // Persist default: unlocked unless explicitly locked later
+  pg_query($connection, "INSERT INTO config (key, value) VALUES ('student_list_finalized', '0') ON CONFLICT (key) DO UPDATE SET value = '0'");
+  $isFinalized = false;
 }
 
 // Check if any students have been scanned in the CURRENT distribution (prevents unlocking after distribution started)
@@ -358,8 +362,12 @@ $student_counts = getStudentCounts($connection);
 // Re-read the finalized status after POST actions
 $isFinalized = false;
 $configResult = pg_query($connection, "SELECT value FROM config WHERE key = 'student_list_finalized'");
-if ($configResult && $row = pg_fetch_assoc($configResult)) {
-    $isFinalized = ($row['value'] === '1');
+if ($configResult && ($row = pg_fetch_assoc($configResult))) {
+  $isFinalized = ($row['value'] === '1');
+} else {
+  // Ensure persisted default remains unlocked after operations if missing
+  pg_query($connection, "INSERT INTO config (key, value) VALUES ('student_list_finalized', '0') ON CONFLICT (key) DO UPDATE SET value = '0'");
+  $isFinalized = false;
 }
 
 // Generate CSRF token for all forms on this page
