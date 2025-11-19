@@ -1,4 +1,9 @@
 <?php
+// Ensure clean JSON responses only (no PHP notices/warnings)
+@ini_set('display_errors', '0');
+@ini_set('display_startup_errors', '0');
+// Optionally limit error reporting to exclude notices in this endpoint
+@error_reporting(E_ALL & ~E_NOTICE & ~E_WARNING);
 /**
  * CSRF Token Generator Endpoint
  * 
@@ -6,7 +11,7 @@
  * Used by AJAX calls to refresh tokens before form submission.
  */
 
-session_start();
+if (session_status() === PHP_SESSION_NONE) { session_start(); }
 
 // Always return JSON content type and disable caching
 header('Content-Type: application/json');
@@ -68,3 +73,4 @@ echo json_encode([
     'token' => $token,
     'action' => $action
 ]);
+exit;

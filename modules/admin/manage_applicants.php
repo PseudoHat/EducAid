@@ -5733,61 +5733,70 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    async function fetchMigrationCsrfToken() {
-        try {
-            const res = await fetch('get_csrf_token.php?action=csv_migration', {
-                headers: { 'Accept': 'application/json' },
-                credentials: 'same-origin',
-                cache: 'no-store'
-            });
-            if (!res.ok) {
-                throw new Error('HTTP ' + res.status);
-            }
-            const ct = (res.headers.get('content-type') || '').toLowerCase();
-            if (!ct.includes('application/json')) {
-                const text = await res.text();
-                throw new Error('Non-JSON response: ' + text.slice(0, 120));
-            }
-            const data = await res.json();
-            if (!data || !data.success || !data.token) {
-                throw new Error('Invalid token payload');
-            }
-            // Populate hidden inputs in both forms if present
-            if (migrationUploadForm) {
-                const inp = migrationUploadForm.querySelector('input[name="csrf_token"]');
-                if (inp) inp.value = data.token;
-            }
-            if (migrationConfirmForm) {
-                const inp2 = migrationConfirmForm.querySelector('input[name="csrf_token"]');
-                if (inp2) inp2.value = data.token;
-            }
-            if (migrationCancelForm) {
-                const inp3 = migrationCancelForm.querySelector('input[name="csrf_token"]');
-                if (inp3) inp3.value = data.token;
-            }
-            // Enable Preview button once token present
-            const btn = getPreviewBtn();
-            if (btn) btn.disabled = false;
-            return true;
-        } catch (e) {
-            console.warn('[Migration] CSRF fetch failed:', e);
-            const btn = getPreviewBtn();
-            if (btn) btn.disabled = true;
-            // Gentle inline notice if modal is open
-            try {
-                const noticeId = 'migrationTokenNotice';
-                let n = document.getElementById(noticeId);
-                if (!n && migrationModalEl) {
-                    n = document.createElement('div');
-                    n.id = noticeId;
-                    n.className = 'alert alert-warning my-2';
-                    n.innerHTML = '<strong>Security token not ready.</strong> Please reload the page or try again.';
-                    const body = migrationModalEl.querySelector('.modal-body');
-                    if (body) body.prepend(n);
-                }
-            } catch (_) {}
-            return false;
+    let _migTokenPromise = null;
+    async function fetchMigrationCsrfToken(retries = 2, delayMs = 400) {
+        if (_migTokenPromise) return _migTokenPromise; // de-dup concurrent fetches
+        const btn = getPreviewBtn();
+        let originalHtml = null;
+        if (btn) {
+            originalHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Preparing…';
         }
+        const attempt = async (remaining, wait) => {
+            try {
+                const res = await fetch('get_csrf_token.php?action=csv_migration', {
+                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                    credentials: 'same-origin',
+                    cache: 'no-store'
+                });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                const ct = (res.headers.get('content-type') || '').toLowerCase();
+                if (!ct.includes('application/json')) {
+                    const text = await res.text();
+                    throw new Error('Non-JSON response: ' + text.slice(0, 160));
+                }
+                const data = await res.json();
+                if (!data || !data.success || !data.token) throw new Error('Invalid token payload');
+                // Populate hidden inputs in all relevant forms
+                if (migrationUploadForm) {
+                    const inp = migrationUploadForm.querySelector('input[name="csrf_token"]');
+                    if (inp) inp.value = data.token;
+                }
+                if (migrationConfirmForm) {
+                    const inp2 = migrationConfirmForm.querySelector('input[name="csrf_token"]');
+                    if (inp2) inp2.value = data.token;
+                }
+                if (migrationCancelForm) {
+                    const inp3 = migrationCancelForm.querySelector('input[name="csrf_token"]');
+                    if (inp3) inp3.value = data.token;
+                }
+                if (btn) { btn.disabled = false; btn.innerHTML = originalHtml; }
+                return true;
+            } catch (e) {
+                if (remaining > 0) {
+                    await new Promise(r => setTimeout(r, wait));
+                    return attempt(remaining - 1, Math.min(wait * 2, 2000));
+                }
+                console.warn('[Migration] CSRF fetch failed after retries:', e);
+                if (btn) { btn.disabled = true; btn.innerHTML = originalHtml || btn.innerHTML; }
+                try {
+                    const noticeId = 'migrationTokenNotice';
+                    let n = document.getElementById(noticeId);
+                    if (!n && migrationModalEl) {
+                        n = document.createElement('div');
+                        n.id = noticeId;
+                        n.className = 'alert alert-warning my-2';
+                        n.innerHTML = '<strong>Security token not ready.</strong> Please reload the page or try again.';
+                        const body = migrationModalEl.querySelector('.modal-body');
+                        if (body) body.prepend(n);
+                    }
+                } catch(_) {}
+                return false;
+            }
+        };
+        _migTokenPromise = attempt(retries, delayMs).finally(() => { _migTokenPromise = null; });
+        return _migTokenPromise;
     }
 
     // Guard form submits if token missing
@@ -5812,8 +5821,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // Refresh token when modal is shown and on file selection
     if (migrationModalEl) {
         migrationModalEl.addEventListener('shown.bs.modal', function() {
-            const btn = getPreviewBtn();
-            if (btn) btn.disabled = true;
             fetchMigrationCsrfToken();
         });
     }
