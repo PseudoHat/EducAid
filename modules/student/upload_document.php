@@ -195,14 +195,31 @@ if (!$current_academic_year) {
 // 1. They don't have year level data at all, OR
 // 2. There's an active distribution and their status_academic_year doesn't match the current one
 // BUT: Migrated students with incomplete profiles are handled separately above
-$has_year_level_credentials = !empty($student['current_year_level']) && 
-                               !empty($student['status_academic_year']) && 
-                               $student['is_graduating'] !== null &&
-                               (!$current_academic_year || $student['status_academic_year'] === $current_academic_year);
+$has_year_level_credentials = !empty($student['current_year_level']) &&
+                               !empty($student['status_academic_year']) &&
+                               $student['is_graduating'] !== null;
 
-// Store year level update requirement in variable (don't redirect, show modal instead)
-// Only set this if NOT a migrated student needing profile completion
-$needs_year_level_update = !$needs_university_selection && !$has_year_level_credentials;
+// Determine reupload vs new registrant context
+$is_reupload_context = $needs_upload && !$is_migrated; // Migrated uses separate profile modal
+$has_prior_year_confirmation = !empty($student['status_academic_year']);
+
+// Year advancement should trigger ONLY when:
+// - In reupload context (returning student updating docs)
+// - Prior year confirmation exists
+// - Distribution academic year is active and changed
+// - And student already has some year level credentials (avoid brand new registrant)
+$year_changed = $current_academic_year && $has_prior_year_confirmation && $student['status_academic_year'] !== $current_academic_year;
+// Missing critical year credential after prior confirmation (e.g., is_graduating null or current_year_level empty)
+$credentials_incomplete_after_confirmation = $has_prior_year_confirmation && ($student['is_graduating'] === null || empty($student['current_year_level']));
+
+// Final decision for showing year advancement modal
+$needs_year_level_update = false;
+if (!$needs_university_selection) {
+    if ($is_reupload_context && ($year_changed || $credentials_incomplete_after_confirmation)) {
+        $needs_year_level_update = true;
+    }
+}
+
 $year_level_update_message = '';
 $force_update = isset($_GET['force_update']) && $_GET['force_update'] == '1';
 
@@ -211,12 +228,12 @@ if ($needs_university_selection) {
     // PRIORITY: Migrated student profile completion
     $year_level_update_message = "Welcome! As a migrated student, please complete your profile by providing your university, mother's maiden name, school ID, and current year level information.";
 } elseif ($needs_year_level_update) {
-    if ($force_update) {
-        $year_level_update_message = "You must update your year level before accessing other pages. Please provide your current information below.";
-    } elseif ($current_academic_year && !empty($student['status_academic_year']) && $student['status_academic_year'] !== $current_academic_year) {
-        $year_level_update_message = "A new distribution has started for Academic Year {$current_academic_year}. Your last recorded year level was for A.Y. {$student['status_academic_year']}. Please update your current information.";
-    } else {
-        $year_level_update_message = "Please provide your current year level and graduation status to continue.";
+    if ($year_changed) {
+        $year_level_update_message = "Academic Year {$current_academic_year} is active. Please confirm or advance your year level (last recorded A.Y. {$student['status_academic_year']}).";
+    } elseif ($credentials_incomplete_after_confirmation) {
+        $year_level_update_message = "Please complete missing year credentials (year level or graduation status) to proceed.";
+    } elseif ($force_update) {
+        $year_level_update_message = "Year credentials update required before continuing.";
     }
 }
 
@@ -249,8 +266,8 @@ if ($test_mode) {
 // 3. Student is NOT given (students who received aid are in read-only mode)
 $can_upload = $needs_upload && $student_status !== 'active' && $student_status !== 'given' && !$test_mode;
 
-// Student is in read-only mode if they're a new registrant (not migrated) OR they're already active OR they have received aid
-$is_new_registrant = (!$needs_upload && !$is_migrated) || $student_status === 'active' || $student_status === 'given';
+// Student is in read-only mode if they're a new registrant (no reupload, not migrated) OR already active OR has received aid
+$is_new_registrant = ((!$needs_upload && !$is_migrated) || $student_status === 'active' || $student_status === 'given');
 
 // Get list of documents that need re-upload (if any)
 $documents_to_reupload = [];
@@ -2329,6 +2346,10 @@ $page_title = 'Upload Documents';
 </head>
 <body>
     <!-- Student Topbar -->
+        /* Modal overlay stacking fix */
+        .modal { z-index: 1065; }
+        .modal-backdrop { z-index: 1060; }
+        .sidebar-backdrop { z-index: 1040; }
     <?php include __DIR__ . '/../../includes/student/student_topbar.php'; ?>
     
     <div id="wrapper" style="padding-top: var(--topbar-h, 60px);">
