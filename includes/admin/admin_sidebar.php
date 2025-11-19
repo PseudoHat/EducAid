@@ -109,10 +109,11 @@ $isSysControlsActive = in_array($current, $sysControlsFiles, true);
 
 /** Submenu membership for "Website CMS" (super_admin) */
 $cmsFiles = [
+    'municipality_content.php',
+    'header_appearance.php',
     'topbar_settings.php',
     'sidebar_settings.php',
     'footer_settings.php',
-    'municipality_content.php',
 ];
 $isCMSActive = in_array($current, $cmsFiles, true);
 
@@ -372,6 +373,16 @@ $canScanQRPublished = $canScanQR && $schedulePublished;
 
         <ul class="collapse list-unstyled ms-3 <?= $isCMSActive ? 'show' : '' ?>" id="submenu-cms">
           <li>
+            <a class="submenu-link <?= is_active('municipality_content.php', $current) ? 'active' : '' ?>" href="municipality_content.php">
+              <i class="bi bi-building me-2"></i> Municipality Branding
+            </a>
+          </li>
+          <li>
+            <a class="submenu-link <?= is_active('header_appearance.php', $current) ? 'active' : '' ?>" href="header_appearance.php">
+              <i class="bi bi-layout-three-columns me-2"></i> Header Appearance
+            </a>
+          </li>
+          <li>
             <a class="submenu-link <?= is_active('topbar_settings.php', $current) ? 'active' : '' ?>" href="topbar_settings.php">
               <i class="bi bi-layout-text-window-reverse me-2"></i> Topbar Settings
             </a>
@@ -384,11 +395,6 @@ $canScanQRPublished = $canScanQR && $schedulePublished;
           <li>
             <a class="submenu-link <?= is_active('footer_settings.php', $current) ? 'active' : '' ?>" href="footer_settings.php">
               <i class="bi bi-layout-text-sidebar-reverse me-2"></i> Footer Settings
-            </a>
-          </li>
-          <li>
-            <a class="submenu-link <?= is_active('municipality_content.php', $current) ? 'active' : '' ?>" href="municipality_content.php">
-              <i class="bi bi-building me-2"></i> Municipality Branding
             </a>
           </li>
         </ul>

@@ -21,7 +21,6 @@ include_once __DIR__ . '/../../config/database.php';
 include_once __DIR__ . '/../../services/ThemeSettingsService.php';
 include_once __DIR__ . '/../../controllers/TopbarSettingsController.php';
 include_once __DIR__ . '/../../includes/CSRFProtection.php';
-include_once __DIR__ . '/../../services/HeaderThemeService.php';
 
 // Check if super admin
 $admin_role = getCurrentAdminRole($connection);
@@ -32,7 +31,6 @@ if ($admin_role !== 'super_admin') {
 
 // Initialize services
 $themeService = new ThemeSettingsService($connection);
-$headerThemeService = new HeaderThemeService($connection);
 $controller = new TopbarSettingsController($themeService, $_SESSION['admin_id'] ?? 0, $connection);
 
 // Ensure fresh CSRF token on GET requests (clear old tokens)
@@ -161,9 +159,6 @@ $current_settings = $form_result['success'] && isset($form_result['data'])
   ? $form_result['data'] 
   : $themeService->getCurrentSettings();
 
-// Header theme settings retrieval (after any save)
-$header_settings = $headerThemeService->getCurrentSettings();
-
 $defaults = $themeService->getDefaultSettings();
 $topbar_bg_color = $current_settings['topbar_bg_color'] ?? ($defaults['topbar_bg_color'] ?? '#2e7d32');
 if (empty($topbar_bg_color)) {
@@ -237,7 +232,7 @@ if (empty($preview_text_color)) {
   /* Sticky preview wrapper */
   body.topbar-settings-page .preview-wrapper {
     position: sticky;
-    top: 80px;
+    top: 120px;
     z-index: 100;
     margin-bottom: 1.5rem;
     transition: all 0.3s ease;
@@ -708,35 +703,6 @@ if (empty($preview_text_color)) {
                 </div>
               </div>
               
-              <div class="settings-card">
-                <h5 class="mb-4">
-                  <i class="bi bi-building-fill"></i>
-                  System Information
-                </h5>
-                
-                <div class="mb-3">
-                  <label for="system_name" class="form-label">System Name</label>
-                  <input type="text" class="form-control" id="system_name" name="system_name" 
-                         value="<?= htmlspecialchars($current_settings['system_name']) ?>" 
-                         placeholder="EducAid">
-                  <div class="form-text">
-                    <i class="bi bi-info-circle"></i> Name of the system/application. 
-                    <strong>Displayed in the website navigation bar as the brand name.</strong>
-                  </div>
-                </div>
-                
-                <div class="mb-0">
-                  <label for="municipality_name" class="form-label">Municipality Name</label>
-                  <input type="text" class="form-control" id="municipality_name" name="municipality_name" 
-                         value="<?= htmlspecialchars($current_settings['municipality_name']) ?>" 
-                         placeholder="City of General Trias">
-                  <div class="form-text">
-                    <i class="bi bi-info-circle"></i> Name of the municipality or local government unit. 
-                    <strong>Displayed in the website navigation bar after the system name (format: System Name • Municipality Name).</strong>
-                  </div>
-                </div>
-              </div>
-              
               <!-- Color Settings Section -->
               <div class="settings-card">
                 <h5 class="mb-4">
@@ -825,93 +791,6 @@ if (empty($preview_text_color)) {
                              readonly>
                     </div>
                   </div>
-                </div>
-              </div>
-
-              <!-- Header Color Settings (with inline preview) -->
-              <div class="settings-card">
-                <h5 class="mb-4">
-                  <i class="bi bi-layout-three-columns"></i>
-                  Header Appearance
-                </h5>
-                <div class="row mb-4 g-3 align-items-stretch">
-                  <div class="col-lg-7">
-                    <!-- Header color inputs -->
-                    <div class="row mb-3">
-                      <div class="col-md-6 mb-3 mb-md-0">
-                        <label class="form-label"><i class="bi bi-paint-bucket"></i> Header Background</label>
-                        <div class="input-group">
-                          <input type="color" class="form-control form-control-color" name="header_bg_color" id="header_bg_color" value="<?= htmlspecialchars($header_settings['header_bg_color']) ?>">
-                          <input type="text" class="form-control" value="<?= htmlspecialchars($header_settings['header_bg_color']) ?>" readonly>
-                        </div>
-                      </div>
-                      <div class="col-md-6">
-                        <label class="form-label"><i class="bi bi-border-style"></i> Header Border Color</label>
-                        <div class="input-group">
-                          <input type="color" class="form-control form-control-color" name="header_border_color" id="header_border_color" value="<?= htmlspecialchars($header_settings['header_border_color']) ?>">
-                          <input type="text" class="form-control" value="<?= htmlspecialchars($header_settings['header_border_color']) ?>" readonly>
-                        </div>
-                      </div>
-                    </div>
-                    <div class="row mb-3">
-                      <div class="col-md-6 mb-3 mb-md-0">
-                        <label class="form-label"><i class="bi bi-fonts"></i> Header Text Color</label>
-                        <div class="input-group">
-                          <input type="color" class="form-control form-control-color" name="header_text_color" id="header_text_color" value="<?= htmlspecialchars($header_settings['header_text_color']) ?>">
-                          <input type="text" class="form-control" value="<?= htmlspecialchars($header_settings['header_text_color']) ?>" readonly>
-                        </div>
-                      </div>
-                      <div class="col-md-6">
-                        <label class="form-label"><i class="bi bi-brightness-high"></i> Header Icon Color</label>
-                        <div class="input-group">
-                          <input type="color" class="form-control form-control-color" name="header_icon_color" id="header_icon_color" value="<?= htmlspecialchars($header_settings['header_icon_color']) ?>">
-                          <input type="text" class="form-control" value="<?= htmlspecialchars($header_settings['header_icon_color']) ?>" readonly>
-                        </div>
-                      </div>
-                    </div>
-                    <div class="row mb-0">
-                      <div class="col-md-6 mb-3 mb-md-0">
-                        <label class="form-label"><i class="bi bi-mouse"></i> Header Hover Background</label>
-                        <div class="input-group">
-                          <input type="color" class="form-control form-control-color" name="header_hover_bg" id="header_hover_bg" value="<?= htmlspecialchars($header_settings['header_hover_bg']) ?>">
-                          <input type="text" class="form-control" value="<?= htmlspecialchars($header_settings['header_hover_bg']) ?>" readonly>
-                        </div>
-                      </div>
-                      <div class="col-md-6">
-                        <label class="form-label"><i class="bi bi-cursor"></i> Header Hover Icon Color</label>
-                        <div class="input-group">
-                          <input type="color" class="form-control form-control-color" name="header_hover_icon_color" id="header_hover_icon_color" value="<?= htmlspecialchars($header_settings['header_hover_icon_color']) ?>">
-                          <input type="text" class="form-control" value="<?= htmlspecialchars($header_settings['header_hover_icon_color']) ?>" readonly>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  <div class="col-lg-5">
-                    <div class="border rounded-3 p-3 h-100 d-flex flex-column" style="background: linear-gradient(135deg, #fafafa 0%, #f0f0f0 100%); border: 2px solid #e2e8f0 !important;">
-                      <div class="fw-semibold small text-muted mb-3 d-flex align-items-center gap-2">
-                        <i class="bi bi-eye-fill"></i>
-                        Header Preview
-                        <span class="badge bg-info" style="font-size: 0.65rem; padding: 0.25rem 0.5rem;">Live</span>
-                      </div>
-                      <div class="preview-header border rounded-2 p-3 flex-grow-1" id="preview-header" style="background: <?= htmlspecialchars($header_settings['header_bg_color']) ?>; border:2px solid <?= htmlspecialchars($header_settings['header_border_color']) ?> !important;">
-                        <div class="d-flex align-items-center justify-content-between">
-                          <div class="d-flex align-items-center gap-2">
-                            <button type="button" class="btn btn-sm" id="preview-menu-btn" style="background: <?= htmlspecialchars($header_settings['header_hover_bg']) ?>; color: <?= htmlspecialchars($header_settings['header_icon_color']) ?>; border-radius: 6px;">
-                              <i class="bi bi-list"></i>
-                            </button>
-                            <span class="fw-semibold" id="preview-header-title" style="color: <?= htmlspecialchars($header_settings['header_text_color']) ?>;">Header Area</span>
-                          </div>
-                          <div class="d-flex align-items-center gap-2">
-                            <button type="button" class="btn btn-sm" style="background:#f8fbf8; color: <?= htmlspecialchars($header_settings['header_icon_color']) ?>; border-radius: 6px;"><i class="bi bi-bell"></i></button>
-                            <button type="button" class="btn btn-sm" style="background:#f8fbf8; color: <?= htmlspecialchars($header_settings['header_icon_color']) ?>; border-radius: 6px;"><i class="bi bi-person-circle"></i></button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div class="row mb-3">
-                  <!-- (Legacy placeholder row removed; preview integrated above) -->
                 </div>
               </div>
 

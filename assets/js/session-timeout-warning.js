@@ -119,7 +119,7 @@ class SessionTimeoutWarning {
     createWarningModal() {
         const modal = document.createElement('div');
         modal.id = 'session-timeout-warning-modal';
-        modal.className = 'session-timeout-modal';
+        modal.className = 'session-timeout-modal toast-mode';
         modal.style.display = 'none';
         
         modal.innerHTML = `
@@ -174,7 +174,6 @@ class SessionTimeoutWarning {
         }
         
         modal.style.display = 'block';
-        document.body.style.overflow = 'hidden';
         
         // Start countdown
         this.startCountdown(secondsRemaining);
@@ -189,7 +188,6 @@ class SessionTimeoutWarning {
         this.warningShown = false;
         const modal = document.getElementById('session-timeout-warning-modal');
         modal.style.display = 'none';
-        document.body.style.overflow = '';
         
         // Stop countdown
         if (this.countdownIntervalId) {

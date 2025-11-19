@@ -25,24 +25,34 @@ $municipality_logo = null;
 $municipality_name = 'General Trias';
 
 if (isset($connection)) {
-    // Fetch General Trias municipality data (assuming municipality_id = 1 or name = 'General Trias')
+    // Fetch General Trias municipality data with correct logo logic
     $muni_result = pg_query_params(
         $connection,
-        "SELECT name, logo_image 
+        "SELECT name, 
+                custom_logo_image,
+                preset_logo_image,
+                use_custom_logo,
+                CASE 
+                    WHEN use_custom_logo = TRUE AND custom_logo_image IS NOT NULL AND custom_logo_image != '' 
+                    THEN custom_logo_image
+                    ELSE preset_logo_image
+                END AS active_logo
          FROM municipalities 
-         WHERE LOWER(name) LIKE LOWER($1)
+         WHERE municipality_id = $1
          LIMIT 1",
-        ['%general trias%']
+        [1] // municipality_id for General Trias
     );
     
     if ($muni_result && pg_num_rows($muni_result) > 0) {
         $muni_data = pg_fetch_assoc($muni_result);
         $municipality_name = $muni_data['name'];
         
-        if (!empty($muni_data['logo_image'])) {
-            $logo_path = trim($muni_data['logo_image']);
+        if (!empty($muni_data['active_logo'])) {
+            $logo_path = trim($muni_data['active_logo']);
             // Remove leading slash if present to make it relative to root
             $municipality_logo = ltrim($logo_path, '/');
+            // Add cache-busting timestamp
+            $municipality_logo .= '?t=' . time();
         }
         pg_free_result($muni_result);
     }

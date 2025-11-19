@@ -115,8 +115,15 @@ if ($navbar_is_super_admin && isset($connection)) {
     if ($muni_id) {
         $muni_result = pg_query_params(
             $connection,
-            "SELECT name, 
-                    COALESCE(custom_logo_image, preset_logo_image) AS active_logo
+            "SELECT name,
+                    custom_logo_image,
+                    preset_logo_image,
+                    use_custom_logo,
+                    CASE 
+                        WHEN use_custom_logo = TRUE AND custom_logo_image IS NOT NULL AND custom_logo_image != '' 
+                        THEN custom_logo_image
+                        ELSE preset_logo_image
+                    END AS active_logo
              FROM municipalities 
              WHERE municipality_id = $1 
              LIMIT 1",
@@ -158,6 +165,12 @@ if ($navbar_is_super_admin && isset($connection)) {
                     
                     // Use base_path to create correct relative path
                     $navbar_municipality_logo = $base_path . $encoded;
+                }
+                
+                // Add cache-busting timestamp to force browser refresh
+                if ($navbar_municipality_logo && !preg_match('#^data:image#i', $navbar_municipality_logo)) {
+                    $separator = (strpos($navbar_municipality_logo, '?') !== false) ? '&' : '?';
+                    $navbar_municipality_logo .= $separator . 't=' . time();
                 }
             }
             pg_free_result($muni_result);

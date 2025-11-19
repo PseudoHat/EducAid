@@ -126,8 +126,7 @@ class TopbarSettingsController {
         $changes = [];
         $trackable_fields = [
             'topbar_email', 'topbar_phone', 'topbar_office_hours',
-            'system_name', 'municipality_name', 'topbar_bg_color',
-            'topbar_bg_gradient', 'topbar_text_color', 'topbar_link_color'
+            'topbar_bg_color', 'topbar_bg_gradient', 'topbar_text_color', 'topbar_link_color'
         ];
         
         foreach ($trackable_fields as $field) {

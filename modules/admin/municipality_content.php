@@ -226,6 +226,54 @@ if (isset($_GET['colors_updated'])) {
     $feedback = ['type' => 'success', 'message' => 'Municipality colors updated successfully!'];
 }
 
+if (isset($_GET['system_info_updated'])) {
+    $feedback = ['type' => 'success', 'message' => 'System information updated successfully!'];
+}
+
+// Handle system information update
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_system_info'])) {
+    $token = $_POST['csrf_token'] ?? '';
+    if (!CSRFProtection::validateToken('municipality-system-info', $token)) {
+        $feedback = ['type' => 'danger', 'message' => 'Security token expired. Please try again.'];
+    } else {
+        $systemName = trim($_POST['system_name'] ?? '');
+        $municipalityName = trim($_POST['municipality_name'] ?? '');
+        
+        if (empty($systemName)) {
+            $feedback = ['type' => 'danger', 'message' => 'System name is required.'];
+        } elseif (empty($municipalityName)) {
+            $feedback = ['type' => 'danger', 'message' => 'Municipality name is required.'];
+        } else {
+            // Update in theme_settings table
+            $updateRes = pg_query_params(
+                $connection,
+                'UPDATE theme_settings SET system_name = $1, municipality_name = $2, updated_at = CURRENT_TIMESTAMP, updated_by = $3 WHERE municipality_id = $4',
+                [$systemName, $municipalityName, $adminId, 1]
+            );
+            
+            if ($updateRes && pg_affected_rows($updateRes) > 0) {
+                header("Location: municipality_content.php?system_info_updated=1");
+                exit;
+            } elseif ($updateRes && pg_affected_rows($updateRes) === 0) {
+                // Try insert if no row exists
+                $insertRes = pg_query_params(
+                    $connection,
+                    'INSERT INTO theme_settings (municipality_id, system_name, municipality_name, updated_by) VALUES ($1, $2, $3, $4)',
+                    [1, $systemName, $municipalityName, $adminId]
+                );
+                if ($insertRes) {
+                    header("Location: municipality_content.php?system_info_updated=1");
+                    exit;
+                } else {
+                    $feedback = ['type' => 'danger', 'message' => 'Database error updating system information.'];
+                }
+            } else {
+                $feedback = ['type' => 'danger', 'message' => 'Database error updating system information.'];
+            }
+        }
+    }
+}
+
 $activeMunicipalityId = $_SESSION['active_municipality_id'] ?? null;
 if (!$activeMunicipalityId && !empty($assignedMunicipalities)) {
     $activeMunicipalityId = $assignedMunicipalities[0]['municipality_id'];
@@ -251,6 +299,15 @@ $otherMunicipalities = array_filter(
     fn($m) => $activeMunicipality && $m['municipality_id'] !== $activeMunicipality['municipality_id']
 );
 
+// Fetch system information from theme_settings
+$systemInfoSettings = [];
+$systemInfoQuery = pg_query_params($connection, "SELECT system_name, municipality_name FROM theme_settings WHERE municipality_id = $1 LIMIT 1", [1]);
+if ($systemInfoQuery && ($systemInfoRow = pg_fetch_assoc($systemInfoQuery))) {
+    $systemInfoSettings = $systemInfoRow;
+} else {
+    $systemInfoSettings = ['system_name' => 'EducAid', 'municipality_name' => 'City of General Trias'];
+}
+
 function content_block_count($connection, string $table, int $municipalityId): ?int {
     if (!table_exists($connection, $table)) {
         return null;
@@ -267,6 +324,15 @@ function content_block_count($connection, string $table, int $municipalityId): ?
     $row = pg_fetch_assoc($res) ?: [];
     pg_free_result($res);
     return isset($row['total']) ? (int) $row['total'] : 0;
+}
+
+// Fetch system information from theme_settings
+$systemInfoSettings = [];
+$systemInfoQuery = pg_query_params($connection, "SELECT system_name, municipality_name FROM theme_settings WHERE municipality_id = $1 LIMIT 1", [1]);
+if ($systemInfoQuery && ($systemInfoRow = pg_fetch_assoc($systemInfoQuery))) {
+    $systemInfoSettings = $systemInfoRow;
+} else {
+    $systemInfoSettings = ['system_name' => 'EducAid', 'municipality_name' => 'City of General Trias'];
 }
 
 $quickActions = [];
@@ -400,12 +466,16 @@ include __DIR__ . '/../../includes/admin/admin_head.php';
                 <div class="card-body">
                     <div class="row g-4 align-items-center">
                         <div class="col-auto">
-                            <div class="muni-logo-wrapper position-relative">
+                            <div class="muni-logo-wrapper position-relative" id="logoContainer">
                                 <?php $logo = build_logo_src($activeMunicipality['active_logo']); ?>
                                 <?php if ($logo): ?>
-                                    <img src="<?= htmlspecialchars($logo) ?>" alt="<?= htmlspecialchars($activeMunicipality['name']) ?> logo" id="municipalityLogo">
+                                    <img src="<?= htmlspecialchars($logo) ?>?t=<?= time() ?>" 
+                                         alt="<?= htmlspecialchars($activeMunicipality['name']) ?> logo" 
+                                         id="municipalityLogo" 
+                                         loading="lazy"
+                                         onerror="console.error('Logo load error:', this.src); this.onerror=null; this.parentElement.innerHTML='<span class=\'text-danger fw-semibold\'><i class=\'bi bi-exclamation-triangle me-1\'></i>Logo Error</span><small class=\'d-block text-muted mt-1\'>Path: <?= htmlspecialchars($activeMunicipality['active_logo']) ?></small>';">
                                 <?php else: ?>
-                                    <span class="text-muted fw-semibold">No Logo</span>
+                                    <span class="text-muted fw-semibold"><i class="bi bi-image me-1"></i>No Logo</span>
                                 <?php endif; ?>
                                 <?php 
                                 $hasPreset = !empty($activeMunicipality['preset_logo_image']);
@@ -485,6 +555,40 @@ include __DIR__ . '/../../includes/admin/admin_head.php';
                                     <i class="bi bi-sliders me-1"></i>Settings
                                 </a>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- System Information Section -->
+            <div class="card mb-4 shadow-sm">
+                <div class="card-header bg-white py-3">
+                    <h5 class="mb-0">
+                        <i class="bi bi-building-fill me-2 text-primary"></i>System Information
+                    </h5>
+                </div>
+                <div class="card-body p-4">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">System Name</label>
+                            <input type="text" class="form-control" value="<?= htmlspecialchars($systemInfoSettings['system_name']) ?>" readonly>
+                            <div class="form-text">
+                                <i class="bi bi-info-circle"></i> Name of the system/application. 
+                                <strong>Displayed in the website navigation bar as the brand name.</strong>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Municipality Name</label>
+                            <input type="text" class="form-control" value="<?= htmlspecialchars($systemInfoSettings['municipality_name']) ?>" readonly>
+                            <div class="form-text">
+                                <i class="bi bi-info-circle"></i> Name of the municipality or local government unit. 
+                                <strong>Displayed in the website navigation bar after the system name (format: System Name • Municipality Name).</strong>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#editSystemInfoModal">
+                                <i class="bi bi-pencil-square me-1"></i>Edit System Information
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -684,10 +788,19 @@ document.addEventListener('DOMContentLoaded', function() {
     const logoUploadForm = document.getElementById('logoUploadForm');
     const toggleLogoTypeBtn = document.getElementById('toggleLogoType');
     
+    // Debug: Log current logo info
+    const logoImg = document.getElementById('municipalityLogo');
+    if (logoImg) {
+        console.log('Current logo src:', logoImg.src);
+        console.log('Logo load status:', logoImg.complete ? 'loaded' : 'loading');
+    }
+    
     // Preview selected image
     logoFileInput?.addEventListener('change', function(e) {
         const file = e.target.files[0];
         if (file) {
+            console.log('File selected:', file.name, 'Size:', file.size, 'Type:', file.type);
+            
             // Validate file size
             if (file.size > 5 * 1024 * 1024) {
                 showFeedback('danger', 'File size exceeds 5MB limit');
@@ -701,6 +814,7 @@ document.addEventListener('DOMContentLoaded', function() {
             reader.onload = function(e) {
                 previewImage.src = e.target.result;
                 previewContainer.style.display = 'block';
+                console.log('Preview loaded');
             };
             reader.readAsDataURL(file);
         } else {
@@ -764,12 +878,34 @@ document.addEventListener('DOMContentLoaded', function() {
                 body: formData
             });
             
+            // Check if response is ok
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const contentType = response.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+                const text = await response.text();
+                console.error('Non-JSON response:', text);
+                throw new Error('Server returned non-JSON response');
+            }
+            
             const result = await response.json();
+            console.log('Upload result:', result);
             
             if (result.success) {
                 showFeedback('success', result.message || 'Logo uploaded successfully!');
+                
+                // Update the logo image immediately if present
+                const logoImg = document.getElementById('municipalityLogo');
+                if (logoImg && result.logo_url) {
+                    // Add cache-busting parameter to force reload
+                    logoImg.src = result.logo_url + '?t=' + new Date().getTime();
+                }
+                
                 setTimeout(() => {
-                    window.location.reload();
+                    // Force hard reload to clear any cached assets
+                    window.location.reload(true);
                 }, 1500);
             } else {
                 showFeedback('danger', result.message || 'Upload failed');
@@ -1153,6 +1289,48 @@ document.getElementById('saveColorsBtn')?.addEventListener('click', async functi
     }
 });
 </script>
+
+<!-- Edit System Information Modal -->
+<div class="modal fade" id="editSystemInfoModal" tabindex="-1" aria-labelledby="editSystemInfoModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form method="POST" action="">
+        <input type="hidden" name="update_system_info" value="1">
+        <input type="hidden" name="csrf_token" value="<?= CSRFProtection::generateToken('municipality-system-info') ?>">
+        <div class="modal-header bg-primary bg-opacity-10">
+          <h5 class="modal-title" id="editSystemInfoModalLabel">
+            <i class="bi bi-building-fill me-2"></i>Edit System Information
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="systemNameInput" class="form-label fw-semibold">System Name</label>
+            <input type="text" class="form-control" id="systemNameInput" name="system_name" value="<?= htmlspecialchars($systemInfoSettings['system_name']) ?>" required>
+            <div class="form-text">
+              <i class="bi bi-info-circle"></i> Name of the system/application. <strong>Displayed in the website navigation bar as the brand name.</strong>
+            </div>
+          </div>
+          <div class="mb-0">
+            <label for="municipalityNameInput" class="form-label fw-semibold">Municipality Name</label>
+            <input type="text" class="form-control" id="municipalityNameInput" name="municipality_name" value="<?= htmlspecialchars($systemInfoSettings['municipality_name']) ?>" required>
+            <div class="form-text">
+              <i class="bi bi-info-circle"></i> Name of the municipality or local government unit. <strong>Displayed in the website navigation bar after the system name (format: System Name • Municipality Name).</strong>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+            <i class="bi bi-x-circle me-1"></i>Cancel
+          </button>
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-check-circle me-1"></i>Save Changes
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
 
 <!-- Generate Theme Confirmation Modal -->
 <div class="modal fade" id="generateThemeModal" tabindex="-1" aria-labelledby="generateThemeModalLabel" aria-hidden="true">

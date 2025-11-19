@@ -17,8 +17,6 @@ class ThemeSettingsService {
             'topbar_email' => 'educaid@generaltrias.gov.ph',
             'topbar_phone' => '(046) 886-4454',
             'topbar_office_hours' => 'Mon–Fri 8:00AM - 5:00PM',
-            'system_name' => 'EducAid',
-            'municipality_name' => 'City of General Trias',
             'topbar_bg_color' => '#2e7d32',
             'topbar_bg_gradient' => '#1b5e20',
             'topbar_text_color' => '#ffffff',
@@ -90,8 +88,7 @@ class ThemeSettingsService {
         $sanitized = [];
         $fields = [
             'topbar_email', 'topbar_phone', 'topbar_office_hours',
-            'system_name', 'municipality_name', 'topbar_bg_color',
-            'topbar_bg_gradient', 'topbar_text_color', 'topbar_link_color'
+            'topbar_bg_color', 'topbar_bg_gradient', 'topbar_text_color', 'topbar_link_color'
         ];
         
         $gradientEnabled = !empty($data['topbar_gradient_enabled']);
@@ -126,16 +123,14 @@ class ThemeSettingsService {
     public function updateSettings($data, $admin_id) {
         $query = "INSERT INTO theme_settings (
                     municipality_id, topbar_email, topbar_phone, topbar_office_hours, 
-                    system_name, municipality_name, topbar_bg_color, topbar_bg_gradient, 
+                    topbar_bg_color, topbar_bg_gradient, 
                     topbar_text_color, topbar_link_color, updated_by
-                  ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+                  ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
                   ON CONFLICT (municipality_id) 
                   DO UPDATE SET 
                     topbar_email = EXCLUDED.topbar_email,
                     topbar_phone = EXCLUDED.topbar_phone,
                     topbar_office_hours = EXCLUDED.topbar_office_hours,
-                    system_name = EXCLUDED.system_name,
-                    municipality_name = EXCLUDED.municipality_name,
                     topbar_bg_color = EXCLUDED.topbar_bg_color,
                     topbar_bg_gradient = EXCLUDED.topbar_bg_gradient,
                     topbar_text_color = EXCLUDED.topbar_text_color,
@@ -148,8 +143,6 @@ class ThemeSettingsService {
             $data['topbar_email'],
             $data['topbar_phone'],
             $data['topbar_office_hours'],
-            $data['system_name'],
-            $data['municipality_name'],
             $data['topbar_bg_color'],
             $data['topbar_bg_gradient'],
             $data['topbar_text_color'],

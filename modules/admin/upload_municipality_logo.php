@@ -197,9 +197,13 @@ if (!$updateResult) {
 }
 
 // Success response
+// Generate the URL for the uploaded logo (relative from modules/admin/)
+$logoUrl = '../../' . str_replace('\\', '/', $dbPath);
+
 echo json_encode([
     'success' => true,
     'message' => 'Logo uploaded successfully',
+    'logo_url' => $logoUrl,
     'data' => [
         'municipality_id' => $municipalityId,
         'municipality_name' => $municipality['name'],
