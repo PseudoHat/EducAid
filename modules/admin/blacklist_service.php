@@ -29,6 +29,13 @@ require_once '../../phpmailer/vendor/autoload.php';
 // Better error handling
 try {
 
+// Check database connection first
+if (!isset($connection) || !$connection) {
+    error_log('Blacklist Service: Database connection not available');
+    echo json_encode(['status' => 'error', 'message' => 'Database connection error']);
+    exit;
+}
+
 if (!isset($_SESSION['admin_username'])) {
     echo json_encode(['status' => 'error', 'message' => 'Unauthorized access']);
     exit;
@@ -38,6 +45,13 @@ $admin_id = $_SESSION['admin_id'];
 
 // Get admin info including password for verification
 $adminQuery = pg_query_params($connection, "SELECT email, first_name, last_name, password FROM admins WHERE admin_id = $1", [$admin_id]);
+
+if (!$adminQuery) {
+    error_log('Blacklist Service: Admin query failed - ' . pg_last_error($connection));
+    echo json_encode(['status' => 'error', 'message' => 'Database query error']);
+    exit;
+}
+
 $admin = pg_fetch_assoc($adminQuery);
 
 if (!$admin) {
@@ -64,6 +78,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     // Step 1: Initiate blacklist process - verify password and send OTP
     if ($action === 'initiate_blacklist') {
+        // Validate required fields exist
+        if (empty($_POST['student_id']) || empty($_POST['admin_password']) || empty($_POST['reason_category']) || empty($_POST['detailed_reason'])) {
+            echo json_encode(['status' => 'error', 'message' => 'Missing required fields']);
+            exit;
+        }
+        
         $student_id = trim($_POST['student_id']); // Remove intval for TEXT student_id
         $password = $_POST['admin_password'];
         $reason_category = $_POST['reason_category'];
