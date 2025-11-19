@@ -22,9 +22,10 @@ include __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../includes/CSRFProtection.php';
 require_once __DIR__ . '/../../services/BlacklistService.php';
 
+// Load PHPMailer - autoload MUST come before use statements
+require_once __DIR__ . '/../../phpmailer/vendor/autoload.php';
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
-require_once '../../phpmailer/vendor/autoload.php';
 
 // Better error handling
 try {
