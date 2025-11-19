@@ -179,6 +179,19 @@ function resetGivenStudents($connection) {
         // Safety: ensure unique column names to avoid duplicate SET assignments
         if (!empty($columnCache['document_columns'])) {
             $columnCache['document_columns'] = array_values(array_unique($columnCache['document_columns']));
+            
+            // EXCLUDE explicitly handled columns to prevent multiple assignments in UPDATE
+            // needs_document_upload matches '%upload%' and qr_code_path matches '%_path', etc.
+            $explicitHandled = ['payroll_no','payroll_number','qr_code_path','qr_code','needs_document_upload','student_type','admin_review_required'];
+            $toExclude = [];
+            foreach ($explicitHandled as $colName) {
+                if (isset($columnCache[$colName]) && $columnCache[$colName] === true) {
+                    $toExclude[] = $colName;
+                }
+            }
+            if (!empty($toExclude)) {
+                $columnCache['document_columns'] = array_values(array_diff($columnCache['document_columns'], $toExclude));
+            }
         }
     }
 
