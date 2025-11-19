@@ -35,79 +35,119 @@ $auditLogger = new AuditLogger($connection);
 
 // Handle unarchive action
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'unarchive') {
+    // Ensure clean JSON output with no stray bytes/notices
+    while (ob_get_level()) { ob_end_clean(); }
+    ini_set('display_errors', '0');
     header('Content-Type: application/json');
-    
-    $studentId = $_POST['student_id'] ?? null;
-    $unarchiveReason = trim($_POST['unarchive_reason'] ?? '');
-    
-    if (!$studentId) {
-        echo json_encode(['success' => false, 'message' => 'Student ID is required']);
+    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+    header('Pragma: no-cache');
+    header('X-Content-Type-Options: nosniff');
+
+    // JSON-safe error/exception handlers
+    set_error_handler(function($errno, $errstr, $errfile, $errline) {
+        http_response_code(500);
+        echo json_encode([
+            'success' => false,
+            'message' => 'Server error: ' . $errstr,
+            'debug' => ['file' => basename($errfile), 'line' => $errline]
+        ]);
         exit;
-    }
-    
-    if (empty($unarchiveReason)) {
-        echo json_encode(['success' => false, 'message' => 'Unarchive reason is required']);
+    });
+    set_exception_handler(function($ex) {
+        http_response_code(500);
+        echo json_encode([
+            'success' => false,
+            'message' => 'Server exception: ' . $ex->getMessage()
+        ]);
         exit;
-    }
-    
-    // Get student data before unarchiving for audit log
-    $studentQuery = pg_query_params($connection,
-        "SELECT student_id, first_name, last_name, middle_name, archive_reason, archived_at 
-         FROM students WHERE student_id = $1",
-        [$studentId]
-    );
-    
-    if (!$studentQuery || pg_num_rows($studentQuery) === 0) {
-        echo json_encode(['success' => false, 'message' => 'Student not found']);
-        exit;
-    }
-    
-    $student = pg_fetch_assoc($studentQuery);
-    $fullName = trim($student['first_name'] . ' ' . ($student['middle_name'] ?? '') . ' ' . $student['last_name']);
-    
-    // Unarchive student with reason
-    $result = pg_query_params($connection,
-        "SELECT unarchive_student($1, $2, $3) as success",
-        [$studentId, $adminId, $unarchiveReason]
-    );
-    
-    if ($result && pg_fetch_assoc($result)['success'] === 't') {
-        // Extract archived files back to permanent storage using NEW structure
-        require_once '../../services/UnifiedFileService.php';
-        $fileService = new UnifiedFileService($connection);
-        $extractResult = $fileService->extractArchivedStudent($studentId);
+    });
+    register_shutdown_function(function(){
+        $e = error_get_last();
+        if ($e && in_array($e['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR])) {
+            http_response_code(500);
+            echo json_encode([
+                'success' => false,
+                'message' => 'Fatal error: ' . $e['message']
+            ]);
+        }
+    });
+
+    try {
+        $studentId = $_POST['student_id'] ?? null;
+        $unarchiveReason = trim($_POST['unarchive_reason'] ?? '');
         
-        // Delete the ZIP file after successful extraction
-        $zipDeleted = false;
-        if ($extractResult['success']) {
-            $zipDeleted = $fileService->deleteArchivedZip($studentId);
+        if (!$studentId) {
+            echo json_encode(['success' => false, 'message' => 'Student ID is required']);
+            exit;
         }
         
-        // Log to audit trail
-        $auditLogger->logStudentUnarchived(
-            $adminId,
-            $adminUsername,
-            $studentId,
-            [
-                'full_name' => $fullName,
-                'archive_reason' => $student['archive_reason'],
-                'archived_at' => $student['archived_at'],
-                'files_restored' => $extractResult['files_extracted'] ?? 0,
-                'zip_deleted' => $zipDeleted
-            ]
+        if (empty($unarchiveReason)) {
+            echo json_encode(['success' => false, 'message' => 'Unarchive reason is required']);
+            exit;
+        }
+        
+        // Get student data before unarchiving for audit log
+        $studentQuery = pg_query_params($connection,
+            "SELECT student_id, first_name, last_name, middle_name, archive_reason, archived_at 
+             FROM students WHERE student_id = $1",
+            [$studentId]
         );
         
-        $message = 'Student successfully unarchived';
-        if (($extractResult['files_extracted'] ?? 0) > 0) {
-            $message .= ' and ' . $extractResult['files_extracted'] . ' files restored';
-        }
-        if ($zipDeleted) {
-            $message .= '. Archive ZIP file removed';
+        if (!$studentQuery || pg_num_rows($studentQuery) === 0) {
+            echo json_encode(['success' => false, 'message' => 'Student not found']);
+            exit;
         }
         
-        echo json_encode(['success' => true, 'message' => $message]);
-    } else {
-        echo json_encode(['success' => false, 'message' => 'Failed to unarchive student']);
+        $student = pg_fetch_assoc($studentQuery);
+        $fullName = trim($student['first_name'] . ' ' . ($student['middle_name'] ?? '') . ' ' . $student['last_name']);
+        
+        // Unarchive student with reason
+        $result = pg_query_params($connection,
+            "SELECT unarchive_student($1, $2, $3) as success",
+            [$studentId, $adminId, $unarchiveReason]
+        );
+        
+        if ($result && pg_fetch_assoc($result)['success'] === 't') {
+            // Extract archived files back to permanent storage using NEW structure
+            require_once '../../services/UnifiedFileService.php';
+            $fileService = new UnifiedFileService($connection);
+            $extractResult = $fileService->extractArchivedStudent($studentId);
+            
+            // Delete the ZIP file after successful extraction
+            $zipDeleted = false;
+            if ($extractResult['success']) {
+                $zipDeleted = $fileService->deleteArchivedZip($studentId);
+            }
+            
+            // Log to audit trail
+            $auditLogger->logStudentUnarchived(
+                $adminId,
+                $adminUsername,
+                $studentId,
+                [
+                    'full_name' => $fullName,
+                    'archive_reason' => $student['archive_reason'],
+                    'archived_at' => $student['archived_at'],
+                    'files_restored' => $extractResult['files_extracted'] ?? 0,
+                    'zip_deleted' => $zipDeleted
+                ]
+            );
+            
+            $message = 'Student successfully unarchived';
+            if (($extractResult['files_extracted'] ?? 0) > 0) {
+                $message .= ' and ' . $extractResult['files_extracted'] . ' files restored';
+            }
+            if ($zipDeleted) {
+                $message .= '. Archive ZIP file removed';
+            }
+            
+            echo json_encode(['success' => true, 'message' => $message]);
+        } else {
+            echo json_encode(['success' => false, 'message' => 'Failed to unarchive student']);
+        }
+    } catch (Throwable $t) {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'message' => 'Error: ' . $t->getMessage()]);
     }
     exit;
 }

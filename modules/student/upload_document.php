@@ -374,7 +374,13 @@ if (!isset($_SESSION['processing_lock'])) {
 
 // Handle AJAX year level update
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_year_level'])) {
+    // Harden JSON responses: clean buffers and set headers
+    while (ob_get_level()) { ob_end_clean(); }
+    ini_set('display_errors', '0');
     header('Content-Type: application/json');
+    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+    header('Pragma: no-cache');
+    header('X-Content-Type-Options: nosniff');
     
     try {
         $year_level = $_POST['year_level'] ?? '';
@@ -389,6 +395,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_year_level']))
         // Debug log
         error_log("UPDATE REQUEST - student_id: {$student_id}, university_id: {$university_id}, mothers_maiden_name: " . ($mothers_maiden_name ?: 'NULL') . ", school_student_id: " . ($school_student_id ?: 'NULL') . ", year_level: {$year_level}, is_graduating: " . ($is_graduating ? 'YES' : 'NO') . ", academic_year: {$academic_year}");
         
+        // Idempotency guard: block duplicate identical submissions within a short window
+        if (!isset($_SESSION['year_update_guard'])) { $_SESSION['year_update_guard'] = []; }
+        $fingerprint = sha1($student_id . '|' . $year_level . '|' . ($is_graduating ? '1' : '0') . '|' . $academic_year . '|' . ($university_id ?? '') . '|' . ($mothers_maiden_name ?? '') . '|' . ($school_student_id ?? ''));
+        $now = time();
+        // If last success had same fingerprint recently, return success immediately
+        if (!empty($_SESSION['year_update_guard']['last_success'])
+            && $_SESSION['year_update_guard']['last_success']['fp'] === $fingerprint
+            && ($now - $_SESSION['year_update_guard']['last_success']['ts']) < 300) {
+            echo json_encode([
+                'success' => true,
+                'message' => 'Year level already updated. Reloading...'
+            ]);
+            exit;
+        }
+        // Prevent concurrent in-progress duplicate
+        if (!empty($_SESSION['year_update_guard']['in_progress'])
+            && ($now - $_SESSION['year_update_guard']['in_progress']) < 20) {
+            echo json_encode([
+                'success' => false,
+                'message' => 'Update already in progress. Please wait a moment...'
+            ]);
+            exit;
+        }
+        $_SESSION['year_update_guard']['in_progress'] = $now;
+
         // Password update for migrated students (optional - only required if provided or if completing profile for first time)
         $new_password = isset($_POST['new_password']) ? trim($_POST['new_password']) : null;
         $confirm_password = isset($_POST['confirm_password']) ? trim($_POST['confirm_password']) : null;
@@ -703,7 +734,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_year_level']))
         $is_first_year_confirmation = empty($current_info['status_academic_year']);
         error_log("YEAR LEVEL ADVANCEMENT CHECK - is_first_year_confirmation: " . ($is_first_year_confirmation ? 'YES' : 'NO') . ", status_academic_year: " . ($current_info['status_academic_year'] ?: 'NULL'));
         
-        if (!$is_first_year_confirmation && 
+        // Skip repetition check entirely for migrated students completing profile
+        if (!$is_migrated_student && !$is_first_year_confirmation && 
             !empty($current_info['current_year_level']) && 
             isset($year_levels[$current_info['current_year_level']]) && 
             isset($year_levels[$year_level])) {
@@ -1163,6 +1195,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_year_level']))
                 'success' => true,
                 'message' => 'Year level updated successfully! You can now upload documents.'
             ]);
+            // Mark idempotency last success
+            $_SESSION['year_update_guard']['last_success'] = ['fp' => $fingerprint, 'ts' => time()];
+            unset($_SESSION['year_update_guard']['in_progress']);
         } else {
             error_log("UPDATE RESULT FALSE - This should not happen");
             echo json_encode(['success' => false, 'message' => 'Failed to update year level. Database update failed.']);
@@ -1171,6 +1206,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_year_level']))
         error_log('Year level update EXCEPTION for student ' . $student_id . ': ' . $e->getMessage());
         error_log('Stack trace: ' . $e->getTraceAsString());
         echo json_encode(['success' => false, 'message' => 'Error: ' . $e->getMessage()]);
+    } finally {
+        // Always clear in_progress lock on exit
+        if (isset($_SESSION['year_update_guard']['in_progress'])) {
+            unset($_SESSION['year_update_guard']['in_progress']);
+        }
     }
     error_log("UPDATE HANDLER COMPLETE - exiting");
     exit;
@@ -3368,6 +3408,7 @@ $page_title = 'Upload Documents';
                             <button type="submit" class="btn btn-lg text-white" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none; border-radius: 12px; padding: 16px; font-weight: 600; font-size: 1.05rem; transition: all 0.3s; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);">
                                 <i class="bi bi-check-circle me-2"></i> Update & Continue
                             </button>
+                            <div id="yearUpdateStatus" class="mt-2 small text-muted" role="status" aria-live="polite"></div>
                         </div>
                         
                         <style>
@@ -3495,6 +3536,11 @@ $page_title = 'Upload Documents';
             if (form) {
                 form.addEventListener('submit', async function(e) {
                     e.preventDefault();
+                    const statusEl = document.getElementById('yearUpdateStatus');
+                    if (statusEl) {
+                        statusEl.className = 'mt-2 small text-muted';
+                        statusEl.textContent = 'Submitting, please wait…';
+                    }
                     
                     // Validate passwords match for migrated students (only if password is being changed)
                     const newPasswordInput = document.getElementById('newPassword');
@@ -3508,11 +3554,13 @@ $page_title = 'Upload Documents';
                         if (newPwd || confirmPwd) {
                             if (newPwd !== confirmPwd) {
                                 alert('Passwords do not match. Please check and try again.');
+                                if (statusEl) { statusEl.textContent = ''; }
                                 return;
                             }
                             
                             if (newPwd.length < 8) {
                                 alert('Password must be at least 8 characters long.');
+                                if (statusEl) { statusEl.textContent = ''; }
                                 return;
                             }
                         }
@@ -3550,10 +3598,14 @@ $page_title = 'Upload Documents';
                         } catch (jsonError) {
                             console.error('JSON parse error:', jsonError);
                             console.error('Response text:', text);
-                            throw new Error('Server returned invalid response. Please check the console for details.');
+                            throw new Error('Server returned invalid response.');
                         }
                         
                         if (result.success) {
+                            if (statusEl) {
+                                statusEl.className = 'mt-2 small text-success';
+                                statusEl.textContent = 'Updated successfully.';
+                            }
                             if (result.archived && result.logout_required) {
                                 // Account was archived - show message and logout
                                 alert(result.message);
@@ -3594,6 +3646,7 @@ $page_title = 'Upload Documents';
                             // Student is repeating/going down - requires admin verification
                             submitBtn.disabled = false;
                             submitBtn.innerHTML = originalBtnText;
+                            if (statusEl) { statusEl.textContent = ''; }
                             
                             const confirmMsg = result.message + '\n\nClick OK to confirm and deactivate your account. You will need to contact admin to reactivate.';
                             
@@ -3619,6 +3672,7 @@ $page_title = 'Upload Documents';
                                     alert(archiveResult.message || 'Failed to deactivate account. Please contact administrator.');
                                     submitBtn.disabled = false;
                                     submitBtn.innerHTML = originalBtnText;
+                                    if (statusEl) { statusEl.textContent = ''; }
                                 }
                             }
                         } else {
@@ -3626,12 +3680,29 @@ $page_title = 'Upload Documents';
                             alert(result.message || 'Failed to update year level. Please try again.');
                             submitBtn.disabled = false;
                             submitBtn.innerHTML = originalBtnText;
+                            if (statusEl) {
+                                statusEl.className = 'mt-2 small text-danger';
+                                statusEl.innerHTML = `${(result.message || 'An error occurred.')} <a href="#" id="retryYearUpdate">Try again</a>`;
+                            }
                         }
                     } catch (error) {
                         console.error('Error updating year level:', error);
                         alert('An error occurred. Please try again.');
                         submitBtn.disabled = false;
                         submitBtn.innerHTML = originalBtnText;
+                        if (statusEl) {
+                            statusEl.className = 'mt-2 small text-danger';
+                            statusEl.innerHTML = `Request failed. <a href="#" id="retryYearUpdate">Try again</a>`;
+                        }
+                        // Attach a one-time retry handler
+                        document.addEventListener('click', function onRetry(e){
+                            const target = e.target;
+                            if (target && target.id === 'retryYearUpdate') {
+                                e.preventDefault();
+                                document.removeEventListener('click', onRetry);
+                                submitBtn.click();
+                            }
+                        });
                     }
                 });
             }
