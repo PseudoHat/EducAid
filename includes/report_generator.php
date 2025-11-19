@@ -34,12 +34,17 @@ class ReportGenerator {
      * Set municipality context for headers
      */
     public function setMunicipalityContext($municipalityId) {
-        $result = pg_query_params($this->connection, 
-            "SELECT name, preset_logo_image FROM municipalities WHERE municipality_id = $1", 
+        $result = pg_query_params($this->connection,
+            "SELECT name, preset_logo_image, custom_logo_image, COALESCE(use_custom_logo,false) AS use_custom_logo
+             FROM municipalities WHERE municipality_id = $1",
             [$municipalityId]);
         if ($result && $row = pg_fetch_assoc($result)) {
             $this->municipalityName = $row['name'];
-            $this->municipalityLogo = $row['preset_logo_image'];
+            if (!empty($row['use_custom_logo']) && !empty($row['custom_logo_image'])) {
+                $this->municipalityLogo = $row['custom_logo_image'];
+            } else {
+                $this->municipalityLogo = $row['preset_logo_image'];
+            }
         }
     }
     
@@ -47,11 +52,22 @@ class ReportGenerator {
      * Generate PDF Report
      */
     public function generatePDF($filterData, $reportType = 'student_list') {
+        if (!empty($filterData['municipality_id'])) {
+            $this->setMunicipalityContext($filterData['municipality_id']);
+        }
+        if (isset($filterData['report_type']) && !empty($filterData['report_type'])) {
+            $reportType = $filterData['report_type'];
+        }
         $this->filters->setFilters($filterData);
         $queryData = $this->filters->buildStudentQuery(true);
         
         $result = pg_query_params($this->connection, $queryData['query'], $queryData['params']);
         $students = pg_fetch_all($result) ?: [];
+
+        // Determine payroll inclusion and mapping based on selected distribution (snapshot)
+        $snapshotId = !empty($filterData['distribution_id']) ? $filterData['distribution_id'] : null;
+        $includePayroll = !empty($snapshotId);
+        $payrollMap = $includePayroll ? $this->getPayrollMapForSnapshot($snapshotId) : [];
         
         // Initialize TCPDF
         $pdf = new \TCPDF('L', PDF_UNIT, 'LEGAL', true, 'UTF-8', false);
@@ -80,13 +96,17 @@ class ReportGenerator {
         // Generate content based on report type
         switch ($reportType) {
             case 'student_list':
-                $this->generateStudentListPDF($pdf, $students);
+                $this->generateStudentListPDF($pdf, $students, $includePayroll, $payrollMap);
+                break;
+            case 'applicants_master':
+                $applicants = $this->getApplicantsForMunicipality($filterData);
+                $this->generateApplicantsPDF($pdf, $applicants, $includePayroll, $payrollMap);
                 break;
             case 'statistics':
                 $this->generateStatisticsPDF($pdf, $students);
                 break;
             default:
-                $this->generateStudentListPDF($pdf, $students);
+                $this->generateStudentListPDF($pdf, $students, $includePayroll, $payrollMap);
         }
         
         // Add footer to all pages
@@ -179,52 +199,126 @@ class ReportGenerator {
     /**
      * Generate Student List PDF
      */
-    private function generateStudentListPDF($pdf, $students) {
+    private function generateStudentListPDF($pdf, $students, $includePayroll, $payrollMap = []) {
         $html = '<style>
             table { border-collapse: collapse; width: 100%; }
             th { background-color: #1182FF; color: white; padding: 5px; font-weight: bold; font-size: 8px; text-align: left; }
             td { padding: 4px; font-size: 7px; border-bottom: 1px solid #ddd; }
             tr:nth-child(even) { background-color: #f9f9f9; }
         </style>';
-        
-        $html .= '<table cellpadding="3">';
-        $html .= '<thead><tr>
-            <th width="5%"><b>No.</b></th>
-            <th width="12%"><b>Student ID</b></th>
-            <th width="14%"><b>Payroll Number</b></th>
-            <th width="20%"><b>Name</b></th>
-            <th width="7%"><b>Gender</b></th>
-            <th width="14%"><b>Barangay</b></th>
-            <th width="12%"><b>University</b></th>
-            <th width="8%"><b>Year Level</b></th>
-            <th width="8%"><b>Status</b></th>
-        </tr></thead><tbody>';
-        
-        $no = 1;
-        foreach ($students as $student) {
-            $fullName = trim($student['first_name'] . ' ' . ($student['middle_name'] ? $student['middle_name'] . ' ' : '') . $student['last_name'] . ' ' . ($student['extension_name'] ?: ''));
-            
-            $html .= '<tr>
-                <td>' . $no++ . '</td>
-                <td>' . htmlspecialchars($student['student_id']) . '</td>
-                <td>' . htmlspecialchars($student['payroll_no'] ?? '-') . '</td>
-                <td>' . htmlspecialchars($fullName) . '</td>
-                <td>' . htmlspecialchars($student['sex'] ?: '-') . '</td>
-                <td>' . htmlspecialchars($student['barangay'] ?: '-') . '</td>
-                <td>' . htmlspecialchars($student['university'] ?: '-') . '</td>
-                <td>' . htmlspecialchars($student['year_level'] ?: '-') . '</td>
-                <td>' . htmlspecialchars($student['status_display']) . '</td>
-            </tr>';
+
+        // Define consistent column widths that sum to 100%
+        if ($includePayroll) {
+            $widths = [5, 12, 14, 22, 7, 14, 14, 6, 6]; // With Payroll
+        } else {
+            $widths = [5, 14, 26, 8, 16, 16, 7, 8];     // Without Payroll
         }
         
+        $html .= '<table cellpadding="3">';
+        $html .= '<thead><tr>';
+        $html .= '<th width="' . $widths[0] . '%"><b>No.</b></th>';
+        $html .= '<th width="' . $widths[1] . '%"><b>Student ID</b></th>';
+        if ($includePayroll) {
+            $html .= '<th width="' . $widths[2] . '%"><b>Payroll Number</b></th>';
+            $nameIdx = 3; $afterName = 4; // index offsets when payroll exists
+        } else {
+            $nameIdx = 2; $afterName = 3; // index offsets when payroll not exists
+        }
+        $html .= '<th width="' . $widths[$nameIdx] . '%"><b>Name</b></th>';
+        $html .= '<th width="' . $widths[$afterName] . '%"><b>Gender</b></th>';
+        $html .= '<th width="' . $widths[$afterName+1] . '%"><b>Barangay</b></th>';
+        $html .= '<th width="' . $widths[$afterName+2] . '%"><b>University</b></th>';
+        $html .= '<th width="' . $widths[$afterName+3] . '%"><b>Year Level</b></th>';
+        $html .= '<th width="' . $widths[$afterName+4] . '%"><b>Status</b></th>';
+        $html .= '</tr></thead><tbody>';
+
+        $no = 1;
+        foreach ($students as $student) {
+            $fullName = trim($student['first_name'] . ' ' . (($student['middle_name'] ?? '') ? ($student['middle_name'] . ' ') : '') . $student['last_name'] . ' ' . ($student['extension_name'] ?? ''));
+            $html .= '<tr>';
+            $html .= '<td width="' . $widths[0] . '%">' . $no++ . '</td>';
+            $html .= '<td width="' . $widths[1] . '%">' . htmlspecialchars($student['student_id']) . '</td>';
+            if ($includePayroll) {
+                $pn = isset($payrollMap[$student['student_id']]) ? $payrollMap[$student['student_id']] : '-';
+                $html .= '<td width="' . $widths[2] . '%">' . htmlspecialchars($pn) . '</td>';
+            }
+            $html .= '<td width="' . $widths[$nameIdx] . '%">' . htmlspecialchars($fullName) . '</td>';
+            $html .= '<td width="' . $widths[$afterName] . '%">' . htmlspecialchars($student['sex'] ?? '-') . '</td>';
+            $html .= '<td width="' . $widths[$afterName+1] . '%">' . htmlspecialchars($student['barangay'] ?? '-') . '</td>';
+            $html .= '<td width="' . $widths[$afterName+2] . '%">' . htmlspecialchars($student['university'] ?? '-') . '</td>';
+            $html .= '<td width="' . $widths[$afterName+3] . '%">' . htmlspecialchars($student['year_level'] ?? '-') . '</td>';
+            $html .= '<td width="' . $widths[$afterName+4] . '%">' . htmlspecialchars($student['status_display'] ?? '-') . '</td>';
+            $html .= '</tr>';
+        }
+
         $html .= '</tbody></table>';
-        
+
         $pdf->writeHTML($html, true, false, true, false, '');
-        
+
         // Summary at bottom
         $pdf->Ln(5);
         $pdf->SetFont('helvetica', 'B', 10);
         $pdf->Cell(0, 5, 'Total Students: ' . count($students), 0, 1, 'R');
+    }
+
+    /**
+     * Generate Applicants Master List PDF
+     */
+    private function generateApplicantsPDF($pdf, $applicants, $includePayroll, $payrollMap = []) {
+        $html = '<style>
+            table { border-collapse: collapse; width: 100%; }
+            th { background-color: #dc3545; color: white; padding: 5px; font-weight: bold; font-size: 8px; text-align: left; }
+            td { padding: 4px; font-size: 7px; border-bottom: 1px solid #ddd; }
+            tr:nth-child(even) { background-color: #f9f9f9; }
+        </style>';
+
+        // Define widths summing to 100
+        if ($includePayroll) {
+            $widths = [5, 14, 16, 22, 8, 10, 15, 10]; // With Payroll
+        } else {
+            $widths = [5, 16, 30, 9, 12, 18, 10];     // Without Payroll
+        }
+
+        $html .= '<table cellpadding="3">';
+        $html .= '<thead><tr>';
+        $html .= '<th width="' . $widths[0] . '%"><b>No.</b></th>';
+        $html .= '<th width="' . $widths[1] . '%"><b>Student ID</b></th>';
+        if ($includePayroll) {
+            $html .= '<th width="' . $widths[2] . '%"><b>Payroll Number</b></th>';
+            $nameIdx = 3; $afterName = 4;
+        } else {
+            $nameIdx = 2; $afterName = 3;
+        }
+        $html .= '<th width="' . $widths[$nameIdx] . '%"><b>Name</b></th>';
+        $html .= '<th width="' . $widths[$afterName] . '%"><b>Gender</b></th>';
+        $html .= '<th width="' . $widths[$afterName+1] . '%"><b>Barangay</b></th>';
+        $html .= '<th width="' . $widths[$afterName+2] . '%"><b>University</b></th>';
+        $html .= '<th width="' . $widths[$afterName+3] . '%"><b>Year Level</b></th>';
+        $html .= '</tr></thead><tbody>';
+
+        $no = 1;
+        foreach ($applicants as $row) {
+            $fullName = trim(($row['last_name'] ?? '') . ', ' . ($row['first_name'] ?? '') . ' ' . (($row['middle_name'] ?? '') ? substr($row['middle_name'], 0, 1) . '.' : '') . ' ' . ($row['extension_name'] ?? ''));
+            $html .= '<tr>';
+            $html .= '<td width="' . $widths[0] . '%">' . $no++ . '</td>';
+            $html .= '<td width="' . $widths[1] . '%">' . htmlspecialchars($row['student_id'] ?? '-') . '</td>';
+            if ($includePayroll) {
+                $pn = isset($payrollMap[$row['student_id'] ?? '']) ? $payrollMap[$row['student_id']] : '-';
+                $html .= '<td width="' . $widths[2] . '%">' . htmlspecialchars($pn) . '</td>';
+            }
+            $html .= '<td width="' . $widths[$nameIdx] . '%">' . htmlspecialchars($fullName) . '</td>';
+            $html .= '<td width="' . $widths[$afterName] . '%">' . htmlspecialchars($row['sex'] ?? '-') . '</td>';
+            $html .= '<td width="' . $widths[$afterName+1] . '%">' . htmlspecialchars($row['barangay'] ?? '-') . '</td>';
+            $html .= '<td width="' . $widths[$afterName+2] . '%">' . htmlspecialchars($row['university'] ?? '-') . '</td>';
+            $html .= '<td width="' . $widths[$afterName+3] . '%">' . htmlspecialchars($row['year_level'] ?? '-') . '</td>';
+            $html .= '</tr>';
+        }
+
+        $html .= '</tbody></table>';
+        $pdf->writeHTML($html, true, false, true, false, '');
+        $pdf->Ln(5);
+        $pdf->SetFont('helvetica', 'B', 10);
+        $pdf->Cell(0, 5, 'Total Applicants: ' . count($applicants), 0, 1, 'R');
     }
     
     /**
@@ -295,6 +389,9 @@ class ReportGenerator {
      * Generate Excel Report with Charts
      */
     public function generateExcel($filterData, $includeCharts = true) {
+        if (!empty($filterData['municipality_id'])) {
+            $this->setMunicipalityContext($filterData['municipality_id']);
+        }
         $this->filters->setFilters($filterData);
         $queryData = $this->filters->buildStudentQuery(true);
         
@@ -302,6 +399,11 @@ class ReportGenerator {
         $students = pg_fetch_all($result) ?: [];
         
         $stats = $this->filters->getStatistics();
+        
+        // Determine payroll inclusion and mapping based on selected distribution (snapshot)
+        $snapshotId = !empty($filterData['distribution_id']) ? $filterData['distribution_id'] : null;
+        $includePayroll = !empty($snapshotId);
+        $payrollMap = $includePayroll ? $this->getPayrollMapForSnapshot($snapshotId) : [];
         
         $spreadsheet = new Spreadsheet();
         
@@ -428,20 +530,19 @@ class ReportGenerator {
         // Add blank row for spacing
         $row++;
         
-        // Headers
-        $headers = [
-            'No.', 'Student ID', 'Payroll Number', 'Last Name', 'First Name', 'Middle Name', 'Extension', 
-            'Gender', 'Birth Date', 'Email', 'Mobile', 'Barangay', 'Municipality', 
-            'University', 'Course', 'Year Level', 'Status'
-        ];
-        $col = 'A';
+        // Headers (conditional Payroll column)
+        $headers = ['No.', 'Student ID'];
+        if ($includePayroll) { $headers[] = 'Payroll Number'; }
+        $headers = array_merge($headers, ['Last Name', 'First Name', 'Middle Name', 'Extension', 'Gender', 'Birth Date', 'Email', 'Mobile', 'Barangay', 'Municipality', 'University', 'Course', 'Year Level', 'Status']);
+        $colIndex = 1; // 1-based for Coordinate
         foreach ($headers as $header) {
-            $detailSheet->setCellValue($col . $row, $header);
-            $col++;
+            $detailSheet->setCellValue(\PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($colIndex) . $row, $header);
+            $colIndex++;
         }
         
         // Style headers
-        $headerRange = 'A' . $row . ':Q' . $row;
+        $lastCol = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex(count($headers));
+        $headerRange = 'A' . $row . ':' . $lastCol . $row;
         $detailSheet->getStyle($headerRange)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FF4A90E2');
         $detailSheet->getStyle($headerRange)->getFont()->setColor(new \PhpOffice\PhpSpreadsheet\Style\Color('FFFFFFFF'))->setBold(true);
         $detailSheet->getStyle($headerRange)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER)->setVertical(Alignment::VERTICAL_CENTER);
@@ -452,50 +553,98 @@ class ReportGenerator {
         // Data rows
         $no = 1;
         foreach ($students as $student) {
-            $detailSheet->setCellValue('A' . $row, $no++);
+            $col = 1; // column index
+            $detailSheet->setCellValue(\PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($col++) . $row, $no++);
 
             // Student ID as TEXT to preserve formatting
             $studentId = $student['student_id'] ?? 'N/A';
-            if (empty(trim($studentId))) {
-                $studentId = 'ERROR: ID Missing';
+            if (empty(trim($studentId))) { $studentId = 'ERROR: ID Missing'; }
+            $detailSheet->setCellValueExplicit(\PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($col++) . $row, $studentId, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+
+            // Payroll Number as TEXT (conditional)
+            if ($includePayroll) {
+                $payrollNo = isset($payrollMap[$student['student_id']]) ? $payrollMap[$student['student_id']] : '-';
+                $detailSheet->setCellValueExplicit(\PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($col++) . $row, $payrollNo !== '' ? $payrollNo : '-', \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
             }
-            $detailSheet->setCellValueExplicit('B' . $row, $studentId, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
 
-            // Payroll Number as TEXT (formatted)
-            $payrollNo = $student['payroll_no'] ?? '';
-            $detailSheet->setCellValueExplicit('C' . $row, $payrollNo !== '' ? $payrollNo : '-', \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+            $detailSheet->setCellValue(\PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($col++) . $row, $student['last_name'] ?? '-');
+            $detailSheet->setCellValue(\PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($col++) . $row, $student['first_name'] ?? '-');
+            $detailSheet->setCellValue(\PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($col++) . $row, $student['middle_name'] ?: '-');
+            $detailSheet->setCellValue(\PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($col++) . $row, $student['extension_name'] ?: '-');
+            $detailSheet->setCellValue(\PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($col++) . $row, $student['sex'] ?: '-');
+            $detailSheet->setCellValue(\PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($col++) . $row, $student['bdate'] ?: '-');
+            $detailSheet->setCellValue(\PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($col++) . $row, $student['email'] ?: '-');
+            $detailSheet->setCellValue(\PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($col++) . $row, $student['mobile'] ?: '-');
+            $detailSheet->setCellValue(\PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($col++) . $row, $student['barangay'] ?: '-');
+            $detailSheet->setCellValue(\PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($col++) . $row, $student['municipality'] ?: '-');
+            $detailSheet->setCellValue(\PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($col++) . $row, $student['university'] ?: '-');
+            $detailSheet->setCellValue(\PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($col++) . $row, $student['course'] ?: '-');
+            $detailSheet->setCellValue(\PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($col++) . $row, $student['year_level'] ?: '-');
+            $detailSheet->setCellValue(\PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($col++) . $row, $student['status_display'] ?? '-');
 
-            $detailSheet->setCellValue('D' . $row, $student['last_name'] ?? '-');
-            $detailSheet->setCellValue('E' . $row, $student['first_name'] ?? '-');
-            $detailSheet->setCellValue('F' . $row, $student['middle_name'] ?: '-');
-            $detailSheet->setCellValue('G' . $row, $student['extension_name'] ?: '-');
-            $detailSheet->setCellValue('H' . $row, $student['sex'] ?: '-');
-            $detailSheet->setCellValue('I' . $row, $student['bdate'] ?: '-');
-            $detailSheet->setCellValue('J' . $row, $student['email'] ?: '-');
-            $detailSheet->setCellValue('K' . $row, $student['mobile'] ?: '-');
-            $detailSheet->setCellValue('L' . $row, $student['barangay'] ?: '-');
-            $detailSheet->setCellValue('M' . $row, $student['municipality'] ?: '-');
-            $detailSheet->setCellValue('N' . $row, $student['university'] ?: '-');
-            $detailSheet->setCellValue('O' . $row, $student['course'] ?: '-');
-            $detailSheet->setCellValue('P' . $row, $student['year_level'] ?: '-');
-            $detailSheet->setCellValue('Q' . $row, $student['status_display'] ?? '-');
-            
             // Alternate row colors
             if ($no % 2 == 0) {
-                $detailSheet->getStyle('A' . $row . ':P' . $row)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FFF0F8FF');
+                $detailSheet->getStyle('A' . $row . ':' . $lastCol . $row)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FFF0F8FF');
             }
             $row++;
         }
         
         // Add borders to all data
-        $dataRange = 'A3:Q' . ($row - 1);
+        $dataRange = 'A3:' . $lastCol . ($row - 1);
         $detailSheet->getStyle($dataRange)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
         
         // Auto-size columns
-        foreach (range('A', 'Q') as $col) {
-            $detailSheet->getColumnDimension($col)->setAutoSize(true);
+        for ($c = 1; $c <= count($headers); $c++) {
+            $detailSheet->getColumnDimension(\PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($c))->setAutoSize(true);
         }
         
+        // ========== APPLICANTS MASTER LIST (Municipality) ==========
+        if (!empty($filterData['report_type']) && in_array($filterData['report_type'], ['comprehensive','applicants_master'])) {
+            $applicantsSheet = $spreadsheet->createSheet();
+            $applicantsSheet->setTitle('Applicants Master');
+            $row = 1;
+            $lastColApp = $includePayroll ? 'M' : 'L';
+            $applicantsSheet->mergeCells('A' . $row . ':' . $lastColApp . $row);
+            $applicantsSheet->setCellValue('A' . $row, 'APPLICANTS MASTER LIST - ' . ($this->municipalityName ?: 'Municipality'));
+            $applicantsSheet->getStyle('A' . $row)->getFont()->setSize(14)->setBold(true);
+            $row += 2;
+            $appHeaders = ['No.', 'Student ID'];
+            if ($includePayroll) { $appHeaders[] = 'Payroll Number'; }
+            $appHeaders = array_merge($appHeaders, ['Last Name', 'First Name', 'Middle Name', 'Ext', 'Gender', 'Barangay', 'University', 'Year Level', 'Status']);
+            $cIndex = 1;
+            foreach ($appHeaders as $h) {
+                $applicantsSheet->setCellValue(\PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($cIndex) . $row, $h);
+                $cIndex++;
+            }
+            $applicantsSheet->getStyle('A' . $row . ':' . (\PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex(count($appHeaders))) . $row)->getFont()->setBold(true);
+            $row++;
+            $no = 1;
+            $applicants = $this->getApplicantsForMunicipality($filterData);
+            foreach ($applicants as $a) {
+                $c = 1;
+                $applicantsSheet->setCellValue(\PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($c++) . $row, $no++);
+                $applicantsSheet->setCellValueExplicit(\PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($c++) . $row, $a['student_id'] ?? '-', \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+                if ($includePayroll) {
+                    $pn = isset($payrollMap[$a['student_id'] ?? '']) ? $payrollMap[$a['student_id']] : '-';
+                    $applicantsSheet->setCellValueExplicit(\PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($c++) . $row, $pn !== '' ? $pn : '-', \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+                }
+                $applicantsSheet->setCellValue(\PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($c++) . $row, $a['last_name'] ?? '-');
+                $applicantsSheet->setCellValue(\PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($c++) . $row, $a['first_name'] ?? '-');
+                $applicantsSheet->setCellValue(\PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($c++) . $row, $a['middle_name'] ?? '-');
+                $applicantsSheet->setCellValue(\PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($c++) . $row, $a['extension_name'] ?? '-');
+                $applicantsSheet->setCellValue(\PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($c++) . $row, $a['sex'] ?? '-');
+                $applicantsSheet->setCellValue(\PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($c++) . $row, $a['barangay'] ?? '-');
+                $applicantsSheet->setCellValue(\PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($c++) . $row, $a['university'] ?? '-');
+                $applicantsSheet->setCellValue(\PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($c++) . $row, $a['year_level'] ?? '-');
+                $applicantsSheet->setCellValue(\PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($c++) . $row, $a['status_display'] ?? 'Applicant');
+                $row++;
+            }
+            $last = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex(count($appHeaders));
+            for ($ci = 1; $ci <= count($appHeaders); $ci++) {
+                $applicantsSheet->getColumnDimension(\PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($ci))->setAutoSize(true);
+            }
+        }
+
         // ========== STATISTICS SHEET ==========
         $statsSheet = $spreadsheet->createSheet();
         $statsSheet->setTitle('Statistics Summary');
@@ -583,6 +732,114 @@ class ReportGenerator {
         $statsSheet->getColumnDimension('B')->setWidth(30);
         $statsSheet->getColumnDimension('C')->setWidth(25);
         
+        // If comprehensive, reorder and include charts optionally
+        if (!empty($filterData['report_type']) && $filterData['report_type'] === 'comprehensive') {
+            // Already added Cover, Details, Applicants (optional), Statistics
+            // Add Barangay Breakdown
+            if (!empty($filterData['municipality_id'])) {
+                $munId = $filterData['municipality_id'];
+                // Barangay breakdown
+                $barangaySql = "
+                    SELECT b.name AS barangay,
+                           COUNT(*) AS total,
+                           SUM(CASE WHEN s.status='active' THEN 1 ELSE 0 END) AS active,
+                           SUM(CASE WHEN s.status='applicant' OR s.status='under_registration' THEN 1 ELSE 0 END) AS applicants,
+                           SUM(CASE WHEN s.status='disabled' THEN 1 ELSE 0 END) AS disabled
+                    FROM students s
+                    LEFT JOIN barangays b ON b.barangay_id = s.barangay_id
+                    WHERE s.municipality_id = $1
+                    GROUP BY b.name
+                    ORDER BY b.name";
+                $barangayRes = pg_query_params($this->connection, $barangaySql, [$munId]);
+                $barangaySheet = $spreadsheet->createSheet();
+                $barangaySheet->setTitle('Barangay Breakdown');
+                $r = 1;
+                $barangaySheet->mergeCells('A' . $r . ':F' . $r);
+                $barangaySheet->setCellValue('A' . $r, 'BARANGAY BREAKDOWN - ' . ($this->municipalityName ?: 'Municipality'));
+                $barangaySheet->getStyle('A' . $r)->getFont()->setBold(true)->setSize(14);
+                $r += 2;
+                $headers = ['Barangay','Total','Active','Applicants','Disabled'];
+                $c = 'A'; foreach ($headers as $h) { $barangaySheet->setCellValue($c.$r, $h); $c++; }
+                $barangaySheet->getStyle('A' . $r . ':E' . $r)->getFont()->setBold(true);
+                $r++;
+                while ($row = pg_fetch_assoc($barangayRes)) {
+                    $barangaySheet->setCellValue('A' . $r, $row['barangay'] ?: 'Unspecified');
+                    $barangaySheet->setCellValue('B' . $r, (int)$row['total']);
+                    $barangaySheet->setCellValue('C' . $r, (int)$row['active']);
+                    $barangaySheet->setCellValue('D' . $r, (int)$row['applicants']);
+                    $barangaySheet->setCellValue('E' . $r, (int)$row['disabled']);
+                    $r++;
+                }
+                foreach (range('A','E') as $col) { $barangaySheet->getColumnDimension($col)->setAutoSize(true); }
+
+                // University breakdown
+                $univSql = "
+                    SELECT u.name AS university,
+                           COUNT(*) AS total,
+                           SUM(CASE WHEN s.status='active' THEN 1 ELSE 0 END) AS active,
+                           SUM(CASE WHEN s.status='applicant' OR s.status='under_registration' THEN 1 ELSE 0 END) AS applicants,
+                           SUM(CASE WHEN s.status='disabled' THEN 1 ELSE 0 END) AS disabled
+                    FROM students s
+                    LEFT JOIN universities u ON u.university_id = s.university_id
+                    WHERE s.municipality_id = $1
+                    GROUP BY u.name
+                    ORDER BY total DESC, u.name";
+                $univRes = pg_query_params($this->connection, $univSql, [$munId]);
+                $univSheet = $spreadsheet->createSheet();
+                $univSheet->setTitle('University Breakdown');
+                $r = 1;
+                $univSheet->mergeCells('A' . $r . ':F' . $r);
+                $univSheet->setCellValue('A' . $r, 'UNIVERSITY BREAKDOWN - ' . ($this->municipalityName ?: 'Municipality'));
+                $univSheet->getStyle('A' . $r)->getFont()->setBold(true)->setSize(14);
+                $r += 2;
+                $headers = ['University','Total','Active','Applicants','Disabled'];
+                $c = 'A'; foreach ($headers as $h) { $univSheet->setCellValue($c.$r, $h); $c++; }
+                $univSheet->getStyle('A' . $r . ':E' . $r)->getFont()->setBold(true);
+                $r++;
+                while ($row = pg_fetch_assoc($univRes)) {
+                    $univSheet->setCellValue('A' . $r, $row['university'] ?: 'Unspecified');
+                    $univSheet->setCellValue('B' . $r, (int)$row['total']);
+                    $univSheet->setCellValue('C' . $r, (int)$row['active']);
+                    $univSheet->setCellValue('D' . $r, (int)$row['applicants']);
+                    $univSheet->setCellValue('E' . $r, (int)$row['disabled']);
+                    $r++;
+                }
+                foreach (range('A','E') as $col) { $univSheet->getColumnDimension($col)->setAutoSize(true); }
+
+                // Distribution summary for municipality
+                $distSql = "
+                    SELECT ds.distribution_id, ds.academic_year, ds.semester, ds.finalized_at,
+                           COUNT(r.student_id) FILTER (WHERE s.municipality_id = $1) AS recipients
+                    FROM distribution_snapshots ds
+                    LEFT JOIN distribution_student_records r ON r.snapshot_id = ds.snapshot_id
+                    LEFT JOIN students s ON s.student_id = r.student_id
+                    WHERE ds.finalized_at IS NOT NULL
+                    GROUP BY ds.distribution_id, ds.academic_year, ds.semester, ds.finalized_at
+                    ORDER BY ds.finalized_at DESC NULLS LAST";
+                $distRes = pg_query_params($this->connection, $distSql, [$munId]);
+                $distSheet = $spreadsheet->createSheet();
+                $distSheet->setTitle('Distributions Summary');
+                $r = 1;
+                $distSheet->mergeCells('A' . $r . ':E' . $r);
+                $distSheet->setCellValue('A' . $r, 'DISTRIBUTIONS SUMMARY - ' . ($this->municipalityName ?: 'Municipality'));
+                $distSheet->getStyle('A' . $r)->getFont()->setBold(true)->setSize(14);
+                $r += 2;
+                $headers = ['Distribution ID','Academic Year','Semester','Finalized At','Recipients'];
+                $c='A'; foreach ($headers as $h) { $distSheet->setCellValue($c.$r, $h); $c++; }
+                $distSheet->getStyle('A' . $r . ':E' . $r)->getFont()->setBold(true);
+                $r++;
+                while ($row = pg_fetch_assoc($distRes)) {
+                    $distSheet->setCellValue('A' . $r, $row['distribution_id']);
+                    $distSheet->setCellValue('B' . $r, $row['academic_year']);
+                    $distSheet->setCellValue('C' . $r, $row['semester']);
+                    $distSheet->setCellValue('D' . $r, $row['finalized_at']);
+                    $distSheet->setCellValue('E' . $r, (int)$row['recipients']);
+                    $r++;
+                }
+                foreach (range('A','E') as $col) { $distSheet->getColumnDimension($col)->setAutoSize(true); }
+            }
+        }
+
         // Set active sheet to cover
         $spreadsheet->setActiveSheetIndex(0);
         
@@ -684,5 +941,54 @@ class ReportGenerator {
             'preview_count' => count($students),
             'filter_summary' => $this->filters->getFilterSummary()
         ];
+    }
+
+    /**
+     * Fetch applicants for the current municipality (based on filters' municipality_id)
+     */
+    private function getApplicantsForMunicipality($filterData) {
+        $municipalityId = $filterData['municipality_id'] ?? null;
+        if (!$municipalityId) {
+            return [];
+        }
+        $params = [$municipalityId];
+        // Build a query to get applicants (no payroll join here; payroll is resolved by selected distribution)
+        $sql = "
+            SELECT s.student_id, s.last_name, s.first_name, s.middle_name, s.extension_name,
+                   s.sex, b.name as barangay, u.name as university, yl.name as year_level,
+                   CASE 
+                     WHEN s.status = 'active' THEN 'Active'
+                     WHEN s.status = 'disabled' THEN 'Disabled'
+                     ELSE 'Applicant'
+                   END as status_display
+            FROM students s
+            LEFT JOIN barangays b ON b.barangay_id = s.barangay_id
+            LEFT JOIN universities u ON u.university_id = s.university_id
+            LEFT JOIN year_levels yl ON yl.year_level_id = s.year_level_id
+            WHERE s.municipality_id = $1
+              AND s.status IN ('applicant','under_registration')
+            ORDER BY s.last_name, s.first_name
+        ";
+        $res = pg_query_params($this->connection, $sql, $params);
+        return pg_fetch_all($res) ?: [];
+    }
+
+    /**
+     * Build a student_id -> payroll_no map for a given distribution snapshot
+     */
+    private function getPayrollMapForSnapshot($snapshotId) {
+        if (empty($snapshotId)) { return []; }
+        $sql = "SELECT student_id, payroll_no FROM distribution_payrolls WHERE snapshot_id = $1";
+        $res = pg_query_params($this->connection, $sql, [$snapshotId]);
+        $map = [];
+        if ($res) {
+            while ($row = pg_fetch_assoc($res)) {
+                $sid = $row['student_id'];
+                if ($sid !== null) {
+                    $map[$sid] = $row['payroll_no'];
+                }
+            }
+        }
+        return $map;
     }
 }

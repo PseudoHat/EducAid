@@ -42,10 +42,28 @@ $municipalities = pg_query($connection, "SELECT municipality_id, name FROM munic
 $yearLevels = pg_query($connection, "SELECT year_level_id, name FROM year_levels ORDER BY name");
 
 if ($adminRole === 'super_admin') {
-    // Super admins can see all universities, distributions, and academic years
-    $universities = pg_query($connection, "SELECT university_id, name FROM universities ORDER BY name");
-    $distributions = pg_query($connection, "SELECT snapshot_id, distribution_id, academic_year, semester, finalized_at FROM distribution_snapshots WHERE finalized_at IS NOT NULL ORDER BY finalized_at DESC");
-    $academicYears = pg_query($connection, "SELECT DISTINCT current_academic_year FROM students WHERE current_academic_year IS NOT NULL ORDER BY current_academic_year DESC");
+    // Even for super admins, scope to their municipality for reporting
+    $universities = pg_query_params($connection,
+        "SELECT DISTINCT u.university_id, u.name
+         FROM universities u
+         INNER JOIN students s ON u.university_id = s.university_id
+         WHERE s.municipality_id = $1
+         ORDER BY u.name", [$adminMunicipalityId]);
+    $distributions = pg_query_params($connection,
+        "SELECT DISTINCT ds.snapshot_id, ds.distribution_id, ds.academic_year, ds.semester, ds.finalized_at
+         FROM distribution_snapshots ds
+         INNER JOIN distribution_student_records r ON r.snapshot_id = ds.snapshot_id
+         INNER JOIN students s ON s.student_id = r.student_id
+         WHERE s.municipality_id = $1 AND ds.finalized_at IS NOT NULL
+         ORDER BY ds.finalized_at DESC",
+        [$adminMunicipalityId]
+    );
+    $academicYears = pg_query_params($connection,
+        "SELECT DISTINCT current_academic_year
+         FROM students WHERE municipality_id = $1 AND current_academic_year IS NOT NULL
+         ORDER BY current_academic_year DESC",
+        [$adminMunicipalityId]
+    );
 } else {
     // Sub-admins only see data from their municipality
     $universities = pg_query_params($connection, "SELECT DISTINCT u.university_id, u.name FROM universities u INNER JOIN students s ON u.university_id = s.university_id WHERE s.municipality_id = $1 ORDER BY u.name", [$adminMunicipalityId]);
@@ -99,6 +117,17 @@ include __DIR__ . '/../../includes/admin/admin_head.php';
                 <input type="hidden" name="csrf_token" value="<?php echo $csrfToken; ?>">
                 
                 <div class="row g-3">
+                    <!-- Report Type -->
+                    <div class="col-md-3">
+                        <label class="form-label">Report Type</label>
+                        <select name="report_type" class="form-select" id="reportType">
+                            <option value="student_list" selected>Standard Student List</option>
+                            <option value="applicants_master">Applicants Master List (Municipality)</option>
+                            <option value="statistics">Statistics Summary</option>
+                            <option value="comprehensive">Comprehensive Workbook (Multi-sheet)</option>
+                        </select>
+                        <small class="text-muted">Comprehensive includes applicants, active, and breakdowns.</small>
+                    </div>
                     <!-- Student Status -->
                     <div class="col-md-3">
                         <label class="form-label">Student Status</label>
