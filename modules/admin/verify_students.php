@@ -128,25 +128,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Revert selected actives back to applicants
   if (isset($_POST['deactivate']) && !empty($_POST['selected_actives'])) {
     $count = count($_POST['selected_actives']);
+
+    // Detect QR schema: whether qr_codes.student_unique_id exists
+    $hasQrStudentUniqueCol = false;
+    $colCheck = pg_query_params(
+      $connection,
+      "SELECT 1 FROM information_schema.columns WHERE table_name = 'qr_codes' AND column_name = 'student_unique_id' LIMIT 1",
+      []
+    );
+    if ($colCheck && pg_num_rows($colCheck) > 0) { $hasQrStudentUniqueCol = true; }
+    if ($colCheck) { pg_free_result($colCheck); }
+
     foreach ($_POST['selected_actives'] as $student_id) {
-      // Delete QR code PNGs and DB records for this student
-      // Try new schema (qr_codes.student_unique_id) via join
-      $qr_res = pg_query_params(
-        $connection,
-        "SELECT q.unique_id
-         FROM qr_codes q
-         JOIN students s ON q.student_unique_id = s.unique_student_id
-         WHERE s.student_id = $1",
-        [$student_id]
-      );
-      if ($qr_res) {
-        while ($qr_row = pg_fetch_assoc($qr_res)) {
-          if (!empty($qr_row['unique_id'])) {
-            $png_path = __DIR__ . '/../../assets/js/qrcode/phpqrcode-master/temp/' . $qr_row['unique_id'] . '.png';
-            if (file_exists($png_path)) { @unlink($png_path); }
+      // Delete QR code PNGs and DB records for this student, using detected schema
+      if ($hasQrStudentUniqueCol) {
+        // New schema: qr_codes.student_unique_id + students.unique_student_id
+        $qr_res = pg_query_params(
+          $connection,
+          "SELECT q.unique_id
+           FROM qr_codes q
+           JOIN students s ON q.student_unique_id = s.unique_student_id
+           WHERE s.student_id = $1",
+          [$student_id]
+        );
+        if ($qr_res) {
+          while ($qr_row = pg_fetch_assoc($qr_res)) {
+            if (!empty($qr_row['unique_id'])) {
+              $png_path = __DIR__ . '/../../assets/js/qrcode/phpqrcode-master/temp/' . $qr_row['unique_id'] . '.png';
+              if (file_exists($png_path)) { @unlink($png_path); }
+            }
           }
+          pg_free_result($qr_res);
         }
-        // Delete QR rows using join
+        // Delete QR rows via join
         pg_query_params(
           $connection,
           "DELETE FROM qr_codes q USING students s
@@ -154,7 +168,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           [$student_id]
         );
       } else {
-        // Fallback to old schema (qr_codes.student_id)
+        // Old schema: qr_codes.student_id
         $qr_res_old = pg_query_params($connection, "SELECT unique_id FROM qr_codes WHERE student_id = $1", [$student_id]);
         if ($qr_res_old) {
           while ($qr_row = pg_fetch_assoc($qr_res_old)) {
@@ -163,8 +177,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
               if (file_exists($png_path)) { @unlink($png_path); }
             }
           }
-          pg_query_params($connection, "DELETE FROM qr_codes WHERE student_id = $1", [$student_id]);
+          pg_free_result($qr_res_old);
         }
+        pg_query_params($connection, "DELETE FROM qr_codes WHERE student_id = $1", [$student_id]);
       }
       // Finally, revert student status
       pg_query_params($connection, "UPDATE students SET status = 'applicant' WHERE student_id = $1", [$student_id]);
