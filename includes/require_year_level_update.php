@@ -35,10 +35,38 @@ if (!isset($connection)) {
 $studentId = $_SESSION['student_id'];
 
 // Get student's year level status and migration/reupload flags
-$student_info_query = "SELECT current_year_level, is_graduating, status_academic_year, admin_review_required, university_id, mothers_maiden_name, school_student_id, needs_upload FROM students WHERE student_id = $1";
-$student_info_result = pg_query_params($connection, $student_info_query, [$studentId]);
-$student_info = pg_fetch_assoc($student_info_result);
+// Be schema-aware: some deployments may not have "needs_upload" yet
+// Also attempt to use documents_to_reupload as a fallback signal for reupload context
+$needs_upload_exists = false;
+$docs_reupload_exists = false;
 
+$col_check_query = "SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name='students' AND column_name IN ('needs_upload','documents_to_reupload')";
+$col_check_result = pg_query($connection, $col_check_query);
+if ($col_check_result) {
+    while ($col = pg_fetch_assoc($col_check_result)) {
+        if ($col['column_name'] === 'needs_upload') {
+            $needs_upload_exists = true;
+        }
+        if ($col['column_name'] === 'documents_to_reupload') {
+            $docs_reupload_exists = true;
+        }
+    }
+}
+
+$base_columns = "current_year_level, is_graduating, status_academic_year, admin_review_required, university_id, mothers_maiden_name, school_student_id";
+if ($needs_upload_exists) {
+    $base_columns .= ", needs_upload";
+}
+if ($docs_reupload_exists) {
+    $base_columns .= ", documents_to_reupload";
+}
+
+$student_info_query = "SELECT $base_columns FROM students WHERE student_id = $1";
+$student_info_result = pg_query_params($connection, $student_info_query, [$studentId]);
+if (!$student_info_result) {
+    return; // Query failed; avoid fatals and let page handle auth/flow
+}
+$student_info = pg_fetch_assoc($student_info_result);
 if (!$student_info) {
     return; // Student not found, let page handle
 }
@@ -73,8 +101,20 @@ if (!$current_academic_year) {
 }
 
 // Refined gating to avoid forcing brand-new registrants
-// Determine reupload vs new registrant context
-$needs_upload_flag = ($student_info['needs_upload'] === 't' || $student_info['needs_upload'] === true || $student_info['needs_upload'] === '1');
+// Determine reupload vs new registrant context (schema-aware)
+$needs_upload_flag = false;
+if ($needs_upload_exists) {
+    $needs_upload_flag = (
+        $student_info['needs_upload'] === 't' ||
+        $student_info['needs_upload'] === true ||
+        $student_info['needs_upload'] === '1' ||
+        $student_info['needs_upload'] === 1 ||
+        $student_info['needs_upload'] === 'true'
+    );
+} elseif ($docs_reupload_exists) {
+    // If specific documents are flagged for reupload, treat as reupload context
+    $needs_upload_flag = !empty($student_info['documents_to_reupload']);
+}
 $has_prior_year_confirmation = !empty($student_info['status_academic_year']);
 $year_changed = $current_academic_year && $has_prior_year_confirmation && $student_info['status_academic_year'] !== $current_academic_year;
 $credentials_incomplete_after_confirmation = $has_prior_year_confirmation && ($student_info['is_graduating'] === null || empty($student_info['current_year_level']));

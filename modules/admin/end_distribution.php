@@ -589,53 +589,50 @@ if (in_array($distribution_status, ['preparing', 'active']) && $has_completed_sn
         $student_count = intval($record_row['count']); // More accurate than students table
     }
     
-    // Count total files in student folders (handles both new nested and old flat structure)
+    // Count total files in student folders (recursive; exclude OCR/auxiliary files)
     $file_count = 0;
     $total_size = 0;
     $document_types = ['enrollment_forms', 'grades', 'id_pictures', 'indigency', 'letter_to_mayor'];
-    
-    foreach ($document_types as $type) {
-        $folder = $pathConfig->getStudentPath() . DIRECTORY_SEPARATOR . $type;
-        if (is_dir($folder)) {
-            $items = scandir($folder);
-            $hasStudentFolders = false;
-            
-            // Check if we have student subdirectories (new structure)
-            foreach ($items as $item) {
-                if ($item !== '.' && $item !== '..' && is_dir($folder . DIRECTORY_SEPARATOR . $item)) {
-                    $hasStudentFolders = true;
-                    break;
-                }
-            }
-            
-            if ($hasStudentFolders) {
-                // NEW STRUCTURE: student/{doc_type}/{student_id}/files
-                foreach ($items as $item) {
-                    if ($item !== '.' && $item !== '..') {
-                        $studentFolder = $folder . DIRECTORY_SEPARATOR . $item;
-                        if (is_dir($studentFolder)) {
-                            // Get all files in student folder
-                            $studentFiles = glob($studentFolder . DIRECTORY_SEPARATOR . '*.*');
-                            foreach ($studentFiles as $file) {
-                                if (is_file($file)) {
-                                    $file_count++;
-                                    $total_size += filesize($file);
-                                }
-                            }
+    $exclude_exts = ['.ocr.txt', '.verify.json', '.confidence.json', '.tsv', '.ocr.json'];
+
+    $countFilesRecursively = function($baseDir) use ($exclude_exts) {
+        $count = 0;
+        $size = 0;
+        if (!is_dir($baseDir)) {
+            return [$count, $size];
+        }
+        try {
+            $it = new RecursiveIteratorIterator(
+                new RecursiveDirectoryIterator($baseDir, FilesystemIterator::SKIP_DOTS),
+                RecursiveIteratorIterator::SELF_FIRST
+            );
+            foreach ($it as $spl) {
+                if ($spl->isFile()) {
+                    $path = $spl->getPathname();
+                    $isAssoc = false;
+                    foreach ($exclude_exts as $ext) {
+                        if (substr($path, -strlen($ext)) === $ext) {
+                            $isAssoc = true;
+                            break;
                         }
                     }
-                }
-            } else {
-                // OLD STRUCTURE: flat files in student/{doc_type}/
-                $files = glob($folder . DIRECTORY_SEPARATOR . '*.*');
-                foreach ($files as $file) {
-                    if (is_file($file)) {
-                        $file_count++;
-                        $total_size += filesize($file);
+                    if (!$isAssoc) {
+                        $count++;
+                        $size += (int)$spl->getSize();
                     }
                 }
             }
+        } catch (Exception $e) {
+            // Ignore counting errors; return what we have
         }
+        return [$count, $size];
+    };
+
+    foreach ($document_types as $type) {
+        $folder = $pathConfig->getStudentPath() . DIRECTORY_SEPARATOR . $type;
+        [$c, $s] = $countFilesRecursively($folder);
+        $file_count += $c;
+        $total_size += $s;
     }
     
     $activeDistributions[] = [
