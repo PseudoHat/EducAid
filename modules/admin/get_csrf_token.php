@@ -8,6 +8,11 @@
 
 session_start();
 
+// Always return JSON content type and disable caching
+header('Content-Type: application/json');
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+header('Pragma: no-cache');
+
 // Require authentication
 if (!isset($_SESSION['admin_username'])) {
     http_response_code(401);
@@ -58,7 +63,6 @@ if (!$token) {
 error_log(sprintf('CSRF: get_csrf_token return for %s -> %s...', $action, substr($token, 0, 16)));
 
 // Return the token
-header('Content-Type: application/json');
 echo json_encode([
     'success' => true,
     'token' => $token,

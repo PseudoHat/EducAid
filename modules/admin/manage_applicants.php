@@ -5711,7 +5711,119 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>
         </div>
     </div>
-</div>
+ </div>
+
+<script>
+// Migration modal CSRF handling and UX hardening
+document.addEventListener('DOMContentLoaded', function() {
+    const migrationModalEl = document.getElementById('migrationModal');
+    const migrationUploadForm = document.getElementById('migrationUploadForm');
+    const migrationConfirmForm = document.getElementById('migrationForm');
+    const migrationCancelForm = document.getElementById('migrationCancelForm');
+    const csvFileInput = document.getElementById('csvFileInput');
+    const csvFilename = document.getElementById('csvFilename');
+
+    const getPreviewBtn = () => (migrationUploadForm ? migrationUploadForm.querySelector('button[type="submit"], .btn.btn-primary') : null);
+
+    // Show selected file name
+    if (csvFileInput && csvFilename) {
+        csvFileInput.addEventListener('change', function() {
+            const f = this.files && this.files[0] ? this.files[0].name : '';
+            csvFilename.textContent = f ? `Selected: ${f}` : '';
+        });
+    }
+
+    async function fetchMigrationCsrfToken() {
+        try {
+            const res = await fetch('get_csrf_token.php?action=csv_migration', {
+                headers: { 'Accept': 'application/json' },
+                credentials: 'same-origin',
+                cache: 'no-store'
+            });
+            if (!res.ok) {
+                throw new Error('HTTP ' + res.status);
+            }
+            const ct = (res.headers.get('content-type') || '').toLowerCase();
+            if (!ct.includes('application/json')) {
+                const text = await res.text();
+                throw new Error('Non-JSON response: ' + text.slice(0, 120));
+            }
+            const data = await res.json();
+            if (!data || !data.success || !data.token) {
+                throw new Error('Invalid token payload');
+            }
+            // Populate hidden inputs in both forms if present
+            if (migrationUploadForm) {
+                const inp = migrationUploadForm.querySelector('input[name="csrf_token"]');
+                if (inp) inp.value = data.token;
+            }
+            if (migrationConfirmForm) {
+                const inp2 = migrationConfirmForm.querySelector('input[name="csrf_token"]');
+                if (inp2) inp2.value = data.token;
+            }
+            if (migrationCancelForm) {
+                const inp3 = migrationCancelForm.querySelector('input[name="csrf_token"]');
+                if (inp3) inp3.value = data.token;
+            }
+            // Enable Preview button once token present
+            const btn = getPreviewBtn();
+            if (btn) btn.disabled = false;
+            return true;
+        } catch (e) {
+            console.warn('[Migration] CSRF fetch failed:', e);
+            const btn = getPreviewBtn();
+            if (btn) btn.disabled = true;
+            // Gentle inline notice if modal is open
+            try {
+                const noticeId = 'migrationTokenNotice';
+                let n = document.getElementById(noticeId);
+                if (!n && migrationModalEl) {
+                    n = document.createElement('div');
+                    n.id = noticeId;
+                    n.className = 'alert alert-warning my-2';
+                    n.innerHTML = '<strong>Security token not ready.</strong> Please reload the page or try again.';
+                    const body = migrationModalEl.querySelector('.modal-body');
+                    if (body) body.prepend(n);
+                }
+            } catch (_) {}
+            return false;
+        }
+    }
+
+    // Guard form submits if token missing
+    function guardFormSubmit(form) {
+        if (!form) return;
+        form.addEventListener('submit', async function(e) {
+            const tokenVal = (form.querySelector('input[name="csrf_token"]') || { value: '' }).value;
+            if (!tokenVal) {
+                e.preventDefault();
+                alert('Security token not ready. Please wait a moment, then try again.');
+                const ok = await fetchMigrationCsrfToken();
+                const btn = getPreviewBtn();
+                if (btn) btn.disabled = !ok;
+                return false;
+            }
+        });
+    }
+
+    guardFormSubmit(migrationUploadForm);
+    guardFormSubmit(migrationConfirmForm);
+
+    // Refresh token when modal is shown and on file selection
+    if (migrationModalEl) {
+        migrationModalEl.addEventListener('shown.bs.modal', function() {
+            const btn = getPreviewBtn();
+            if (btn) btn.disabled = true;
+            fetchMigrationCsrfToken();
+        });
+    }
+    if (csvFileInput) {
+        csvFileInput.addEventListener('change', function() {
+            fetchMigrationCsrfToken();
+        });
+    }
+});
+</script>
 
 </body>
 </html>

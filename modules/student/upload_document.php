@@ -4149,6 +4149,59 @@ $page_title = 'Upload Documents';
         });
     </script>
     
+        <!-- Modal Stacking Fixes for Migrated Profile & Year Advancement -->
+        <style>
+            .modal { z-index: 205000 !important; }
+            .modal-backdrop { z-index: 204999 !important; background-color: rgba(0,0,0,0.55); }
+            /* Neutralize stacking-context creators while a modal is open */
+            body.modal-open #wrapper,
+            body.modal-open .home-section,
+            body.modal-open .content-wrapper,
+            body.modal-open .student-container,
+            body.modal-open [data-stacking-context] {
+                transform: none !important;
+                filter: none !important;
+                perspective: none !important;
+                will-change: auto !important;
+            }
+        </style>
+
+        <script>
+            // Ensure all Bootstrap modals are portaled to body to escape local stacking contexts
+            document.addEventListener('DOMContentLoaded', function() {
+                function portalizeModals(root=document) {
+                    root.querySelectorAll('.modal').forEach(function(modal) {
+                        if (modal.dataset.portalized === '1') return;
+                        modal.addEventListener('show.bs.modal', function() {
+                            if (modal.parentElement !== document.body) {
+                                document.body.appendChild(modal);
+                            }
+                        });
+                        modal.dataset.portalized = '1';
+                    });
+                }
+
+                // Initial pass
+                portalizeModals();
+
+                // Watch for dynamically-inserted modals
+                const mo = new MutationObserver(function(muts) {
+                    muts.forEach(function(m) {
+                        m.addedNodes && m.addedNodes.forEach(function(node){
+                            if (node.nodeType === 1) {
+                                if (node.matches && node.matches('.modal')) {
+                                    portalizeModals(node.parentElement || document);
+                                } else if (node.querySelectorAll) {
+                                    portalizeModals(node);
+                                }
+                            }
+                        });
+                    });
+                });
+                mo.observe(document.documentElement, { childList: true, subtree: true });
+            });
+        </script>
+
     <!-- Anti-FOUC Script -->
     <script>
         (function() {

@@ -311,12 +311,14 @@ $student_info = pg_fetch_assoc($student_info_result);
     }
     
     /* Ensure modals appear above sidebar/backdrops */
-    .modal { z-index: 1100 !important; position: fixed; }
+    .modal { z-index: 1100 !important; position: fixed; pointer-events: auto; }
     .modal-backdrop { z-index: 1095 !important; }
+    .modal-backdrop.show { opacity: 0.45 !important; }
 
     /* When any Bootstrap modal is open, neutralize potential stacking-context creators */
-    body.modal-open .home-section { transform: none !important; filter: none !important; }
-    body.modal-open .home-section * { transform: none !important; }
+    body.modal-open .home-section,
+    body.modal-open #wrapper,
+    body.modal-open #wrapper * { transform: none !important; filter: none !important; }
 
     /* Prevent the student sidebar overlay from intercepting clicks while a modal is open */
     body.modal-open .sidebar-backdrop { pointer-events: none !important; opacity: 0 !important; z-index: 0 !important; }
@@ -576,6 +578,16 @@ $student_info = pg_fetch_assoc($student_info_result);
       // FOUC Prevention - show body after load
       document.body.classList.add('ready');
       
+      // Ensure password modal is rendered at <body> level to avoid stacking issues
+      const passwordModalEl = document.getElementById('passwordModal');
+      if (passwordModalEl) {
+        passwordModalEl.addEventListener('show.bs.modal', () => {
+          if (passwordModalEl.parentElement !== document.body) {
+            document.body.appendChild(passwordModalEl);
+          }
+        });
+      }
+
       // Hook password save
       document.getElementById('savePasswordBtn')?.addEventListener('click', function() {
         // Minimal client-side check
