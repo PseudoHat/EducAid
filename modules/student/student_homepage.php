@@ -151,12 +151,8 @@ $past_participation_query = "
 ";
 $past_participation_result = pg_query_params($connection, $past_participation_query, [$studentId]);
 
-if (!isset($_SESSION['schedule_modal_shown'])) {
-    $_SESSION['schedule_modal_shown'] = true;
-    $showScheduleModal = true;
-} else {
-    $showScheduleModal = false;
-}
+// Email schedule instead of showing modal
+$shouldEmailSchedule = !isset($_SESSION['schedule_emailed']);
 ?>
 
 <!DOCTYPE html>
@@ -547,31 +543,46 @@ if (!isset($_SESSION['schedule_modal_shown'])) {
             );
             if ($schedRes && pg_num_rows($schedRes) > 0) {
                 $rows = pg_fetch_all($schedRes);
-                // Show modal on first login instead of alert
-                if ($showScheduleModal) {
-                    echo '<div class="modal fade" id="scheduleModal" tabindex="-1" aria-labelledby="scheduleModalLabel" aria-hidden="true">'
-                       . '<div class="modal-dialog modal-dialog-centered student-modal-responsive">'
-                       . '<div class="modal-content">'
-                       . '<div class="modal-header">'
-                       . '<h5 class="modal-title" id="scheduleModalLabel">Your Distribution Schedule</h5>'
-                       . '<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>'
-                       . '</div>'
-                       . '<div class="modal-body">';
-                    // Display location
+                
+                // Email schedule on first visit instead of showing modal
+                if ($shouldEmailSchedule) {
+                    $_SESSION['schedule_emailed'] = true;
+                    
+                    // Build schedule details for email
+                    $scheduleDetails = "\n\nYour Distribution Schedule:\n";
+                    $scheduleDetails .= "========================\n\n";
+                    
                     if ($location !== '') {
-                        echo '<p><strong>Location:</strong> ' . htmlspecialchars($location) . '</p>';
+                        $scheduleDetails .= "Location: " . $location . "\n\n";
                     }
+                    
                     foreach ($rows as $r) {
-                        echo htmlspecialchars($r['distribution_date']) . ' (Batch ' . htmlspecialchars($r['batch_no']) . '): ' . htmlspecialchars($r['time_slot']) . '<br>';
+                        $scheduleDetails .= "📅 " . date('l, F j, Y', strtotime($r['distribution_date']));
+                        $scheduleDetails .= " (Batch " . $r['batch_no'] . ")\n";
+                        $scheduleDetails .= "🕐 Time: " . $r['time_slot'] . "\n\n";
                     }
-                    echo '</div><div class="modal-footer">'
-                       . '<button type="button" class="btn btn-primary" data-bs-dismiss="modal">OK</button>'
-                       . '</div></div></div></div>';
-                    // JS trigger for modal
-                    echo '<script>document.addEventListener("DOMContentLoaded", function() {'
-                        . 'var modal = new bootstrap.Modal(document.getElementById("scheduleModal"));'
-                        . 'modal.show();'
-                        . '});</script>';
+                    
+                    $scheduleDetails .= "\nPlease arrive 15 minutes before your scheduled time.\n";
+                    $scheduleDetails .= "Bring a valid ID and your QR code.\n";
+                    
+                    // Send email notification
+                    $emailTitle = "Your Educational Assistance Distribution Schedule";
+                    $emailMessage = "Hello " . htmlspecialchars($student_info['first_name']) . ",\n\n";
+                    $emailMessage .= "Your distribution schedule has been finalized." . $scheduleDetails;
+                    $emailMessage .= "\nIf you have any questions, please contact the administrator.\n\n";
+                    $emailMessage .= "Thank you,\nEducAid Team";
+                    
+                    // Send notification (will email if preferences allow)
+                    createStudentNotification(
+                        $connection,
+                        $studentId,
+                        $emailTitle,
+                        $emailMessage,
+                        'schedule',
+                        'high',
+                        'student_homepage.php',
+                        false
+                    );
                 }
                 // Render schedule section - Modern Design
                 echo "<section class='modern-schedule-section section-spacing'>";

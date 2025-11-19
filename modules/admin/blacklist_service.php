@@ -76,8 +76,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         }
         
-        // Validate inputs
-        $validReasons = ['fraudulent_activity', 'academic_misconduct', 'system_abuse', 'other'];
+        // Validate inputs - include all valid reason categories
+        $validReasons = ['fraudulent_activity', 'academic_misconduct', 'system_abuse', 'duplicate', 'other'];
         if (!in_array($reason_category, $validReasons)) {
             echo json_encode(['status' => 'error', 'message' => 'Invalid reason category']);
             exit;

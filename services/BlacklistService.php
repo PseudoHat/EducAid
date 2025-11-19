@@ -280,6 +280,7 @@ class BlacklistService {
             self::REASON_ACADEMIC_MISCONDUCT,
             self::REASON_SYSTEM_ABUSE,
             self::REASON_DUPLICATE_ACCOUNT,
+            'duplicate', // Alias for duplicate_account (form compatibility)
             self::REASON_OTHER
         ]);
     }
