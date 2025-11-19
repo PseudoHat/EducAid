@@ -14,8 +14,16 @@ $is_ajax_post = $_SERVER['REQUEST_METHOD'] === 'POST' &&
 
 // For AJAX requests, catch any fatal errors and return JSON
 if ($is_ajax_request || $is_ajax_post) {
-    // Set up error handler to catch any PHP errors and return JSON
+    // Set up error handler to catch PHP warnings/notices gracefully for AJAX
     set_error_handler(function($errno, $errstr, $errfile, $errline) {
+        // Treat minor levels as non-fatal: log and continue
+        $nonFatal = [E_NOTICE, E_USER_NOTICE, E_WARNING, E_USER_WARNING, E_DEPRECATED, E_USER_DEPRECATED, E_STRICT];
+        if (in_array($errno, $nonFatal, true)) {
+            error_log("AJAX non-fatal: $errstr in " . basename($errfile) . ":$errline (errno=$errno)");
+            // Return true to indicate the error was handled and prevent output
+            return true;
+        }
+        // For anything else (recoverable, etc.), return JSON 500
         http_response_code(500);
         header('Content-Type: application/json');
         echo json_encode([
@@ -412,6 +420,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_year_level']))
         // Prevent concurrent in-progress duplicate
         if (!empty($_SESSION['year_update_guard']['in_progress'])
             && ($now - $_SESSION['year_update_guard']['in_progress']) < 20) {
+            http_response_code(200);
             echo json_encode([
                 'success' => false,
                 'message' => 'Update already in progress. Please wait a moment...'
@@ -419,6 +428,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_year_level']))
             exit;
         }
         $_SESSION['year_update_guard']['in_progress'] = $now;
+        // Guarantee cleanup of the in-progress lock even on fatal/exit
+        register_shutdown_function(function(){
+            if (isset($_SESSION['year_update_guard']['in_progress'])) {
+                unset($_SESSION['year_update_guard']['in_progress']);
+            }
+        });
 
         // Password update for migrated students (optional - only required if provided or if completing profile for first time)
         $new_password = isset($_POST['new_password']) ? trim($_POST['new_password']) : null;
@@ -3534,6 +3549,8 @@ $page_title = 'Upload Documents';
         document.addEventListener('DOMContentLoaded', function() {
             const form = document.getElementById('yearLevelUpdateForm');
             if (form) {
+                if (form.dataset.listenerAttached === '1') { return; }
+                form.dataset.listenerAttached = '1';
                 form.addEventListener('submit', async function(e) {
                     e.preventDefault();
                     const statusEl = document.getElementById('yearUpdateStatus');
@@ -3583,12 +3600,7 @@ $page_title = 'Upload Documents';
                             body: formData
                         });
                         
-                        // Check if response is OK
-                        if (!response.ok) {
-                            throw new Error(`Server returned ${response.status}: ${response.statusText}`);
-                        }
-                        
-                        // Try to parse JSON
+                        // Try to parse JSON regardless of status (server ensures JSON)
                         const text = await response.text();
                         console.log('Raw response:', text);
                         
@@ -3599,6 +3611,10 @@ $page_title = 'Upload Documents';
                             console.error('JSON parse error:', jsonError);
                             console.error('Response text:', text);
                             throw new Error('Server returned invalid response.');
+                        }
+                        // If HTTP not OK but JSON provided, surface message gracefully
+                        if (!response.ok && result && typeof result === 'object') {
+                            throw new Error(result.message || `Server returned ${response.status}`);
                         }
                         
                         if (result.success) {
