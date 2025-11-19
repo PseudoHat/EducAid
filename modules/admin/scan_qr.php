@@ -880,6 +880,21 @@ $settingsPath = __DIR__ . '/../../data/municipal_settings.json';
 $settings = file_exists($settingsPath) ? json_decode(file_get_contents($settingsPath), true) : [];
 $distribution_location = $settings['schedule_meta']['location'] ?? '';
 
+// Fallback: derive location from schedules table if JSON metadata missing or blank
+if (empty($distribution_location)) {
+  $loc_query = pg_query($connection, "SELECT location FROM schedules WHERE location IS NOT NULL AND location <> '' ORDER BY schedule_id DESC LIMIT 1");
+  if ($loc_query && pg_num_rows($loc_query) > 0) {
+    $loc_row = pg_fetch_assoc($loc_query);
+    if (!empty($loc_row['location'])) {
+      $distribution_location = $loc_row['location'];
+    }
+  }
+}
+
+// If still empty allow manual input (remove readonly later in the form rendering)
+// We expose a flag so the input can be editable only when no source value is found
+$allow_manual_location_entry = empty($distribution_location);
+
 $csrf_lookup_token = CSRFProtection::generateToken('lookup_qr');
 $csrf_confirm_token = CSRFProtection::generateToken('confirm_distribution');
 $csrf_complete_token = CSRFProtection::generateToken('complete_distribution');
@@ -1856,11 +1871,21 @@ $csrf_complete_token = CSRFProtection::generateToken('complete_distribution');
             <div class="mb-3">
               <label for="distribution_location" class="form-label fw-bold">
                 <i class="bi bi-geo-alt me-1"></i>Distribution Location *
-                <i class="bi bi-lock text-muted ms-1" title="Locked from settings"></i>
+                <?php if (!$allow_manual_location_entry): ?>
+                  <i class="bi bi-lock text-muted ms-1" title="Locked from settings"></i>
+                <?php else: ?>
+                  <span class="badge bg-info-subtle text-info align-middle ms-1" title="Manual entry enabled">Manual</span>
+                <?php endif; ?>
               </label>
-              <input type="text" class="form-control" id="distribution_location" name="distribution_location" 
-                     value="<?php echo htmlspecialchars($distribution_location); ?>" readonly required>
-              <small class="text-muted">Location is set in Municipal Settings</small>
+              <input type="text" class="form-control" id="distribution_location" name="distribution_location"
+                     value="<?php echo htmlspecialchars($distribution_location); ?>"
+                     <?php echo !$allow_manual_location_entry ? 'readonly' : ''; ?>
+                     placeholder="<?php echo $allow_manual_location_entry ? 'Enter distribution location (e.g., City Hall Grounds)' : ''; ?>" required>
+              <?php if ($allow_manual_location_entry): ?>
+                <small class="text-muted">No stored location found in settings or schedules. Please enter one.</small>
+              <?php else: ?>
+                <small class="text-muted">Location sourced from Municipal Settings / Schedule metadata</small>
+              <?php endif; ?>
             </div>
 
             <div class="row">
