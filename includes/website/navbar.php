@@ -167,10 +167,32 @@ if ($navbar_is_super_admin && isset($connection)) {
                     $navbar_municipality_logo = $base_path . $encoded;
                 }
                 
-                // Add cache-busting timestamp to force browser refresh
+                // Add cache-busting with file modification time (only updates when file changes)
                 if ($navbar_municipality_logo && !preg_match('#^data:image#i', $navbar_municipality_logo)) {
+                    // Build absolute file path to check modification time
+                    $absolutePath = null;
+                    if (strpos($navbar_municipality_logo, 'http') === 0) {
+                        // External URL - use current timestamp as fallback
+                        $cacheKey = time();
+                    } else {
+                        // Local file - determine document root relative path
+                        $docRoot = $_SERVER['DOCUMENT_ROOT'];
+                        // Remove base_path prefix to get document root relative path
+                        $cleanPath = $logo_path;
+                        if (str_starts_with($cleanPath, 'assets/')) {
+                            $absolutePath = $docRoot . '/' . $cleanPath;
+                        } elseif (str_starts_with($cleanPath, '/')) {
+                            $absolutePath = $docRoot . $cleanPath;
+                        } else {
+                            $absolutePath = $docRoot . '/assets/' . $cleanPath;
+                        }
+                        
+                        // Use file modification time if file exists, otherwise use a static version
+                        $cacheKey = file_exists($absolutePath) ? filemtime($absolutePath) : '1';
+                    }
+                    
                     $separator = (strpos($navbar_municipality_logo, '?') !== false) ? '&' : '?';
-                    $navbar_municipality_logo .= $separator . 't=' . time();
+                    $navbar_municipality_logo .= $separator . 'v=' . $cacheKey;
                 }
             }
             pg_free_result($muni_result);

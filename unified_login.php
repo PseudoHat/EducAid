@@ -51,8 +51,11 @@ if (isset($connection)) {
             $logo_path = trim($muni_data['active_logo']);
             // Remove leading slash if present to make it relative to root
             $municipality_logo = ltrim($logo_path, '/');
-            // Add cache-busting timestamp
-            $municipality_logo .= '?t=' . time();
+            
+            // Add cache-busting with file modification time (only updates when file changes)
+            $absolutePath = $_SERVER['DOCUMENT_ROOT'] . '/' . $municipality_logo;
+            $cacheKey = file_exists($absolutePath) ? filemtime($absolutePath) : '1';
+            $municipality_logo .= '?v=' . $cacheKey;
         }
         pg_free_result($muni_result);
     }

@@ -41,6 +41,7 @@ $confirm = isset($_GET['confirm']) && $_GET['confirm'] === 'YES_DELETE_ALL';
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Railway Data Cleanup - EducAid</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -230,6 +231,55 @@ $confirm = isset($_GET['confirm']) && $_GET['confirm'] === 'YES_DELETE_ALL';
             background: #ffc107;
             color: #333;
         }
+        
+        /* Modal Styles */
+        .modal-backdrop {
+            background-color: rgba(0, 0, 0, 0.8);
+        }
+        .confirmation-modal {
+            background: white;
+            border-radius: 15px;
+            max-width: 600px;
+            margin: 50px auto;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+        }
+        .modal-header-danger {
+            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 15px 15px 0 0;
+        }
+        .modal-body-content {
+            padding: 30px;
+        }
+        .modal-footer-actions {
+            padding: 20px 30px;
+            background: #f8f9fa;
+            border-radius: 0 0 15px 15px;
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+        .checkbox-confirm {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 15px 0;
+            padding: 15px;
+            background: #fff3cd;
+            border-radius: 8px;
+            border: 2px solid #ffc107;
+        }
+        .checkbox-confirm input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+        .checkbox-confirm label {
+            margin: 0;
+            cursor: pointer;
+            font-weight: 600;
+        }
     </style>
 </head>
 <body>
@@ -376,17 +426,14 @@ if (!$confirm) {
         if ($isRailway) {
             echo '<li>⚠️ This will affect your LIVE Railway database</li>';
         }
-        echo '<li>Add <code>?confirm=YES_DELETE_ALL</code> to the URL</li>';
+        echo '<li>All user configurations will be reset to defaults</li>';
         echo '</ol>';
         
-        echo '<p style="margin-bottom: 10px;"><strong>URL to execute deletion:</strong></p>';
-        $currentUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http") . "://$_SERVER[HTTP_HOST]$_SERVER[REQUEST_URI]";
-        $deleteUrl = $currentUrl . '?confirm=YES_DELETE_ALL';
-        echo '<div class="code" style="word-break: break-all;">' . htmlspecialchars($deleteUrl) . '</div>';
-        
-        echo '<p style="margin-top: 20px; font-size: 0.9em; color: #721c24;">';
-        echo '<strong>⚠️ Copy the URL above and paste it in your browser to execute the deletion.</strong>';
-        echo '</p>';
+        echo '<div style="text-align: center; margin-top: 30px;">';
+        echo '<button type="button" class="btn btn-danger" onclick="showConfirmModal()" style="font-size: 1.2em; padding: 15px 40px;">';
+        echo '<span class="icon">🗑️</span> Proceed with Deletion';
+        echo '</button>';
+        echo '</div>';
         echo '</div>';
     }
     
@@ -509,6 +556,46 @@ if (!$confirm) {
                 'name' => 'Delete Signup Slots',
                 'query' => 'DELETE FROM signup_slots',
                 'description' => 'Remove all signup slot records (must be deleted after students)'
+            ],
+            [
+                'name' => 'Reset Theme Settings to Defaults',
+                'query' => "UPDATE theme_settings SET 
+                    topbar_email = 'educaid@generaltrias.gov.ph',
+                    topbar_phone = '(046) 886-4454',
+                    topbar_office_hours = 'Mon-Fri 8:00 AM - 5:00 PM',
+                    topbar_bg_color = '#1565c0',
+                    topbar_bg_gradient = '#0d47a1',
+                    topbar_text_color = '#ffffff',
+                    topbar_link_color = '#e3f2fd',
+                    header_bg_color = '#ffffff',
+                    header_border_color = '#e0e0e0',
+                    header_text_color = '#333333',
+                    header_icon_color = '#666666',
+                    header_hover_bg = '#f5f5f5',
+                    header_hover_icon_color = '#1976d2'
+                    WHERE municipality_id = 1",
+                'description' => 'Reset all theme customizations to default values'
+            ],
+            [
+                'name' => 'Clear Admin Notification Preferences',
+                'query' => "UPDATE admins SET 
+                    notification_student_approved = TRUE,
+                    notification_student_rejected = TRUE,
+                    notification_document_uploaded = TRUE,
+                    notification_new_application = TRUE,
+                    notification_system_alert = TRUE
+                    WHERE municipality_id = 1",
+                'description' => 'Reset admin notification preferences to all enabled'
+            ],
+            [
+                'name' => 'Clear CMS Content Customizations',
+                'query' => "DELETE FROM landing_content_blocks WHERE municipality_id = 1",
+                'description' => 'Remove all custom CMS content edits for landing page'
+            ],
+            [
+                'name' => 'Clear Login Page Customizations',
+                'query' => "DELETE FROM login_content_blocks WHERE municipality_id = 1",
+                'description' => 'Remove all custom CMS content edits for login page'
             ]
         ];
         
@@ -623,5 +710,100 @@ if (!$confirm) {
 ?>
         </div>
     </div>
+    
+    <!-- Confirmation Modal -->
+    <div class="modal fade" id="confirmModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="confirmation-modal">
+                <div class="modal-header-danger">
+                    <h2 style="margin: 0; font-size: 1.8em;">⚠️ FINAL CONFIRMATION</h2>
+                    <p style="margin: 10px 0 0 0; opacity: 0.95;">This action CANNOT be undone!</p>
+                </div>
+                <div class="modal-body-content">
+                    <div style="background: #fff3cd; padding: 20px; border-radius: 8px; border: 2px solid #ffc107; margin-bottom: 20px;">
+                        <h4 style="color: #856404; margin-bottom: 10px;">⚠️ What will be deleted:</h4>
+                        <ul style="margin: 10px 0 10px 20px; color: #856404;">
+                            <li><strong>All student data</strong> (accounts, documents, notifications)</li>
+                            <li><strong>All distribution records</strong> (snapshots, history)</li>
+                            <li><strong>All user configurations</strong> (theme settings, CMS content)</li>
+                            <li><strong>All schedules and slots</strong></li>
+                        </ul>
+                    </div>
+                    
+                    <div class="checkbox-confirm">
+                        <input type="checkbox" id="confirmCheckbox1" onchange="validateConfirmation()">
+                        <label for="confirmCheckbox1">I understand this will permanently delete ALL student data</label>
+                    </div>
+                    
+                    <div class="checkbox-confirm">
+                        <input type="checkbox" id="confirmCheckbox2" onchange="validateConfirmation()">
+                        <label for="confirmCheckbox2">I understand this will reset ALL user configurations</label>
+                    </div>
+                    
+                    <div class="checkbox-confirm">
+                        <input type="checkbox" id="confirmCheckbox3" onchange="validateConfirmation()">
+                        <label for="confirmCheckbox3">I have a backup (if needed) and accept the risk</label>
+                    </div>
+                    
+                    <div style="margin-top: 20px; padding: 15px; background: #f8d7da; border-radius: 8px; border: 2px solid #dc3545;">
+                        <p style="margin: 0; color: #721c24; font-weight: bold; font-size: 1.1em; text-align: center;">
+                            ⚠️ THIS ACTION CANNOT BE REVERSED ⚠️
+                        </p>
+                    </div>
+                </div>
+                <div class="modal-footer-actions">
+                    <button type="button" class="btn btn-secondary" onclick="hideConfirmModal()" style="padding: 10px 25px;">
+                        Cancel
+                    </button>
+                    <button type="button" id="confirmDeleteBtn" class="btn btn-danger" disabled onclick="executeDelete()" style="padding: 10px 25px;">
+                        <strong>🗑️ DELETE ALL DATA</strong>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let confirmModal = null;
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            confirmModal = new bootstrap.Modal(document.getElementById('confirmModal'));
+        });
+        
+        function showConfirmModal() {
+            // Reset checkboxes
+            document.getElementById('confirmCheckbox1').checked = false;
+            document.getElementById('confirmCheckbox2').checked = false;
+            document.getElementById('confirmCheckbox3').checked = false;
+            document.getElementById('confirmDeleteBtn').disabled = true;
+            
+            confirmModal.show();
+        }
+        
+        function hideConfirmModal() {
+            confirmModal.hide();
+        }
+        
+        function validateConfirmation() {
+            const checkbox1 = document.getElementById('confirmCheckbox1').checked;
+            const checkbox2 = document.getElementById('confirmCheckbox2').checked;
+            const checkbox3 = document.getElementById('confirmCheckbox3').checked;
+            
+            const confirmBtn = document.getElementById('confirmDeleteBtn');
+            confirmBtn.disabled = !(checkbox1 && checkbox2 && checkbox3);
+        }
+        
+        function executeDelete() {
+            // Double confirmation
+            if (!confirm('FINAL WARNING: Are you absolutely sure? This will permanently delete ALL data and reset ALL configurations!')) {
+                return;
+            }
+            
+            // Redirect to execution URL
+            const currentUrl = window.location.href.split('?')[0];
+            window.location.href = currentUrl + '?confirm=YES_DELETE_ALL';
+        }
+    </script>
 </body>
 </html>
