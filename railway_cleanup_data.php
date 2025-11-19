@@ -282,7 +282,8 @@ if (!$confirm) {
         'documents' => 0,
         'distribution_records' => 0,
         'student_snapshots' => 0,
-        'distribution_snapshots' => 0
+        'distribution_snapshots' => 0,
+        'schedules' => 0
     ];
     
     // Count records
@@ -294,6 +295,7 @@ if (!$confirm) {
         'distribution_records' => "SELECT COUNT(*) as count FROM distribution_student_records",
         'student_snapshots' => "SELECT COUNT(*) as count FROM distribution_student_snapshot",
         'distribution_snapshots' => "SELECT COUNT(*) as count FROM distribution_snapshots",
+        'schedules' => "SELECT COUNT(*) as count FROM schedules",
         'signup_slots' => "SELECT COUNT(*) as count FROM signup_slots"
     ];
     
@@ -326,6 +328,11 @@ if (!$confirm) {
     echo '<div class="stat-label">Documents</div>';
     echo '</div>';
     
+    echo '<div class="stat-box">';
+    echo '<div class="stat-number">' . $stats['schedules'] . '</div>';
+    echo '<div class="stat-label">Schedules</div>';
+    echo '</div>';
+
     echo '<div class="stat-box">';
     echo '<div class="stat-number">' . $stats['distribution_records'] . '</div>';
     echo '<div class="stat-label">Distribution Records</div>';
@@ -494,6 +501,11 @@ if (!$confirm) {
                 'description' => 'Remove all student account records'
             ],
             [
+                'name' => 'Delete Schedules',
+                'query' => 'DELETE FROM schedules',
+                'description' => 'Remove all schedule records'
+            ],
+            [
                 'name' => 'Delete Signup Slots',
                 'query' => 'DELETE FROM signup_slots',
                 'description' => 'Remove all signup slot records (must be deleted after students)'
@@ -556,6 +568,32 @@ if (!$confirm) {
             }
         }
         
+        echo '</div>';
+
+        // Reset municipal_settings.json (schedule flags)
+        echo '<div class="section">';
+        echo '<h3><span class="icon">🧹</span>Reset Municipal Settings (Schedule)</h3>';
+        $settingsPath = __DIR__ . '/data/municipal_settings.json';
+        $settings = [];
+        $settingsExists = file_exists($settingsPath);
+        if ($settingsExists) {
+            $decoded = json_decode(@file_get_contents($settingsPath), true);
+            if (is_array($decoded)) { $settings = $decoded; }
+        }
+        $settings['schedule_published'] = false;
+        if (isset($settings['schedule_meta'])) { unset($settings['schedule_meta']); }
+        $encoded = json_encode($settings, JSON_PRETTY_PRINT);
+        if ($encoded !== false && @file_put_contents($settingsPath, $encoded) !== false) {
+            echo '<div class="step">';
+            echo '<div class="step-title"><span class="success">✓</span> Municipal settings updated</div>';
+            echo '<div class="step-content">Schedule flags reset (schedule_published=false, schedule_meta removed) in <code>data/municipal_settings.json</code>.</div>';
+            echo '</div>';
+        } else {
+            echo '<div class="step error">';
+            echo '<div class="step-title"><span class="error">✗</span> Failed to update municipal settings</div>';
+            echo '<div class="step-content">Could not write to <code>data/municipal_settings.json</code>. Check file permissions and path.</div>';
+            echo '</div>';
+        }
         echo '</div>';
         
         // Success summary
