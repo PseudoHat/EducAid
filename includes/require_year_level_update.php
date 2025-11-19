@@ -34,8 +34,8 @@ if (!isset($connection)) {
 
 $studentId = $_SESSION['student_id'];
 
-// Get student's year level status and migration status
-$student_info_query = "SELECT current_year_level, is_graduating, status_academic_year, admin_review_required, university_id, mothers_maiden_name, school_student_id FROM students WHERE student_id = $1";
+// Get student's year level status and migration/reupload flags
+$student_info_query = "SELECT current_year_level, is_graduating, status_academic_year, admin_review_required, university_id, mothers_maiden_name, school_student_id, needs_upload FROM students WHERE student_id = $1";
 $student_info_result = pg_query_params($connection, $student_info_query, [$studentId]);
 $student_info = pg_fetch_assoc($student_info_result);
 
@@ -72,16 +72,23 @@ if (!$current_academic_year) {
     }
 }
 
-// Check if student needs to update their year level credentials
-// They need to update if:
-// 1. They are a migrated student who hasn't completed their profile (PRIORITY), OR
-// 2. They don't have year level data at all, OR
-// 3. There's an active distribution and their status_academic_year doesn't match the current one
-$needs_year_level_update = $needs_migrated_profile_completion ||
-                           empty($student_info['current_year_level']) || 
-                           empty($student_info['status_academic_year']) || 
-                           $student_info['is_graduating'] === null ||
-                           ($current_academic_year && $student_info['status_academic_year'] !== $current_academic_year);
+// Refined gating to avoid forcing brand-new registrants
+// Determine reupload vs new registrant context
+$needs_upload_flag = ($student_info['needs_upload'] === 't' || $student_info['needs_upload'] === true || $student_info['needs_upload'] === '1');
+$has_prior_year_confirmation = !empty($student_info['status_academic_year']);
+$year_changed = $current_academic_year && $has_prior_year_confirmation && $student_info['status_academic_year'] !== $current_academic_year;
+$credentials_incomplete_after_confirmation = $has_prior_year_confirmation && ($student_info['is_graduating'] === null || empty($student_info['current_year_level']));
+$is_reupload_context = $needs_upload_flag && !$is_migrated;
+
+// Only force on:
+// - Migrated profile completion (priority), OR
+// - Reupload context with AY change OR incomplete credentials AFTER prior confirmation
+$needs_year_level_update = false;
+if ($needs_migrated_profile_completion) {
+    $needs_year_level_update = true;
+} elseif ($is_reupload_context && ($year_changed || $credentials_incomplete_after_confirmation)) {
+    $needs_year_level_update = true;
+}
 
 // If they need to update, redirect to upload_document.php
 // The modal will automatically appear there
