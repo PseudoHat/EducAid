@@ -146,7 +146,7 @@ function initiateBlacklist() {
     sendBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Sending...';
     sendBtn.disabled = true;
     
-    fetch('blacklist_service.php', {
+    fetch('../../modules/admin/blacklist_service.php', {
         method: 'POST',
         body: formData
     })
@@ -228,7 +228,7 @@ function completeBlacklist() {
     confirmBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Processing...';
     confirmBtn.disabled = true;
     
-    fetch('blacklist_service.php', {
+    fetch('../../modules/admin/blacklist_service.php', {
         method: 'POST',
         body: formData
     })
