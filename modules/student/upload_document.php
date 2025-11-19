@@ -199,6 +199,29 @@ $has_year_level_credentials = !empty($student['current_year_level']) &&
                                !empty($student['status_academic_year']) &&
                                $student['is_graduating'] !== null;
 
+// PostgreSQL returns 'f'/'t' strings for booleans.
+// Guard against missing column/key (e.g., older schema without needs_upload) to prevent warnings.
+$needs_upload = isset($student['needs_upload']) && (
+    $student['needs_upload'] === 't' ||
+    $student['needs_upload'] === true ||
+    $student['needs_upload'] === 1 ||
+    $student['needs_upload'] === '1' ||
+    $student['needs_upload'] === 'true'
+);
+$student_status = $student['status'] ?? 'applicant';
+
+// IMPORTANT: Migrated students ALWAYS need to upload documents (treat them like re-upload mode)
+// Note: $is_migrated is already defined near the top of the file
+if ($is_migrated) {
+    $needs_upload = true;
+}
+
+// TESTING MODE: Allow re-upload if ?test_reupload=1 is in URL (REMOVE IN PRODUCTION)
+$test_mode = isset($_GET['test_reupload']) && $_GET['test_reupload'] == '1';
+if ($test_mode) {
+    $needs_upload = true;
+}
+
 // Determine reupload vs new registrant context
 $is_reupload_context = $needs_upload && !$is_migrated; // Migrated uses separate profile modal
 $has_prior_year_confirmation = !empty($student['status_academic_year']);
@@ -237,28 +260,7 @@ if ($needs_university_selection) {
     }
 }
 
-// PostgreSQL returns 'f'/'t' strings for booleans.
-// Guard against missing column/key (e.g., older schema without needs_upload) to prevent warnings.
-$needs_upload = isset($student['needs_upload']) && (
-    $student['needs_upload'] === 't' ||
-    $student['needs_upload'] === true ||
-    $student['needs_upload'] === 1 ||
-    $student['needs_upload'] === '1' ||
-    $student['needs_upload'] === 'true'
-);
-$student_status = $student['status'] ?? 'applicant';
-
-// IMPORTANT: Migrated students ALWAYS need to upload documents (treat them like re-upload mode)
-// Note: $is_migrated is already defined near the top of the file
-if ($is_migrated) {
-    $needs_upload = true;
-}
-
-// TESTING MODE: Allow re-upload if ?test_reupload=1 is in URL (REMOVE IN PRODUCTION)
-$test_mode = isset($_GET['test_reupload']) && $_GET['test_reupload'] == '1';
-if ($test_mode) {
-    $needs_upload = true;
-}
+// (moved needs_upload computation above to prevent undefined variable usage)
 
 // Only allow uploads if:
 // 1. Student needs upload (needs_document_upload = true OR is migrated) AND
@@ -2346,10 +2348,12 @@ $page_title = 'Upload Documents';
 </head>
 <body>
     <!-- Student Topbar -->
+    <style>
         /* Modal overlay stacking fix */
         .modal { z-index: 1065; }
         .modal-backdrop { z-index: 1060; }
         .sidebar-backdrop { z-index: 1040; }
+    </style>
     <?php include __DIR__ . '/../../includes/student/student_topbar.php'; ?>
     
     <div id="wrapper" style="padding-top: var(--topbar-h, 60px);">

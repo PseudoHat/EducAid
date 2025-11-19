@@ -5,7 +5,7 @@
 
 class DistributionMonitor {
     constructor() {
-        this.pollInterval = 15000; // Check every 15 seconds
+        this.pollInterval = 60000; // Check every 60 seconds (1 minute)
         this.lastStatus = null;
         this.lastTimestamp = null;
         this.intervalId = null;
