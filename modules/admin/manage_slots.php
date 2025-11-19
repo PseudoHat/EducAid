@@ -498,6 +498,104 @@ if ($totalSlotsQuery) {
       word-break: break-word;
     }
   }
+  
+  /* Toast Notifications - Bottom Right Corner */
+  .toast-container {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 9999;
+    max-width: 400px;
+  }
+  
+  .toast-notification {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+    padding: 16px 20px;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    animation: slideInRight 0.3s ease-out;
+    border-left: 4px solid #28a745;
+  }
+  
+  .toast-notification.toast-error {
+    border-left-color: #dc3545;
+  }
+  
+  .toast-notification.toast-warning {
+    border-left-color: #ffc107;
+  }
+  
+  .toast-notification.toast-info {
+    border-left-color: #0dcaf0;
+  }
+  
+  .toast-icon {
+    font-size: 24px;
+    flex-shrink: 0;
+  }
+  
+  .toast-content {
+    flex: 1;
+    font-size: 14px;
+    color: #333;
+  }
+  
+  .toast-close {
+    background: transparent;
+    border: none;
+    font-size: 20px;
+    color: #999;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+    transition: color 0.2s;
+  }
+  
+  .toast-close:hover {
+    color: #333;
+  }
+  
+  @keyframes slideInRight {
+    from {
+      transform: translateX(400px);
+      opacity: 0;
+    }
+    to {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+  
+  @keyframes slideOutRight {
+    from {
+      transform: translateX(0);
+      opacity: 1;
+    }
+    to {
+      transform: translateX(400px);
+      opacity: 0;
+    }
+  }
+  
+  .toast-notification.hiding {
+    animation: slideOutRight 0.3s ease-out forwards;
+  }
+  
+  @media (max-width: 576px) {
+    .toast-container {
+      right: 10px;
+      left: 10px;
+      max-width: none;
+    }
+    
+    .toast-notification {
+      padding: 14px 16px;
+    }
+  }
 </style>
 </head>
 <body>
@@ -1478,5 +1576,58 @@ if ($totalSlotsQuery) {
     });
   });
 </script>
+
+<!-- Toast Container -->
+<div class="toast-container" id="toastContainer"></div>
+
+<?php if (isset($toast_message)): ?>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    showToast(<?php echo json_encode($toast_message); ?>, <?php echo json_encode($toast_type); ?>);
+});
+
+function showToast(message, type = 'success') {
+    const container = document.getElementById('toastContainer');
+    
+    const icons = {
+        success: '✓',
+        error: '✕',
+        warning: '⚠',
+        info: 'ℹ'
+    };
+    
+    const toast = document.createElement('div');
+    toast.className = `toast-notification toast-${type}`;
+    toast.innerHTML = `
+        <div class="toast-icon">${icons[type] || icons.success}</div>
+        <div class="toast-content">${message}</div>
+        <button class="toast-close" onclick="closeToast(this)">&times;</button>
+    `;
+    
+    container.appendChild(toast);
+    
+    // Auto-dismiss after 5 seconds
+    setTimeout(() => {
+        closeToast(toast.querySelector('.toast-close'));
+    }, 5000);
+    
+    // Clean up URL parameters
+    const url = new URL(window.location);
+    url.searchParams.delete('status');
+    url.searchParams.delete('error');
+    url.searchParams.delete('count');
+    window.history.replaceState({}, '', url);
+}
+
+function closeToast(button) {
+    const toast = button.closest('.toast-notification');
+    toast.classList.add('hiding');
+    setTimeout(() => {
+        toast.remove();
+    }, 300);
+}
+</script>
+<?php endif; ?>
+
 </body>
 </html>

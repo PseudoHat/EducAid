@@ -1007,13 +1007,14 @@ $yearLevels = pg_fetch_all(pg_query($connection, "SELECT year_level_id, name FRO
                     </div>
                 </div>
 
-                <?php if (isset($_SESSION['success_message'])): ?>
-                    <div class="alert alert-success alert-dismissible fade show" role="alert">
-                        <?php echo htmlspecialchars($_SESSION['success_message']); ?>
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                    </div>
-                    <?php unset($_SESSION['success_message']); ?>
-                <?php endif; ?>
+                <?php 
+                // Store success message for toast
+                $toast_message = null;
+                if (isset($_SESSION['success_message'])) {
+                    $toast_message = $_SESSION['success_message'];
+                    unset($_SESSION['success_message']);
+                }
+                ?>
 
                 <!-- Filters Section -->
                 <div class="filter-section">
@@ -1136,7 +1137,7 @@ $yearLevels = pg_fetch_all(pg_query($connection, "SELECT year_level_id, name FRO
                     </div>
                 <?php else: ?>
                     <!-- Results Table -->
-                    <div class="table-responsive">
+                    <div class="table-scroll-container">
                         <table class="table table-hover mb-0">
                             <thead>
                                 <tr>
@@ -2212,6 +2213,52 @@ $yearLevels = pg_fetch_all(pg_query($connection, "SELECT year_level_id, name FRO
 
     <!-- Include Blacklist Modal -->
     <?php include __DIR__ . '/../../includes/admin/blacklist_modal.php'; ?>
+    
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+    
+    <?php if (isset($toast_message)): ?>
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        showToast(<?php echo json_encode($toast_message); ?>);
+    });
+    
+    function showToast(message, type = 'success') {
+        const container = document.getElementById('toastContainer');
+        
+        const icons = {
+            success: '\u2713',
+            error: '\u2715',
+            warning: '\u26a0',
+            info: '\u2139'
+        };
+        
+        const toast = document.createElement('div');
+        toast.className = `toast-notification toast-${type}`;
+        toast.innerHTML = `
+            <div class="toast-icon">${icons[type] || icons.success}</div>
+            <div class="toast-content">${message}</div>
+            <button class="toast-close" onclick="closeToast(this)">&times;</button>
+        `;
+        
+        container.appendChild(toast);
+        
+        // Auto-dismiss after 5 seconds
+        setTimeout(() => {
+            closeToast(toast.querySelector('.toast-close'));
+        }, 5000);
+    }
+    
+    function closeToast(button) {
+        const toast = button.closest('.toast-notification');
+        toast.classList.add('hiding');
+        setTimeout(() => {
+            toast.remove();
+        }, 300);
+    }
+    </script>
+    <?php endif; ?>
+    
 </body>
 </html>
 
