@@ -69,6 +69,9 @@ class BlacklistService {
             }
             
             // Update student status to blacklisted
+            // Truncate archive_reason to prevent text field overflow
+            $archiveReason = substr("Blacklisted: {$reason_category} - {$detailed_reason}", 0, 500);
+            
             $updateStudent = pg_query_params($this->connection,
                 "UPDATE students 
                  SET status = 'blacklisted',
@@ -80,13 +83,20 @@ class BlacklistService {
                  WHERE student_id = $3",
                 [
                     $admin_id,
-                    "Blacklisted: {$reason_category} - {$detailed_reason}",
+                    $archiveReason,
                     $student_id
                 ]
             );
             
-            if (!$updateStudent || pg_affected_rows($updateStudent) === 0) {
-                throw new Exception("Failed to update student status");
+            if (!$updateStudent) {
+                $dbError = pg_last_error($this->connection);
+                error_log("BlacklistService: UPDATE failed - " . $dbError);
+                throw new Exception("Failed to update student status: " . $dbError);
+            }
+            
+            if (pg_affected_rows($updateStudent) === 0) {
+                error_log("BlacklistService: No rows affected for student_id: {$student_id}");
+                throw new Exception("Student not found or already blacklisted");
             }
             
             // Insert into blacklisted_students table
