@@ -62,19 +62,25 @@ if (!$admin) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
     
+    // Debug logging BEFORE CSRF check
+    error_log("=== BLACKLIST SERVICE REQUEST ===");
+    error_log("Request Method: " . $_SERVER['REQUEST_METHOD']);
+    error_log("Action received: " . $action);
+    error_log("Student ID: " . ($_POST['student_id'] ?? 'NOT SET'));
+    error_log("Reason category: " . ($_POST['reason_category'] ?? 'NOT SET'));
+    error_log("Session admin_id: " . ($_SESSION['admin_id'] ?? 'NOT SET'));
+    error_log("Session admin_username: " . ($_SESSION['admin_username'] ?? 'NOT SET'));
+    error_log("================================");
+    
     // CSRF Protection - validate token for all POST actions
     $csrfToken = $_POST['csrf_token'] ?? '';
     if (!CSRFProtection::validateToken('blacklist_operation', $csrfToken, false)) {
+        error_log("BLACKLIST SERVICE: CSRF validation failed");
         echo json_encode(['status' => 'error', 'message' => 'Invalid security token. Please refresh the page.']);
         exit;
     }
     
-    // Debug logging
-    error_log("=== BLACKLIST SERVICE DEBUG ===");
-    error_log("Action received: " . $action);
-    error_log("POST data: " . print_r($_POST, true));
-    error_log("Session admin_id: " . ($_SESSION['admin_id'] ?? 'NOT SET'));
-    error_log("============================");
+    error_log("BLACKLIST SERVICE: CSRF validation passed");
     
     // Step 1: Initiate blacklist process - verify password and send OTP
     if ($action === 'initiate_blacklist') {
@@ -341,11 +347,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 echo json_encode(['status' => 'error', 'message' => 'Invalid request']);
 
 } catch (Exception $e) {
-    // Log the error but don't expose internal details
-    error_log("Blacklist service error: " . $e->getMessage());
+    // Log the error with full details
+    error_log("=== BLACKLIST SERVICE ERROR ===");
+    error_log("Error Message: " . $e->getMessage());
+    error_log("Error File: " . $e->getFile() . " on line " . $e->getLine());
     error_log("Stack trace: " . $e->getTraceAsString());
+    error_log("POST data: " . print_r($_POST, true));
+    error_log("Session data: " . print_r($_SESSION, true));
+    error_log("==============================");
     
     echo json_encode(['status' => 'error', 'message' => 'System error: ' . $e->getMessage()]);
+} catch (Error $e) {
+    // Catch PHP 7+ fatal errors
+    error_log("=== BLACKLIST SERVICE FATAL ERROR ===");
+    error_log("Error Message: " . $e->getMessage());
+    error_log("Error File: " . $e->getFile() . " on line " . $e->getLine());
+    error_log("Stack trace: " . $e->getTraceAsString());
+    error_log("=====================================");
+    
+    echo json_encode(['status' => 'error', 'message' => 'Fatal error: ' . $e->getMessage()]);
 }
 
 // Ensure clean exit
