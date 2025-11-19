@@ -7,6 +7,10 @@
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
+// Load PHPMailer namespace at the top
+require_once '../../phpmailer/vendor/autoload.php';
+use PHPMailer\PHPMailer\PHPMailer;
+
 echo "=== Blacklist Service Diagnostic ===\n\n";
 
 echo "1. Testing database connection...\n";
@@ -52,8 +56,6 @@ try {
 
 echo "5. Testing PHPMailer...\n";
 try {
-    require_once '../../phpmailer/vendor/autoload.php';
-    use PHPMailer\PHPMailer\PHPMailer;
     $testMail = new PHPMailer(true);
     echo "   ✓ PHPMailer loaded OK\n\n";
 } catch (Exception $e) {
