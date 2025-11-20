@@ -1135,7 +1135,7 @@ function render_table($applicants, $connection) {
                         </button>
                         <?php if ($_SESSION['admin_role'] === 'super_admin'): ?>
                         <button class="btn btn-warning btn-sm ms-1" 
-                                onclick="showArchiveModal('<?= $student_id ?>', '<?= htmlspecialchars($applicant['first_name'] . ' ' . $applicant['last_name'], ENT_QUOTES) ?>')"
+                                onclick="showArchiveModal('<?= $student_id ?>', '<?= htmlspecialchars($applicant['first_name'] . ' ' . $applicant['last_name'], ENT_QUOTES) ?>', event)"
                                 title="Archive Student">
                             <i class="bi bi-archive"></i>
                         </button>
@@ -1143,7 +1143,7 @@ function render_table($applicants, $connection) {
                                 onclick="showBlacklistModal('<?= $student_id ?>', '<?= htmlspecialchars($applicant['first_name'] . ' ' . $applicant['last_name'], ENT_QUOTES) ?>', '<?= htmlspecialchars($applicant['email'], ENT_QUOTES) ?>', {
                                     barangay: '<?= htmlspecialchars($applicant['barangay'] ?? 'N/A', ENT_QUOTES) ?>',
                                     status: 'Applicant'
-                                })"
+                                }, event)"
                                 title="Blacklist Student">
                             <i class="bi bi-shield-exclamation"></i>
                         </button>
@@ -1208,7 +1208,7 @@ function render_table($applicants, $connection) {
                                 <?php if ($_SESSION['admin_role'] === 'super_admin'): ?>
                                 <div class="ms-auto">
                                     <button class="btn btn-outline-warning btn-sm me-2" 
-                                            onclick="showArchiveModal('<?= $student_id ?>', '<?= htmlspecialchars($applicant['first_name'] . ' ' . $applicant['last_name'], ENT_QUOTES) ?>')"
+                                            onclick="showArchiveModal('<?= $student_id ?>', '<?= htmlspecialchars($applicant['first_name'] . ' ' . $applicant['last_name'], ENT_QUOTES) ?>', event)"
                                             data-bs-dismiss="modal">
                                         <i class="bi bi-archive me-1"></i> Archive Student
                                     </button>
@@ -1216,7 +1216,7 @@ function render_table($applicants, $connection) {
                                             onclick="showBlacklistModal('<?= $student_id ?>', '<?= htmlspecialchars($applicant['first_name'] . ' ' . $applicant['last_name'], ENT_QUOTES) ?>', '<?= htmlspecialchars($applicant['email'], ENT_QUOTES) ?>', {
                                                 barangay: '<?= htmlspecialchars($applicant['barangay'] ?? 'N/A', ENT_QUOTES) ?>',
                                                 status: 'Applicant'
-                                            })"
+                                            }, event)"
                                             data-bs-dismiss="modal">
                                         <i class="bi bi-shield-exclamation me-1"></i> Blacklist Student
                                     </button>
@@ -2364,7 +2364,7 @@ if ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '' === 'XMLHttpRequest' || (isset($_GET
 
 <!-- Archive Student Modal -->
 <div class="modal fade" id="archiveModal" tabindex="-1" aria-labelledby="archiveModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-fullscreen-sm-down">
         <div class="modal-content">
             <div class="modal-header bg-warning">
                 <h5 class="modal-title" id="archiveModalLabel">
@@ -2743,7 +2743,7 @@ if ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '' === 'XMLHttpRequest' || (isset($_GET
 
 <!-- Password Confirmation Modal -->
 <div class="modal fade" id="passwordConfirmModal" tabindex="-1" aria-labelledby="passwordConfirmModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-sm">
+    <div class="modal-dialog modal-dialog-centered modal-fullscreen-sm-down">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="passwordConfirmModalLabel"><i class="bi bi-shield-lock me-2"></i>Confirm Password</h5>
@@ -3967,6 +3967,77 @@ document.addEventListener('DOMContentLoaded', function() {
     background-color: #7c3aed !important;
 }
 
+/* Archive Modal Responsive Design */
+@media (min-width: 768px) {
+    #archiveModal .modal-dialog {
+        max-width: 600px;
+    }
+}
+
+@media (max-width: 767.98px) {
+    #archiveModal .modal-body {
+        padding: 1rem;
+    }
+    
+    #archiveModal .form-control,
+    #archiveModal .form-select,
+    #archiveModal textarea {
+        font-size: 16px; /* Prevent zoom on iOS */
+    }
+    
+    #archiveModal .modal-footer {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    
+    #archiveModal .modal-footer .btn {
+        width: 100%;
+    }
+    
+    #archiveModal .alert {
+        font-size: 0.9rem;
+        padding: 0.75rem;
+    }
+    
+    #archiveModal .alert ul {
+        padding-left: 1.25rem;
+    }
+}
+
+/* Password Confirmation Modal - Wider on Desktop */
+@media (min-width: 768px) {
+    #passwordConfirmModal .modal-dialog {
+        max-width: 500px;
+    }
+}
+
+@media (max-width: 767.98px) {
+    #passwordConfirmModal .modal-body {
+        padding: 1rem;
+    }
+    
+    #passwordConfirmModal .form-control {
+        font-size: 16px; /* Prevent zoom on iOS */
+    }
+    
+    #passwordConfirmModal .modal-footer {
+        flex-direction: column-reverse;
+        gap: 0.5rem;
+    }
+    
+    #passwordConfirmModal .modal-footer .btn {
+        width: 100%;
+    }
+}
+
+/* Tablet specific adjustments */
+@media (min-width: 768px) and (max-width: 991.98px) {
+    #archiveModal .modal-dialog,
+    #passwordConfirmModal .modal-dialog {
+        max-width: 85%;
+    }
+}
+
 /* ------------------ Mobile Responsiveness Enhancements ------------------ */
 @media (max-width: 575.98px) {
     .modal-dialog { margin: 8px auto; }
@@ -4564,10 +4635,35 @@ function closeDocumentViewer() {
 }
 
 // Archive Student Modal and Functions
-function showArchiveModal(studentId, studentName) {
+let archiveModalLock = false;
+function showArchiveModal(studentId, studentName, event) {
+    // Get the button that triggered this
+    const btn = event?.target?.closest('button');
+    
+    // Prevent double-click opening multiple modals
+    if (archiveModalLock) {
+        console.log('Archive modal already opening, ignoring duplicate call');
+        return;
+    }
+    archiveModalLock = true;
+    
+    // Disable the button temporarily
+    if (btn) {
+        btn.disabled = true;
+        const originalHTML = btn.innerHTML;
+        btn.innerHTML = '<i class="bi bi-hourglass-split"></i>';
+        
+        // Re-enable after delay
+        setTimeout(() => {
+            btn.disabled = false;
+            btn.innerHTML = originalHTML;
+        }, 1000);
+    }
+    
     const modal = document.getElementById('archiveModal');
     if (!modal) {
         console.error('Archive modal element not found');
+        archiveModalLock = false;
         return;
     }
 
@@ -4585,6 +4681,16 @@ function showArchiveModal(studentId, studentName) {
 
     const bsModal = bootstrap.Modal.getOrCreateInstance(modal);
     bsModal.show();
+    
+    // Release lock after modal is shown
+    setTimeout(() => {
+        archiveModalLock = false;
+    }, 500);
+    
+    // Also release lock when modal is closed
+    modal.addEventListener('hidden.bs.modal', function() {
+        archiveModalLock = false;
+    }, { once: true });
 }
 
 function handleArchiveReasonChange() {
@@ -4608,10 +4714,17 @@ function handleArchiveReasonChange() {
 // Handle archive form submission with confirmation dialog
 document.addEventListener('DOMContentLoaded', function() {
     const archiveForm = document.getElementById('archiveForm');
+    let archiveFormSubmitting = false;
 
     if (archiveForm) {
         archiveForm.addEventListener('submit', function(e) {
             e.preventDefault();
+
+            // Prevent double submission
+            if (archiveFormSubmitting) {
+                console.log('Archive form already submitting, ignoring duplicate submission');
+                return;
+            }
 
             // Validate reason selection
             const reasonSelect = document.getElementById('archiveReason');
@@ -4634,10 +4747,31 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // Show confirmation dialog
             if (confirm(`⚠️ CONFIRM ARCHIVE\n\nStudent: ${studentName}\nReason: ${reason}\n\nThis will:\n• Deactivate the student account\n• Compress all documents to ZIP\n• Prevent student login\n• Move student to archived list\n\nAre you sure you want to proceed?`)) {
+                // Disable submit button to prevent double clicks
+                archiveFormSubmitting = true;
+                const submitBtn = document.getElementById('confirmArchiveBtn');
+                if (submitBtn) {
+                    submitBtn.disabled = true;
+                    submitBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Processing...';
+                }
+                
                 // Submit the form
                 archiveForm.submit();
             }
         });
+        
+        // Reset flag when modal is hidden
+        const archiveModal = document.getElementById('archiveModal');
+        if (archiveModal) {
+            archiveModal.addEventListener('hidden.bs.modal', function() {
+                archiveFormSubmitting = false;
+                const submitBtn = document.getElementById('confirmArchiveBtn');
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '<i class="bi bi-archive me-1"></i> Archive Student';
+                }
+            });
+        }
     }
 });
 

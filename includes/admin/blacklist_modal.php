@@ -1,6 +1,6 @@
 <!-- Blacklist Modal -->
 <div class="modal fade" id="blacklistModal" tabindex="-1" aria-labelledby="blacklistModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable modal-fullscreen-sm-down">
         <div class="modal-content">
             <div class="modal-header bg-danger text-white">
                 <h5 class="modal-title" id="blacklistModalLabel">
@@ -69,8 +69,32 @@
 
 <script>
 let currentBlacklistStudent = null;
+let blacklistModalLock = false;
 
-function showBlacklistModal(studentId, studentName, studentEmail, additionalInfo = {}) {
+function showBlacklistModal(studentId, studentName, studentEmail, additionalInfo = {}, event) {
+    // Get the button that triggered this
+    const btn = event?.target?.closest('button');
+    
+    // Prevent double-click opening multiple modals
+    if (blacklistModalLock) {
+        console.log('Blacklist modal already opening, ignoring duplicate call');
+        return;
+    }
+    blacklistModalLock = true;
+    
+    // Disable the button temporarily
+    if (btn) {
+        btn.disabled = true;
+        const originalHTML = btn.innerHTML;
+        btn.innerHTML = '<i class="bi bi-hourglass-split"></i>';
+        
+        // Re-enable after delay
+        setTimeout(() => {
+            btn.disabled = false;
+            btn.innerHTML = originalHTML;
+        }, 1000);
+    }
+    
     currentBlacklistStudent = {
         id: studentId,
         name: studentName,
@@ -113,7 +137,19 @@ function showBlacklistModal(studentId, studentName, studentEmail, additionalInfo
     document.getElementById('studentInfo').innerHTML = studentInfoHtml;
     
     // Show modal
-    new bootstrap.Modal(document.getElementById('blacklistModal')).show();
+    const blacklistModalEl = document.getElementById('blacklistModal');
+    const blacklistModalInstance = new bootstrap.Modal(blacklistModalEl);
+    blacklistModalInstance.show();
+    
+    // Release lock after modal is shown
+    setTimeout(() => {
+        blacklistModalLock = false;
+    }, 500);
+    
+    // Also release lock when modal is closed
+    blacklistModalEl.addEventListener('hidden.bs.modal', function() {
+        blacklistModalLock = false;
+    }, { once: true });
     
     // Prevent form submission
     const form = document.getElementById('blacklistForm');
@@ -123,7 +159,15 @@ function showBlacklistModal(studentId, studentName, studentEmail, additionalInfo
     };
 }
 
+let initiateBlacklistInProgress = false;
+
 function initiateBlacklist() {
+    // Prevent double submission
+    if (initiateBlacklistInProgress) {
+        console.log('Blacklist initiation already in progress');
+        return;
+    }
+    
     const formData = new FormData(document.getElementById('blacklistForm'));
     formData.append('action', 'initiate_blacklist');
     
@@ -139,6 +183,9 @@ function initiateBlacklist() {
         alert('Please enter your admin password.');
         return;
     }
+    
+    // Set flag to prevent double clicks
+    initiateBlacklistInProgress = true;
     
     // Show loading state
     const sendBtn = document.getElementById('sendOtpBtn');
@@ -189,6 +236,7 @@ function initiateBlacklist() {
             showAlert('danger', data.message || 'Unknown error occurred');
             sendBtn.innerHTML = originalText;
             sendBtn.disabled = false;
+            initiateBlacklistInProgress = false;
         }
     })
     .catch(error => {
@@ -196,10 +244,19 @@ function initiateBlacklist() {
         showAlert('danger', 'Network error: ' + error.message);
         sendBtn.innerHTML = originalText;
         sendBtn.disabled = false;
+        initiateBlacklistInProgress = false;
     });
 }
 
+let completeBlacklistInProgress = false;
+
 function completeBlacklist() {
+    // Prevent double submission
+    if (completeBlacklistInProgress) {
+        console.log('Blacklist completion already in progress');
+        return;
+    }
+    
     const otp = document.getElementById('blacklist_otp').value;
     
     if (!otp || otp.length !== 6) {
@@ -210,6 +267,9 @@ function completeBlacklist() {
     if (!confirm(`FINAL CONFIRMATION: This will permanently blacklist ${currentBlacklistStudent.name}. This action cannot be undone. Continue?`)) {
         return;
     }
+    
+    // Set flag to prevent double clicks
+    completeBlacklistInProgress = true;
     
     // Get CSRF token from the form
     const csrfToken = document.querySelector('#blacklistForm input[name="csrf_token"]').value;
@@ -267,6 +327,7 @@ function completeBlacklist() {
             showAlert('danger', data.message || 'Unknown error occurred');
             confirmBtn.innerHTML = originalText;
             confirmBtn.disabled = false;
+            completeBlacklistInProgress = false;
         }
     })
     .catch(error => {
@@ -274,6 +335,7 @@ function completeBlacklist() {
         showAlert('danger', 'Network error: ' + error.message);
         confirmBtn.innerHTML = originalText;
         confirmBtn.disabled = false;
+        completeBlacklistInProgress = false;
     });
 }
 
@@ -326,5 +388,33 @@ function showAlert(type, message) {
     background: linear-gradient(45deg, #c82333, #bd2130);
     transform: translateY(-1px);
     box-shadow: 0 4px 8px rgba(220, 53, 69, 0.3);
+}
+
+/* Mobile and Tablet Optimizations */
+@media (max-width: 767.98px) {
+    #blacklistModal .modal-body {
+        padding: 1rem;
+    }
+    
+    #blacklistModal .form-control,
+    #blacklistModal .form-select {
+        font-size: 16px; /* Prevent zoom on iOS */
+    }
+    
+    #blacklistModal .modal-footer {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    
+    #blacklistModal .modal-footer .btn {
+        width: 100%;
+    }
+}
+
+/* Tablet specific adjustments */
+@media (min-width: 768px) and (max-width: 991.98px) {
+    #blacklistModal .modal-dialog {
+        max-width: 90%;
+    }
 }
 </style>
