@@ -51,9 +51,9 @@ function ensureBarangayExists($connection, $municipalityId) {
 function upsertStudent($connection, $payload) {
     $sql = "INSERT INTO students (
                 student_id, first_name, last_name, email, mobile, sex, bdate, password,
-                municipality_id, barangay_id, status, current_year_level, 
-                first_registered_academic_year, current_academic_year, is_graduating
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+                municipality_id, barangay_id, university_id, year_level_id, status, current_year_level, 
+                first_registered_academic_year, current_academic_year, is_graduating, course
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
             ON CONFLICT (student_id) DO UPDATE SET
                 first_name = EXCLUDED.first_name,
                 last_name = EXCLUDED.last_name,
@@ -64,11 +64,14 @@ function upsertStudent($connection, $payload) {
                 password = EXCLUDED.password,
                 municipality_id = EXCLUDED.municipality_id,
                 barangay_id = EXCLUDED.barangay_id,
+                university_id = EXCLUDED.university_id,
+                year_level_id = EXCLUDED.year_level_id,
                 status = EXCLUDED.status,
                 current_year_level = EXCLUDED.current_year_level,
                 first_registered_academic_year = EXCLUDED.first_registered_academic_year,
                 current_academic_year = EXCLUDED.current_academic_year,
-                is_graduating = EXCLUDED.is_graduating";
+                is_graduating = EXCLUDED.is_graduating,
+                course = EXCLUDED.course";
 
     $params = [
         $payload['student_id'],
@@ -81,11 +84,14 @@ function upsertStudent($connection, $payload) {
         $payload['password_hash'],
         $payload['municipality_id'],
         $payload['barangay_id'],
+        $payload['university_id'] ?? 1,
+        $payload['year_level_id'] ?? 2, // Default to year_level_id 2 (typically "2nd Year")
         $payload['status'],
         $payload['current_year_level'] ?? '2nd Year',
         $payload['first_registered_academic_year'] ?? '2024-2025',
         $payload['current_academic_year'] ?? '2025-2026',
         isset($payload['is_graduating']) ? ($payload['is_graduating'] ? 'true' : 'false') : 'false',
+        $payload['course'] ?? 'Demo Course',
     ];
 
     $res = pg_query_params($connection, $sql, $params);
@@ -117,11 +123,14 @@ try {
             'password_hash' => hashPwd('Password123!'),
             'municipality_id' => 1,
             'barangay_id' => $barangayId,
+            'university_id' => 1,
+            'year_level_id' => 2, // 2nd Year
             'status' => 'under_registration',
             'current_year_level' => '2nd Year',
             'first_registered_academic_year' => '2024-2025',
             'current_academic_year' => '2025-2026',
             'is_graduating' => false,
+            'course' => 'Bachelor of Science in Computer Science',
         ],
         [
             'student_id' => 'DEMO-APP-0001',
@@ -134,11 +143,14 @@ try {
             'password_hash' => hashPwd('Password123!'),
             'municipality_id' => 1,
             'barangay_id' => $barangayId,
+            'university_id' => 1,
+            'year_level_id' => 3, // 3rd Year
             'status' => 'applicant',
             'current_year_level' => '3rd Year',
             'first_registered_academic_year' => '2023-2024',
             'current_academic_year' => '2025-2026',
             'is_graduating' => false,
+            'course' => 'Bachelor of Science in Information Technology',
         ],
         [
             'student_id' => 'DEMO-APP-0002',
@@ -151,11 +163,14 @@ try {
             'password_hash' => hashPwd('Password123!'),
             'municipality_id' => 1,
             'barangay_id' => $barangayId,
+            'university_id' => 1,
+            'year_level_id' => 4, // 4th Year
             'status' => 'applicant',
             'current_year_level' => '4th Year',
             'first_registered_academic_year' => '2022-2023',
             'current_academic_year' => '2025-2026',
             'is_graduating' => false,
+            'course' => 'Bachelor of Science in Nursing',
         ],
     ];
 
