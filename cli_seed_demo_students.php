@@ -51,8 +51,9 @@ function ensureBarangayExists($connection, $municipalityId) {
 function upsertStudent($connection, $payload) {
     $sql = "INSERT INTO students (
                 student_id, first_name, last_name, email, mobile, sex, bdate, password,
-                municipality_id, barangay_id, status
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+                municipality_id, barangay_id, status, current_year_level, 
+                first_registered_academic_year, current_academic_year, is_graduating
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
             ON CONFLICT (student_id) DO UPDATE SET
                 first_name = EXCLUDED.first_name,
                 last_name = EXCLUDED.last_name,
@@ -63,7 +64,11 @@ function upsertStudent($connection, $payload) {
                 password = EXCLUDED.password,
                 municipality_id = EXCLUDED.municipality_id,
                 barangay_id = EXCLUDED.barangay_id,
-                status = EXCLUDED.status";
+                status = EXCLUDED.status,
+                current_year_level = EXCLUDED.current_year_level,
+                first_registered_academic_year = EXCLUDED.first_registered_academic_year,
+                current_academic_year = EXCLUDED.current_academic_year,
+                is_graduating = EXCLUDED.is_graduating";
 
     $params = [
         $payload['student_id'],
@@ -77,6 +82,10 @@ function upsertStudent($connection, $payload) {
         $payload['municipality_id'],
         $payload['barangay_id'],
         $payload['status'],
+        $payload['current_year_level'] ?? '2nd Year',
+        $payload['first_registered_academic_year'] ?? '2024-2025',
+        $payload['current_academic_year'] ?? '2025-2026',
+        isset($payload['is_graduating']) ? ($payload['is_graduating'] ? 'true' : 'false') : 'false',
     ];
 
     $res = pg_query_params($connection, $sql, $params);
@@ -109,6 +118,10 @@ try {
             'municipality_id' => 1,
             'barangay_id' => $barangayId,
             'status' => 'under_registration',
+            'current_year_level' => '2nd Year',
+            'first_registered_academic_year' => '2024-2025',
+            'current_academic_year' => '2025-2026',
+            'is_graduating' => false,
         ],
         [
             'student_id' => 'DEMO-APP-0001',
@@ -122,6 +135,10 @@ try {
             'municipality_id' => 1,
             'barangay_id' => $barangayId,
             'status' => 'applicant',
+            'current_year_level' => '3rd Year',
+            'first_registered_academic_year' => '2023-2024',
+            'current_academic_year' => '2025-2026',
+            'is_graduating' => false,
         ],
         [
             'student_id' => 'DEMO-APP-0002',
@@ -135,6 +152,10 @@ try {
             'municipality_id' => 1,
             'barangay_id' => $barangayId,
             'status' => 'applicant',
+            'current_year_level' => '4th Year',
+            'first_registered_academic_year' => '2022-2023',
+            'current_academic_year' => '2025-2026',
+            'is_graduating' => false,
         ],
     ];
 
