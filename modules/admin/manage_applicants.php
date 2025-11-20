@@ -1012,20 +1012,74 @@ $perPage = 10;
 $offset = ($page - 1) * $perPage;
 $sort = $_GET['sort'] ?? $_POST['sort'] ?? 'asc';
 $search = trim($_GET['search_surname'] ?? $_POST['search_surname'] ?? '');
+$filterYearLevel = $_GET['filter_year_level'] ?? $_POST['filter_year_level'] ?? '';
+$filterDocStatus = $_GET['filter_doc_status'] ?? $_POST['filter_doc_status'] ?? '';
+$filterType = $_GET['filter_type'] ?? $_POST['filter_type'] ?? '';
+$filterBeneficiary = $_GET['filter_beneficiary'] ?? $_POST['filter_beneficiary'] ?? '';
 
 // Exclude archived students from applicants list
-$where = "status = 'applicant' AND (is_archived = FALSE OR is_archived IS NULL)";
+$where = "s.status = 'applicant' AND (s.is_archived = FALSE OR s.is_archived IS NULL)";
 $params = [];
+$paramCount = 0;
+
 if ($search) {
-    $where .= " AND last_name ILIKE $1";
+    $paramCount++;
+    $where .= " AND s.last_name ILIKE $" . $paramCount;
     $params[] = "%$search%";
 }
-$countQuery = "SELECT COUNT(*) FROM students WHERE $where";
+
+if ($filterYearLevel) {
+    $paramCount++;
+    $where .= " AND s.current_year_level = $" . $paramCount;
+    $params[] = $filterYearLevel;
+}
+
+if ($filterType) {
+    if ($filterType === 'new') {
+        $where .= " AND (s.admin_review_required IS NULL OR s.admin_review_required = FALSE) AND (s.needs_document_upload IS NULL OR s.needs_document_upload = FALSE)";
+    } elseif ($filterType === 'migrated') {
+        $where .= " AND s.admin_review_required = TRUE";
+    } elseif ($filterType === 're-upload') {
+        $where .= " AND s.needs_document_upload = TRUE AND (s.admin_review_required IS NULL OR s.admin_review_required = FALSE)";
+    }
+}
+
+if ($filterBeneficiary === 'yes') {
+    $where .= " AND EXISTS (SELECT 1 FROM distribution_student_records dsr WHERE dsr.student_id = s.student_id)";
+} elseif ($filterBeneficiary === 'no') {
+    $where .= " AND NOT EXISTS (SELECT 1 FROM distribution_student_records dsr WHERE dsr.student_id = s.student_id)";
+}
+
+$countQuery = "SELECT COUNT(*) FROM students s WHERE $where";
 $totalApplicants = pg_fetch_assoc(pg_query_params($connection, $countQuery, $params))['count'];
 $totalPages = max(1, ceil($totalApplicants / $perPage));
 
-$query = "SELECT * FROM students WHERE $where ORDER BY last_name " . ($sort === 'desc' ? 'DESC' : 'ASC') . " LIMIT $perPage OFFSET $offset";
-$applicants = $params ? pg_query_params($connection, $query, $params) : pg_query($connection, $query);
+$query = "SELECT s.*, 
+    (SELECT COUNT(*) FROM distribution_student_records dsr WHERE dsr.student_id = s.student_id) as distribution_count
+    FROM students s WHERE $where ORDER BY s.last_name " . ($sort === 'desc' ? 'DESC' : 'ASC') . " LIMIT $perPage OFFSET $offset";
+$applicantsResult = $params ? pg_query_params($connection, $query, $params) : pg_query($connection, $query);
+
+// Apply document completion filter client-side (since it requires checking file system)
+$filteredApplicants = [];
+while ($row = pg_fetch_assoc($applicantsResult)) {
+    $isComplete = check_documents($connection, $row['student_id']);
+    
+    // Apply document status filter
+    if ($filterDocStatus === 'complete' && !$isComplete) {
+        continue;
+    } elseif ($filterDocStatus === 'incomplete' && $isComplete) {
+        continue;
+    }
+    
+    $filteredApplicants[] = $row;
+}
+
+// Recalculate pagination for filtered results
+if ($filterDocStatus) {
+    $totalApplicants = count($filteredApplicants);
+    $totalPages = max(1, ceil($totalApplicants / $perPage));
+    $filteredApplicants = array_slice($filteredApplicants, $offset, $perPage);
+}
 
 // Table rendering function with live preview
 function render_table($applicants, $connection) {
@@ -1042,15 +1096,16 @@ function render_table($applicants, $connection) {
                 <th>Year Level</th>
                 <th>Graduating</th>
                 <th>Type</th>
+                <th>Past Beneficiary</th>
                 <th>Documents</th>
                 <th>Action</th>
             </tr>
         </thead>
         <tbody id="applicantsTableBody">
-        <?php if (pg_num_rows($applicants) === 0): ?>
-            <tr><td colspan="8" class="text-center no-applicants">No applicants found.</td></tr>
+        <?php if (empty($applicants)): ?>
+            <tr><td colspan="9" class="text-center no-applicants">No applicants found.</td></tr>
         <?php else: ?>
-            <?php while ($applicant = pg_fetch_assoc($applicants)) {
+            <?php foreach ($applicants as $applicant) {
                 $student_id = $applicant['student_id'];
                 $isComplete = check_documents($connection, $student_id);
                 
@@ -1123,6 +1178,19 @@ function render_table($applicants, $connection) {
                         <span class="badge <?= $type_color ?> text-white" title="<?= $tooltip ?>">
                             <i class="bi bi-<?= $type_icon ?>"></i> <?= $type_label ?>
                         </span>
+                    </td>
+                    <td data-label="Past Beneficiary">
+                        <?php 
+                        $distribution_count = intval($applicant['distribution_count'] ?? 0);
+                        if ($distribution_count > 0): ?>
+                            <span class="badge bg-success" title="Received aid <?= $distribution_count ?> time<?= $distribution_count > 1 ? 's' : '' ?>">
+                                <i class="bi bi-check-circle-fill"></i> Yes (<?= $distribution_count ?>x)
+                            </span>
+                        <?php else: ?>
+                            <span class="badge bg-secondary">
+                                <i class="bi bi-x-circle"></i> First Time
+                            </span>
+                        <?php endif; ?>
                     </td>
                     <td data-label="Documents">
                         <span class="badge <?= $isComplete ? 'badge-success' : 'badge-secondary' ?>">
@@ -2266,7 +2334,7 @@ if ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '' === 'XMLHttpRequest' || (isset($_GET
         </div>
     </div>
     <?php
-    echo render_table($applicants, $connection);
+    echo render_table($filteredApplicants, $connection);
     render_pagination($page, $totalPages);
     echo ob_get_clean();
     exit;
@@ -2327,22 +2395,57 @@ if ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '' === 'XMLHttpRequest' || (isset($_GET
             <!-- Filter Section - Clean style -->
             <div class="filter-section">
                 <form class="row g-3" id="filterForm" method="GET">
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <label class="form-label">Sort by Surname</label>
                         <select name="sort" class="form-select">
                             <option value="asc" <?= $sort === 'asc' ? 'selected' : '' ?>>A to Z</option>
                             <option value="desc" <?= $sort === 'desc' ? 'selected' : '' ?>>Z to A</option>
                         </select>
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <label class="form-label">Search by Surname</label>
                         <input type="text" name="search_surname" class="form-control" value="<?= htmlspecialchars($search) ?>" placeholder="Enter surname...">
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-2">
+                        <label class="form-label">Year Level</label>
+                        <select name="filter_year_level" class="form-select">
+                            <option value="">All Years</option>
+                            <option value="2nd Year" <?= $filterYearLevel === '2nd Year' ? 'selected' : '' ?>>2nd Year</option>
+                            <option value="3rd Year" <?= $filterYearLevel === '3rd Year' ? 'selected' : '' ?>>3rd Year</option>
+                            <option value="4th Year" <?= $filterYearLevel === '4th Year' ? 'selected' : '' ?>>4th Year</option>
+                            <option value="5th Year or Higher" <?= $filterYearLevel === '5th Year or Higher' ? 'selected' : '' ?>>5th Year+</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Documents</label>
+                        <select name="filter_doc_status" class="form-select" id="filterDocStatus">
+                            <option value="">All</option>
+                            <option value="complete" <?= $filterDocStatus === 'complete' ? 'selected' : '' ?>>Complete</option>
+                            <option value="incomplete" <?= $filterDocStatus === 'incomplete' ? 'selected' : '' ?>>Incomplete</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Type</label>
+                        <select name="filter_type" class="form-select">
+                            <option value="">All Types</option>
+                            <option value="new" <?= $filterType === 'new' ? 'selected' : '' ?>>New Registration</option>
+                            <option value="re-upload" <?= $filterType === 're-upload' ? 'selected' : '' ?>>Re-upload</option>
+                            <option value="migrated" <?= $filterType === 'migrated' ? 'selected' : '' ?>>Migrated</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Past Beneficiary</label>
+                        <select name="filter_beneficiary" class="form-select">
+                            <option value="">All Students</option>
+                            <option value="yes" <?= $filterBeneficiary === 'yes' ? 'selected' : '' ?>>Yes (Previous Recipient)</option>
+                            <option value="no" <?= $filterBeneficiary === 'no' ? 'selected' : '' ?>>No (First Time)</option>
+                        </select>
+                    </div>
+                    <div class="col-md-9">
                         <label class="form-label">&nbsp;</label>
                         <div class="d-flex gap-2">
-                            <button type="submit" class="btn btn-primary"><i class="bi bi-search me-1"></i> Filter</button>
-                            <button type="button" class="btn btn-outline-secondary" id="clearFiltersBtn">Clear</button>
+                            <button type="submit" class="btn btn-primary"><i class="bi bi-search me-1"></i> Apply Filters</button>
+                            <button type="button" class="btn btn-outline-secondary" id="clearFiltersBtn">Clear All</button>
                         </div>
                     </div>
                 </form>
@@ -2350,7 +2453,7 @@ if ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '' === 'XMLHttpRequest' || (isset($_GET
 
             <!-- Applicants Table -->
             <div class="table-responsive" id="tableWrapper">
-                <?= render_table($applicants, $connection) ?>
+                <?= render_table($filteredApplicants, $connection) ?>
             </div>
             <div id="pagination">
                 <?php render_pagination($page, $totalPages); ?>
