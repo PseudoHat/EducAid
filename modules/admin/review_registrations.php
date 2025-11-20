@@ -1137,8 +1137,8 @@ $yearLevels = pg_fetch_all(pg_query($connection, "SELECT year_level_id, name FRO
                     </div>
                 <?php else: ?>
                     <!-- Results Table -->
-                    <div class="table-scroll-container">
-                        <table class="table table-hover mb-0">
+                    <div class="table-responsive">
+                        <table class="table table-bordered align-middle">
                             <thead>
                                 <tr>
                                     <th width="40">
